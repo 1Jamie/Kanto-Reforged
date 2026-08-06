@@ -1,0 +1,20 @@
+{
+  "id": "expansion_pack",
+  "name": "Kanto Reforged",
+  "version": "1.0.0",
+  "api": 2,
+  "entry": "main.lua",
+  "profile": "content",
+  "category": "CONTENT",
+  "game_version": ">=0.0.0-dev <1.0.0",
+  "priority": 50,
+  "permissions": [
+    "engine_internals"
+  ],
+  "dependencies": [],
+  "optional_dependencies": [],
+  "conflicts": [],
+  "description": "Gen 2-3 Pokemon, moves, abilities & more.",
+  "github": "bryanthaboi/expansion_pack",
+  "affects_link": true
+}

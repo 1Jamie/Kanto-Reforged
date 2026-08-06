@@ -1,0 +1,35 @@
+# ---------------------------------------------------------------------------
+# Copyright-sensitive / third-party game art — never commit these.
+# Sprites & berry plot art are fetched by generate_pokemon_mod.py (PokeAPI /
+# pret sources). Include them in a local install zip after generating; do not
+# push to GitHub.
+# ---------------------------------------------------------------------------
+assets/
+map_previews/
+
+# Generated Python bytecode
+__pycache__/
+*.py[cod]
+*$py.class
+
+# ROMs, saves, patches, dumps (safety net — never ship these)
+*.gb
+*.gbc
+*.gba
+*.nds
+*.rom
+*.sav
+*.sgm
+*.rtc
+*.ips
+*.bps
+*.ups
+*.xdelta
+
+# OS / editor noise
+.DS_Store
+Thumbs.db
+*~
+.*.swp
+.idea/
+.vscode/

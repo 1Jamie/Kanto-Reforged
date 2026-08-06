@@ -1,0 +1,48 @@
+-- Sharing metadata (25-community-and-ecosystem.md 3.2).  Read by tooling
+-- and the manager detail pane; never by the loader's merge.
+return {
+  summary = "Kanto Reforged: Gen 2-3 Pokemon, moves, abilities, AI, and more.",
+  author = "Pokemon Gen 1 Recompilation Project",
+  contact = "https://github.com/bryanthaboi/gen1recomp",
+  tags = { "content", "pokemon", "gen2", "gen3", "abilities", "encounters", "items" },
+  differences = {
+    changed = {
+      "Kanto wild encounters mix in Gen 2–3 species by habitat and level",
+      "battle damage uses Gen 2–3 ability and move effect hooks",
+      "vanilla evolutions gain Gen 2–3 branches (e.g. Golbat→Crobat)",
+      "Kanto learnsets/TMs gain Gen 2–3 move backports (Metal Claw, Iron Tail, …)",
+    },
+    added = {
+      "235 Gen 2–3 species with sprites, learnsets, and abilities",
+      "custom types Dark / Steel / Fairy and their matchups",
+      "hundreds of Gen 2–3 moves and custom move effects",
+      "held items with party Give/Take (Leftovers, Focus Band, berries, type boosters)",
+      "gender on mons (Gen 2 Attack DV); Attract / Cute Charm use opposite-gender infatuation",
+      "Leftovers / Focus Band are one-time overworld finds (not sold)",
+      "smarter wild/trainer AI (prefers damage, skips moves that would fail)",
+      "curated Gen 2–3 mixes into gyms, Elite Four, rival, and some trainers",
+      "mod option: FULL SPAWN MIX (randomize whole tables from Gen 1–3)",
+      "mod option: XP SHARE (SLOT 2) (default on; 70% pool to fighters, ≤30% to party slot 2)",
+      "mod option: SMARTER AI (default on)",
+      "Viridian Rare Candy NPC; taking candy permanently enables story level caps",
+    },
+    known = {
+      "some Gen 4+ learnset leftovers remain registered",
+      "friendship / time / location evolutions are approximated",
+      "a few abilities and many move stubs are still unfinished",
+      "FULL SPAWN MIX rewrites encounter tables; change it before a long session",
+      "held items are expansion-pack only; wild held drops are berry-only (5%)",
+      "existing saves get gender backfilled from DVs on load (deterministic)",
+      "XP SHARE (SLOT 2) splits the Gen 1 XP pool (never inflates past ~100%); replaces EXP.ALL while enabled",
+      "trainer mixes are curated one-slot swaps, not full Gen 2/3 gym redesigns",
+      "level caps stay off until you take Rare Candies from the Viridian NPC",
+      "level caps follow Radical Red–style story milestones (Mt. Moon, Nugget Bridge, …)",
+      "Gen 2–3 TM-only damaging moves: up to 4 per Kanto mon land on learnsets at Lv30",
+    },
+  },
+  credits = {
+    { who = "PokeAPI", for_ = "species, moves, and habitat metadata" },
+    { who = "pret/pokered", for_ = "Gen 1 battle and encounter foundations" },
+  },
+  compat = { engine = ">=1.0.0 <2.0.0", modApi = 2 },
+}
