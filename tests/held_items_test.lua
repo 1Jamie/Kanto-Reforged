@@ -1,4 +1,4 @@
--- Held-item essentials / berry behavior (keeps expansion_pack_test under
+-- Held-item essentials / berry behavior (keeps Kanto-Reforged_test under
 -- LuaJIT's 200-local limit).
 return function(T, Data, HeldItems)
   local drains = 0

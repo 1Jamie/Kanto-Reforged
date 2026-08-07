@@ -2,7 +2,7 @@
 
 Gen 2 and 3 content for Red/Blue on this engine. Same Kanto story, more Pokemon, moves, abilities, held items, and some bag/party QoL so the extra stuff is easier to use. My goal here was not bolt on or make things feel weird, but if gamefreak were to do these pieces in gen1 how would they have done it? the features added are attempted to be done in a way to make them feel like they are part of gen 1 inspired by some of my favorite thing from different generations and rom hacks ive played. I tried my best in the import pipeline to make the gen2-3 look good and look like they blong in gen1 by scaling them, adjusting the pixel counts and following the color count rules and style constraints where i could. hopefully at the end of the day it looks like an almost "alternate history" version of gen1.
 
-Mod id is `expansion_pack`. Turn it on in the launcher Mods tab or the F10 manager.
+Mod id is `Kanto-Reforged`. Turn it on in the launcher Mods tab or the F10 manager.
 
 ## What it looks like
 

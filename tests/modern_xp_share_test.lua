@@ -5,7 +5,7 @@ return function(T, Data, run)
   local Pokemon = require("src.pokemon.Pokemon")
   local BattleState = require("src.battle.BattleState")
 
-  local schema = run.loader.optionSchemas.expansion_pack
+  local schema = run.loader.optionSchemas["Kanto-Reforged"]
   local modernOpt
   for _, opt in ipairs(schema or {}) do
     if opt.key == ModernXpShare.OPTION_KEY then modernOpt = opt break end
@@ -38,15 +38,15 @@ return function(T, Data, run)
 
   local saved = {}
   local function setOpt(key, value)
-    saved[key] = run.loader.modOptions.expansion_pack
-      and run.loader.modOptions.expansion_pack[key]
-    run.loader.modOptions.expansion_pack = run.loader.modOptions.expansion_pack or {}
-    run.loader.modOptions.expansion_pack[key] = value
+    saved[key] = run.loader.modOptions["Kanto-Reforged"]
+      and run.loader.modOptions["Kanto-Reforged"][key]
+    run.loader.modOptions["Kanto-Reforged"] = run.loader.modOptions["Kanto-Reforged"] or {}
+    run.loader.modOptions["Kanto-Reforged"][key] = value
   end
   local function restoreOpts()
-    run.loader.modOptions.expansion_pack = run.loader.modOptions.expansion_pack or {}
+    run.loader.modOptions["Kanto-Reforged"] = run.loader.modOptions["Kanto-Reforged"] or {}
     for k, v in pairs(saved) do
-      run.loader.modOptions.expansion_pack[k] = v
+      run.loader.modOptions["Kanto-Reforged"][k] = v
     end
   end
 

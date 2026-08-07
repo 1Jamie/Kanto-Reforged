@@ -2,7 +2,7 @@
 
 Numbers, locations, unlock gates, recipes. The short overview and install steps are in [README.md](README.md). The play-through style guide is [WALKTHROUGH.md](WALKTHROUGH.md).
 
-Mod id: `expansion_pack`. Enable it in the launcher Mods tab or the F10 manager. This mod sets `affects_link`, so both sides need matching mods for link play.
+Mod id: `Kanto-Reforged`. Enable it in the launcher Mods tab or the F10 manager. This mod sets `affects_link`, so both sides need matching mods for link play.
 
 ---
 
@@ -514,6 +514,6 @@ Legendary custom maps save return coordinates on enter and exit via warp hooks s
 | `roamers.lua` / `roaming_radar.lua` / `roamer_dex.lua` / `kanto_graph.lua` | Roamers |
 | `legend_shrines.lua` / `legend_regis.lua` / `legend_mythicals.lua` | Statics + custom maps |
 
-Tests live under `tests/` and are pulled in by `tests/expansion_pack_test.lua`.
+Tests live under `tests/` and are pulled in by `tests/Kanto-Reforged_test.lua`.
 
 Map PNG previews (optional QA): `map_previews/` via `render_map_previews.py`.

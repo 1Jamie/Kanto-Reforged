@@ -12,7 +12,7 @@ sys.path.insert(0, os.path.join(REPO, "tools"))
 
 import tiled_export as te  # noqa: E402
 
-OUT_DIR = os.path.join(REPO, "mods", "expansion_pack", "map_previews")
+OUT_DIR = os.path.join(REPO, "mods", "Kanto-Reforged", "map_previews")
 MAPS_JSON = os.path.join(OUT_DIR, "maps.json")
 BLOCK_PX = te.BLOCK_PX
 CELL_PX = te.CELL_PX

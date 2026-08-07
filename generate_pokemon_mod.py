@@ -643,7 +643,7 @@ def load_vanilla_moves(repo_root="."):
     return ids
 
 
-def load_expansion_move_powers(outdir="mods/Kanto-Reforged"):
+def load_kanto_reforged_move_powers(outdir="mods/Kanto-Reforged"):
     """Parse power for each Kanto Reforged move from pokemon_data.lua (0 = status)."""
     path = os.path.join(outdir, "pokemon_data.lua")
     powers = {}
@@ -681,7 +681,7 @@ def collect_kanto_move_patches(registered_moves, start=1, end=151, outdir="mods/
     no Gen 2 TM items and builds wild/trainer moves from learnsets alone.
     """
     vanilla_moves = load_vanilla_moves()
-    move_powers = load_expansion_move_powers(outdir)
+    move_powers = load_kanto_reforged_move_powers(outdir)
     learnset_patches = {}
     tmhm_patches = {}
     TM_LEARN_LEVEL = 30
@@ -1256,7 +1256,7 @@ def front_canvas_px(front_size):
     return front_size * 8
 
 
-def resprite_expansion_pack(outdir):
+def resprite_kanto_reforged(outdir):
     """Re-bake front sprites from the PokéAPI cache using height-based
     frontSize, and rewrite frontSize fields in pokemon_data.lua.
     Does not re-fetch species tables."""
@@ -1610,7 +1610,7 @@ def main():
         return
 
     if args.resprite:
-        resprite_expansion_pack(args.outdir)
+        resprite_kanto_reforged(args.outdir)
         return
 
     if args.ability_patches_only:

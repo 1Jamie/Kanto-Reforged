@@ -284,8 +284,8 @@ return function(T, Data, HeldItems, run)
   T.check(BerryFarm.plotReady(emptyMod, 5), "plot 5 still ready after ensureState")
 
   local Warp = require("src.world.Warp")
-  run.loader.modSave.expansion_pack = run.loader.modSave.expansion_pack or {}
-  run.loader.modSave.expansion_pack.returnCenter = {
+  run.loader.modSave["Kanto-Reforged"] = run.loader.modSave["Kanto-Reforged"] or {}
+  run.loader.modSave["Kanto-Reforged"].returnCenter = {
     map = "PEWTER_POKECENTER", x = 9, y = 7,
   }
   local exitWarp = {
@@ -319,7 +319,7 @@ return function(T, Data, HeldItems, run)
     "save.lastOutdoor stays the town after farm leave")
 
   -- Poisoned LAST_MAP → farm is repaired via savedOutdoor
-  run.loader.modSave.expansion_pack.savedOutdoor = {
+  run.loader.modSave["Kanto-Reforged"].savedOutdoor = {
     id = "VIRIDIAN_CITY", x = 23, y = 25,
   }
   local pcExit = Data.maps.VIRIDIAN_POKECENTER.warps[1]

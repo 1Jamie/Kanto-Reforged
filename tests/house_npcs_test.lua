@@ -87,8 +87,8 @@ return function(T, Data, run)
   T.eq(Data.maps.BIRTH_ISLAND_KANT.index, 1103, "Birth Island index 1103")
   T.check(talkOk("SKY_PILLAR_KANT", "TEXT_SKYPILLARKANT_RAYQUAZA"), "Rayquaza talk")
 
-  run.loader.modSave.expansion_pack = run.loader.modSave.expansion_pack or {}
-  run.loader.modSave.expansion_pack.legend_return_SKY_PILLAR_KANT = {
+  run.loader.modSave["Kanto-Reforged"] = run.loader.modSave["Kanto-Reforged"] or {}
+  run.loader.modSave["Kanto-Reforged"].legend_return_SKY_PILLAR_KANT = {
     map = "ROUTE_23", x = 10, y = 20,
   }
   local exitWarp = LegendMythicals.EXIT_WARPS[1]

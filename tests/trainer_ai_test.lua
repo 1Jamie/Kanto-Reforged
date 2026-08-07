@@ -4,7 +4,7 @@ return function(T, Data, run)
   local ExpTrainers = require("mods.Kanto-Reforged.trainers")
   local TrainerAI = require("src.battle.TrainerAI")
 
-  local schema = run.loader.optionSchemas.expansion_pack
+  local schema = run.loader.optionSchemas["Kanto-Reforged"]
   local smartOpt
   for _, opt in ipairs(schema or {}) do
     if opt.key == TrainerAi.OPTION_KEY then smartOpt = opt break end
@@ -189,9 +189,9 @@ return function(T, Data, run)
   end
 
   -- chooseMove with empty aiMods (wild-style) still uses EXP_SMART when on.
-  local savedOpts = run.loader.modOptions.expansion_pack
-  run.loader.modOptions.expansion_pack = run.loader.modOptions.expansion_pack or {}
-  run.loader.modOptions.expansion_pack[TrainerAi.OPTION_KEY] = true
+  local savedOpts = run.loader.modOptions["Kanto-Reforged"]
+  run.loader.modOptions["Kanto-Reforged"] = run.loader.modOptions["Kanto-Reforged"] or {}
+  run.loader.modOptions["Kanto-Reforged"][TrainerAi.OPTION_KEY] = true
 
   local mon = {
     curMoves = {
@@ -314,13 +314,13 @@ return function(T, Data, run)
   end
 
   -- Toggle off restores vanilla empty-mod random (rng returns 1 → GROWL).
-  run.loader.modOptions.expansion_pack[TrainerAi.OPTION_KEY] = false
+  run.loader.modOptions["Kanto-Reforged"][TrainerAi.OPTION_KEY] = false
   mon.aiLayer2 = 0
   battle.enemyAIMods = {}
   local vanillaPick = TrainerAI.chooseMove(mon, function() return 1 end, battle)
   T.eq(vanillaPick.id, "GROWL", "with smarter AI off, empty mods stay uniform-random")
 
-  run.loader.modOptions.expansion_pack[TrainerAi.OPTION_KEY] = true
+  run.loader.modOptions["Kanto-Reforged"][TrainerAi.OPTION_KEY] = true
 
   -- ------- Three-tier gate -------------------------------------------------
   local tactLayer = Data.ai_classes[TrainerAi.LAYER_TACTICAL]
@@ -670,7 +670,7 @@ return function(T, Data, run)
 
   -- Toggle off: elite and lite both stop injecting tactical layers.
   do
-    run.loader.modOptions.expansion_pack[TrainerAi.OPTION_KEY] = false
+    run.loader.modOptions["Kanto-Reforged"][TrainerAi.OPTION_KEY] = false
     local attacker = {
       curMoves = { { id = "GROWL", pp = 40 }, { id = "TACKLE", pp = 35 } },
       curTypes = { "NORMAL" },
@@ -706,10 +706,10 @@ return function(T, Data, run)
     T.eq(liteOff.id, "GROWL",
       "toggle off: lite gym Jr Trainer stays vanilla-random (no EXP_TACTICAL_LITE)")
 
-    run.loader.modOptions.expansion_pack[TrainerAi.OPTION_KEY] = true
+    run.loader.modOptions["Kanto-Reforged"][TrainerAi.OPTION_KEY] = true
   end
 
-  run.loader.modOptions.expansion_pack = savedOpts
+  run.loader.modOptions["Kanto-Reforged"] = savedOpts
 
   -- Trainer mixes landed on the live Data table.
   T.eq(Data.trainers.OPP_BROCK.parties[1][1].species, "ARON",

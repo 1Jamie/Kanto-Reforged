@@ -10,7 +10,7 @@ One important heads up before anything else: **static legendaries despawn if you
 
 ## Before you start
 
-1. Enable **Kanto Reforged** (`expansion_pack`) in the Mods tab or F10 manager.
+1. Enable **Kanto Reforged** (`Kanto-Reforged`) in the Mods tab or F10 manager.
 2. Decide these options early:
    - **XP SHARE (SLOT 2)** (default on): fighters get most of the XP pool, party slot 2 gets a share. Ignores the old EXP.ALL behavior while its on.
    - **SMARTER AI** (default on): trainers play less dumb. Turn off if you want classic gen1 chaos.
