@@ -1,4 +1,4 @@
--- Map expansion species onto Gen 1 party/menu icon classes.
+-- Map Kanto Reforged species onto Gen 1 party/menu icon classes.
 -- Vanilla only ships ~10 shared icon sheets keyed by dex 1–151; anything
 -- past that draws blank unless icons.bySpecies is filled.
 

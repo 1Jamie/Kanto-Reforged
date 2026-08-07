@@ -148,7 +148,7 @@ function DexNav.register(mod)
       local mapId = DexNav.currentMapId(game)
       local dex = (game.save and game.save.pokedex) or { seen = {}, owned = {} }
       local roamers = nil
-      local ok, Roamers = pcall(require, "mods.expansion_pack.roamers")
+      local ok, Roamers = pcall(require, "mods.Kanto-Reforged.roamers")
       if ok and Roamers and mapId then
         local list = {}
         for _, id in ipairs(Roamers.BEASTS or {}) do

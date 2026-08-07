@@ -1,7 +1,7 @@
 -- Smarter AI scoring + curated trainer Gen 2/3 mixes.
 return function(T, Data, run)
-  local TrainerAi = require("mods.expansion_pack.trainer_ai")
-  local ExpTrainers = require("mods.expansion_pack.trainers")
+  local TrainerAi = require("mods.Kanto-Reforged.trainer_ai")
+  local ExpTrainers = require("mods.Kanto-Reforged.trainers")
   local TrainerAI = require("src.battle.TrainerAI")
 
   local schema = run.loader.optionSchemas.expansion_pack
@@ -101,7 +101,7 @@ return function(T, Data, run)
       "smart AI prefers sleep over Tackle vs a healthy unstatused target")
   end
 
-  -- Will-O-Wisp (expansion burn) treated as status infliction.
+  -- Will-O-Wisp (Will-O-Wisp burn) treated as status infliction.
   local willO = Data.moves.WILL_O_WISP
   if willO then
     local vBurn = view({ userMon = { hp = 80, stats = { hp = 100 } } })

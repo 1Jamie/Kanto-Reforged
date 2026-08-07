@@ -1,7 +1,7 @@
 -- DV / Hidden Power / statExp judge on Underground Path Route 5.
 
-local HouseNpcs = require("mods.expansion_pack.house_npcs")
-local MoveEffects = require("mods.expansion_pack.move_effects")
+local HouseNpcs = require("mods.Kanto-Reforged.house_npcs")
+local MoveEffects = require("mods.Kanto-Reforged.move_effects")
 local Strings = require("src.core.Strings")
 
 local JudgeNpc = {}

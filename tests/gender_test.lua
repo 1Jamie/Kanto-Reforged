@@ -1,7 +1,7 @@
 -- Gender rates, DV assignment, save backfill, Attract / Cute Charm infatuation.
 return function(T, Data, run)
-  local Gender = require("mods.expansion_pack.gender")
-  local Abilities = require("mods.expansion_pack.abilities")
+  local Gender = require("mods.Kanto-Reforged.gender")
+  local Abilities = require("mods.Kanto-Reforged.abilities")
   local Status = require("src.battle.Status")
   local Pokemon = require("src.pokemon.Pokemon")
 
@@ -204,7 +204,7 @@ return function(T, Data, run)
 
   -- Trainer DV overwrite must re-sync gender
   do
-    local Gender = require("mods.expansion_pack.gender")
+    local Gender = require("mods.Kanto-Reforged.gender")
     local mon = {
       species = "RATTATA",
       dvs = { attack = 15, defense = 8, speed = 8, special = 8 },
@@ -216,7 +216,7 @@ return function(T, Data, run)
 
   -- Cute Charm wild: forces opposite when roll says so
   do
-    local Gender = require("mods.expansion_pack.gender")
+    local Gender = require("mods.Kanto-Reforged.gender")
     local wild = {
       species = "RATTATA",
       dvs = { attack = 15 },

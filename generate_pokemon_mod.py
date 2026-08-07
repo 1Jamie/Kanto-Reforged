@@ -85,7 +85,7 @@ GEN2_3_VERSION_GROUPS = {
     "colosseum", "xd",
 }
 
-# mods/expansion_pack/berry_farm.lua plot art: pret/pokeemerald's berry tree
+# mods/Kanto-Reforged/berry_farm.lua plot art: pret/pokeemerald's berry tree
 # object-event graphics (MIT-style decomp of Emerald's own GBA source tree,
 # not a ROM rip) already ship a soil patch, a generic sprout, and a per-berry
 # ripe-tree sheet, so the farm's plot art is fetched from there instead of
@@ -643,8 +643,8 @@ def load_vanilla_moves(repo_root="."):
     return ids
 
 
-def load_expansion_move_powers(outdir="mods/expansion_pack"):
-    """Parse power for each expansion move from pokemon_data.lua (0 = status)."""
+def load_expansion_move_powers(outdir="mods/Kanto-Reforged"):
+    """Parse power for each Kanto Reforged move from pokemon_data.lua (0 = status)."""
     path = os.path.join(outdir, "pokemon_data.lua")
     powers = {}
     if not os.path.exists(path):
@@ -666,13 +666,13 @@ def load_expansion_move_powers(outdir="mods/expansion_pack"):
     return powers
 
 
-def collect_kanto_move_patches(registered_moves, start=1, end=151, outdir="mods/expansion_pack"):
+def collect_kanto_move_patches(registered_moves, start=1, end=151, outdir="mods/Kanto-Reforged"):
     """Diff Gen 2/3 learnsets/TMs against Gen 1 for Kanto species.
 
     Returns (learnset_patches, tmhm_patches) where each maps species id ->
     list of additions.  Learnset entries are {level, move}; tmhm is a list
     of move ids.  Only moves that already exist in Gen 1 or will be
-    registered by the expansion pack are kept (so trainers/wild/gyms can
+    registered by Kanto Reforged are kept (so trainers/wild/gyms can
     legally roll them via Pokemon.movesAtLevel).
 
     Damaging Gen 2/3-only TM moves (e.g. Iron Tail on Pikachu) are also
@@ -731,7 +731,7 @@ def collect_kanto_move_patches(registered_moves, start=1, end=151, outdir="mods/
             learn_adds.append({"level": level, "move": move})
             seen_learn.add(move)
 
-        # Damaging expansion TMs with no Gen 2/3 level-up slot → up to four
+        # Damaging Gen 2/3 TMs with no Gen 2/3 level-up slot → up to four
         # highest-power synthetic learnset entries (level 30), skipping the
         # generic tutor/TM spam so signature moves (Iron Tail, Zap Cannon)
         # survive Pokemon.movesAtLevel's last-4 window.
@@ -778,7 +778,7 @@ def collect_kanto_move_patches(registered_moves, start=1, end=151, outdir="mods/
 
 
 def write_learnset_patches_lua(path, learnset_patches, tmhm_patches):
-    """Write mods/expansion_pack/learnset_patches.lua."""
+    """Write mods/Kanto-Reforged/learnset_patches.lua."""
     print(f"Writing {path}...")
     with open(path, "w", encoding="utf-8") as f:
         f.write("-- Generated Gen 2/3 learnset/TM additions for Kanto species\n")
@@ -843,7 +843,7 @@ def collect_kanto_ability_patches(start=1, end=151):
 
 
 def write_ability_patches_lua(path, ability_patches):
-    """Write mods/expansion_pack/ability_patches.lua."""
+    """Write mods/Kanto-Reforged/ability_patches.lua."""
     print(f"Writing {path}...")
     with open(path, "w", encoding="utf-8") as f:
         f.write("-- Generated Gen 3 abilities for Kanto species (PokeAPI)\n")
@@ -887,7 +887,7 @@ def collect_gender_rate_patches(start=1, end=386):
 
 
 def write_gender_patches_lua(path, gender_patches):
-    """Write mods/expansion_pack/gender_patches.lua."""
+    """Write mods/Kanto-Reforged/gender_patches.lua."""
     print(f"Writing {path}...")
     with open(path, "w", encoding="utf-8") as f:
         f.write("-- Generated genderRate (PokéAPI female eighths; -1 = genderless)\n")
@@ -1005,7 +1005,7 @@ def collect_breeding_patches(start=1, end=386):
 
 
 def write_breeding_patches_lua(path, breeding_patches):
-    """Write mods/expansion_pack/breeding_patches.lua."""
+    """Write mods/Kanto-Reforged/breeding_patches.lua."""
     print(f"Writing {path}...")
     with open(path, "w", encoding="utf-8") as f:
         f.write("-- Generated breeding fields (PokéAPI egg groups / hatch / egg moves)\n")
@@ -1235,7 +1235,7 @@ def process_sprite(input_path, output_path, target_size):
 
 
 # Gen 1 battle fronts are 40 / 48 / 56 px (frontSize 5 / 6 / 7 tiles).
-# Expansion sprites used to be force-fitted to 56x56, so small mons like
+# Kanto Reforged sprites used to be force-fitted to 56x56, so small mons like
 # Aron drew as large as Onix. Map dex height onto those three buckets so
 # proportions roughly match Gen 1 (Geodude-sized rocks stay small).
 def front_size_for_height_dm(height_dm):
@@ -1354,7 +1354,7 @@ def key_out_matte(img, matte=BERRY_TREE_MATTE):
     return img
 
 def generate_berry_farm_assets(outdir):
-    """Fetch mods/expansion_pack/berry_farm.lua's plot art (soil patch,
+    """Fetch mods/Kanto-Reforged/berry_farm.lua's plot art (soil patch,
     generic sprout, per-berry ripe tree) from pret/pokeemerald's decomp
     instead of shipping the sourced PNGs in version control.
 
@@ -1560,7 +1560,7 @@ def parse_evolution_chain(chain_node, evolutions_map):
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Generate expansion_pack species data, sprites, and berry-farm art. "
+        description="Generate Kanto-Reforged species data, sprites, and berry-farm art. "
         "Run from an extracted mod folder: python3 generate_pokemon_mod.py"
     )
     parser.add_argument("--start", type=int, default=152)
@@ -1681,7 +1681,7 @@ def main():
         print(
             f"Done: {len(learnset_patches)} species learnset patches, "
             f"{len(tmhm_patches)} species TM/HM patches "
-            f"({len(registered_moves)} expansion moves known)"
+            f"({len(registered_moves)} Kanto Reforged moves known)"
         )
         return
 
@@ -2144,7 +2144,7 @@ def main():
             f.write(f"      heightFt = {mon['dexEntry']['heightFt']},\n")
             f.write(f"      heightIn = {mon['dexEntry']['heightIn']},\n")
             f.write(f"      weight = {mon['dexEntry']['weight']},\n")
-            # Inline prose for now; mods/expansion_pack/dex_entries.lua
+            # Inline prose for now; mods/Kanto-Reforged/dex_entries.lua
             # registers it into Data.text at load (vanilla uses _NameDexEntry keys).
             f.write(f"      text = {json.dumps(mon['dexEntry']['text'])}\n")
             f.write("    }\n")

@@ -1,6 +1,6 @@
 -- Slot-2 Exp. Share: 70% pool to fighters / ≤30% to bench slot 2 (clamped).
 return function(T, Data, run)
-  local ModernXpShare = require("mods.expansion_pack.modern_xp_share")
+  local ModernXpShare = require("mods.Kanto-Reforged.modern_xp_share")
   local Experience = require("src.battle.Experience")
   local Pokemon = require("src.pokemon.Pokemon")
   local BattleState = require("src.battle.BattleState")

@@ -31,7 +31,7 @@ return {
       "friendship / time / location evolutions are approximated",
       "a few abilities and many move stubs are still unfinished",
       "FULL SPAWN MIX rewrites encounter tables; change it before a long session",
-      "held items are expansion-pack only; wild held drops are berry-only (5%)",
+      "held items are Kanto Reforged only; wild held drops are berry-only (5%)",
       "existing saves get gender backfilled from DVs on load (deterministic)",
       "XP SHARE (SLOT 2) splits the Gen 1 XP pool (never inflates past ~100%); replaces EXP.ALL while enabled",
       "trainer mixes are curated one-slot swaps, not full Gen 2/3 gym redesigns",

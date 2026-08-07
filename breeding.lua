@@ -1,7 +1,7 @@
 -- Gen 3-style breeding helpers mapped onto Gen 1 DVs / genderRate / abilities.
 -- Daycare UI and overworld step hooks live in daycare.lua.
 
-local Gender = require("mods.expansion_pack.gender")
+local Gender = require("mods.Kanto-Reforged.gender")
 local Growth = require("src.pokemon.Growth")
 local Pokemon = require("src.pokemon.Pokemon")
 local Stats = require("src.pokemon.Stats")
@@ -484,7 +484,7 @@ function Breeding.applyPatches(mod, patches)
     })
     n = n + 1
   end
-  -- Deoxys form alias used by the expansion pack
+  -- Deoxys form alias used by Kanto Reforged
   if patches.species.DEOXYS then
     local row = patches.species.DEOXYS
     mod.content.pokemon:patch("DEOXYS_NORMAL", {

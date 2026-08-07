@@ -1,4 +1,4 @@
--- Expansion-pack trainer AI: three tiers.
+-- Kanto Reforged trainer AI: three tiers.
 --   soft  — EXP_SMART (trash / wild): dump no-ops, soft STAB/SE, situational
 --           status/setup/heal. Better than Gen 1 random, still loose.
 --   lite  — EXP_SMART + EXP_TACTICAL_LITE: mid-roll damage sense, mild KO bias,

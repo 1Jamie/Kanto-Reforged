@@ -1,8 +1,8 @@
--- Gen 3-style Route 5 daycare (expansion pack): two parents, compatibility,
+-- Gen 3-style Route 5 daycare (Kanto Reforged): two parents, compatibility,
 -- eggs. Custom HOUSE interior + Day-Care Lady; overrides talk scripts;
 -- monkey-patches overworld steps. Route 5 outdoors is unchanged.
 
-local Breeding = require("mods.expansion_pack.breeding")
+local Breeding = require("mods.Kanto-Reforged.breeding")
 local Strings = require("src.core.Strings")
 
 local Daycare = {}
@@ -211,7 +211,7 @@ end
 local function depositMon(game, done)
   local TextBox = require("src.render.TextBox")
   local PartyMenu = require("src.ui.PartyMenu")
-  local Gender = require("mods.expansion_pack.gender")
+  local Gender = require("mods.Kanto-Reforged.gender")
   local t = game.data.text
   local dc = ensureDaycare(game.save)
   local playerName = game.save.player and game.save.player.name or "RED"

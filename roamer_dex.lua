@@ -1,7 +1,7 @@
 -- Pokédex AREA line for active roamers after first seen.
 
-local Roamers = require("mods.expansion_pack.roamers")
-local KantoGraph = require("mods.expansion_pack.kanto_graph")
+local Roamers = require("mods.Kanto-Reforged.roamers")
+local KantoGraph = require("mods.Kanto-Reforged.kanto_graph")
 local Font = require("src.render.Font")
 local Strings = require("src.core.Strings")
 

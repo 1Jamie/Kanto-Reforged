@@ -1,6 +1,6 @@
 -- Move relearner / tutor / deleter hub in Saffron Pidgey House.
 
-local HouseNpcs = require("mods.expansion_pack.house_npcs")
+local HouseNpcs = require("mods.Kanto-Reforged.house_npcs")
 local Strings = require("src.core.Strings")
 
 local MoveHub = {}
@@ -64,7 +64,7 @@ local function learnsetMoves(game, mon)
     end
   end
   -- egg moves from breeding data if present
-  local Breeding = require("mods.expansion_pack.breeding")
+  local Breeding = require("mods.Kanto-Reforged.breeding")
   if Breeding and Breeding.eggMovesFor then
     for _, id in ipairs(Breeding.eggMovesFor(mon.species) or {}) do
       add(id)

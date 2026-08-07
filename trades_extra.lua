@@ -1,6 +1,6 @@
 -- Extra Gen 1 → Gen 2/3 in-game trades with held-item preloads.
 
-local HouseNpcs = require("mods.expansion_pack.house_npcs")
+local HouseNpcs = require("mods.Kanto-Reforged.house_npcs")
 
 local TradesExtra = {}
 TradesExtra.OWNER = "trades_extra"

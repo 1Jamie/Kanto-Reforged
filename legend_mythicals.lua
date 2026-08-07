@@ -1,6 +1,6 @@
 -- Custom maps (≥1100) + Celebi / Jirachi / Deoxys / Rayquaza.
 
-local HouseNpcs = require("mods.expansion_pack.house_npcs")
+local HouseNpcs = require("mods.Kanto-Reforged.house_npcs")
 local Strings = require("src.core.Strings")
 
 local LegendMythicals = {}

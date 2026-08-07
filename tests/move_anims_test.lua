@@ -1,6 +1,6 @@
--- Gen 1 stock anim reuse + custom compositions for expansion moves.
+-- Gen 1 stock anim reuse + custom compositions for Gen 2+ moves.
 return function(T, Data, run)
-  local MoveAnims = require("mods.expansion_pack.move_anims")
+  local MoveAnims = require("mods.Kanto-Reforged.move_anims")
 
   -- Custom compositions take priority over whole-clip aliases
   T.eq(MoveAnims.pickAlias({ id = "SHADOW_BALL", type = "GHOST", power = 80 }),
@@ -46,8 +46,8 @@ return function(T, Data, run)
   T.eq(MoveAnims.pickAlias({ id = "STRONG_DARK", type = "DARK", power = 90 }),
     "SUPER_FANG", "strong Dark defaults to Super Fang (not Night Shade)")
 
-  -- Every expansion damaging move with power 0/nil gets a non-status alias
-  local pd = require("mods.expansion_pack.pokemon_data")
+  -- Every Gen 2+ damaging move with power 0/nil gets a non-status alias
+  local pd = require("mods.Kanto-Reforged.pokemon_data")
   local statusAnims = {
     GROWL = true, SMOKESCREEN = true, WITHDRAW = true, GROWTH = true,
     THUNDER_WAVE = true, MIST = true, FOCUS_ENERGY = true, POISONPOWDER = true,
@@ -100,7 +100,7 @@ return function(T, Data, run)
   T.eq(MoveAnims.ALIAS_BY_ID.PURSUIT, "QUICK_ATTACK",
     "ALIAS_BY_ID records stock alias for Pursuit")
 
-  -- Every CUSTOM entry for an expansion move is registered and playable
+  -- Every CUSTOM entry for a Gen 2+ move is registered and playable
   local AnimPlayer = require("src.battle.AnimPlayer")
   local player = AnimPlayer.new(Data.battle_anims)
   local unplayable = 0
@@ -119,7 +119,7 @@ return function(T, Data, run)
       end
     end
   end
-  T.eq(unplayable, 0, "all expansion CUSTOM anims register and play")
+  T.eq(unplayable, 0, "all Gen 2+ CUSTOM anims register and play")
 
   -- Spot-check a few more compositions
   player:start("ROLLOUT", true)

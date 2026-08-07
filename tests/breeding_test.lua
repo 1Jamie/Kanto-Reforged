@@ -1,7 +1,7 @@
 -- Breeding compatibility, inheritance, hatch, two-slot daycare save shape.
 return function(T, Data, run)
-  local Breeding = require("mods.expansion_pack.breeding")
-  local Gender = require("mods.expansion_pack.gender")
+  local Breeding = require("mods.Kanto-Reforged.breeding")
+  local Gender = require("mods.Kanto-Reforged.gender")
   local Party = require("src.pokemon.Party")
 
   local function slotCount(dc)
@@ -212,7 +212,7 @@ return function(T, Data, run)
   T.eq(slotCount(legacy), 1, "one slot occupied")
 
   -- Interior + Day-Care Lady map patch
-  local Daycare = require("mods.expansion_pack.daycare")
+  local Daycare = require("mods.Kanto-Reforged.daycare")
   local MapScripts = require("src.script.MapScripts")
   local daycareMap = Data.maps.DAYCARE
   T.eq(#daycareMap.blocks, 16, "DAYCARE still 4×4 blocks")

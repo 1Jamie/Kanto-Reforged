@@ -1,4 +1,4 @@
--- One-time overworld placements for expansion held items.
+-- One-time overworld placements for Kanto Reforged held items.
 -- Leftovers / Focus Band are intentionally not sold in marts.
 --
 -- Re-entry: every map below stays reachable after its story gate in Gen 1

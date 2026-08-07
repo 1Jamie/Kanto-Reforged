@@ -1,6 +1,6 @@
 -- Gen 3 Root / Claw fossils at Cinnabar Lab.
 
-local HouseNpcs = require("mods.expansion_pack.house_npcs")
+local HouseNpcs = require("mods.Kanto-Reforged.house_npcs")
 local Strings = require("src.core.Strings")
 
 local FossilsGen3 = {}

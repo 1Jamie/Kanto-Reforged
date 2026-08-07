@@ -1,7 +1,7 @@
 -- DIY roaming legendaries: beasts + Eon duo.
 
-local KantoGraph = require("mods.expansion_pack.kanto_graph")
-local HouseNpcs = require("mods.expansion_pack.house_npcs")
+local KantoGraph = require("mods.Kanto-Reforged.kanto_graph")
+local HouseNpcs = require("mods.Kanto-Reforged.house_npcs")
 local Strings = require("src.core.Strings")
 
 local Roamers = {}

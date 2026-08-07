@@ -1,7 +1,7 @@
 -- Berry Blender + Soil Expert (badge berry unlocks, ranks, vitamin crafts).
 
-local HouseNpcs = require("mods.expansion_pack.house_npcs")
-local BerryFarm = require("mods.expansion_pack.berry_farm")
+local HouseNpcs = require("mods.Kanto-Reforged.house_npcs")
+local BerryFarm = require("mods.Kanto-Reforged.berry_farm")
 local Strings = require("src.core.Strings")
 
 local BerryQuests = {}
@@ -216,7 +216,7 @@ local function hasGrassLevel(game, minLv)
 end
 
 local function berryTypesInBag(save)
-  local HeldItems = require("mods.expansion_pack.held_items")
+  local HeldItems = require("mods.Kanto-Reforged.held_items")
   local n = 0
   local inv = save.inventory or {}
   for _, id in ipairs(HeldItems.BERRY_PACK) do

@@ -1,6 +1,6 @@
 -- Overworld held-item placements (hidden / balls / NPCs).
 return function(T, Data, HeldItems, run)
-  local OverworldLoot = require("mods.expansion_pack.overworld_loot")
+  local OverworldLoot = require("mods.Kanto-Reforged.overworld_loot")
   local Map = require("src.world.Map")
   local MapScripts = require("src.script.MapScripts")
 

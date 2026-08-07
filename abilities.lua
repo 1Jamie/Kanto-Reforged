@@ -419,7 +419,7 @@ function Abilities.onPostDamage(battle, user, target, move, damage)
     -- Gen 3 Cute Charm is 1/3 (Gen 4+ lowered it to 30%).
     local ua = abilityOf(battle, user)
     if ua ~= "OBLIVIOUS" then
-      local Gender = require("mods.expansion_pack.gender")
+      local Gender = require("mods.Kanto-Reforged.gender")
       if Gender.canInfatuate(target.mon, user.mon) then
         Gender.applyInfatuation(battle, user)
       end

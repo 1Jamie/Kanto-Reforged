@@ -1,4 +1,4 @@
--- Standalone: luajit mods/expansion_pack/tests/expansion_pack_test.lua
+-- Standalone: luajit mods/Kanto-Reforged/tests/expansion_pack_test.lua
 package.path = "./?.lua;./?/init.lua;" .. package.path
 
 local T = require("tests.modkit")
@@ -8,7 +8,7 @@ Data:load()
 
 -- Stub missing moves in the test dataset to allow validation against mock fixtures
 -- (kept as a safety net; generator remaps Gen 1 ids so this should be empty)
-local pokemon_data = require("mods.expansion_pack.pokemon_data")
+local pokemon_data = require("mods.Kanto-Reforged.pokemon_data")
 for id, species in pairs(pokemon_data.species) do
   for _, entry in ipairs(species.learnset) do
     if not Data.moves[entry.move] and not pokemon_data.moves[entry.move] then
@@ -75,7 +75,7 @@ Data.encounters.SAFARI_ZONE_EAST = {
   }
 }
 
-local run = T.sdk.loadMod("mods/expansion_pack", { data = Data })
+local run = T.sdk.loadMod("mods/Kanto-Reforged", { data = Data })
 T.eq(#run.errors, 0, "loads clean (" .. tostring(run.errors[1]) .. ")")
 T.eq(run.mod and run.mod.state, "loaded", "reached the loaded state")
 
@@ -104,7 +104,7 @@ end
 
 -- Pokédex flavor text must be a Data.text key (vanilla pattern), not raw prose.
 do
-  local DexEntries = require("mods.expansion_pack.dex_entries")
+  local DexEntries = require("mods.Kanto-Reforged.dex_entries")
   local chiki = Data.pokemon.CHIKORITA
   local entry = chiki and chiki.dexEntry
   T.check(entry ~= nil, "Chikorita has dexEntry")
@@ -215,8 +215,8 @@ T.eq(damageAllowed, 100, "Wonder Guard allows super-effective attacks")
 T.eq(infoAllowed.typeMult, 20, "Wonder Guard preserves super-effective multiplier")
 
 -- 7. Verify Wild Spawn Distributions Mapping
-local ExpEncounters = require("mods.expansion_pack.encounters")
-local packData = require("mods.expansion_pack.pokemon_data")
+local ExpEncounters = require("mods.Kanto-Reforged.encounters")
+local packData = require("mods.Kanto-Reforged.pokemon_data")
 local encIndex = ExpEncounters.buildIndex(packData)
 
 local route1 = Data.encounters.ROUTE_1
@@ -244,7 +244,7 @@ T.check(mixedSpecies["BAYLEEF"] == nil, "Bayleef is not a Route 1 wild encounter
 T.check(mixedSpecies["MEGANIUM"] == nil, "Meganium is not a Route 1 wild encounter")
 
 -- Card + options surface
-local cardChunk = loadfile("mods/expansion_pack/mod.card")
+local cardChunk = loadfile("mods/Kanto-Reforged/mod.card")
 T.check(cardChunk ~= nil, "expansion_pack ships a mod.card")
 local cardOk, card = pcall(cardChunk)
 T.check(cardOk and type(card) == "table", "mod.card returns a table")
@@ -382,7 +382,7 @@ T.eq(encIndex.meta.CHIKORITA.stage, 0, "Chikorita is base-stage")
 
 -- 8. Verify Truant
 local slaking = { mon = { species = "SLAKING" }, name = "Slaking", isPlayer = true }
-local Abilities = require("mods.expansion_pack.abilities")
+local Abilities = require("mods.Kanto-Reforged.abilities")
 Abilities.onTurnStart({ data = Data }, slaking)
 T.check(slaking.loafing == true, "Truant toggle goes active")
 T.check(slaking.skipMove == nil, "Truant does not skip move on first turn")
@@ -841,7 +841,7 @@ T.eq(drumUser.mon.hp, 50, "Belly Drum spends half HP")
 T.eq(drumUser.stages.attack, 6, "Belly Drum maxes Attack")
 
 -- 19. Hidden Power / Weather Ball / hazards / Encore / Wish
-local ExpME = require("mods.expansion_pack.move_effects")
+local ExpME = require("mods.Kanto-Reforged.move_effects")
 
 -- All-15 DVs → Dark type, power 70 (Gen 3 formula)
 local hpType, hpPower = ExpME.hiddenPower({
@@ -1158,7 +1158,7 @@ do
   T.eq(sleeper.mon.status, nil, "wake clears SLP")
   T.check(msgs and msgs[1] and msgs[1]:find("woke up", 1, true),
     "wake announces woke up")
-  local ExpMoveEffects = require("mods.expansion_pack.move_effects")
+  local ExpMoveEffects = require("mods.Kanto-Reforged.move_effects")
   T.check(Data.statuses.SLP.beforeMove == ExpMoveEffects.sleepBeforeMove,
     "live Data.statuses.SLP uses wake-and-attack handler")
 
@@ -1620,7 +1620,7 @@ T.eq(followUser.stages.evasion, 2, "Follow Me stand-in raises evasion")
 
 -- ------- Held items
 
-local HeldItems = require("mods.expansion_pack.held_items")
+local HeldItems = require("mods.Kanto-Reforged.held_items")
 T.check(Data.items.LEFTOVERS ~= nil, "Leftovers item registered")
 T.check(Data.items.FOCUS_BAND ~= nil, "Focus Band item registered")
 T.check(Data.items.MIRACLE_SEED ~= nil, "Miracle Seed item registered")
@@ -1742,21 +1742,21 @@ local withHoldTarget = {
 T.check(HeldItems.ofBattler(withHoldTarget) == "LEFTOVERS", "ofBattler reads hold")
 T.check(HeldItems.ofBattler({ mon = { heldItem = nil } }) == nil, "ofBattler empty")
 
-require("mods.expansion_pack.tests.berry_sources_test")(T, Data, HeldItems, run)
-require("mods.expansion_pack.tests.held_items_test")(T, Data, HeldItems)
-require("mods.expansion_pack.tests.overworld_loot_test")(T, Data, HeldItems, run)
-require("mods.expansion_pack.tests.house_npcs_test")(T, Data, run)
-require("mods.expansion_pack.tests.summary_ui_test")(T, Data, run)
-require("mods.expansion_pack.tests.gender_test")(T, Data, run)
-require("mods.expansion_pack.tests.breeding_test")(T, Data, run)
-require("mods.expansion_pack.tests.dexnav_test")(T, Data, run)
-require("mods.expansion_pack.tests.rollout_test")(T, Data, run)
-require("mods.expansion_pack.tests.move_anims_test")(T, Data, run)
-require("mods.expansion_pack.tests.species_icons_test")(T, Data, run)
-require("mods.expansion_pack.tests.bag_pockets_test")(T, Data, run)
-require("mods.expansion_pack.tests.modern_xp_share_test")(T, Data, run)
-require("mods.expansion_pack.tests.trainer_ai_test")(T, Data, run)
-require("mods.expansion_pack.tests.level_caps_test")(T, Data, run)
+require("mods.Kanto-Reforged.tests.berry_sources_test")(T, Data, HeldItems, run)
+require("mods.Kanto-Reforged.tests.held_items_test")(T, Data, HeldItems)
+require("mods.Kanto-Reforged.tests.overworld_loot_test")(T, Data, HeldItems, run)
+require("mods.Kanto-Reforged.tests.house_npcs_test")(T, Data, run)
+require("mods.Kanto-Reforged.tests.summary_ui_test")(T, Data, run)
+require("mods.Kanto-Reforged.tests.gender_test")(T, Data, run)
+require("mods.Kanto-Reforged.tests.breeding_test")(T, Data, run)
+require("mods.Kanto-Reforged.tests.dexnav_test")(T, Data, run)
+require("mods.Kanto-Reforged.tests.rollout_test")(T, Data, run)
+require("mods.Kanto-Reforged.tests.move_anims_test")(T, Data, run)
+require("mods.Kanto-Reforged.tests.species_icons_test")(T, Data, run)
+require("mods.Kanto-Reforged.tests.bag_pockets_test")(T, Data, run)
+require("mods.Kanto-Reforged.tests.modern_xp_share_test")(T, Data, run)
+require("mods.Kanto-Reforged.tests.trainer_ai_test")(T, Data, run)
+require("mods.Kanto-Reforged.tests.level_caps_test")(T, Data, run)
 
 run.release()
 T.finish("expansion_pack")

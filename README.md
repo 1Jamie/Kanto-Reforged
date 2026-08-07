@@ -131,8 +131,6 @@ The Route 5 Day Care house (same building as vanilla) is Gen 3-style when this m
 
 Sprites, `pokemon_data.lua`, ability/learnset/gender/breeding patches, and berry farm art come from `generate_pokemon_mod.py`. It hits PokeAPI (and a couple public sprite sources). Run it from inside the mod folder after you unzip, or whenever you want a fresh pull.
 
-`assets/` and `map_previews/` are gitignored on purpose (fetched / generated third-party game art). Generate sprites locally; do not push those folders to GitHub. Repo screenshots live in `screen-shots/`.
-
 You need Python 3, `requests`, and `Pillow`, plus network on the first run.
 
 ```bash
@@ -142,7 +140,7 @@ python3 -m pip install requests Pillow
 ### Linux and macOS
 
 ```bash
-cd mods/expansion_pack   # or wherever the mod lives
+cd mods/Kanto-Reforged   # or wherever the mod lives
 python3 generate_pokemon_mod.py
 ```
 
@@ -164,7 +162,7 @@ python3 generate_pokemon_mod.py --resprite
 Install Python 3 from python.org and tick "Add Python to PATH". Then in Command Prompt or PowerShell:
 
 ```bat
-cd path\to\expansion_pack
+cd path\to\Kanto-Reforged
 py -m pip install requests Pillow
 py generate_pokemon_mod.py
 ```
@@ -180,7 +178,7 @@ Termux rough steps:
 ```bash
 pkg install python
 pip install requests Pillow
-cd ~/storage/.../expansion_pack
+cd ~/storage/.../Kanto-Reforged
 python generate_pokemon_mod.py
 ```
 
@@ -189,7 +187,7 @@ Zip it up afterward and import in-game.
 ## Installing in the game
 
 1. Run the generator if `assets/` or `pokemon_data.lua` are missing.
-2. Put `expansion_pack/` under the games `mods/` folder, or install the zip from the launcher.
+2. Put `Kanto-Reforged/` under the games `mods/` folder, or install the zip from the launcher.
 3. Enable Kanto Reforged and start or continue a save.
 
 ## Full guide

@@ -1,10 +1,10 @@
 -- Bag pockets + raised capacity.
 return function(T, Data, run)
-  local BagPockets = require("mods.expansion_pack.bag_pockets")
+  local BagPockets = require("mods.Kanto-Reforged.bag_pockets")
   local Bag = require("src.inventory.Bag")
   local ItemEffects = require("src.inventory.ItemEffects")
 
-  T.eq(Bag.CAPACITY, BagPockets.CAPACITY, "Bag.CAPACITY raised for expansion")
+  T.eq(Bag.CAPACITY, BagPockets.CAPACITY, "Bag.CAPACITY raised for Kanto Reforged")
   T.eq(Data.constants.bagSize, BagPockets.CAPACITY, "constants.bagSize matches")
 
   T.eq(BagPockets.classify("POKE_BALL", Data.items.POKE_BALL), "balls",

@@ -1,12 +1,12 @@
 -- Object-index hygiene + overworld NPC / legendary content smoke tests.
 return function(T, Data, run)
-  local HouseNpcs = require("mods.expansion_pack.house_npcs")
+  local HouseNpcs = require("mods.Kanto-Reforged.house_npcs")
   local MapScripts = require("src.script.MapScripts")
-  local Competitive = require("mods.expansion_pack.competitive_items")
-  local BerryQuests = require("mods.expansion_pack.berry_quests")
-  local Roamers = require("mods.expansion_pack.roamers")
-  local DexNav = require("mods.expansion_pack.dexnav")
-  local LegendMythicals = require("mods.expansion_pack.legend_mythicals")
+  local Competitive = require("mods.Kanto-Reforged.competitive_items")
+  local BerryQuests = require("mods.Kanto-Reforged.berry_quests")
+  local Roamers = require("mods.Kanto-Reforged.roamers")
+  local DexNav = require("mods.Kanto-Reforged.dexnav")
+  local LegendMythicals = require("mods.Kanto-Reforged.legend_mythicals")
   local Warp = require("src.world.Warp")
 
   -- Claim registry must include baseline + every appendNpc from this milestone.
@@ -100,7 +100,7 @@ return function(T, Data, run)
   T.eq(retY, 20, "Sky Pillar exit y")
 
   -- Roamers + DexNav ROAM row
-  local mod = Roamers._mod or require("mods.expansion_pack.level_caps")._mod
+  local mod = Roamers._mod or require("mods.Kanto-Reforged.level_caps")._mod
   T.check(mod ~= nil and mod.save ~= nil, "roamers installed with mod API")
   Roamers.activateBeasts(mod)
   local loc = Roamers.getLocation(mod, "RAIKOU")

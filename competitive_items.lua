@@ -1,7 +1,7 @@
 -- Choice Band / Life Orb / Focus Sash (+ Heart Scale, trade preloads).
 
 local Strings = require("src.core.Strings")
-local HeldItems = require("mods.expansion_pack.held_items")
+local HeldItems = require("mods.Kanto-Reforged.held_items")
 
 local Competitive = {}
 

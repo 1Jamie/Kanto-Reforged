@@ -1,4 +1,4 @@
--- Map expansion (Gen 2+) moves onto Gen 1 battle-anim primitives.
+-- Map Gen 2+ moves onto Gen 1 battle-anim primitives.
 -- Prefer custom seq compositions (subanims + SE_* + stock SFX ids) when a
 -- whole-clip alias would collide with a sibling move; fall back to stock
 -- Gen 1 clips otherwise. Sounds always reference Gen 1 move ids so the

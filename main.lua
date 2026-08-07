@@ -1,10 +1,10 @@
-local Abilities = require("mods.expansion_pack.abilities")
-local ExpMoveEffects = require("mods.expansion_pack.move_effects")
-local HeldItems = require("mods.expansion_pack.held_items")
-local Gender = require("mods.expansion_pack.gender")
-local ModernXpShare = require("mods.expansion_pack.modern_xp_share")
-local TrainerAi = require("mods.expansion_pack.trainer_ai")
-local ExpTrainers = require("mods.expansion_pack.trainers")
+local Abilities = require("mods.Kanto-Reforged.abilities")
+local ExpMoveEffects = require("mods.Kanto-Reforged.move_effects")
+local HeldItems = require("mods.Kanto-Reforged.held_items")
+local Gender = require("mods.Kanto-Reforged.gender")
+local ModernXpShare = require("mods.Kanto-Reforged.modern_xp_share")
+local TrainerAi = require("mods.Kanto-Reforged.trainer_ai")
+local ExpTrainers = require("mods.Kanto-Reforged.trainers")
 local Strings = require("src.core.Strings")
 
 local function battlerHasType(battler, typeId)
@@ -42,8 +42,8 @@ local function getSpecialStat(battler, isAttack)
   return isAttack and battler.sp_attack or battler.sp_defense
 end
 
-local mixEncounters = require("mods.expansion_pack.encounters").mix
-local ExpEncounters = require("mods.expansion_pack.encounters")
+local mixEncounters = require("mods.Kanto-Reforged.encounters").mix
+local ExpEncounters = require("mods.Kanto-Reforged.encounters")
 
 local function spawnModeFromOptions(mod)
   if mod.options and mod.options:get("full_spawn_random") then
@@ -85,71 +85,71 @@ return function(mod)
   Gender.register(mod)
   Gender.install(mod)
 
-  local Breeding = require("mods.expansion_pack.breeding")
+  local Breeding = require("mods.Kanto-Reforged.breeding")
   Breeding.register(mod)
   Breeding.install(mod)
 
-  local Daycare = require("mods.expansion_pack.daycare")
+  local Daycare = require("mods.Kanto-Reforged.daycare")
   Daycare.register(mod)
   Daycare.install(mod)
 
-  local BerryFarm = require("mods.expansion_pack.berry_farm")
+  local BerryFarm = require("mods.Kanto-Reforged.berry_farm")
   BerryFarm.register(mod)
   BerryFarm.install(mod)
 
-  local LevelCaps = require("mods.expansion_pack.level_caps")
+  local LevelCaps = require("mods.Kanto-Reforged.level_caps")
   LevelCaps.register(mod)
   LevelCaps.install(mod)
 
-  local OverworldLoot = require("mods.expansion_pack.overworld_loot")
+  local OverworldLoot = require("mods.Kanto-Reforged.overworld_loot")
   OverworldLoot.register(mod)
 
-  local HouseNpcs = require("mods.expansion_pack.house_npcs")
+  local HouseNpcs = require("mods.Kanto-Reforged.house_npcs")
   HouseNpcs.resetClaims()
 
-  local Competitive = require("mods.expansion_pack.competitive_items")
+  local Competitive = require("mods.Kanto-Reforged.competitive_items")
   Competitive.register(mod)
   Competitive.install(mod)
 
-  local BattleClubs = require("mods.expansion_pack.battle_clubs")
+  local BattleClubs = require("mods.Kanto-Reforged.battle_clubs")
   BattleClubs.register(mod)
 
-  local JudgeNpc = require("mods.expansion_pack.judge_npc")
+  local JudgeNpc = require("mods.Kanto-Reforged.judge_npc")
   JudgeNpc.register(mod)
 
-  local TradesExtra = require("mods.expansion_pack.trades_extra")
+  local TradesExtra = require("mods.Kanto-Reforged.trades_extra")
   TradesExtra.register(mod)
 
-  local BerryQuests = require("mods.expansion_pack.berry_quests")
+  local BerryQuests = require("mods.Kanto-Reforged.berry_quests")
   BerryQuests.register(mod)
 
-  local MoveHub = require("mods.expansion_pack.move_hub")
+  local MoveHub = require("mods.Kanto-Reforged.move_hub")
   MoveHub.register(mod)
 
-  local ItemSmith = require("mods.expansion_pack.item_smith")
+  local ItemSmith = require("mods.Kanto-Reforged.item_smith")
   ItemSmith.register(mod)
 
-  local Roamers = require("mods.expansion_pack.roamers")
+  local Roamers = require("mods.Kanto-Reforged.roamers")
   Roamers.register(mod)
   Roamers.install(mod)
 
-  local RoamingRadar = require("mods.expansion_pack.roaming_radar")
+  local RoamingRadar = require("mods.Kanto-Reforged.roaming_radar")
   RoamingRadar.register(mod)
 
-  local RoamerDex = require("mods.expansion_pack.roamer_dex")
+  local RoamerDex = require("mods.Kanto-Reforged.roamer_dex")
   RoamerDex.install(mod)
 
-  local LegendShrines = require("mods.expansion_pack.legend_shrines")
+  local LegendShrines = require("mods.Kanto-Reforged.legend_shrines")
   LegendShrines.register(mod)
 
-  local LegendRegis = require("mods.expansion_pack.legend_regis")
+  local LegendRegis = require("mods.Kanto-Reforged.legend_regis")
   LegendRegis.register(mod)
 
-  local LegendMythicals = require("mods.expansion_pack.legend_mythicals")
+  local LegendMythicals = require("mods.Kanto-Reforged.legend_mythicals")
   LegendMythicals.register(mod)
   LegendMythicals.install(mod)
 
-  local FossilsGen3 = require("mods.expansion_pack.fossils_gen3")
+  local FossilsGen3 = require("mods.Kanto-Reforged.fossils_gen3")
   FossilsGen3.register(mod)
 
   ModernXpShare.install(mod)
@@ -217,8 +217,8 @@ return function(mod)
   end
 
   -- 1. Load generated databases
-  local has_types, types_data = pcall(require, "mods.expansion_pack.types_data")
-  local has_pokemon, pokemon_data = pcall(require, "mods.expansion_pack.pokemon_data")
+  local has_types, types_data = pcall(require, "mods.Kanto-Reforged.types_data")
+  local has_pokemon, pokemon_data = pcall(require, "mods.Kanto-Reforged.pokemon_data")
   
   -- 2. Register Custom Types and Type Matchups
   if has_types then
@@ -244,13 +244,13 @@ return function(mod)
     end
     mod.log:info("Registered %d custom moves", moves_registered)
 
-    local MoveAnims = require("mods.expansion_pack.move_anims")
+    local MoveAnims = require("mods.Kanto-Reforged.move_anims")
     MoveAnims.register(mod, pokemon_data.moves)
     MoveAnims.install(mod)
     
     local species_registered = 0
     local highestDex = 151
-    local DexEntries = require("mods.expansion_pack.dex_entries")
+    local DexEntries = require("mods.Kanto-Reforged.dex_entries")
     local dexTexts = DexEntries.bindAll(mod, pokemon_data.species)
     for id, record in pairs(pokemon_data.species) do
       mod.content.pokemon:register(id, record)
@@ -264,7 +264,7 @@ return function(mod)
       mod.log:info("Registered %d Pokédex flavor texts", dexTexts)
     end
 
-    local SpeciesIcons = require("mods.expansion_pack.species_icons")
+    local SpeciesIcons = require("mods.Kanto-Reforged.species_icons")
     SpeciesIcons.register(mod, pokemon_data.species)
 
     -- Pokédex list is 1..constants.dexSize; vanilla import stamps 151, so
@@ -364,7 +364,7 @@ return function(mod)
     -- Patch Gen 1 species with Gen 2/3 level-up + TM learnset additions.
     -- Wild/trainer/gym parties all build moves via Pokemon.movesAtLevel, so
     -- this is what makes Charmander know Metal Claw, etc.
-    local okPatches, learnset_patches = pcall(require, "mods.expansion_pack.learnset_patches")
+    local okPatches, learnset_patches = pcall(require, "mods.Kanto-Reforged.learnset_patches")
     if okPatches and learnset_patches then
       local function mergeLearnset(existing, additions)
         local byMove = {}
@@ -451,7 +451,7 @@ return function(mod)
     end
 
     -- Gen 3 abilities for vanilla Kanto species (Bulbasaur OVERGROW, etc.)
-    local okAbil, ability_patches = pcall(require, "mods.expansion_pack.ability_patches")
+    local okAbil, ability_patches = pcall(require, "mods.Kanto-Reforged.ability_patches")
     if okAbil and ability_patches and ability_patches.abilities then
       local nAbil = 0
       for speciesId, ability in pairs(ability_patches.abilities) do
@@ -466,7 +466,7 @@ return function(mod)
     end
 
     -- Gender rates (PokéAPI female eighths; -1 = genderless)
-    local okGender, gender_patches = pcall(require, "mods.expansion_pack.gender_patches")
+    local okGender, gender_patches = pcall(require, "mods.Kanto-Reforged.gender_patches")
     if okGender and gender_patches and gender_patches.rates then
       local nGender = 0
       for speciesId, rate in pairs(gender_patches.rates) do
@@ -487,7 +487,7 @@ return function(mod)
     end
 
     -- Breeding: egg groups, hatch counters, baby species, egg moves
-    local okBreed, breeding_patches = pcall(require, "mods.expansion_pack.breeding_patches")
+    local okBreed, breeding_patches = pcall(require, "mods.Kanto-Reforged.breeding_patches")
     if okBreed and breeding_patches then
       local nBreed = Breeding.applyPatches(mod, breeding_patches)
       mod.log:info("Patched breeding data onto %d species", nBreed)
@@ -498,13 +498,13 @@ return function(mod)
     mod.log:warn("pokemon_data.lua not found or failed to load: " .. tostring(pokemon_data))
   end
 
-  local SummaryUi = require("mods.expansion_pack.summary_ui")
+  local SummaryUi = require("mods.Kanto-Reforged.summary_ui")
   SummaryUi.register(mod)
 
-  local DexNav = require("mods.expansion_pack.dexnav")
+  local DexNav = require("mods.Kanto-Reforged.dexnav")
   DexNav.register(mod)
 
-  local BagPockets = require("mods.expansion_pack.bag_pockets")
+  local BagPockets = require("mods.Kanto-Reforged.bag_pockets")
   BagPockets.register(mod)
   
   -- 4. Hook into battle damage pipeline (SpA/SpD + abilities +

@@ -1,6 +1,6 @@
--- Gen 1 menu-icon class mapping for expansion species.
+-- Gen 1 menu-icon class mapping for Kanto Reforged species.
 return function(T, Data, run)
-  local SpeciesIcons = require("mods.expansion_pack.species_icons")
+  local SpeciesIcons = require("mods.Kanto-Reforged.species_icons")
 
   T.eq(SpeciesIcons.pickClass({ id = "HERACROSS", types = { "BUG", "FIGHTING" } }),
     "BUG", "Heracross → BUG")
@@ -24,8 +24,8 @@ return function(T, Data, run)
   T.eq(Data.icons.bySpecies.HERACROSS, "BUG", "Heracross registered in bySpecies")
   T.eq(Data.icons.bySpecies.STEELIX, "SNAKE", "Steelix registered in bySpecies")
 
-  -- Every expansion species got a known class name
-  local pd = require("mods.expansion_pack.pokemon_data")
+  -- Every Kanto Reforged species got a known class name
+  local pd = require("mods.Kanto-Reforged.pokemon_data")
   local valid = {
     GRASS = true, MON = true, WATER = true, BUG = true, BIRD = true,
     QUADRUPED = true, SNAKE = true, FAIRY = true, BALL = true, HELIX = true,
@@ -39,6 +39,6 @@ return function(T, Data, run)
       bad = bad + 1
     end
   end
-  T.eq(missing, 0, "every expansion species has a bySpecies icon")
+  T.eq(missing, 0, "every Kanto Reforged species has a bySpecies icon")
   T.eq(bad, 0, "every mapped icon is a Gen 1 class name")
 end

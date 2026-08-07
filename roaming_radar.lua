@@ -1,7 +1,7 @@
 -- Roaming Radar key-item screen + bag/start-menu access.
 
-local KantoGraph = require("mods.expansion_pack.kanto_graph")
-local Roamers = require("mods.expansion_pack.roamers")
+local KantoGraph = require("mods.Kanto-Reforged.kanto_graph")
+local Roamers = require("mods.Kanto-Reforged.roamers")
 local Strings = require("src.core.Strings")
 
 local RoamingRadar = {}

@@ -10,7 +10,7 @@
 -- modern_xp_share for save compatibility.
 --
 -- Stock BattleState has no awardExperience hook -- this module installs
--- applyExpShare at runtime and wraps enemyMonFainted so the expansion pack
+-- applyExpShare at runtime and wraps enemyMonFainted so Kanto Reforged
 -- needs zero engine edits.
 
 local Strings = require("src.core.Strings")

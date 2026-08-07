@@ -1,4 +1,4 @@
--- Gen 2–3 held items for the expansion pack (engine stays Gen1-faithful).
+-- Gen 2–3 held items for Kanto Reforged (engine stays Gen1-faithful).
 -- Storage: mon.heldItem (string id). Give/Take via ui.party.submenu.
 
 local Strings = require("src.core.Strings")

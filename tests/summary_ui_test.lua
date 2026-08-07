@@ -1,7 +1,7 @@
 -- Summary page 3 (ability / held item) + Kanto ability patches.
 return function(T, Data, run)
-  local SummaryUi = require("mods.expansion_pack.summary_ui")
-  local HeldItems = require("mods.expansion_pack.held_items")
+  local SummaryUi = require("mods.Kanto-Reforged.summary_ui")
+  local HeldItems = require("mods.Kanto-Reforged.held_items")
 
   -- Kanto species received Gen 3 abilities from ability_patches.lua
   T.eq(Data.pokemon.BULBASAUR.ability, "OVERGROW", "Bulbasaur ability OVERGROW")
@@ -24,7 +24,7 @@ return function(T, Data, run)
 
   -- SummaryMenu screen replaced with 3-page wrapper
   local screen = Data.screens and Data.screens.SummaryMenu
-  T.check(screen ~= nil, "SummaryMenu screen registered by expansion")
+  T.check(screen ~= nil, "SummaryMenu screen registered by Kanto Reforged")
   T.check(type(screen) == "function" or (type(screen) == "table" and type(screen.new) == "function"),
     "SummaryMenu factory is callable")
 
@@ -42,7 +42,7 @@ return function(T, Data, run)
     ot = "RED",
     otId = 12345,
   }
-  local Gender = require("mods.expansion_pack.gender")
+  local Gender = require("mods.Kanto-Reforged.gender")
   T.eq(Gender.glyph(mon), "♂", "summary mon gender glyph")
   T.eq(Gender.nameWithGlyph(mon, "SPARKY"), "SPARKY♂", "page 3 name includes gender")
   -- Minimal game stub for SummaryMenu.new (needs data, input, save, stack)
@@ -68,7 +68,7 @@ return function(T, Data, run)
 
   T.eq(HeldItems.def("MAGNET").name, "MAGNET", "Magnet held-item name for summary")
 
-  local AbilityText = require("mods.expansion_pack.ability_text")
+  local AbilityText = require("mods.Kanto-Reforged.ability_text")
   T.check(AbilityText.describe("RUN_AWAY"):find("escape", 1, true),
     "Run Away has a summary blurb")
   T.eq(AbilityText.describe(nil), "No special ability.", "nil ability blurb")

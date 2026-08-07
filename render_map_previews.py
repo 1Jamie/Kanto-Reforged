@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Render expansion_pack custom maps to PNG for visual QA."""
+"""Render Kanto-Reforged custom maps to PNG for visual QA."""
 
 import json
 import os

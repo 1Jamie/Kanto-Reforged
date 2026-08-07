@@ -1,4 +1,4 @@
--- Pokédex flavor text bridge for expansion species.
+-- Pokédex flavor text bridge for Kanto Reforged species.
 --
 -- Vanilla stores dexEntry.text as a key into Data.text (e.g. "_BulbasaurDexEntry").
 -- The generator embeds PokéAPI paragraphs inline, so DexEntryMenu's
@@ -14,7 +14,7 @@ local DexEntries = {}
 local COLS = 18
 local MAX_LINES = 6
 
-local Overrides = require("mods.expansion_pack.dex_text_overrides")
+local Overrides = require("mods.Kanto-Reforged.dex_text_overrides")
 
 local function isTextKey(s)
   return type(s) == "string" and s:match("^_[%w_]+$") ~= nil

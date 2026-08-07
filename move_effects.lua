@@ -430,7 +430,7 @@ function MoveEffects.register(mod)
     kind = "secondary",
     run = function(ctx)
       local chance = ctx.move.statChance or 10
-      local Ab = require("mods.expansion_pack.abilities")
+      local Ab = require("mods.Kanto-Reforged.abilities")
       if Ab.abilityOf(ctx.battle, ctx.user) == "SERENE_GRACE" then
         chance = chance * 2
       end
@@ -876,7 +876,7 @@ function MoveEffects.register(mod)
   mod.content.move_effects:register("EXP_PERISH_SONG_EFFECT", {
     kind = "primary",
     run = function(ctx)
-      local Ab = require("mods.expansion_pack.abilities")
+      local Ab = require("mods.Kanto-Reforged.abilities")
       for _, b in ipairs({ ctx.user, ctx.target }) do
         if b and b.mon and not b.expPerishTurns then
           if Ab.abilityOf(ctx.battle, b) ~= "SOUNDPROOF" then
@@ -904,8 +904,8 @@ function MoveEffects.register(mod)
     kind = "primary",
     accuracyChecked = true,
     run = function(ctx)
-      local Abilities = require("mods.expansion_pack.abilities")
-      local Gender = require("mods.expansion_pack.gender")
+      local Abilities = require("mods.Kanto-Reforged.abilities")
+      local Gender = require("mods.Kanto-Reforged.gender")
       if Abilities.abilityOf(ctx.battle, ctx.target) == "OBLIVIOUS" then
         return { Strings("But, it failed!") }
       end
@@ -928,7 +928,7 @@ function MoveEffects.register(mod)
     kind = "primary",
     accuracyChecked = true,
     run = function(ctx)
-      local Gender = require("mods.expansion_pack.gender")
+      local Gender = require("mods.Kanto-Reforged.gender")
       if not Gender.canInfatuate(ctx.user and ctx.user.mon, ctx.target and ctx.target.mon) then
         return { Strings("But, it failed!") }
       end
@@ -954,7 +954,7 @@ function MoveEffects.register(mod)
       local msgs = applyStages(ctx, target, {
         { stat = "attack", change = 2 },
       }, false)
-      local Abilities = require("mods.expansion_pack.abilities")
+      local Abilities = require("mods.Kanto-Reforged.abilities")
       if Abilities.abilityOf(ctx.battle, target) == "OWN_TEMPO" then
         if #msgs == 0 then return { Strings("But, it failed!") } end
         return msgs
@@ -1231,7 +1231,7 @@ function MoveEffects.register(mod)
   mod.content.move_effects:register("EXP_ROLE_PLAY_EFFECT", {
     kind = "primary",
     run = function(ctx)
-      local Ab = require("mods.expansion_pack.abilities")
+      local Ab = require("mods.Kanto-Reforged.abilities")
       local foeAb = Ab.abilityOf(ctx.battle, ctx.target)
       if not foeAb then return { Strings("But, it failed!") } end
       ctx.user.expTracedAbility = foeAb
@@ -1243,7 +1243,7 @@ function MoveEffects.register(mod)
     kind = "primary",
     accuracyChecked = true,
     run = function(ctx)
-      local Ab = require("mods.expansion_pack.abilities")
+      local Ab = require("mods.Kanto-Reforged.abilities")
       local a = Ab.abilityOf(ctx.battle, ctx.user)
       local b = Ab.abilityOf(ctx.battle, ctx.target)
       if not a and not b then return { Strings("But, it failed!") } end
@@ -1471,7 +1471,7 @@ function MoveEffects.register(mod)
     kind = "primary",
     accuracyChecked = true,
     run = function(ctx)
-      local Ab = require("mods.expansion_pack.abilities")
+      local Ab = require("mods.Kanto-Reforged.abilities")
       local a = Ab.abilityOf(ctx.battle, ctx.user)
       if not a then return { Strings("But, it failed!") } end
       ctx.target.expTracedAbility = a
@@ -1697,7 +1697,7 @@ function MoveEffects.register(mod)
     kind = "primary",
     accuracyChecked = true,
     run = function(ctx)
-      local HeldItems = require("mods.expansion_pack.held_items")
+      local HeldItems = require("mods.Kanto-Reforged.held_items")
       local a = ctx.user.mon
       local b = ctx.target.mon
       if not a or not b then return { Strings("But, it failed!") } end
@@ -1718,7 +1718,7 @@ function MoveEffects.register(mod)
   mod.content.move_effects:register("EXP_KNOCK_OFF_EFFECT", {
     kind = "full",
     afterDamage = function(ctx)
-      local HeldItems = require("mods.expansion_pack.held_items")
+      local HeldItems = require("mods.Kanto-Reforged.held_items")
       if not ctx.target or not ctx.target.mon or not ctx.target.mon.heldItem then
         return
       end
@@ -1744,7 +1744,7 @@ function MoveEffects.register(mod)
       end
       ctx.user.mon.heldItem = last
       ctx.user.expLastConsumedItem = nil
-      local HeldItems = require("mods.expansion_pack.held_items")
+      local HeldItems = require("mods.Kanto-Reforged.held_items")
       local def = HeldItems.def(last)
       return { Strings("%s found one\n%s!", displayName(ctx.user), def and def.name or last) }
     end,
@@ -1762,7 +1762,7 @@ function MoveEffects.register(mod)
       end
       b.heldItem = a.heldItem
       a.heldItem = nil
-      local HeldItems = require("mods.expansion_pack.held_items")
+      local HeldItems = require("mods.Kanto-Reforged.held_items")
       local def = HeldItems.def(b.heldItem)
       local msgs = { Strings("%s gave its\n%s!", displayName(ctx.user), def and def.name or b.heldItem) }
       HeldItems.tickStatusBerry(ctx.battle, ctx.target)
@@ -1777,7 +1777,7 @@ function MoveEffects.install(mod)
   local BattleState = require("src.battle.BattleState")
   local StatusRegistry = require("src.battle.StatusRegistry")
   local Strings = require("src.core.Strings")
-  local Abilities = require("mods.expansion_pack.abilities")
+  local Abilities = require("mods.Kanto-Reforged.abilities")
 
   local original_fightLocked = BattleState.fightLockedAction
   BattleState.fightLockedAction = function(self, battler)

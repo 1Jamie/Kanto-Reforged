@@ -1,9 +1,9 @@
--- Bag pockets + larger capacity for the expansion pack.
+-- Bag pockets + larger capacity for Kanto Reforged.
 -- Keeps flat save.inventory; filters Bag.order while the bag is open so the
 -- stock BagMenu USE/TOSS flows keep working.
 
 local ItemEffects = require("src.inventory.ItemEffects")
-local HeldItems = require("mods.expansion_pack.held_items")
+local HeldItems = require("mods.Kanto-Reforged.held_items")
 local Bag = require("src.inventory.Bag")
 local Strings = require("src.core.Strings")
 

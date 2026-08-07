@@ -1,11 +1,11 @@
--- Shared helpers for expansion house NPCs / object index hygiene.
+-- Shared helpers for Kanto Reforged house NPCs / object index hygiene.
 
-local LevelCaps = require("mods.expansion_pack.level_caps")
+local LevelCaps = require("mods.Kanto-Reforged.level_caps")
 local Strings = require("src.core.Strings")
 
 local HouseNpcs = {}
 
--- Reserved object indices claimed by existing expansion modules.
+-- Reserved object indices claimed by existing Kanto Reforged modules.
 -- New modules MUST register via claim() and never collide.
 HouseNpcs.BASELINE_CLAIMS = {
   { map = "VIRIDIAN_CITY", index = 8, owner = "level_caps" },
@@ -117,7 +117,7 @@ function HouseNpcs.partyHasType(game, typeId)
 end
 
 function HouseNpcs.leadHoldsBerry(game)
-  local HeldItems = require("mods.expansion_pack.held_items")
+  local HeldItems = require("mods.Kanto-Reforged.held_items")
   local party = game.save and game.save.party or {}
   local lead = party[1]
   if not lead or not lead.heldItem then return false end

@@ -1,6 +1,6 @@
 -- Route DexNav: aggregation, progressive rows, fishing note, start-menu gate.
 return function(T, Data, run)
-  local DexNav = require("mods.expansion_pack.dexnav")
+  local DexNav = require("mods.Kanto-Reforged.dexnav")
   local Runtime = require("src.mods.Runtime")
 
   -- Different grass vs fish ranges must not merge into one fake span
@@ -81,7 +81,7 @@ return function(T, Data, run)
   T.eq(#emptyItems, 0, "unknown map builds zero species rows")
   T.eq(emptyFooter, nil, "unknown map has no fishing footer")
 
-  -- Real ROUTE_1 (after expansion mix) still aggregates something
+  -- Real ROUTE_1 (after Kanto Reforged mix) still aggregates something
   local r1Items, r1Footer = DexNav.buildItems(Data, "ROUTE_1", {
     seen = {}, owned = {},
   })

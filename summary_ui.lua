@@ -1,12 +1,12 @@
--- Extra SummaryMenu page: ability + held item (Gen 2/3 expansion fields).
+-- Extra SummaryMenu page: ability + held item (Gen 2/3 Kanto Reforged fields).
 -- Wraps the builtin two-page status screen without editing src/.
 
 local Font = require("src.render.Font")
 local Strings = require("src.core.Strings")
 local TextBox = require("src.render.TextBox")
-local HeldItems = require("mods.expansion_pack.held_items")
-local AbilityText = require("mods.expansion_pack.ability_text")
-local Gender = require("mods.expansion_pack.gender")
+local HeldItems = require("mods.Kanto-Reforged.held_items")
+local AbilityText = require("mods.Kanto-Reforged.ability_text")
+local Gender = require("mods.Kanto-Reforged.gender")
 
 local SummaryUi = {}
 

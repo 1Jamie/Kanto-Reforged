@@ -2,7 +2,7 @@
 -- via a door on every Pokémon Center.
 
 local Strings = require("src.core.Strings")
-local HeldItems = require("mods.expansion_pack.held_items")
+local HeldItems = require("mods.Kanto-Reforged.held_items")
 
 local BerryFarm = {}
 
@@ -114,7 +114,7 @@ local function markName(plotIndex)
   return ("BERRY_PLOT_MARK_%d"):format(plotIndex)
 end
 
--- Plot art (mods/expansion_pack/assets/plot_*.png) is fetched by
+-- Plot art (mods/Kanto-Reforged/assets/plot_*.png) is fetched by
 -- generate_pokemon_mod.py from pret/pokeemerald's berry-tree object
 -- graphics rather than checked in, same as every Pokémon sprite that
 -- script pulls from PokeAPI — see generate_berry_farm_assets() there.
@@ -138,7 +138,7 @@ BerryFarm.PLOT_SPRITE_BY_BERRY = {
 local function registerPlotSprites(mod)
   local function sprite(id, file)
     mod.content.sprites:register(id, {
-      image = "mods/expansion_pack/assets/" .. file,
+      image = "mods/Kanto-Reforged/assets/" .. file,
       frames = 1,
       walker = false,
     })

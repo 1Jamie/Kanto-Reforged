@@ -2681,8 +2681,8 @@ P.species = {
     evolutions = {
       { method = "LEVEL", species = "BAYLEEF", level = 16 },
     },
-    spriteFront = "mods/expansion_pack/assets/chikorita_front.png",
-    spriteBack = "mods/expansion_pack/assets/chikorita_back.png",
+    spriteFront = "mods/Kanto-Reforged/assets/chikorita_front.png",
+    spriteBack = "mods/Kanto-Reforged/assets/chikorita_back.png",
     frontSize = 6,
     dexEntry = {
       kind = "LEAF POKMON",
@@ -2802,8 +2802,8 @@ P.species = {
     evolutions = {
       { method = "LEVEL", species = "MEGANIUM", level = 32 },
     },
-    spriteFront = "mods/expansion_pack/assets/bayleef_front.png",
-    spriteBack = "mods/expansion_pack/assets/bayleef_back.png",
+    spriteFront = "mods/Kanto-Reforged/assets/bayleef_front.png",
+    spriteBack = "mods/Kanto-Reforged/assets/bayleef_back.png",
     frontSize = 6,
     dexEntry = {
       kind = "LEAF POKMON",
@@ -2940,8 +2940,8 @@ P.species = {
     },
     evolutions = {
     },
-    spriteFront = "mods/expansion_pack/assets/meganium_front.png",
-    spriteBack = "mods/expansion_pack/assets/meganium_back.png",
+    spriteFront = "mods/Kanto-Reforged/assets/meganium_front.png",
+    spriteBack = "mods/Kanto-Reforged/assets/meganium_back.png",
     frontSize = 7,
     dexEntry = {
       kind = "HERB POKMON",
@@ -3054,8 +3054,8 @@ P.species = {
     evolutions = {
       { method = "LEVEL", species = "QUILAVA", level = 14 },
     },
-    spriteFront = "mods/expansion_pack/assets/cyndaquil_front.png",
-    spriteBack = "mods/expansion_pack/assets/cyndaquil_back.png",
+    spriteFront = "mods/Kanto-Reforged/assets/cyndaquil_front.png",
+    spriteBack = "mods/Kanto-Reforged/assets/cyndaquil_back.png",
     frontSize = 5,
     dexEntry = {
       kind = "FIRE MOUSE POKMON",
@@ -3175,8 +3175,8 @@ P.species = {
     evolutions = {
       { method = "LEVEL", species = "TYPHLOSION", level = 36 },
     },
-    spriteFront = "mods/expansion_pack/assets/quilava_front.png",
-    spriteBack = "mods/expansion_pack/assets/quilava_back.png",
+    spriteFront = "mods/Kanto-Reforged/assets/quilava_front.png",
+    spriteBack = "mods/Kanto-Reforged/assets/quilava_back.png",
     frontSize = 6,
     dexEntry = {
       kind = "VOLCANO POKMON",
@@ -3328,8 +3328,8 @@ P.species = {
     },
     evolutions = {
     },
-    spriteFront = "mods/expansion_pack/assets/typhlosion_front.png",
-    spriteBack = "mods/expansion_pack/assets/typhlosion_back.png",
+    spriteFront = "mods/Kanto-Reforged/assets/typhlosion_front.png",
+    spriteBack = "mods/Kanto-Reforged/assets/typhlosion_back.png",
     frontSize = 7,
     dexEntry = {
       kind = "VOLCANO POKMON",
@@ -3459,8 +3459,8 @@ P.species = {
     evolutions = {
       { method = "LEVEL", species = "CROCONAW", level = 18 },
     },
-    spriteFront = "mods/expansion_pack/assets/totodile_front.png",
-    spriteBack = "mods/expansion_pack/assets/totodile_back.png",
+    spriteFront = "mods/Kanto-Reforged/assets/totodile_front.png",
+    spriteBack = "mods/Kanto-Reforged/assets/totodile_back.png",
     frontSize = 5,
     dexEntry = {
       kind = "BIG JAW POKMON",
@@ -3597,8 +3597,8 @@ P.species = {
     evolutions = {
       { method = "LEVEL", species = "FERALIGATR", level = 30 },
     },
-    spriteFront = "mods/expansion_pack/assets/croconaw_front.png",
-    spriteBack = "mods/expansion_pack/assets/croconaw_back.png",
+    spriteFront = "mods/Kanto-Reforged/assets/croconaw_front.png",
+    spriteBack = "mods/Kanto-Reforged/assets/croconaw_back.png",
     frontSize = 6,
     dexEntry = {
       kind = "BIG JAW POKMON",
@@ -3755,8 +3755,8 @@ P.species = {
     },
     evolutions = {
     },
-    spriteFront = "mods/expansion_pack/assets/feraligatr_front.png",
-    spriteBack = "mods/expansion_pack/assets/feraligatr_back.png",
+    spriteFront = "mods/Kanto-Reforged/assets/feraligatr_front.png",
+    spriteBack = "mods/Kanto-Reforged/assets/feraligatr_back.png",
     frontSize = 7,
     dexEntry = {
       kind = "BIG JAW POKMON",
@@ -3895,8 +3895,8 @@ P.species = {
     evolutions = {
       { method = "LEVEL", species = "FURRET", level = 15 },
     },
-    spriteFront = "mods/expansion_pack/assets/sentret_front.png",
-    spriteBack = "mods/expansion_pack/assets/sentret_back.png",
+    spriteFront = "mods/Kanto-Reforged/assets/sentret_front.png",
+    spriteBack = "mods/Kanto-Reforged/assets/sentret_back.png",
     frontSize = 6,
     dexEntry = {
       kind = "SCOUT POKMON",
@@ -4046,8 +4046,8 @@ P.species = {
     },
     evolutions = {
     },
-    spriteFront = "mods/expansion_pack/assets/furret_front.png",
-    spriteBack = "mods/expansion_pack/assets/furret_back.png",
+    spriteFront = "mods/Kanto-Reforged/assets/furret_front.png",
+    spriteBack = "mods/Kanto-Reforged/assets/furret_back.png",
     frontSize = 7,
     dexEntry = {
       kind = "LONG BODY POKMON",
@@ -4178,8 +4178,8 @@ P.species = {
     evolutions = {
       { method = "LEVEL", species = "NOCTOWL", level = 20 },
     },
-    spriteFront = "mods/expansion_pack/assets/hoothoot_front.png",
-    spriteBack = "mods/expansion_pack/assets/hoothoot_back.png",
+    spriteFront = "mods/Kanto-Reforged/assets/hoothoot_front.png",
+    spriteBack = "mods/Kanto-Reforged/assets/hoothoot_back.png",
     frontSize = 5,
     dexEntry = {
       kind = "OWL POKMON",
@@ -4320,8 +4320,8 @@ P.species = {
     },
     evolutions = {
     },
-    spriteFront = "mods/expansion_pack/assets/noctowl_front.png",
-    spriteBack = "mods/expansion_pack/assets/noctowl_back.png",
+    spriteFront = "mods/Kanto-Reforged/assets/noctowl_front.png",
+    spriteBack = "mods/Kanto-Reforged/assets/noctowl_back.png",
     frontSize = 7,
     dexEntry = {
       kind = "OWL POKMON",
@@ -4426,8 +4426,8 @@ P.species = {
     evolutions = {
       { method = "LEVEL", species = "LEDIAN", level = 18 },
     },
-    spriteFront = "mods/expansion_pack/assets/ledyba_front.png",
-    spriteBack = "mods/expansion_pack/assets/ledyba_back.png",
+    spriteFront = "mods/Kanto-Reforged/assets/ledyba_front.png",
+    spriteBack = "mods/Kanto-Reforged/assets/ledyba_back.png",
     frontSize = 6,
     dexEntry = {
       kind = "FIVE STAR POKMON",
@@ -4539,8 +4539,8 @@ P.species = {
     },
     evolutions = {
     },
-    spriteFront = "mods/expansion_pack/assets/ledian_front.png",
-    spriteBack = "mods/expansion_pack/assets/ledian_back.png",
+    spriteFront = "mods/Kanto-Reforged/assets/ledian_front.png",
+    spriteBack = "mods/Kanto-Reforged/assets/ledian_back.png",
     frontSize = 7,
     dexEntry = {
       kind = "FIVE STAR POKMON",
@@ -4655,8 +4655,8 @@ P.species = {
     evolutions = {
       { method = "LEVEL", species = "ARIADOS", level = 22 },
     },
-    spriteFront = "mods/expansion_pack/assets/spinarak_front.png",
-    spriteBack = "mods/expansion_pack/assets/spinarak_back.png",
+    spriteFront = "mods/Kanto-Reforged/assets/spinarak_front.png",
+    spriteBack = "mods/Kanto-Reforged/assets/spinarak_back.png",
     frontSize = 5,
     dexEntry = {
       kind = "STRING SPIT POKMON",
@@ -4788,8 +4788,8 @@ P.species = {
     },
     evolutions = {
     },
-    spriteFront = "mods/expansion_pack/assets/ariados_front.png",
-    spriteBack = "mods/expansion_pack/assets/ariados_back.png",
+    spriteFront = "mods/Kanto-Reforged/assets/ariados_front.png",
+    spriteBack = "mods/Kanto-Reforged/assets/ariados_back.png",
     frontSize = 6,
     dexEntry = {
       kind = "LONG LEG POKMON",
@@ -4920,8 +4920,8 @@ P.species = {
     },
     evolutions = {
     },
-    spriteFront = "mods/expansion_pack/assets/crobat_front.png",
-    spriteBack = "mods/expansion_pack/assets/crobat_back.png",
+    spriteFront = "mods/Kanto-Reforged/assets/crobat_front.png",
+    spriteBack = "mods/Kanto-Reforged/assets/crobat_back.png",
     frontSize = 7,
     dexEntry = {
       kind = "BAT POKMON",
@@ -5040,8 +5040,8 @@ P.species = {
     evolutions = {
       { method = "LEVEL", species = "LANTURN", level = 27 },
     },
-    spriteFront = "mods/expansion_pack/assets/chinchou_front.png",
-    spriteBack = "mods/expansion_pack/assets/chinchou_back.png",
+    spriteFront = "mods/Kanto-Reforged/assets/chinchou_front.png",
+    spriteBack = "mods/Kanto-Reforged/assets/chinchou_back.png",
     frontSize = 5,
     dexEntry = {
       kind = "ANGLER POKMON",
@@ -5175,8 +5175,8 @@ P.species = {
     },
     evolutions = {
     },
-    spriteFront = "mods/expansion_pack/assets/lanturn_front.png",
-    spriteBack = "mods/expansion_pack/assets/lanturn_back.png",
+    spriteFront = "mods/Kanto-Reforged/assets/lanturn_front.png",
+    spriteBack = "mods/Kanto-Reforged/assets/lanturn_back.png",
     frontSize = 6,
     dexEntry = {
       kind = "LIGHT POKMON",
@@ -5292,8 +5292,8 @@ P.species = {
     evolutions = {
       { method = "LEVEL", species = "PIKACHU", level = 15 },
     },
-    spriteFront = "mods/expansion_pack/assets/pichu_front.png",
-    spriteBack = "mods/expansion_pack/assets/pichu_back.png",
+    spriteFront = "mods/Kanto-Reforged/assets/pichu_front.png",
+    spriteBack = "mods/Kanto-Reforged/assets/pichu_back.png",
     frontSize = 5,
     dexEntry = {
       kind = "TINY MOUSE POKMON",
@@ -5435,8 +5435,8 @@ P.species = {
     evolutions = {
       { method = "LEVEL", species = "CLEFAIRY", level = 15 },
     },
-    spriteFront = "mods/expansion_pack/assets/cleffa_front.png",
-    spriteBack = "mods/expansion_pack/assets/cleffa_back.png",
+    spriteFront = "mods/Kanto-Reforged/assets/cleffa_front.png",
+    spriteBack = "mods/Kanto-Reforged/assets/cleffa_back.png",
     frontSize = 5,
     dexEntry = {
       kind = "STAR SHAPE POKMON",
@@ -5563,8 +5563,8 @@ P.species = {
     evolutions = {
       { method = "LEVEL", species = "JIGGLYPUFF", level = 15 },
     },
-    spriteFront = "mods/expansion_pack/assets/igglybuff_front.png",
-    spriteBack = "mods/expansion_pack/assets/igglybuff_back.png",
+    spriteFront = "mods/Kanto-Reforged/assets/igglybuff_front.png",
+    spriteBack = "mods/Kanto-Reforged/assets/igglybuff_back.png",
     frontSize = 5,
     dexEntry = {
       kind = "BALLOON POKMON",
@@ -5700,8 +5700,8 @@ P.species = {
     evolutions = {
       { method = "LEVEL", species = "TOGETIC", level = 20 },
     },
-    spriteFront = "mods/expansion_pack/assets/togepi_front.png",
-    spriteBack = "mods/expansion_pack/assets/togepi_back.png",
+    spriteFront = "mods/Kanto-Reforged/assets/togepi_front.png",
+    spriteBack = "mods/Kanto-Reforged/assets/togepi_back.png",
     frontSize = 5,
     dexEntry = {
       kind = "SPIKE BALL POKMON",
@@ -5862,8 +5862,8 @@ P.species = {
     },
     evolutions = {
     },
-    spriteFront = "mods/expansion_pack/assets/togetic_front.png",
-    spriteBack = "mods/expansion_pack/assets/togetic_back.png",
+    spriteFront = "mods/Kanto-Reforged/assets/togetic_front.png",
+    spriteBack = "mods/Kanto-Reforged/assets/togetic_back.png",
     frontSize = 5,
     dexEntry = {
       kind = "HAPPINESS POKMON",
@@ -5981,8 +5981,8 @@ P.species = {
     evolutions = {
       { method = "LEVEL", species = "XATU", level = 25 },
     },
-    spriteFront = "mods/expansion_pack/assets/natu_front.png",
-    spriteBack = "mods/expansion_pack/assets/natu_back.png",
+    spriteFront = "mods/Kanto-Reforged/assets/natu_front.png",
+    spriteBack = "mods/Kanto-Reforged/assets/natu_back.png",
     frontSize = 5,
     dexEntry = {
       kind = "TINY BIRD POKMON",
@@ -6112,8 +6112,8 @@ P.species = {
     },
     evolutions = {
     },
-    spriteFront = "mods/expansion_pack/assets/xatu_front.png",
-    spriteBack = "mods/expansion_pack/assets/xatu_back.png",
+    spriteFront = "mods/Kanto-Reforged/assets/xatu_front.png",
+    spriteBack = "mods/Kanto-Reforged/assets/xatu_back.png",
     frontSize = 7,
     dexEntry = {
       kind = "MYSTIC POKMON",
@@ -6225,8 +6225,8 @@ P.species = {
     evolutions = {
       { method = "LEVEL", species = "FLAAFFY", level = 15 },
     },
-    spriteFront = "mods/expansion_pack/assets/mareep_front.png",
-    spriteBack = "mods/expansion_pack/assets/mareep_back.png",
+    spriteFront = "mods/Kanto-Reforged/assets/mareep_front.png",
+    spriteBack = "mods/Kanto-Reforged/assets/mareep_back.png",
     frontSize = 5,
     dexEntry = {
       kind = "WOOL POKMON",
@@ -6352,8 +6352,8 @@ P.species = {
     evolutions = {
       { method = "LEVEL", species = "AMPHAROS", level = 30 },
     },
-    spriteFront = "mods/expansion_pack/assets/flaaffy_front.png",
-    spriteBack = "mods/expansion_pack/assets/flaaffy_back.png",
+    spriteFront = "mods/Kanto-Reforged/assets/flaaffy_front.png",
+    spriteBack = "mods/Kanto-Reforged/assets/flaaffy_back.png",
     frontSize = 6,
     dexEntry = {
       kind = "WOOL POKMON",
@@ -6505,8 +6505,8 @@ P.species = {
     },
     evolutions = {
     },
-    spriteFront = "mods/expansion_pack/assets/ampharos_front.png",
-    spriteBack = "mods/expansion_pack/assets/ampharos_back.png",
+    spriteFront = "mods/Kanto-Reforged/assets/ampharos_front.png",
+    spriteBack = "mods/Kanto-Reforged/assets/ampharos_back.png",
     frontSize = 7,
     dexEntry = {
       kind = "LIGHT POKMON",
@@ -6646,8 +6646,8 @@ P.species = {
     },
     evolutions = {
     },
-    spriteFront = "mods/expansion_pack/assets/bellossom_front.png",
-    spriteBack = "mods/expansion_pack/assets/bellossom_back.png",
+    spriteFront = "mods/Kanto-Reforged/assets/bellossom_front.png",
+    spriteBack = "mods/Kanto-Reforged/assets/bellossom_back.png",
     frontSize = 5,
     dexEntry = {
       kind = "FLOWER POKMON",
@@ -6796,8 +6796,8 @@ P.species = {
     evolutions = {
       { method = "LEVEL", species = "AZUMARILL", level = 18 },
     },
-    spriteFront = "mods/expansion_pack/assets/marill_front.png",
-    spriteBack = "mods/expansion_pack/assets/marill_back.png",
+    spriteFront = "mods/Kanto-Reforged/assets/marill_front.png",
+    spriteBack = "mods/Kanto-Reforged/assets/marill_back.png",
     frontSize = 5,
     dexEntry = {
       kind = "AQUA MOUSE POKMON",
@@ -6949,8 +6949,8 @@ P.species = {
     },
     evolutions = {
     },
-    spriteFront = "mods/expansion_pack/assets/azumarill_front.png",
-    spriteBack = "mods/expansion_pack/assets/azumarill_back.png",
+    spriteFront = "mods/Kanto-Reforged/assets/azumarill_front.png",
+    spriteBack = "mods/Kanto-Reforged/assets/azumarill_back.png",
     frontSize = 6,
     dexEntry = {
       kind = "AQUA RABBIT POKMON",
@@ -7103,8 +7103,8 @@ P.species = {
     },
     evolutions = {
     },
-    spriteFront = "mods/expansion_pack/assets/sudowoodo_front.png",
-    spriteBack = "mods/expansion_pack/assets/sudowoodo_back.png",
+    spriteFront = "mods/Kanto-Reforged/assets/sudowoodo_front.png",
+    spriteBack = "mods/Kanto-Reforged/assets/sudowoodo_back.png",
     frontSize = 6,
     dexEntry = {
       kind = "IMITATION POKMON",
@@ -7253,8 +7253,8 @@ P.species = {
     },
     evolutions = {
     },
-    spriteFront = "mods/expansion_pack/assets/politoed_front.png",
-    spriteBack = "mods/expansion_pack/assets/politoed_back.png",
+    spriteFront = "mods/Kanto-Reforged/assets/politoed_front.png",
+    spriteBack = "mods/Kanto-Reforged/assets/politoed_back.png",
     frontSize = 6,
     dexEntry = {
       kind = "FROG POKMON",
@@ -7374,8 +7374,8 @@ P.species = {
     evolutions = {
       { method = "LEVEL", species = "SKIPLOOM", level = 18 },
     },
-    spriteFront = "mods/expansion_pack/assets/hoppip_front.png",
-    spriteBack = "mods/expansion_pack/assets/hoppip_back.png",
+    spriteFront = "mods/Kanto-Reforged/assets/hoppip_front.png",
+    spriteBack = "mods/Kanto-Reforged/assets/hoppip_back.png",
     frontSize = 5,
     dexEntry = {
       kind = "COTTONWEED POKMON",
@@ -7496,8 +7496,8 @@ P.species = {
     evolutions = {
       { method = "LEVEL", species = "JUMPLUFF", level = 27 },
     },
-    spriteFront = "mods/expansion_pack/assets/skiploom_front.png",
-    spriteBack = "mods/expansion_pack/assets/skiploom_back.png",
+    spriteFront = "mods/Kanto-Reforged/assets/skiploom_front.png",
+    spriteBack = "mods/Kanto-Reforged/assets/skiploom_back.png",
     frontSize = 5,
     dexEntry = {
       kind = "COTTONWEED POKMON",
@@ -7620,8 +7620,8 @@ P.species = {
     },
     evolutions = {
     },
-    spriteFront = "mods/expansion_pack/assets/jumpluff_front.png",
-    spriteBack = "mods/expansion_pack/assets/jumpluff_back.png",
+    spriteFront = "mods/Kanto-Reforged/assets/jumpluff_front.png",
+    spriteBack = "mods/Kanto-Reforged/assets/jumpluff_back.png",
     frontSize = 6,
     dexEntry = {
       kind = "COTTONWEED POKMON",
@@ -7763,8 +7763,8 @@ P.species = {
     },
     evolutions = {
     },
-    spriteFront = "mods/expansion_pack/assets/aipom_front.png",
-    spriteBack = "mods/expansion_pack/assets/aipom_back.png",
+    spriteFront = "mods/Kanto-Reforged/assets/aipom_front.png",
+    spriteBack = "mods/Kanto-Reforged/assets/aipom_back.png",
     frontSize = 6,
     dexEntry = {
       kind = "LONG TAIL POKMON",
@@ -7869,8 +7869,8 @@ P.species = {
     evolutions = {
       { method = "ITEM", species = "SUNFLORA", item = "MOON_STONE" },
     },
-    spriteFront = "mods/expansion_pack/assets/sunkern_front.png",
-    spriteBack = "mods/expansion_pack/assets/sunkern_back.png",
+    spriteFront = "mods/Kanto-Reforged/assets/sunkern_front.png",
+    spriteBack = "mods/Kanto-Reforged/assets/sunkern_back.png",
     frontSize = 5,
     dexEntry = {
       kind = "SEED POKMON",
@@ -7990,8 +7990,8 @@ P.species = {
     },
     evolutions = {
     },
-    spriteFront = "mods/expansion_pack/assets/sunflora_front.png",
-    spriteBack = "mods/expansion_pack/assets/sunflora_back.png",
+    spriteFront = "mods/Kanto-Reforged/assets/sunflora_front.png",
+    spriteBack = "mods/Kanto-Reforged/assets/sunflora_back.png",
     frontSize = 6,
     dexEntry = {
       kind = "SUN POKMON",
@@ -8110,8 +8110,8 @@ P.species = {
     },
     evolutions = {
     },
-    spriteFront = "mods/expansion_pack/assets/yanma_front.png",
-    spriteBack = "mods/expansion_pack/assets/yanma_back.png",
+    spriteFront = "mods/Kanto-Reforged/assets/yanma_front.png",
+    spriteBack = "mods/Kanto-Reforged/assets/yanma_back.png",
     frontSize = 6,
     dexEntry = {
       kind = "CLEAR WING POKMON",
@@ -8240,8 +8240,8 @@ P.species = {
     evolutions = {
       { method = "LEVEL", species = "QUAGSIRE", level = 20 },
     },
-    spriteFront = "mods/expansion_pack/assets/wooper_front.png",
-    spriteBack = "mods/expansion_pack/assets/wooper_back.png",
+    spriteFront = "mods/Kanto-Reforged/assets/wooper_front.png",
+    spriteBack = "mods/Kanto-Reforged/assets/wooper_back.png",
     frontSize = 5,
     dexEntry = {
       kind = "WATER FISH POKMON",
@@ -8387,8 +8387,8 @@ P.species = {
     },
     evolutions = {
     },
-    spriteFront = "mods/expansion_pack/assets/quagsire_front.png",
-    spriteBack = "mods/expansion_pack/assets/quagsire_back.png",
+    spriteFront = "mods/Kanto-Reforged/assets/quagsire_front.png",
+    spriteBack = "mods/Kanto-Reforged/assets/quagsire_back.png",
     frontSize = 7,
     dexEntry = {
       kind = "WATER FISH POKMON",
@@ -8546,8 +8546,8 @@ P.species = {
     },
     evolutions = {
     },
-    spriteFront = "mods/expansion_pack/assets/espeon_front.png",
-    spriteBack = "mods/expansion_pack/assets/espeon_back.png",
+    spriteFront = "mods/Kanto-Reforged/assets/espeon_front.png",
+    spriteBack = "mods/Kanto-Reforged/assets/espeon_back.png",
     frontSize = 6,
     dexEntry = {
       kind = "SUN POKMON",
@@ -8709,8 +8709,8 @@ P.species = {
     },
     evolutions = {
     },
-    spriteFront = "mods/expansion_pack/assets/umbreon_front.png",
-    spriteBack = "mods/expansion_pack/assets/umbreon_back.png",
+    spriteFront = "mods/Kanto-Reforged/assets/umbreon_front.png",
+    spriteBack = "mods/Kanto-Reforged/assets/umbreon_back.png",
     frontSize = 6,
     dexEntry = {
       kind = "MOONLIGHT POKMON",
@@ -8849,8 +8849,8 @@ P.species = {
     },
     evolutions = {
     },
-    spriteFront = "mods/expansion_pack/assets/murkrow_front.png",
-    spriteBack = "mods/expansion_pack/assets/murkrow_back.png",
+    spriteFront = "mods/Kanto-Reforged/assets/murkrow_front.png",
+    spriteBack = "mods/Kanto-Reforged/assets/murkrow_back.png",
     frontSize = 5,
     dexEntry = {
       kind = "DARKNESS POKMON",
@@ -9032,8 +9032,8 @@ P.species = {
     },
     evolutions = {
     },
-    spriteFront = "mods/expansion_pack/assets/slowking_front.png",
-    spriteBack = "mods/expansion_pack/assets/slowking_back.png",
+    spriteFront = "mods/Kanto-Reforged/assets/slowking_front.png",
+    spriteBack = "mods/Kanto-Reforged/assets/slowking_back.png",
     frontSize = 7,
     dexEntry = {
       kind = "ROYAL POKMON",
@@ -9175,8 +9175,8 @@ P.species = {
     },
     evolutions = {
     },
-    spriteFront = "mods/expansion_pack/assets/misdreavus_front.png",
-    spriteBack = "mods/expansion_pack/assets/misdreavus_back.png",
+    spriteFront = "mods/Kanto-Reforged/assets/misdreavus_front.png",
+    spriteBack = "mods/Kanto-Reforged/assets/misdreavus_back.png",
     frontSize = 5,
     dexEntry = {
       kind = "SCREECH POKMON",
@@ -9215,8 +9215,8 @@ P.species = {
     },
     evolutions = {
     },
-    spriteFront = "mods/expansion_pack/assets/unown_front.png",
-    spriteBack = "mods/expansion_pack/assets/unown_back.png",
+    spriteFront = "mods/Kanto-Reforged/assets/unown_front.png",
+    spriteBack = "mods/Kanto-Reforged/assets/unown_back.png",
     frontSize = 5,
     dexEntry = {
       kind = "SYMBOL POKMON",
@@ -9276,8 +9276,8 @@ P.species = {
     },
     evolutions = {
     },
-    spriteFront = "mods/expansion_pack/assets/wobbuffet_front.png",
-    spriteBack = "mods/expansion_pack/assets/wobbuffet_back.png",
+    spriteFront = "mods/Kanto-Reforged/assets/wobbuffet_front.png",
+    spriteBack = "mods/Kanto-Reforged/assets/wobbuffet_back.png",
     frontSize = 7,
     dexEntry = {
       kind = "PATIENT POKMON",
@@ -9428,8 +9428,8 @@ P.species = {
     },
     evolutions = {
     },
-    spriteFront = "mods/expansion_pack/assets/girafarig_front.png",
-    spriteBack = "mods/expansion_pack/assets/girafarig_back.png",
+    spriteFront = "mods/Kanto-Reforged/assets/girafarig_front.png",
+    spriteBack = "mods/Kanto-Reforged/assets/girafarig_back.png",
     frontSize = 7,
     dexEntry = {
       kind = "LONG NECK POKMON",
@@ -9551,8 +9551,8 @@ P.species = {
     evolutions = {
       { method = "LEVEL", species = "FORRETRESS", level = 31 },
     },
-    spriteFront = "mods/expansion_pack/assets/pineco_front.png",
-    spriteBack = "mods/expansion_pack/assets/pineco_back.png",
+    spriteFront = "mods/Kanto-Reforged/assets/pineco_front.png",
+    spriteBack = "mods/Kanto-Reforged/assets/pineco_back.png",
     frontSize = 5,
     dexEntry = {
       kind = "BAGWORM POKMON",
@@ -9707,8 +9707,8 @@ P.species = {
     },
     evolutions = {
     },
-    spriteFront = "mods/expansion_pack/assets/forretress_front.png",
-    spriteBack = "mods/expansion_pack/assets/forretress_back.png",
+    spriteFront = "mods/Kanto-Reforged/assets/forretress_front.png",
+    spriteBack = "mods/Kanto-Reforged/assets/forretress_back.png",
     frontSize = 6,
     dexEntry = {
       kind = "BAGWORM POKMON",
@@ -9865,8 +9865,8 @@ P.species = {
     },
     evolutions = {
     },
-    spriteFront = "mods/expansion_pack/assets/dunsparce_front.png",
-    spriteBack = "mods/expansion_pack/assets/dunsparce_back.png",
+    spriteFront = "mods/Kanto-Reforged/assets/dunsparce_front.png",
+    spriteBack = "mods/Kanto-Reforged/assets/dunsparce_back.png",
     frontSize = 7,
     dexEntry = {
       kind = "LAND SNAKE POKMON",
@@ -10015,8 +10015,8 @@ P.species = {
     },
     evolutions = {
     },
-    spriteFront = "mods/expansion_pack/assets/gligar_front.png",
-    spriteBack = "mods/expansion_pack/assets/gligar_back.png",
+    spriteFront = "mods/Kanto-Reforged/assets/gligar_front.png",
+    spriteBack = "mods/Kanto-Reforged/assets/gligar_back.png",
     frontSize = 6,
     dexEntry = {
       kind = "FLY SCORPION POKMON",
@@ -10173,8 +10173,8 @@ P.species = {
     },
     evolutions = {
     },
-    spriteFront = "mods/expansion_pack/assets/steelix_front.png",
-    spriteBack = "mods/expansion_pack/assets/steelix_back.png",
+    spriteFront = "mods/Kanto-Reforged/assets/steelix_front.png",
+    spriteBack = "mods/Kanto-Reforged/assets/steelix_back.png",
     frontSize = 7,
     dexEntry = {
       kind = "IRON SNAKE POKMON",
@@ -10330,8 +10330,8 @@ P.species = {
     evolutions = {
       { method = "LEVEL", species = "GRANBULL", level = 23 },
     },
-    spriteFront = "mods/expansion_pack/assets/snubbull_front.png",
-    spriteBack = "mods/expansion_pack/assets/snubbull_back.png",
+    spriteFront = "mods/Kanto-Reforged/assets/snubbull_front.png",
+    spriteBack = "mods/Kanto-Reforged/assets/snubbull_back.png",
     frontSize = 5,
     dexEntry = {
       kind = "FAIRY POKMON",
@@ -10498,8 +10498,8 @@ P.species = {
     },
     evolutions = {
     },
-    spriteFront = "mods/expansion_pack/assets/granbull_front.png",
-    spriteBack = "mods/expansion_pack/assets/granbull_back.png",
+    spriteFront = "mods/Kanto-Reforged/assets/granbull_front.png",
+    spriteBack = "mods/Kanto-Reforged/assets/granbull_back.png",
     frontSize = 7,
     dexEntry = {
       kind = "FAIRY POKMON",
@@ -10643,8 +10643,8 @@ P.species = {
     },
     evolutions = {
     },
-    spriteFront = "mods/expansion_pack/assets/qwilfish_front.png",
-    spriteBack = "mods/expansion_pack/assets/qwilfish_back.png",
+    spriteFront = "mods/Kanto-Reforged/assets/qwilfish_front.png",
+    spriteBack = "mods/Kanto-Reforged/assets/qwilfish_back.png",
     frontSize = 5,
     dexEntry = {
       kind = "BALLOON POKMON",
@@ -10799,8 +10799,8 @@ P.species = {
     },
     evolutions = {
     },
-    spriteFront = "mods/expansion_pack/assets/scizor_front.png",
-    spriteBack = "mods/expansion_pack/assets/scizor_back.png",
+    spriteFront = "mods/Kanto-Reforged/assets/scizor_front.png",
+    spriteBack = "mods/Kanto-Reforged/assets/scizor_back.png",
     frontSize = 7,
     dexEntry = {
       kind = "PINCER POKMON",
@@ -10917,8 +10917,8 @@ P.species = {
     },
     evolutions = {
     },
-    spriteFront = "mods/expansion_pack/assets/shuckle_front.png",
-    spriteBack = "mods/expansion_pack/assets/shuckle_back.png",
+    spriteFront = "mods/Kanto-Reforged/assets/shuckle_front.png",
+    spriteBack = "mods/Kanto-Reforged/assets/shuckle_back.png",
     frontSize = 5,
     dexEntry = {
       kind = "MOLD POKMON",
@@ -11068,8 +11068,8 @@ P.species = {
     },
     evolutions = {
     },
-    spriteFront = "mods/expansion_pack/assets/heracross_front.png",
-    spriteBack = "mods/expansion_pack/assets/heracross_back.png",
+    spriteFront = "mods/Kanto-Reforged/assets/heracross_front.png",
+    spriteBack = "mods/Kanto-Reforged/assets/heracross_back.png",
     frontSize = 7,
     dexEntry = {
       kind = "SINGLE HORN POKMON",
@@ -11226,8 +11226,8 @@ P.species = {
     },
     evolutions = {
     },
-    spriteFront = "mods/expansion_pack/assets/sneasel_front.png",
-    spriteBack = "mods/expansion_pack/assets/sneasel_back.png",
+    spriteFront = "mods/Kanto-Reforged/assets/sneasel_front.png",
+    spriteBack = "mods/Kanto-Reforged/assets/sneasel_back.png",
     frontSize = 6,
     dexEntry = {
       kind = "SHARP CLAW POKMON",
@@ -11371,8 +11371,8 @@ P.species = {
     evolutions = {
       { method = "LEVEL", species = "URSARING", level = 30 },
     },
-    spriteFront = "mods/expansion_pack/assets/teddiursa_front.png",
-    spriteBack = "mods/expansion_pack/assets/teddiursa_back.png",
+    spriteFront = "mods/Kanto-Reforged/assets/teddiursa_front.png",
+    spriteBack = "mods/Kanto-Reforged/assets/teddiursa_back.png",
     frontSize = 5,
     dexEntry = {
       kind = "LITTLE BEAR POKMON",
@@ -11529,8 +11529,8 @@ P.species = {
     },
     evolutions = {
     },
-    spriteFront = "mods/expansion_pack/assets/ursaring_front.png",
-    spriteBack = "mods/expansion_pack/assets/ursaring_back.png",
+    spriteFront = "mods/Kanto-Reforged/assets/ursaring_front.png",
+    spriteBack = "mods/Kanto-Reforged/assets/ursaring_back.png",
     frontSize = 7,
     dexEntry = {
       kind = "HIBERNATOR POKMON",
@@ -11643,8 +11643,8 @@ P.species = {
     evolutions = {
       { method = "LEVEL", species = "MAGCARGO", level = 38 },
     },
-    spriteFront = "mods/expansion_pack/assets/slugma_front.png",
-    spriteBack = "mods/expansion_pack/assets/slugma_back.png",
+    spriteFront = "mods/Kanto-Reforged/assets/slugma_front.png",
+    spriteBack = "mods/Kanto-Reforged/assets/slugma_back.png",
     frontSize = 5,
     dexEntry = {
       kind = "LAVA POKMON",
@@ -11774,8 +11774,8 @@ P.species = {
     },
     evolutions = {
     },
-    spriteFront = "mods/expansion_pack/assets/magcargo_front.png",
-    spriteBack = "mods/expansion_pack/assets/magcargo_back.png",
+    spriteFront = "mods/Kanto-Reforged/assets/magcargo_front.png",
+    spriteBack = "mods/Kanto-Reforged/assets/magcargo_back.png",
     frontSize = 6,
     dexEntry = {
       kind = "LAVA POKMON",
@@ -11900,8 +11900,8 @@ P.species = {
     evolutions = {
       { method = "LEVEL", species = "PILOSWINE", level = 33 },
     },
-    spriteFront = "mods/expansion_pack/assets/swinub_front.png",
-    spriteBack = "mods/expansion_pack/assets/swinub_back.png",
+    spriteFront = "mods/Kanto-Reforged/assets/swinub_front.png",
+    spriteBack = "mods/Kanto-Reforged/assets/swinub_back.png",
     frontSize = 5,
     dexEntry = {
       kind = "PIG POKMON",
@@ -12044,8 +12044,8 @@ P.species = {
     },
     evolutions = {
     },
-    spriteFront = "mods/expansion_pack/assets/piloswine_front.png",
-    spriteBack = "mods/expansion_pack/assets/piloswine_back.png",
+    spriteFront = "mods/Kanto-Reforged/assets/piloswine_front.png",
+    spriteBack = "mods/Kanto-Reforged/assets/piloswine_back.png",
     frontSize = 6,
     dexEntry = {
       kind = "SWINE POKMON",
@@ -12171,8 +12171,8 @@ P.species = {
     },
     evolutions = {
     },
-    spriteFront = "mods/expansion_pack/assets/corsola_front.png",
-    spriteBack = "mods/expansion_pack/assets/corsola_back.png",
+    spriteFront = "mods/Kanto-Reforged/assets/corsola_front.png",
+    spriteBack = "mods/Kanto-Reforged/assets/corsola_back.png",
     frontSize = 5,
     dexEntry = {
       kind = "CORAL POKMON",
@@ -12284,8 +12284,8 @@ P.species = {
     evolutions = {
       { method = "LEVEL", species = "OCTILLERY", level = 25 },
     },
-    spriteFront = "mods/expansion_pack/assets/remoraid_front.png",
-    spriteBack = "mods/expansion_pack/assets/remoraid_back.png",
+    spriteFront = "mods/Kanto-Reforged/assets/remoraid_front.png",
+    spriteBack = "mods/Kanto-Reforged/assets/remoraid_back.png",
     frontSize = 5,
     dexEntry = {
       kind = "JET POKMON",
@@ -12419,8 +12419,8 @@ P.species = {
     },
     evolutions = {
     },
-    spriteFront = "mods/expansion_pack/assets/octillery_front.png",
-    spriteBack = "mods/expansion_pack/assets/octillery_back.png",
+    spriteFront = "mods/Kanto-Reforged/assets/octillery_front.png",
+    spriteBack = "mods/Kanto-Reforged/assets/octillery_back.png",
     frontSize = 6,
     dexEntry = {
       kind = "JET POKMON",
@@ -12541,8 +12541,8 @@ P.species = {
     },
     evolutions = {
     },
-    spriteFront = "mods/expansion_pack/assets/delibird_front.png",
-    spriteBack = "mods/expansion_pack/assets/delibird_back.png",
+    spriteFront = "mods/Kanto-Reforged/assets/delibird_front.png",
+    spriteBack = "mods/Kanto-Reforged/assets/delibird_back.png",
     frontSize = 6,
     dexEntry = {
       kind = "DELIVERY POKMON",
@@ -12672,8 +12672,8 @@ P.species = {
     },
     evolutions = {
     },
-    spriteFront = "mods/expansion_pack/assets/mantine_front.png",
-    spriteBack = "mods/expansion_pack/assets/mantine_back.png",
+    spriteFront = "mods/Kanto-Reforged/assets/mantine_front.png",
+    spriteBack = "mods/Kanto-Reforged/assets/mantine_back.png",
     frontSize = 7,
     dexEntry = {
       kind = "KITE POKMON",
@@ -12804,8 +12804,8 @@ P.species = {
     },
     evolutions = {
     },
-    spriteFront = "mods/expansion_pack/assets/skarmory_front.png",
-    spriteBack = "mods/expansion_pack/assets/skarmory_back.png",
+    spriteFront = "mods/Kanto-Reforged/assets/skarmory_front.png",
+    spriteBack = "mods/Kanto-Reforged/assets/skarmory_back.png",
     frontSize = 7,
     dexEntry = {
       kind = "ARMOR BIRD POKMON",
@@ -12941,8 +12941,8 @@ P.species = {
     evolutions = {
       { method = "LEVEL", species = "HOUNDOOM", level = 24 },
     },
-    spriteFront = "mods/expansion_pack/assets/houndour_front.png",
-    spriteBack = "mods/expansion_pack/assets/houndour_back.png",
+    spriteFront = "mods/Kanto-Reforged/assets/houndour_front.png",
+    spriteBack = "mods/Kanto-Reforged/assets/houndour_back.png",
     frontSize = 5,
     dexEntry = {
       kind = "DARK POKMON",
@@ -13088,8 +13088,8 @@ P.species = {
     },
     evolutions = {
     },
-    spriteFront = "mods/expansion_pack/assets/houndoom_front.png",
-    spriteBack = "mods/expansion_pack/assets/houndoom_back.png",
+    spriteFront = "mods/Kanto-Reforged/assets/houndoom_front.png",
+    spriteBack = "mods/Kanto-Reforged/assets/houndoom_back.png",
     frontSize = 7,
     dexEntry = {
       kind = "DARK POKMON",
@@ -13216,8 +13216,8 @@ P.species = {
     },
     evolutions = {
     },
-    spriteFront = "mods/expansion_pack/assets/kingdra_front.png",
-    spriteBack = "mods/expansion_pack/assets/kingdra_back.png",
+    spriteFront = "mods/Kanto-Reforged/assets/kingdra_front.png",
+    spriteBack = "mods/Kanto-Reforged/assets/kingdra_back.png",
     frontSize = 7,
     dexEntry = {
       kind = "DRAGON POKMON",
@@ -13334,8 +13334,8 @@ P.species = {
     evolutions = {
       { method = "LEVEL", species = "DONPHAN", level = 25 },
     },
-    spriteFront = "mods/expansion_pack/assets/phanpy_front.png",
-    spriteBack = "mods/expansion_pack/assets/phanpy_back.png",
+    spriteFront = "mods/Kanto-Reforged/assets/phanpy_front.png",
+    spriteBack = "mods/Kanto-Reforged/assets/phanpy_back.png",
     frontSize = 5,
     dexEntry = {
       kind = "LONG NOSE POKMON",
@@ -13490,8 +13490,8 @@ P.species = {
     },
     evolutions = {
     },
-    spriteFront = "mods/expansion_pack/assets/donphan_front.png",
-    spriteBack = "mods/expansion_pack/assets/donphan_back.png",
+    spriteFront = "mods/Kanto-Reforged/assets/donphan_front.png",
+    spriteBack = "mods/Kanto-Reforged/assets/donphan_back.png",
     frontSize = 6,
     dexEntry = {
       kind = "ARMOR POKMON",
@@ -13616,8 +13616,8 @@ P.species = {
     },
     evolutions = {
     },
-    spriteFront = "mods/expansion_pack/assets/porygon2_front.png",
-    spriteBack = "mods/expansion_pack/assets/porygon2_back.png",
+    spriteFront = "mods/Kanto-Reforged/assets/porygon2_front.png",
+    spriteBack = "mods/Kanto-Reforged/assets/porygon2_back.png",
     frontSize = 5,
     dexEntry = {
       kind = "VIRTUAL POKMON",
@@ -13753,8 +13753,8 @@ P.species = {
     },
     evolutions = {
     },
-    spriteFront = "mods/expansion_pack/assets/stantler_front.png",
-    spriteBack = "mods/expansion_pack/assets/stantler_back.png",
+    spriteFront = "mods/Kanto-Reforged/assets/stantler_front.png",
+    spriteBack = "mods/Kanto-Reforged/assets/stantler_back.png",
     frontSize = 7,
     dexEntry = {
       kind = "BIG HORN POKMON",
@@ -13792,8 +13792,8 @@ P.species = {
     },
     evolutions = {
     },
-    spriteFront = "mods/expansion_pack/assets/smeargle_front.png",
-    spriteBack = "mods/expansion_pack/assets/smeargle_back.png",
+    spriteFront = "mods/Kanto-Reforged/assets/smeargle_front.png",
+    spriteBack = "mods/Kanto-Reforged/assets/smeargle_back.png",
     frontSize = 6,
     dexEntry = {
       kind = "PAINTER POKMON",
@@ -13890,8 +13890,8 @@ P.species = {
       { method = "LEVEL", species = "HITMONCHAN", level = 20 },
       { method = "LEVEL", species = "HITMONTOP", level = 20 },
     },
-    spriteFront = "mods/expansion_pack/assets/tyrogue_front.png",
-    spriteBack = "mods/expansion_pack/assets/tyrogue_back.png",
+    spriteFront = "mods/Kanto-Reforged/assets/tyrogue_front.png",
+    spriteBack = "mods/Kanto-Reforged/assets/tyrogue_back.png",
     frontSize = 5,
     dexEntry = {
       kind = "SCUFFLE POKMON",
@@ -14031,8 +14031,8 @@ P.species = {
     },
     evolutions = {
     },
-    spriteFront = "mods/expansion_pack/assets/hitmontop_front.png",
-    spriteBack = "mods/expansion_pack/assets/hitmontop_back.png",
+    spriteFront = "mods/Kanto-Reforged/assets/hitmontop_front.png",
+    spriteBack = "mods/Kanto-Reforged/assets/hitmontop_back.png",
     frontSize = 7,
     dexEntry = {
       kind = "HANDSTAND POKMON",
@@ -14156,8 +14156,8 @@ P.species = {
     evolutions = {
       { method = "LEVEL", species = "JYNX", level = 30 },
     },
-    spriteFront = "mods/expansion_pack/assets/smoochum_front.png",
-    spriteBack = "mods/expansion_pack/assets/smoochum_back.png",
+    spriteFront = "mods/Kanto-Reforged/assets/smoochum_front.png",
+    spriteBack = "mods/Kanto-Reforged/assets/smoochum_back.png",
     frontSize = 5,
     dexEntry = {
       kind = "KISS POKMON",
@@ -14280,8 +14280,8 @@ P.species = {
     evolutions = {
       { method = "LEVEL", species = "ELECTABUZZ", level = 30 },
     },
-    spriteFront = "mods/expansion_pack/assets/elekid_front.png",
-    spriteBack = "mods/expansion_pack/assets/elekid_back.png",
+    spriteFront = "mods/Kanto-Reforged/assets/elekid_front.png",
+    spriteBack = "mods/Kanto-Reforged/assets/elekid_back.png",
     frontSize = 5,
     dexEntry = {
       kind = "ELECTRIC POKMON",
@@ -14402,8 +14402,8 @@ P.species = {
     evolutions = {
       { method = "LEVEL", species = "MAGMAR", level = 30 },
     },
-    spriteFront = "mods/expansion_pack/assets/magby_front.png",
-    spriteBack = "mods/expansion_pack/assets/magby_back.png",
+    spriteFront = "mods/Kanto-Reforged/assets/magby_front.png",
+    spriteBack = "mods/Kanto-Reforged/assets/magby_back.png",
     frontSize = 5,
     dexEntry = {
       kind = "LIVE COAL POKMON",
@@ -14537,8 +14537,8 @@ P.species = {
     },
     evolutions = {
     },
-    spriteFront = "mods/expansion_pack/assets/miltank_front.png",
-    spriteBack = "mods/expansion_pack/assets/miltank_back.png",
+    spriteFront = "mods/Kanto-Reforged/assets/miltank_front.png",
+    spriteBack = "mods/Kanto-Reforged/assets/miltank_back.png",
     frontSize = 6,
     dexEntry = {
       kind = "MILK COW POKMON",
@@ -14724,8 +14724,8 @@ P.species = {
     },
     evolutions = {
     },
-    spriteFront = "mods/expansion_pack/assets/blissey_front.png",
-    spriteBack = "mods/expansion_pack/assets/blissey_back.png",
+    spriteFront = "mods/Kanto-Reforged/assets/blissey_front.png",
+    spriteBack = "mods/Kanto-Reforged/assets/blissey_back.png",
     frontSize = 7,
     dexEntry = {
       kind = "HAPPINESS POKMON",
@@ -14859,8 +14859,8 @@ P.species = {
     },
     evolutions = {
     },
-    spriteFront = "mods/expansion_pack/assets/raikou_front.png",
-    spriteBack = "mods/expansion_pack/assets/raikou_back.png",
+    spriteFront = "mods/Kanto-Reforged/assets/raikou_front.png",
+    spriteBack = "mods/Kanto-Reforged/assets/raikou_back.png",
     frontSize = 7,
     dexEntry = {
       kind = "THUNDER POKMON",
@@ -14995,8 +14995,8 @@ P.species = {
     },
     evolutions = {
     },
-    spriteFront = "mods/expansion_pack/assets/entei_front.png",
-    spriteBack = "mods/expansion_pack/assets/entei_back.png",
+    spriteFront = "mods/Kanto-Reforged/assets/entei_front.png",
+    spriteBack = "mods/Kanto-Reforged/assets/entei_back.png",
     frontSize = 7,
     dexEntry = {
       kind = "VOLCANO POKMON",
@@ -15134,8 +15134,8 @@ P.species = {
     },
     evolutions = {
     },
-    spriteFront = "mods/expansion_pack/assets/suicune_front.png",
-    spriteBack = "mods/expansion_pack/assets/suicune_back.png",
+    spriteFront = "mods/Kanto-Reforged/assets/suicune_front.png",
+    spriteBack = "mods/Kanto-Reforged/assets/suicune_back.png",
     frontSize = 7,
     dexEntry = {
       kind = "AURORA POKMON",
@@ -15264,8 +15264,8 @@ P.species = {
     evolutions = {
       { method = "LEVEL", species = "PUPITAR", level = 30 },
     },
-    spriteFront = "mods/expansion_pack/assets/larvitar_front.png",
-    spriteBack = "mods/expansion_pack/assets/larvitar_back.png",
+    spriteFront = "mods/Kanto-Reforged/assets/larvitar_front.png",
+    spriteBack = "mods/Kanto-Reforged/assets/larvitar_back.png",
     frontSize = 5,
     dexEntry = {
       kind = "ROCK SKIN POKMON",
@@ -15404,8 +15404,8 @@ P.species = {
     evolutions = {
       { method = "LEVEL", species = "TYRANITAR", level = 55 },
     },
-    spriteFront = "mods/expansion_pack/assets/pupitar_front.png",
-    spriteBack = "mods/expansion_pack/assets/pupitar_back.png",
+    spriteFront = "mods/Kanto-Reforged/assets/pupitar_front.png",
+    spriteBack = "mods/Kanto-Reforged/assets/pupitar_back.png",
     frontSize = 6,
     dexEntry = {
       kind = "HARD SHELL POKMON",
@@ -15599,8 +15599,8 @@ P.species = {
     },
     evolutions = {
     },
-    spriteFront = "mods/expansion_pack/assets/tyranitar_front.png",
-    spriteBack = "mods/expansion_pack/assets/tyranitar_back.png",
+    spriteFront = "mods/Kanto-Reforged/assets/tyranitar_front.png",
+    spriteBack = "mods/Kanto-Reforged/assets/tyranitar_back.png",
     frontSize = 7,
     dexEntry = {
       kind = "ARMOR POKMON",
@@ -15762,8 +15762,8 @@ P.species = {
     },
     evolutions = {
     },
-    spriteFront = "mods/expansion_pack/assets/lugia_front.png",
-    spriteBack = "mods/expansion_pack/assets/lugia_back.png",
+    spriteFront = "mods/Kanto-Reforged/assets/lugia_front.png",
+    spriteBack = "mods/Kanto-Reforged/assets/lugia_back.png",
     frontSize = 7,
     dexEntry = {
       kind = "DIVING POKMON",
@@ -15912,8 +15912,8 @@ P.species = {
     },
     evolutions = {
     },
-    spriteFront = "mods/expansion_pack/assets/ho_oh_front.png",
-    spriteBack = "mods/expansion_pack/assets/ho_oh_back.png",
+    spriteFront = "mods/Kanto-Reforged/assets/ho_oh_front.png",
+    spriteBack = "mods/Kanto-Reforged/assets/ho_oh_back.png",
     frontSize = 7,
     dexEntry = {
       kind = "RAINBOW POKMON",
@@ -16051,8 +16051,8 @@ P.species = {
     },
     evolutions = {
     },
-    spriteFront = "mods/expansion_pack/assets/celebi_front.png",
-    spriteBack = "mods/expansion_pack/assets/celebi_back.png",
+    spriteFront = "mods/Kanto-Reforged/assets/celebi_front.png",
+    spriteBack = "mods/Kanto-Reforged/assets/celebi_back.png",
     frontSize = 5,
     dexEntry = {
       kind = "TIME TRAVEL POKMON",
@@ -16178,8 +16178,8 @@ P.species = {
     evolutions = {
       { method = "LEVEL", species = "GROVYLE", level = 16 },
     },
-    spriteFront = "mods/expansion_pack/assets/treecko_front.png",
-    spriteBack = "mods/expansion_pack/assets/treecko_back.png",
+    spriteFront = "mods/Kanto-Reforged/assets/treecko_front.png",
+    spriteBack = "mods/Kanto-Reforged/assets/treecko_back.png",
     frontSize = 5,
     dexEntry = {
       kind = "WOOD GECKO POKMON",
@@ -16323,8 +16323,8 @@ P.species = {
     evolutions = {
       { method = "LEVEL", species = "SCEPTILE", level = 36 },
     },
-    spriteFront = "mods/expansion_pack/assets/grovyle_front.png",
-    spriteBack = "mods/expansion_pack/assets/grovyle_back.png",
+    spriteFront = "mods/Kanto-Reforged/assets/grovyle_front.png",
+    spriteBack = "mods/Kanto-Reforged/assets/grovyle_back.png",
     frontSize = 6,
     dexEntry = {
       kind = "WOOD GECKO POKMON",
@@ -16492,8 +16492,8 @@ P.species = {
     },
     evolutions = {
     },
-    spriteFront = "mods/expansion_pack/assets/sceptile_front.png",
-    spriteBack = "mods/expansion_pack/assets/sceptile_back.png",
+    spriteFront = "mods/Kanto-Reforged/assets/sceptile_front.png",
+    spriteBack = "mods/Kanto-Reforged/assets/sceptile_back.png",
     frontSize = 7,
     dexEntry = {
       kind = "FOREST POKMON",
@@ -16612,8 +16612,8 @@ P.species = {
     evolutions = {
       { method = "LEVEL", species = "COMBUSKEN", level = 16 },
     },
-    spriteFront = "mods/expansion_pack/assets/torchic_front.png",
-    spriteBack = "mods/expansion_pack/assets/torchic_back.png",
+    spriteFront = "mods/Kanto-Reforged/assets/torchic_front.png",
+    spriteBack = "mods/Kanto-Reforged/assets/torchic_back.png",
     frontSize = 5,
     dexEntry = {
       kind = "CHICK POKMON",
@@ -16759,8 +16759,8 @@ P.species = {
     evolutions = {
       { method = "LEVEL", species = "BLAZIKEN", level = 36 },
     },
-    spriteFront = "mods/expansion_pack/assets/combusken_front.png",
-    spriteBack = "mods/expansion_pack/assets/combusken_back.png",
+    spriteFront = "mods/Kanto-Reforged/assets/combusken_front.png",
+    spriteBack = "mods/Kanto-Reforged/assets/combusken_back.png",
     frontSize = 6,
     dexEntry = {
       kind = "YOUNG FOWL POKMON",
@@ -16934,8 +16934,8 @@ P.species = {
     },
     evolutions = {
     },
-    spriteFront = "mods/expansion_pack/assets/blaziken_front.png",
-    spriteBack = "mods/expansion_pack/assets/blaziken_back.png",
+    spriteFront = "mods/Kanto-Reforged/assets/blaziken_front.png",
+    spriteBack = "mods/Kanto-Reforged/assets/blaziken_back.png",
     frontSize = 7,
     dexEntry = {
       kind = "BLAZE POKMON",
@@ -17054,8 +17054,8 @@ P.species = {
     evolutions = {
       { method = "LEVEL", species = "MARSHTOMP", level = 16 },
     },
-    spriteFront = "mods/expansion_pack/assets/mudkip_front.png",
-    spriteBack = "mods/expansion_pack/assets/mudkip_back.png",
+    spriteFront = "mods/Kanto-Reforged/assets/mudkip_front.png",
+    spriteBack = "mods/Kanto-Reforged/assets/mudkip_back.png",
     frontSize = 5,
     dexEntry = {
       kind = "MUD FISH POKMON",
@@ -17197,8 +17197,8 @@ P.species = {
     evolutions = {
       { method = "LEVEL", species = "SWAMPERT", level = 36 },
     },
-    spriteFront = "mods/expansion_pack/assets/marshtomp_front.png",
-    spriteBack = "mods/expansion_pack/assets/marshtomp_back.png",
+    spriteFront = "mods/Kanto-Reforged/assets/marshtomp_front.png",
+    spriteBack = "mods/Kanto-Reforged/assets/marshtomp_back.png",
     frontSize = 5,
     dexEntry = {
       kind = "MUD FISH POKMON",
@@ -17359,8 +17359,8 @@ P.species = {
     },
     evolutions = {
     },
-    spriteFront = "mods/expansion_pack/assets/swampert_front.png",
-    spriteBack = "mods/expansion_pack/assets/swampert_back.png",
+    spriteFront = "mods/Kanto-Reforged/assets/swampert_front.png",
+    spriteBack = "mods/Kanto-Reforged/assets/swampert_back.png",
     frontSize = 7,
     dexEntry = {
       kind = "MUD FISH POKMON",
@@ -17475,8 +17475,8 @@ P.species = {
     evolutions = {
       { method = "LEVEL", species = "MIGHTYENA", level = 18 },
     },
-    spriteFront = "mods/expansion_pack/assets/poochyena_front.png",
-    spriteBack = "mods/expansion_pack/assets/poochyena_back.png",
+    spriteFront = "mods/Kanto-Reforged/assets/poochyena_front.png",
+    spriteBack = "mods/Kanto-Reforged/assets/poochyena_back.png",
     frontSize = 5,
     dexEntry = {
       kind = "BITE POKMON",
@@ -17609,8 +17609,8 @@ P.species = {
     },
     evolutions = {
     },
-    spriteFront = "mods/expansion_pack/assets/mightyena_front.png",
-    spriteBack = "mods/expansion_pack/assets/mightyena_back.png",
+    spriteFront = "mods/Kanto-Reforged/assets/mightyena_front.png",
+    spriteBack = "mods/Kanto-Reforged/assets/mightyena_back.png",
     frontSize = 6,
     dexEntry = {
       kind = "BITE POKMON",
@@ -17721,8 +17721,8 @@ P.species = {
     evolutions = {
       { method = "LEVEL", species = "LINOONE", level = 20 },
     },
-    spriteFront = "mods/expansion_pack/assets/zigzagoon_front.png",
-    spriteBack = "mods/expansion_pack/assets/zigzagoon_back.png",
+    spriteFront = "mods/Kanto-Reforged/assets/zigzagoon_front.png",
+    spriteBack = "mods/Kanto-Reforged/assets/zigzagoon_back.png",
     frontSize = 5,
     dexEntry = {
       kind = "TINY RACCOON POKMON",
@@ -17856,8 +17856,8 @@ P.species = {
     },
     evolutions = {
     },
-    spriteFront = "mods/expansion_pack/assets/linoone_front.png",
-    spriteBack = "mods/expansion_pack/assets/linoone_back.png",
+    spriteFront = "mods/Kanto-Reforged/assets/linoone_front.png",
+    spriteBack = "mods/Kanto-Reforged/assets/linoone_back.png",
     frontSize = 5,
     dexEntry = {
       kind = "RUSHING POKMON",
@@ -17902,8 +17902,8 @@ P.species = {
       { method = "LEVEL", species = "SILCOON", level = 7 },
       { method = "LEVEL", species = "CASCOON", level = 7 },
     },
-    spriteFront = "mods/expansion_pack/assets/wurmple_front.png",
-    spriteBack = "mods/expansion_pack/assets/wurmple_back.png",
+    spriteFront = "mods/Kanto-Reforged/assets/wurmple_front.png",
+    spriteBack = "mods/Kanto-Reforged/assets/wurmple_back.png",
     frontSize = 5,
     dexEntry = {
       kind = "WORM POKMON",
@@ -17947,8 +17947,8 @@ P.species = {
     evolutions = {
       { method = "LEVEL", species = "BEAUTIFLY", level = 10 },
     },
-    spriteFront = "mods/expansion_pack/assets/silcoon_front.png",
-    spriteBack = "mods/expansion_pack/assets/silcoon_back.png",
+    spriteFront = "mods/Kanto-Reforged/assets/silcoon_front.png",
+    spriteBack = "mods/Kanto-Reforged/assets/silcoon_back.png",
     frontSize = 5,
     dexEntry = {
       kind = "COCOON POKMON",
@@ -18056,8 +18056,8 @@ P.species = {
     },
     evolutions = {
     },
-    spriteFront = "mods/expansion_pack/assets/beautifly_front.png",
-    spriteBack = "mods/expansion_pack/assets/beautifly_back.png",
+    spriteFront = "mods/Kanto-Reforged/assets/beautifly_front.png",
+    spriteBack = "mods/Kanto-Reforged/assets/beautifly_back.png",
     frontSize = 6,
     dexEntry = {
       kind = "BUTTERFLY POKMON",
@@ -18101,8 +18101,8 @@ P.species = {
     evolutions = {
       { method = "LEVEL", species = "DUSTOX", level = 10 },
     },
-    spriteFront = "mods/expansion_pack/assets/cascoon_front.png",
-    spriteBack = "mods/expansion_pack/assets/cascoon_back.png",
+    spriteFront = "mods/Kanto-Reforged/assets/cascoon_front.png",
+    spriteBack = "mods/Kanto-Reforged/assets/cascoon_back.png",
     frontSize = 5,
     dexEntry = {
       kind = "COCOON POKMON",
@@ -18209,8 +18209,8 @@ P.species = {
     },
     evolutions = {
     },
-    spriteFront = "mods/expansion_pack/assets/dustox_front.png",
-    spriteBack = "mods/expansion_pack/assets/dustox_back.png",
+    spriteFront = "mods/Kanto-Reforged/assets/dustox_front.png",
+    spriteBack = "mods/Kanto-Reforged/assets/dustox_back.png",
     frontSize = 6,
     dexEntry = {
       kind = "POISON MOTH POKMON",
@@ -18320,8 +18320,8 @@ P.species = {
     evolutions = {
       { method = "LEVEL", species = "LOMBRE", level = 14 },
     },
-    spriteFront = "mods/expansion_pack/assets/lotad_front.png",
-    spriteBack = "mods/expansion_pack/assets/lotad_back.png",
+    spriteFront = "mods/Kanto-Reforged/assets/lotad_front.png",
+    spriteBack = "mods/Kanto-Reforged/assets/lotad_back.png",
     frontSize = 5,
     dexEntry = {
       kind = "WATER WEED POKMON",
@@ -18464,8 +18464,8 @@ P.species = {
     evolutions = {
       { method = "ITEM", species = "LUDICOLO", item = "WATER_STONE" },
     },
-    spriteFront = "mods/expansion_pack/assets/lombre_front.png",
-    spriteBack = "mods/expansion_pack/assets/lombre_back.png",
+    spriteFront = "mods/Kanto-Reforged/assets/lombre_front.png",
+    spriteBack = "mods/Kanto-Reforged/assets/lombre_back.png",
     frontSize = 6,
     dexEntry = {
       kind = "JOLLY POKMON",
@@ -18621,8 +18621,8 @@ P.species = {
     },
     evolutions = {
     },
-    spriteFront = "mods/expansion_pack/assets/ludicolo_front.png",
-    spriteBack = "mods/expansion_pack/assets/ludicolo_back.png",
+    spriteFront = "mods/Kanto-Reforged/assets/ludicolo_front.png",
+    spriteBack = "mods/Kanto-Reforged/assets/ludicolo_back.png",
     frontSize = 7,
     dexEntry = {
       kind = "CAREFREE POKMON",
@@ -18732,8 +18732,8 @@ P.species = {
     evolutions = {
       { method = "LEVEL", species = "NUZLEAF", level = 14 },
     },
-    spriteFront = "mods/expansion_pack/assets/seedot_front.png",
-    spriteBack = "mods/expansion_pack/assets/seedot_back.png",
+    spriteFront = "mods/Kanto-Reforged/assets/seedot_front.png",
+    spriteBack = "mods/Kanto-Reforged/assets/seedot_back.png",
     frontSize = 5,
     dexEntry = {
       kind = "ACORN POKMON",
@@ -18890,8 +18890,8 @@ P.species = {
     evolutions = {
       { method = "ITEM", species = "SHIFTRY", item = "LEAF_STONE" },
     },
-    spriteFront = "mods/expansion_pack/assets/nuzleaf_front.png",
-    spriteBack = "mods/expansion_pack/assets/nuzleaf_back.png",
+    spriteFront = "mods/Kanto-Reforged/assets/nuzleaf_front.png",
+    spriteBack = "mods/Kanto-Reforged/assets/nuzleaf_back.png",
     frontSize = 6,
     dexEntry = {
       kind = "WILY POKMON",
@@ -19092,8 +19092,8 @@ P.species = {
     },
     evolutions = {
     },
-    spriteFront = "mods/expansion_pack/assets/shiftry_front.png",
-    spriteBack = "mods/expansion_pack/assets/shiftry_back.png",
+    spriteFront = "mods/Kanto-Reforged/assets/shiftry_front.png",
+    spriteBack = "mods/Kanto-Reforged/assets/shiftry_back.png",
     frontSize = 7,
     dexEntry = {
       kind = "WICKED POKMON",
@@ -19176,8 +19176,8 @@ P.species = {
     evolutions = {
       { method = "LEVEL", species = "SWELLOW", level = 22 },
     },
-    spriteFront = "mods/expansion_pack/assets/taillow_front.png",
-    spriteBack = "mods/expansion_pack/assets/taillow_back.png",
+    spriteFront = "mods/Kanto-Reforged/assets/taillow_front.png",
+    spriteBack = "mods/Kanto-Reforged/assets/taillow_back.png",
     frontSize = 5,
     dexEntry = {
       kind = "TINY SWALLOW POKMON",
@@ -19267,8 +19267,8 @@ P.species = {
     },
     evolutions = {
     },
-    spriteFront = "mods/expansion_pack/assets/swellow_front.png",
-    spriteBack = "mods/expansion_pack/assets/swellow_back.png",
+    spriteFront = "mods/Kanto-Reforged/assets/swellow_front.png",
+    spriteBack = "mods/Kanto-Reforged/assets/swellow_back.png",
     frontSize = 5,
     dexEntry = {
       kind = "SWALLOW POKMON",
@@ -19382,8 +19382,8 @@ P.species = {
     evolutions = {
       { method = "LEVEL", species = "PELIPPER", level = 25 },
     },
-    spriteFront = "mods/expansion_pack/assets/wingull_front.png",
-    spriteBack = "mods/expansion_pack/assets/wingull_back.png",
+    spriteFront = "mods/Kanto-Reforged/assets/wingull_front.png",
+    spriteBack = "mods/Kanto-Reforged/assets/wingull_back.png",
     frontSize = 5,
     dexEntry = {
       kind = "SEAGULL POKMON",
@@ -19525,8 +19525,8 @@ P.species = {
     },
     evolutions = {
     },
-    spriteFront = "mods/expansion_pack/assets/pelipper_front.png",
-    spriteBack = "mods/expansion_pack/assets/pelipper_back.png",
+    spriteFront = "mods/Kanto-Reforged/assets/pelipper_front.png",
+    spriteBack = "mods/Kanto-Reforged/assets/pelipper_back.png",
     frontSize = 6,
     dexEntry = {
       kind = "WATER BIRD POKMON",
@@ -19667,8 +19667,8 @@ P.species = {
     evolutions = {
       { method = "LEVEL", species = "KIRLIA", level = 20 },
     },
-    spriteFront = "mods/expansion_pack/assets/ralts_front.png",
-    spriteBack = "mods/expansion_pack/assets/ralts_back.png",
+    spriteFront = "mods/Kanto-Reforged/assets/ralts_front.png",
+    spriteBack = "mods/Kanto-Reforged/assets/ralts_back.png",
     frontSize = 5,
     dexEntry = {
       kind = "FEELING POKMON",
@@ -19814,8 +19814,8 @@ P.species = {
     evolutions = {
       { method = "LEVEL", species = "GARDEVOIR", level = 30 },
     },
-    spriteFront = "mods/expansion_pack/assets/kirlia_front.png",
-    spriteBack = "mods/expansion_pack/assets/kirlia_back.png",
+    spriteFront = "mods/Kanto-Reforged/assets/kirlia_front.png",
+    spriteBack = "mods/Kanto-Reforged/assets/kirlia_back.png",
     frontSize = 6,
     dexEntry = {
       kind = "EMOTION POKMON",
@@ -19988,8 +19988,8 @@ P.species = {
     },
     evolutions = {
     },
-    spriteFront = "mods/expansion_pack/assets/gardevoir_front.png",
-    spriteBack = "mods/expansion_pack/assets/gardevoir_back.png",
+    spriteFront = "mods/Kanto-Reforged/assets/gardevoir_front.png",
+    spriteBack = "mods/Kanto-Reforged/assets/gardevoir_back.png",
     frontSize = 7,
     dexEntry = {
       kind = "EMBRACE POKMON",
@@ -20096,8 +20096,8 @@ P.species = {
     evolutions = {
       { method = "LEVEL", species = "MASQUERAIN", level = 22 },
     },
-    spriteFront = "mods/expansion_pack/assets/surskit_front.png",
-    spriteBack = "mods/expansion_pack/assets/surskit_back.png",
+    spriteFront = "mods/Kanto-Reforged/assets/surskit_front.png",
+    spriteBack = "mods/Kanto-Reforged/assets/surskit_back.png",
     frontSize = 5,
     dexEntry = {
       kind = "POND SKATER POKMON",
@@ -20247,8 +20247,8 @@ P.species = {
     },
     evolutions = {
     },
-    spriteFront = "mods/expansion_pack/assets/masquerain_front.png",
-    spriteBack = "mods/expansion_pack/assets/masquerain_back.png",
+    spriteFront = "mods/Kanto-Reforged/assets/masquerain_front.png",
+    spriteBack = "mods/Kanto-Reforged/assets/masquerain_back.png",
     frontSize = 6,
     dexEntry = {
       kind = "EYEBALL POKMON",
@@ -20346,8 +20346,8 @@ P.species = {
     evolutions = {
       { method = "LEVEL", species = "BRELOOM", level = 23 },
     },
-    spriteFront = "mods/expansion_pack/assets/shroomish_front.png",
-    spriteBack = "mods/expansion_pack/assets/shroomish_back.png",
+    spriteFront = "mods/Kanto-Reforged/assets/shroomish_front.png",
+    spriteBack = "mods/Kanto-Reforged/assets/shroomish_back.png",
     frontSize = 5,
     dexEntry = {
       kind = "MUSHROOM POKMON",
@@ -20494,8 +20494,8 @@ P.species = {
     },
     evolutions = {
     },
-    spriteFront = "mods/expansion_pack/assets/breloom_front.png",
-    spriteBack = "mods/expansion_pack/assets/breloom_back.png",
+    spriteFront = "mods/Kanto-Reforged/assets/breloom_front.png",
+    spriteBack = "mods/Kanto-Reforged/assets/breloom_back.png",
     frontSize = 6,
     dexEntry = {
       kind = "MUSHROOM POKMON",
@@ -20619,8 +20619,8 @@ P.species = {
     evolutions = {
       { method = "LEVEL", species = "VIGOROTH", level = 18 },
     },
-    spriteFront = "mods/expansion_pack/assets/slakoth_front.png",
-    spriteBack = "mods/expansion_pack/assets/slakoth_back.png",
+    spriteFront = "mods/Kanto-Reforged/assets/slakoth_front.png",
+    spriteBack = "mods/Kanto-Reforged/assets/slakoth_back.png",
     frontSize = 6,
     dexEntry = {
       kind = "SLACKER POKMON",
@@ -20782,8 +20782,8 @@ P.species = {
     evolutions = {
       { method = "LEVEL", species = "SLAKING", level = 36 },
     },
-    spriteFront = "mods/expansion_pack/assets/vigoroth_front.png",
-    spriteBack = "mods/expansion_pack/assets/vigoroth_back.png",
+    spriteFront = "mods/Kanto-Reforged/assets/vigoroth_front.png",
+    spriteBack = "mods/Kanto-Reforged/assets/vigoroth_back.png",
     frontSize = 7,
     dexEntry = {
       kind = "WILD MONKEY POKMON",
@@ -20967,8 +20967,8 @@ P.species = {
     },
     evolutions = {
     },
-    spriteFront = "mods/expansion_pack/assets/slaking_front.png",
-    spriteBack = "mods/expansion_pack/assets/slaking_back.png",
+    spriteFront = "mods/Kanto-Reforged/assets/slaking_front.png",
+    spriteBack = "mods/Kanto-Reforged/assets/slaking_back.png",
     frontSize = 7,
     dexEntry = {
       kind = "LAZY POKMON",
@@ -21053,8 +21053,8 @@ P.species = {
     evolutions = {
       { method = "LEVEL", species = "NINJASK", level = 20 },
     },
-    spriteFront = "mods/expansion_pack/assets/nincada_front.png",
-    spriteBack = "mods/expansion_pack/assets/nincada_back.png",
+    spriteFront = "mods/Kanto-Reforged/assets/nincada_front.png",
+    spriteBack = "mods/Kanto-Reforged/assets/nincada_back.png",
     frontSize = 5,
     dexEntry = {
       kind = "TRAINEE POKMON",
@@ -21179,8 +21179,8 @@ P.species = {
     },
     evolutions = {
     },
-    spriteFront = "mods/expansion_pack/assets/ninjask_front.png",
-    spriteBack = "mods/expansion_pack/assets/ninjask_back.png",
+    spriteFront = "mods/Kanto-Reforged/assets/ninjask_front.png",
+    spriteBack = "mods/Kanto-Reforged/assets/ninjask_back.png",
     frontSize = 6,
     dexEntry = {
       kind = "NINJA POKMON",
@@ -21290,8 +21290,8 @@ P.species = {
     },
     evolutions = {
     },
-    spriteFront = "mods/expansion_pack/assets/shedinja_front.png",
-    spriteBack = "mods/expansion_pack/assets/shedinja_back.png",
+    spriteFront = "mods/Kanto-Reforged/assets/shedinja_front.png",
+    spriteBack = "mods/Kanto-Reforged/assets/shedinja_back.png",
     frontSize = 6,
     dexEntry = {
       kind = "SHED POKMON",
@@ -21390,8 +21390,8 @@ P.species = {
     evolutions = {
       { method = "LEVEL", species = "LOUDRED", level = 20 },
     },
-    spriteFront = "mods/expansion_pack/assets/whismur_front.png",
-    spriteBack = "mods/expansion_pack/assets/whismur_back.png",
+    spriteFront = "mods/Kanto-Reforged/assets/whismur_front.png",
+    spriteBack = "mods/Kanto-Reforged/assets/whismur_back.png",
     frontSize = 5,
     dexEntry = {
       kind = "WHISPER POKMON",
@@ -21510,8 +21510,8 @@ P.species = {
     evolutions = {
       { method = "LEVEL", species = "EXPLOUD", level = 40 },
     },
-    spriteFront = "mods/expansion_pack/assets/loudred_front.png",
-    spriteBack = "mods/expansion_pack/assets/loudred_back.png",
+    spriteFront = "mods/Kanto-Reforged/assets/loudred_front.png",
+    spriteBack = "mods/Kanto-Reforged/assets/loudred_back.png",
     frontSize = 6,
     dexEntry = {
       kind = "BIG VOICE POKMON",
@@ -21653,8 +21653,8 @@ P.species = {
     },
     evolutions = {
     },
-    spriteFront = "mods/expansion_pack/assets/exploud_front.png",
-    spriteBack = "mods/expansion_pack/assets/exploud_back.png",
+    spriteFront = "mods/Kanto-Reforged/assets/exploud_front.png",
+    spriteBack = "mods/Kanto-Reforged/assets/exploud_back.png",
     frontSize = 7,
     dexEntry = {
       kind = "LOUD NOISE POKMON",
@@ -21782,8 +21782,8 @@ P.species = {
     evolutions = {
       { method = "LEVEL", species = "HARIYAMA", level = 24 },
     },
-    spriteFront = "mods/expansion_pack/assets/makuhita_front.png",
-    spriteBack = "mods/expansion_pack/assets/makuhita_back.png",
+    spriteFront = "mods/Kanto-Reforged/assets/makuhita_front.png",
+    spriteBack = "mods/Kanto-Reforged/assets/makuhita_back.png",
     frontSize = 6,
     dexEntry = {
       kind = "GUTS POKMON",
@@ -21924,8 +21924,8 @@ P.species = {
     },
     evolutions = {
     },
-    spriteFront = "mods/expansion_pack/assets/hariyama_front.png",
-    spriteBack = "mods/expansion_pack/assets/hariyama_back.png",
+    spriteFront = "mods/Kanto-Reforged/assets/hariyama_front.png",
+    spriteBack = "mods/Kanto-Reforged/assets/hariyama_back.png",
     frontSize = 7,
     dexEntry = {
       kind = "ARM THRUST POKMON",
@@ -22025,8 +22025,8 @@ P.species = {
     evolutions = {
       { method = "LEVEL", species = "MARILL", level = 15 },
     },
-    spriteFront = "mods/expansion_pack/assets/azurill_front.png",
-    spriteBack = "mods/expansion_pack/assets/azurill_back.png",
+    spriteFront = "mods/Kanto-Reforged/assets/azurill_front.png",
+    spriteBack = "mods/Kanto-Reforged/assets/azurill_back.png",
     frontSize = 5,
     dexEntry = {
       kind = "POLKA DOT POKMON",
@@ -22142,8 +22142,8 @@ P.species = {
     },
     evolutions = {
     },
-    spriteFront = "mods/expansion_pack/assets/nosepass_front.png",
-    spriteBack = "mods/expansion_pack/assets/nosepass_back.png",
+    spriteFront = "mods/Kanto-Reforged/assets/nosepass_front.png",
+    spriteBack = "mods/Kanto-Reforged/assets/nosepass_back.png",
     frontSize = 6,
     dexEntry = {
       kind = "COMPASS POKMON",
@@ -22251,8 +22251,8 @@ P.species = {
     evolutions = {
       { method = "ITEM", species = "DELCATTY", item = "MOON_STONE" },
     },
-    spriteFront = "mods/expansion_pack/assets/skitty_front.png",
-    spriteBack = "mods/expansion_pack/assets/skitty_back.png",
+    spriteFront = "mods/Kanto-Reforged/assets/skitty_front.png",
+    spriteBack = "mods/Kanto-Reforged/assets/skitty_back.png",
     frontSize = 5,
     dexEntry = {
       kind = "KITTEN POKMON",
@@ -22372,8 +22372,8 @@ P.species = {
     },
     evolutions = {
     },
-    spriteFront = "mods/expansion_pack/assets/delcatty_front.png",
-    spriteBack = "mods/expansion_pack/assets/delcatty_back.png",
+    spriteFront = "mods/Kanto-Reforged/assets/delcatty_front.png",
+    spriteBack = "mods/Kanto-Reforged/assets/delcatty_back.png",
     frontSize = 6,
     dexEntry = {
       kind = "PRIM POKMON",
@@ -22540,8 +22540,8 @@ P.species = {
     },
     evolutions = {
     },
-    spriteFront = "mods/expansion_pack/assets/sableye_front.png",
-    spriteBack = "mods/expansion_pack/assets/sableye_back.png",
+    spriteFront = "mods/Kanto-Reforged/assets/sableye_front.png",
+    spriteBack = "mods/Kanto-Reforged/assets/sableye_back.png",
     frontSize = 5,
     dexEntry = {
       kind = "DARKNESS POKMON",
@@ -22678,8 +22678,8 @@ P.species = {
     },
     evolutions = {
     },
-    spriteFront = "mods/expansion_pack/assets/mawile_front.png",
-    spriteBack = "mods/expansion_pack/assets/mawile_back.png",
+    spriteFront = "mods/Kanto-Reforged/assets/mawile_front.png",
+    spriteBack = "mods/Kanto-Reforged/assets/mawile_back.png",
     frontSize = 5,
     dexEntry = {
       kind = "DECEIVER POKMON",
@@ -22786,8 +22786,8 @@ P.species = {
     evolutions = {
       { method = "LEVEL", species = "LAIRON", level = 32 },
     },
-    spriteFront = "mods/expansion_pack/assets/aron_front.png",
-    spriteBack = "mods/expansion_pack/assets/aron_back.png",
+    spriteFront = "mods/Kanto-Reforged/assets/aron_front.png",
+    spriteBack = "mods/Kanto-Reforged/assets/aron_back.png",
     frontSize = 5,
     dexEntry = {
       kind = "IRON ARMOR POKMON",
@@ -22902,8 +22902,8 @@ P.species = {
     evolutions = {
       { method = "LEVEL", species = "AGGRON", level = 42 },
     },
-    spriteFront = "mods/expansion_pack/assets/lairon_front.png",
-    spriteBack = "mods/expansion_pack/assets/lairon_back.png",
+    spriteFront = "mods/Kanto-Reforged/assets/lairon_front.png",
+    spriteBack = "mods/Kanto-Reforged/assets/lairon_back.png",
     frontSize = 6,
     dexEntry = {
       kind = "IRON ARMOR POKMON",
@@ -23059,8 +23059,8 @@ P.species = {
     },
     evolutions = {
     },
-    spriteFront = "mods/expansion_pack/assets/aggron_front.png",
-    spriteBack = "mods/expansion_pack/assets/aggron_back.png",
+    spriteFront = "mods/Kanto-Reforged/assets/aggron_front.png",
+    spriteBack = "mods/Kanto-Reforged/assets/aggron_back.png",
     frontSize = 7,
     dexEntry = {
       kind = "IRON ARMOR POKMON",
@@ -23201,8 +23201,8 @@ P.species = {
     evolutions = {
       { method = "LEVEL", species = "MEDICHAM", level = 37 },
     },
-    spriteFront = "mods/expansion_pack/assets/meditite_front.png",
-    spriteBack = "mods/expansion_pack/assets/meditite_back.png",
+    spriteFront = "mods/Kanto-Reforged/assets/meditite_front.png",
+    spriteBack = "mods/Kanto-Reforged/assets/meditite_back.png",
     frontSize = 5,
     dexEntry = {
       kind = "MEDITATE POKMON",
@@ -23358,8 +23358,8 @@ P.species = {
     },
     evolutions = {
     },
-    spriteFront = "mods/expansion_pack/assets/medicham_front.png",
-    spriteBack = "mods/expansion_pack/assets/medicham_back.png",
+    spriteFront = "mods/Kanto-Reforged/assets/medicham_front.png",
+    spriteBack = "mods/Kanto-Reforged/assets/medicham_back.png",
     frontSize = 7,
     dexEntry = {
       kind = "MEDITATE POKMON",
@@ -23459,8 +23459,8 @@ P.species = {
     evolutions = {
       { method = "LEVEL", species = "MANECTRIC", level = 26 },
     },
-    spriteFront = "mods/expansion_pack/assets/electrike_front.png",
-    spriteBack = "mods/expansion_pack/assets/electrike_back.png",
+    spriteFront = "mods/Kanto-Reforged/assets/electrike_front.png",
+    spriteBack = "mods/Kanto-Reforged/assets/electrike_back.png",
     frontSize = 5,
     dexEntry = {
       kind = "LIGHTNING POKMON",
@@ -23571,8 +23571,8 @@ P.species = {
     },
     evolutions = {
     },
-    spriteFront = "mods/expansion_pack/assets/manectric_front.png",
-    spriteBack = "mods/expansion_pack/assets/manectric_back.png",
+    spriteFront = "mods/Kanto-Reforged/assets/manectric_front.png",
+    spriteBack = "mods/Kanto-Reforged/assets/manectric_back.png",
     frontSize = 7,
     dexEntry = {
       kind = "DISCHARGE POKMON",
@@ -23694,8 +23694,8 @@ P.species = {
     },
     evolutions = {
     },
-    spriteFront = "mods/expansion_pack/assets/plusle_front.png",
-    spriteBack = "mods/expansion_pack/assets/plusle_back.png",
+    spriteFront = "mods/Kanto-Reforged/assets/plusle_front.png",
+    spriteBack = "mods/Kanto-Reforged/assets/plusle_back.png",
     frontSize = 5,
     dexEntry = {
       kind = "CHEERING POKMON",
@@ -23814,8 +23814,8 @@ P.species = {
     },
     evolutions = {
     },
-    spriteFront = "mods/expansion_pack/assets/minun_front.png",
-    spriteBack = "mods/expansion_pack/assets/minun_back.png",
+    spriteFront = "mods/Kanto-Reforged/assets/minun_front.png",
+    spriteBack = "mods/Kanto-Reforged/assets/minun_back.png",
     frontSize = 5,
     dexEntry = {
       kind = "CHEERING POKMON",
@@ -23945,8 +23945,8 @@ P.species = {
     },
     evolutions = {
     },
-    spriteFront = "mods/expansion_pack/assets/volbeat_front.png",
-    spriteBack = "mods/expansion_pack/assets/volbeat_back.png",
+    spriteFront = "mods/Kanto-Reforged/assets/volbeat_front.png",
+    spriteBack = "mods/Kanto-Reforged/assets/volbeat_back.png",
     frontSize = 5,
     dexEntry = {
       kind = "FIREFLY POKMON",
@@ -24073,8 +24073,8 @@ P.species = {
     },
     evolutions = {
     },
-    spriteFront = "mods/expansion_pack/assets/illumise_front.png",
-    spriteBack = "mods/expansion_pack/assets/illumise_back.png",
+    spriteFront = "mods/Kanto-Reforged/assets/illumise_front.png",
+    spriteBack = "mods/Kanto-Reforged/assets/illumise_back.png",
     frontSize = 5,
     dexEntry = {
       kind = "FIREFLY POKMON",
@@ -24186,8 +24186,8 @@ P.species = {
     },
     evolutions = {
     },
-    spriteFront = "mods/expansion_pack/assets/roselia_front.png",
-    spriteBack = "mods/expansion_pack/assets/roselia_back.png",
+    spriteFront = "mods/Kanto-Reforged/assets/roselia_front.png",
+    spriteBack = "mods/Kanto-Reforged/assets/roselia_back.png",
     frontSize = 5,
     dexEntry = {
       kind = "THORN POKMON",
@@ -24301,8 +24301,8 @@ P.species = {
     evolutions = {
       { method = "LEVEL", species = "SWALOT", level = 26 },
     },
-    spriteFront = "mods/expansion_pack/assets/gulpin_front.png",
-    spriteBack = "mods/expansion_pack/assets/gulpin_back.png",
+    spriteFront = "mods/Kanto-Reforged/assets/gulpin_front.png",
+    spriteBack = "mods/Kanto-Reforged/assets/gulpin_back.png",
     frontSize = 5,
     dexEntry = {
       kind = "STOMACH POKMON",
@@ -24435,8 +24435,8 @@ P.species = {
     },
     evolutions = {
     },
-    spriteFront = "mods/expansion_pack/assets/swalot_front.png",
-    spriteBack = "mods/expansion_pack/assets/swalot_back.png",
+    spriteFront = "mods/Kanto-Reforged/assets/swalot_front.png",
+    spriteBack = "mods/Kanto-Reforged/assets/swalot_back.png",
     frontSize = 7,
     dexEntry = {
       kind = "POISON BAG POKMON",
@@ -24544,8 +24544,8 @@ P.species = {
     evolutions = {
       { method = "LEVEL", species = "SHARPEDO", level = 30 },
     },
-    spriteFront = "mods/expansion_pack/assets/carvanha_front.png",
-    spriteBack = "mods/expansion_pack/assets/carvanha_back.png",
+    spriteFront = "mods/Kanto-Reforged/assets/carvanha_front.png",
+    spriteBack = "mods/Kanto-Reforged/assets/carvanha_back.png",
     frontSize = 6,
     dexEntry = {
       kind = "SAVAGE POKMON",
@@ -24675,8 +24675,8 @@ P.species = {
     },
     evolutions = {
     },
-    spriteFront = "mods/expansion_pack/assets/sharpedo_front.png",
-    spriteBack = "mods/expansion_pack/assets/sharpedo_back.png",
+    spriteFront = "mods/Kanto-Reforged/assets/sharpedo_front.png",
+    spriteBack = "mods/Kanto-Reforged/assets/sharpedo_back.png",
     frontSize = 7,
     dexEntry = {
       kind = "BRUTAL POKMON",
@@ -24780,8 +24780,8 @@ P.species = {
     evolutions = {
       { method = "LEVEL", species = "WAILORD", level = 40 },
     },
-    spriteFront = "mods/expansion_pack/assets/wailmer_front.png",
-    spriteBack = "mods/expansion_pack/assets/wailmer_back.png",
+    spriteFront = "mods/Kanto-Reforged/assets/wailmer_front.png",
+    spriteBack = "mods/Kanto-Reforged/assets/wailmer_back.png",
     frontSize = 7,
     dexEntry = {
       kind = "BALL WHALE POKMON",
@@ -24897,8 +24897,8 @@ P.species = {
     },
     evolutions = {
     },
-    spriteFront = "mods/expansion_pack/assets/wailord_front.png",
-    spriteBack = "mods/expansion_pack/assets/wailord_back.png",
+    spriteFront = "mods/Kanto-Reforged/assets/wailord_front.png",
+    spriteBack = "mods/Kanto-Reforged/assets/wailord_back.png",
     frontSize = 7,
     dexEntry = {
       kind = "FLOAT WHALE POKMON",
@@ -25023,8 +25023,8 @@ P.species = {
     evolutions = {
       { method = "LEVEL", species = "CAMERUPT", level = 33 },
     },
-    spriteFront = "mods/expansion_pack/assets/numel_front.png",
-    spriteBack = "mods/expansion_pack/assets/numel_back.png",
+    spriteFront = "mods/Kanto-Reforged/assets/numel_front.png",
+    spriteBack = "mods/Kanto-Reforged/assets/numel_back.png",
     frontSize = 5,
     dexEntry = {
       kind = "NUMB POKMON",
@@ -25166,8 +25166,8 @@ P.species = {
     },
     evolutions = {
     },
-    spriteFront = "mods/expansion_pack/assets/camerupt_front.png",
-    spriteBack = "mods/expansion_pack/assets/camerupt_back.png",
+    spriteFront = "mods/Kanto-Reforged/assets/camerupt_front.png",
+    spriteBack = "mods/Kanto-Reforged/assets/camerupt_back.png",
     frontSize = 7,
     dexEntry = {
       kind = "ERUPTION POKMON",
@@ -25296,8 +25296,8 @@ P.species = {
     },
     evolutions = {
     },
-    spriteFront = "mods/expansion_pack/assets/torkoal_front.png",
-    spriteBack = "mods/expansion_pack/assets/torkoal_back.png",
+    spriteFront = "mods/Kanto-Reforged/assets/torkoal_front.png",
+    spriteBack = "mods/Kanto-Reforged/assets/torkoal_back.png",
     frontSize = 5,
     dexEntry = {
       kind = "COAL POKMON",
@@ -25423,8 +25423,8 @@ P.species = {
     evolutions = {
       { method = "LEVEL", species = "GRUMPIG", level = 32 },
     },
-    spriteFront = "mods/expansion_pack/assets/spoink_front.png",
-    spriteBack = "mods/expansion_pack/assets/spoink_back.png",
+    spriteFront = "mods/Kanto-Reforged/assets/spoink_front.png",
+    spriteBack = "mods/Kanto-Reforged/assets/spoink_back.png",
     frontSize = 5,
     dexEntry = {
       kind = "BOUNCE POKMON",
@@ -25584,8 +25584,8 @@ P.species = {
     },
     evolutions = {
     },
-    spriteFront = "mods/expansion_pack/assets/grumpig_front.png",
-    spriteBack = "mods/expansion_pack/assets/grumpig_back.png",
+    spriteFront = "mods/Kanto-Reforged/assets/grumpig_front.png",
+    spriteBack = "mods/Kanto-Reforged/assets/grumpig_back.png",
     frontSize = 6,
     dexEntry = {
       kind = "MANIPULATE POKMON",
@@ -25683,8 +25683,8 @@ P.species = {
     },
     evolutions = {
     },
-    spriteFront = "mods/expansion_pack/assets/spinda_front.png",
-    spriteBack = "mods/expansion_pack/assets/spinda_back.png",
+    spriteFront = "mods/Kanto-Reforged/assets/spinda_front.png",
+    spriteBack = "mods/Kanto-Reforged/assets/spinda_back.png",
     frontSize = 6,
     dexEntry = {
       kind = "SPOT PANDA POKMON",
@@ -25794,8 +25794,8 @@ P.species = {
     evolutions = {
       { method = "LEVEL", species = "VIBRAVA", level = 35 },
     },
-    spriteFront = "mods/expansion_pack/assets/trapinch_front.png",
-    spriteBack = "mods/expansion_pack/assets/trapinch_back.png",
+    spriteFront = "mods/Kanto-Reforged/assets/trapinch_front.png",
+    spriteBack = "mods/Kanto-Reforged/assets/trapinch_back.png",
     frontSize = 5,
     dexEntry = {
       kind = "ANT PIT POKMON",
@@ -25945,8 +25945,8 @@ P.species = {
     evolutions = {
       { method = "LEVEL", species = "FLYGON", level = 45 },
     },
-    spriteFront = "mods/expansion_pack/assets/vibrava_front.png",
-    spriteBack = "mods/expansion_pack/assets/vibrava_back.png",
+    spriteFront = "mods/Kanto-Reforged/assets/vibrava_front.png",
+    spriteBack = "mods/Kanto-Reforged/assets/vibrava_back.png",
     frontSize = 6,
     dexEntry = {
       kind = "VIBRATION POKMON",
@@ -26125,8 +26125,8 @@ P.species = {
     },
     evolutions = {
     },
-    spriteFront = "mods/expansion_pack/assets/flygon_front.png",
-    spriteBack = "mods/expansion_pack/assets/flygon_back.png",
+    spriteFront = "mods/Kanto-Reforged/assets/flygon_front.png",
+    spriteBack = "mods/Kanto-Reforged/assets/flygon_back.png",
     frontSize = 7,
     dexEntry = {
       kind = "MYSTIC POKMON",
@@ -26252,8 +26252,8 @@ P.species = {
     evolutions = {
       { method = "LEVEL", species = "CACTURNE", level = 32 },
     },
-    spriteFront = "mods/expansion_pack/assets/cacnea_front.png",
-    spriteBack = "mods/expansion_pack/assets/cacnea_back.png",
+    spriteFront = "mods/Kanto-Reforged/assets/cacnea_front.png",
+    spriteBack = "mods/Kanto-Reforged/assets/cacnea_back.png",
     frontSize = 5,
     dexEntry = {
       kind = "CACTUS POKMON",
@@ -26400,8 +26400,8 @@ P.species = {
     },
     evolutions = {
     },
-    spriteFront = "mods/expansion_pack/assets/cacturne_front.png",
-    spriteBack = "mods/expansion_pack/assets/cacturne_back.png",
+    spriteFront = "mods/Kanto-Reforged/assets/cacturne_front.png",
+    spriteBack = "mods/Kanto-Reforged/assets/cacturne_back.png",
     frontSize = 7,
     dexEntry = {
       kind = "SCARECROW POKMON",
@@ -26518,8 +26518,8 @@ P.species = {
     evolutions = {
       { method = "LEVEL", species = "ALTARIA", level = 35 },
     },
-    spriteFront = "mods/expansion_pack/assets/swablu_front.png",
-    spriteBack = "mods/expansion_pack/assets/swablu_back.png",
+    spriteFront = "mods/Kanto-Reforged/assets/swablu_front.png",
+    spriteBack = "mods/Kanto-Reforged/assets/swablu_back.png",
     frontSize = 5,
     dexEntry = {
       kind = "COTTON BIRD POKMON",
@@ -26671,8 +26671,8 @@ P.species = {
     },
     evolutions = {
     },
-    spriteFront = "mods/expansion_pack/assets/altaria_front.png",
-    spriteBack = "mods/expansion_pack/assets/altaria_back.png",
+    spriteFront = "mods/Kanto-Reforged/assets/altaria_front.png",
+    spriteBack = "mods/Kanto-Reforged/assets/altaria_back.png",
     frontSize = 6,
     dexEntry = {
       kind = "HUMMING POKMON",
@@ -26820,8 +26820,8 @@ P.species = {
     },
     evolutions = {
     },
-    spriteFront = "mods/expansion_pack/assets/zangoose_front.png",
-    spriteBack = "mods/expansion_pack/assets/zangoose_back.png",
+    spriteFront = "mods/Kanto-Reforged/assets/zangoose_front.png",
+    spriteBack = "mods/Kanto-Reforged/assets/zangoose_back.png",
     frontSize = 7,
     dexEntry = {
       kind = "CAT FERRET POKMON",
@@ -26956,8 +26956,8 @@ P.species = {
     },
     evolutions = {
     },
-    spriteFront = "mods/expansion_pack/assets/seviper_front.png",
-    spriteBack = "mods/expansion_pack/assets/seviper_back.png",
+    spriteFront = "mods/Kanto-Reforged/assets/seviper_front.png",
+    spriteBack = "mods/Kanto-Reforged/assets/seviper_back.png",
     frontSize = 7,
     dexEntry = {
       kind = "FANG SNAKE POKMON",
@@ -27097,8 +27097,8 @@ P.species = {
     },
     evolutions = {
     },
-    spriteFront = "mods/expansion_pack/assets/lunatone_front.png",
-    spriteBack = "mods/expansion_pack/assets/lunatone_back.png",
+    spriteFront = "mods/Kanto-Reforged/assets/lunatone_front.png",
+    spriteBack = "mods/Kanto-Reforged/assets/lunatone_back.png",
     frontSize = 6,
     dexEntry = {
       kind = "METEORITE POKMON",
@@ -27241,8 +27241,8 @@ P.species = {
     },
     evolutions = {
     },
-    spriteFront = "mods/expansion_pack/assets/solrock_front.png",
-    spriteBack = "mods/expansion_pack/assets/solrock_back.png",
+    spriteFront = "mods/Kanto-Reforged/assets/solrock_front.png",
+    spriteBack = "mods/Kanto-Reforged/assets/solrock_back.png",
     frontSize = 6,
     dexEntry = {
       kind = "METEORITE POKMON",
@@ -27357,8 +27357,8 @@ P.species = {
     evolutions = {
       { method = "LEVEL", species = "WHISCASH", level = 30 },
     },
-    spriteFront = "mods/expansion_pack/assets/barboach_front.png",
-    spriteBack = "mods/expansion_pack/assets/barboach_back.png",
+    spriteFront = "mods/Kanto-Reforged/assets/barboach_front.png",
+    spriteBack = "mods/Kanto-Reforged/assets/barboach_back.png",
     frontSize = 5,
     dexEntry = {
       kind = "WHISKERS POKMON",
@@ -27495,8 +27495,8 @@ P.species = {
     },
     evolutions = {
     },
-    spriteFront = "mods/expansion_pack/assets/whiscash_front.png",
-    spriteBack = "mods/expansion_pack/assets/whiscash_back.png",
+    spriteFront = "mods/Kanto-Reforged/assets/whiscash_front.png",
+    spriteBack = "mods/Kanto-Reforged/assets/whiscash_back.png",
     frontSize = 6,
     dexEntry = {
       kind = "WHISKERS POKMON",
@@ -27616,8 +27616,8 @@ P.species = {
     evolutions = {
       { method = "LEVEL", species = "CRAWDAUNT", level = 30 },
     },
-    spriteFront = "mods/expansion_pack/assets/corphish_front.png",
-    spriteBack = "mods/expansion_pack/assets/corphish_back.png",
+    spriteFront = "mods/Kanto-Reforged/assets/corphish_front.png",
+    spriteBack = "mods/Kanto-Reforged/assets/corphish_back.png",
     frontSize = 5,
     dexEntry = {
       kind = "RUFFIAN POKMON",
@@ -27761,8 +27761,8 @@ P.species = {
     },
     evolutions = {
     },
-    spriteFront = "mods/expansion_pack/assets/crawdaunt_front.png",
-    spriteBack = "mods/expansion_pack/assets/crawdaunt_back.png",
+    spriteFront = "mods/Kanto-Reforged/assets/crawdaunt_front.png",
+    spriteBack = "mods/Kanto-Reforged/assets/crawdaunt_back.png",
     frontSize = 6,
     dexEntry = {
       kind = "ROGUE POKMON",
@@ -27885,8 +27885,8 @@ P.species = {
     evolutions = {
       { method = "LEVEL", species = "CLAYDOL", level = 36 },
     },
-    spriteFront = "mods/expansion_pack/assets/baltoy_front.png",
-    spriteBack = "mods/expansion_pack/assets/baltoy_back.png",
+    spriteFront = "mods/Kanto-Reforged/assets/baltoy_front.png",
+    spriteBack = "mods/Kanto-Reforged/assets/baltoy_back.png",
     frontSize = 5,
     dexEntry = {
       kind = "CLAY DOLL POKMON",
@@ -28024,8 +28024,8 @@ P.species = {
     },
     evolutions = {
     },
-    spriteFront = "mods/expansion_pack/assets/claydol_front.png",
-    spriteBack = "mods/expansion_pack/assets/claydol_back.png",
+    spriteFront = "mods/Kanto-Reforged/assets/claydol_front.png",
+    spriteBack = "mods/Kanto-Reforged/assets/claydol_back.png",
     frontSize = 7,
     dexEntry = {
       kind = "CLAY DOLL POKMON",
@@ -28125,8 +28125,8 @@ P.species = {
     evolutions = {
       { method = "LEVEL", species = "CRADILY", level = 40 },
     },
-    spriteFront = "mods/expansion_pack/assets/lileep_front.png",
-    spriteBack = "mods/expansion_pack/assets/lileep_back.png",
+    spriteFront = "mods/Kanto-Reforged/assets/lileep_front.png",
+    spriteBack = "mods/Kanto-Reforged/assets/lileep_back.png",
     frontSize = 6,
     dexEntry = {
       kind = "SEA LILY POKMON",
@@ -28245,8 +28245,8 @@ P.species = {
     },
     evolutions = {
     },
-    spriteFront = "mods/expansion_pack/assets/cradily_front.png",
-    spriteBack = "mods/expansion_pack/assets/cradily_back.png",
+    spriteFront = "mods/Kanto-Reforged/assets/cradily_front.png",
+    spriteBack = "mods/Kanto-Reforged/assets/cradily_back.png",
     frontSize = 7,
     dexEntry = {
       kind = "BARNACLE POKMON",
@@ -28347,8 +28347,8 @@ P.species = {
     evolutions = {
       { method = "LEVEL", species = "ARMALDO", level = 40 },
     },
-    spriteFront = "mods/expansion_pack/assets/anorith_front.png",
-    spriteBack = "mods/expansion_pack/assets/anorith_back.png",
+    spriteFront = "mods/Kanto-Reforged/assets/anorith_front.png",
+    spriteBack = "mods/Kanto-Reforged/assets/anorith_back.png",
     frontSize = 5,
     dexEntry = {
       kind = "OLD SHRIMP POKMON",
@@ -28466,8 +28466,8 @@ P.species = {
     },
     evolutions = {
     },
-    spriteFront = "mods/expansion_pack/assets/armaldo_front.png",
-    spriteBack = "mods/expansion_pack/assets/armaldo_back.png",
+    spriteFront = "mods/Kanto-Reforged/assets/armaldo_front.png",
+    spriteBack = "mods/Kanto-Reforged/assets/armaldo_back.png",
     frontSize = 7,
     dexEntry = {
       kind = "PLATE POKMON",
@@ -28551,8 +28551,8 @@ P.species = {
     evolutions = {
       { method = "ITEM", species = "MILOTIC", item = "WATER_STONE" },
     },
-    spriteFront = "mods/expansion_pack/assets/feebas_front.png",
-    spriteBack = "mods/expansion_pack/assets/feebas_back.png",
+    spriteFront = "mods/Kanto-Reforged/assets/feebas_front.png",
+    spriteBack = "mods/Kanto-Reforged/assets/feebas_back.png",
     frontSize = 5,
     dexEntry = {
       kind = "FISH POKMON",
@@ -28686,8 +28686,8 @@ P.species = {
     },
     evolutions = {
     },
-    spriteFront = "mods/expansion_pack/assets/milotic_front.png",
-    spriteBack = "mods/expansion_pack/assets/milotic_back.png",
+    spriteFront = "mods/Kanto-Reforged/assets/milotic_front.png",
+    spriteBack = "mods/Kanto-Reforged/assets/milotic_back.png",
     frontSize = 7,
     dexEntry = {
       kind = "TENDER POKMON",
@@ -28779,8 +28779,8 @@ P.species = {
     },
     evolutions = {
     },
-    spriteFront = "mods/expansion_pack/assets/castform_front.png",
-    spriteBack = "mods/expansion_pack/assets/castform_back.png",
+    spriteFront = "mods/Kanto-Reforged/assets/castform_front.png",
+    spriteBack = "mods/Kanto-Reforged/assets/castform_back.png",
     frontSize = 5,
     dexEntry = {
       kind = "WEATHER POKMON",
@@ -28905,8 +28905,8 @@ P.species = {
     },
     evolutions = {
     },
-    spriteFront = "mods/expansion_pack/assets/kecleon_front.png",
-    spriteBack = "mods/expansion_pack/assets/kecleon_back.png",
+    spriteFront = "mods/Kanto-Reforged/assets/kecleon_front.png",
+    spriteBack = "mods/Kanto-Reforged/assets/kecleon_back.png",
     frontSize = 6,
     dexEntry = {
       kind = "COLOR SWAP POKMON",
@@ -29030,8 +29030,8 @@ P.species = {
     evolutions = {
       { method = "LEVEL", species = "BANETTE", level = 37 },
     },
-    spriteFront = "mods/expansion_pack/assets/shuppet_front.png",
-    spriteBack = "mods/expansion_pack/assets/shuppet_back.png",
+    spriteFront = "mods/Kanto-Reforged/assets/shuppet_front.png",
+    spriteBack = "mods/Kanto-Reforged/assets/shuppet_back.png",
     frontSize = 5,
     dexEntry = {
       kind = "PUPPET POKMON",
@@ -29168,8 +29168,8 @@ P.species = {
     },
     evolutions = {
     },
-    spriteFront = "mods/expansion_pack/assets/banette_front.png",
-    spriteBack = "mods/expansion_pack/assets/banette_back.png",
+    spriteFront = "mods/Kanto-Reforged/assets/banette_front.png",
+    spriteBack = "mods/Kanto-Reforged/assets/banette_back.png",
     frontSize = 6,
     dexEntry = {
       kind = "MARIONETTE POKMON",
@@ -29294,8 +29294,8 @@ P.species = {
     evolutions = {
       { method = "LEVEL", species = "DUSCLOPS", level = 37 },
     },
-    spriteFront = "mods/expansion_pack/assets/duskull_front.png",
-    spriteBack = "mods/expansion_pack/assets/duskull_back.png",
+    spriteFront = "mods/Kanto-Reforged/assets/duskull_front.png",
+    spriteBack = "mods/Kanto-Reforged/assets/duskull_back.png",
     frontSize = 6,
     dexEntry = {
       kind = "REQUIEM POKMON",
@@ -29452,8 +29452,8 @@ P.species = {
     },
     evolutions = {
     },
-    spriteFront = "mods/expansion_pack/assets/dusclops_front.png",
-    spriteBack = "mods/expansion_pack/assets/dusclops_back.png",
+    spriteFront = "mods/Kanto-Reforged/assets/dusclops_front.png",
+    spriteBack = "mods/Kanto-Reforged/assets/dusclops_back.png",
     frontSize = 7,
     dexEntry = {
       kind = "BECKON POKMON",
@@ -29588,8 +29588,8 @@ P.species = {
     },
     evolutions = {
     },
-    spriteFront = "mods/expansion_pack/assets/tropius_front.png",
-    spriteBack = "mods/expansion_pack/assets/tropius_back.png",
+    spriteFront = "mods/Kanto-Reforged/assets/tropius_front.png",
+    spriteBack = "mods/Kanto-Reforged/assets/tropius_back.png",
     frontSize = 7,
     dexEntry = {
       kind = "FRUIT POKMON",
@@ -29728,8 +29728,8 @@ P.species = {
     },
     evolutions = {
     },
-    spriteFront = "mods/expansion_pack/assets/chimecho_front.png",
-    spriteBack = "mods/expansion_pack/assets/chimecho_back.png",
+    spriteFront = "mods/Kanto-Reforged/assets/chimecho_front.png",
+    spriteBack = "mods/Kanto-Reforged/assets/chimecho_back.png",
     frontSize = 5,
     dexEntry = {
       kind = "WIND CHIME POKMON",
@@ -29878,8 +29878,8 @@ P.species = {
     },
     evolutions = {
     },
-    spriteFront = "mods/expansion_pack/assets/absol_front.png",
-    spriteBack = "mods/expansion_pack/assets/absol_back.png",
+    spriteFront = "mods/Kanto-Reforged/assets/absol_front.png",
+    spriteBack = "mods/Kanto-Reforged/assets/absol_back.png",
     frontSize = 6,
     dexEntry = {
       kind = "DISASTER POKMON",
@@ -29936,8 +29936,8 @@ P.species = {
     evolutions = {
       { method = "LEVEL", species = "WOBBUFFET", level = 15 },
     },
-    spriteFront = "mods/expansion_pack/assets/wynaut_front.png",
-    spriteBack = "mods/expansion_pack/assets/wynaut_back.png",
+    spriteFront = "mods/Kanto-Reforged/assets/wynaut_front.png",
+    spriteBack = "mods/Kanto-Reforged/assets/wynaut_back.png",
     frontSize = 5,
     dexEntry = {
       kind = "BRIGHT POKMON",
@@ -30043,8 +30043,8 @@ P.species = {
     evolutions = {
       { method = "LEVEL", species = "GLALIE", level = 42 },
     },
-    spriteFront = "mods/expansion_pack/assets/snorunt_front.png",
-    spriteBack = "mods/expansion_pack/assets/snorunt_back.png",
+    spriteFront = "mods/Kanto-Reforged/assets/snorunt_front.png",
+    spriteBack = "mods/Kanto-Reforged/assets/snorunt_back.png",
     frontSize = 5,
     dexEntry = {
       kind = "SNOW HAT POKMON",
@@ -30173,8 +30173,8 @@ P.species = {
     },
     evolutions = {
     },
-    spriteFront = "mods/expansion_pack/assets/glalie_front.png",
-    spriteBack = "mods/expansion_pack/assets/glalie_back.png",
+    spriteFront = "mods/Kanto-Reforged/assets/glalie_front.png",
+    spriteBack = "mods/Kanto-Reforged/assets/glalie_back.png",
     frontSize = 7,
     dexEntry = {
       kind = "FACE POKMON",
@@ -30277,8 +30277,8 @@ P.species = {
     evolutions = {
       { method = "LEVEL", species = "SEALEO", level = 32 },
     },
-    spriteFront = "mods/expansion_pack/assets/spheal_front.png",
-    spriteBack = "mods/expansion_pack/assets/spheal_back.png",
+    spriteFront = "mods/Kanto-Reforged/assets/spheal_front.png",
+    spriteBack = "mods/Kanto-Reforged/assets/spheal_back.png",
     frontSize = 6,
     dexEntry = {
       kind = "CLAP POKMON",
@@ -30387,8 +30387,8 @@ P.species = {
     evolutions = {
       { method = "LEVEL", species = "WALREIN", level = 44 },
     },
-    spriteFront = "mods/expansion_pack/assets/sealeo_front.png",
-    spriteBack = "mods/expansion_pack/assets/sealeo_back.png",
+    spriteFront = "mods/Kanto-Reforged/assets/sealeo_front.png",
+    spriteBack = "mods/Kanto-Reforged/assets/sealeo_back.png",
     frontSize = 6,
     dexEntry = {
       kind = "BALL ROLL POKMON",
@@ -30512,8 +30512,8 @@ P.species = {
     },
     evolutions = {
     },
-    spriteFront = "mods/expansion_pack/assets/walrein_front.png",
-    spriteBack = "mods/expansion_pack/assets/walrein_back.png",
+    spriteFront = "mods/Kanto-Reforged/assets/walrein_front.png",
+    spriteBack = "mods/Kanto-Reforged/assets/walrein_back.png",
     frontSize = 7,
     dexEntry = {
       kind = "ICE BREAK POKMON",
@@ -30589,8 +30589,8 @@ P.species = {
       { method = "ITEM", species = "HUNTAIL", item = "WATER_STONE" },
       { method = "ITEM", species = "GOREBYSS", item = "MOON_STONE" },
     },
-    spriteFront = "mods/expansion_pack/assets/clamperl_front.png",
-    spriteBack = "mods/expansion_pack/assets/clamperl_back.png",
+    spriteFront = "mods/Kanto-Reforged/assets/clamperl_front.png",
+    spriteBack = "mods/Kanto-Reforged/assets/clamperl_back.png",
     frontSize = 5,
     dexEntry = {
       kind = "BIVALVE POKMON",
@@ -30684,8 +30684,8 @@ P.species = {
     },
     evolutions = {
     },
-    spriteFront = "mods/expansion_pack/assets/huntail_front.png",
-    spriteBack = "mods/expansion_pack/assets/huntail_back.png",
+    spriteFront = "mods/Kanto-Reforged/assets/huntail_front.png",
+    spriteBack = "mods/Kanto-Reforged/assets/huntail_back.png",
     frontSize = 7,
     dexEntry = {
       kind = "DEEP SEA POKMON",
@@ -30782,8 +30782,8 @@ P.species = {
     },
     evolutions = {
     },
-    spriteFront = "mods/expansion_pack/assets/gorebyss_front.png",
-    spriteBack = "mods/expansion_pack/assets/gorebyss_back.png",
+    spriteFront = "mods/Kanto-Reforged/assets/gorebyss_front.png",
+    spriteBack = "mods/Kanto-Reforged/assets/gorebyss_back.png",
     frontSize = 7,
     dexEntry = {
       kind = "SOUTH SEA POKMON",
@@ -30902,8 +30902,8 @@ P.species = {
     },
     evolutions = {
     },
-    spriteFront = "mods/expansion_pack/assets/relicanth_front.png",
-    spriteBack = "mods/expansion_pack/assets/relicanth_back.png",
+    spriteFront = "mods/Kanto-Reforged/assets/relicanth_front.png",
+    spriteBack = "mods/Kanto-Reforged/assets/relicanth_back.png",
     frontSize = 6,
     dexEntry = {
       kind = "LONGEVITY POKMON",
@@ -31005,8 +31005,8 @@ P.species = {
     },
     evolutions = {
     },
-    spriteFront = "mods/expansion_pack/assets/luvdisc_front.png",
-    spriteBack = "mods/expansion_pack/assets/luvdisc_back.png",
+    spriteFront = "mods/Kanto-Reforged/assets/luvdisc_front.png",
+    spriteBack = "mods/Kanto-Reforged/assets/luvdisc_back.png",
     frontSize = 5,
     dexEntry = {
       kind = "RENDEZVOUS POKMON",
@@ -31118,8 +31118,8 @@ P.species = {
     evolutions = {
       { method = "LEVEL", species = "SHELGON", level = 30 },
     },
-    spriteFront = "mods/expansion_pack/assets/bagon_front.png",
-    spriteBack = "mods/expansion_pack/assets/bagon_back.png",
+    spriteFront = "mods/Kanto-Reforged/assets/bagon_front.png",
+    spriteBack = "mods/Kanto-Reforged/assets/bagon_back.png",
     frontSize = 5,
     dexEntry = {
       kind = "ROCK HEAD POKMON",
@@ -31238,8 +31238,8 @@ P.species = {
     evolutions = {
       { method = "LEVEL", species = "SALAMENCE", level = 50 },
     },
-    spriteFront = "mods/expansion_pack/assets/shelgon_front.png",
-    spriteBack = "mods/expansion_pack/assets/shelgon_back.png",
+    spriteFront = "mods/Kanto-Reforged/assets/shelgon_front.png",
+    spriteBack = "mods/Kanto-Reforged/assets/shelgon_back.png",
     frontSize = 6,
     dexEntry = {
       kind = "ENDURANCE POKMON",
@@ -31390,8 +31390,8 @@ P.species = {
     },
     evolutions = {
     },
-    spriteFront = "mods/expansion_pack/assets/salamence_front.png",
-    spriteBack = "mods/expansion_pack/assets/salamence_back.png",
+    spriteFront = "mods/Kanto-Reforged/assets/salamence_front.png",
+    spriteBack = "mods/Kanto-Reforged/assets/salamence_back.png",
     frontSize = 7,
     dexEntry = {
       kind = "DRAGON POKMON",
@@ -31439,8 +31439,8 @@ P.species = {
     evolutions = {
       { method = "LEVEL", species = "METANG", level = 20 },
     },
-    spriteFront = "mods/expansion_pack/assets/beldum_front.png",
-    spriteBack = "mods/expansion_pack/assets/beldum_back.png",
+    spriteFront = "mods/Kanto-Reforged/assets/beldum_front.png",
+    spriteBack = "mods/Kanto-Reforged/assets/beldum_back.png",
     frontSize = 5,
     dexEntry = {
       kind = "IRON BALL POKMON",
@@ -31581,8 +31581,8 @@ P.species = {
     evolutions = {
       { method = "LEVEL", species = "METAGROSS", level = 45 },
     },
-    spriteFront = "mods/expansion_pack/assets/metang_front.png",
-    spriteBack = "mods/expansion_pack/assets/metang_back.png",
+    spriteFront = "mods/Kanto-Reforged/assets/metang_front.png",
+    spriteBack = "mods/Kanto-Reforged/assets/metang_back.png",
     frontSize = 6,
     dexEntry = {
       kind = "IRON CLAW POKMON",
@@ -31730,8 +31730,8 @@ P.species = {
     },
     evolutions = {
     },
-    spriteFront = "mods/expansion_pack/assets/metagross_front.png",
-    spriteBack = "mods/expansion_pack/assets/metagross_back.png",
+    spriteFront = "mods/Kanto-Reforged/assets/metagross_front.png",
+    spriteBack = "mods/Kanto-Reforged/assets/metagross_back.png",
     frontSize = 7,
     dexEntry = {
       kind = "IRON LEG POKMON",
@@ -31862,8 +31862,8 @@ P.species = {
     },
     evolutions = {
     },
-    spriteFront = "mods/expansion_pack/assets/regirock_front.png",
-    spriteBack = "mods/expansion_pack/assets/regirock_back.png",
+    spriteFront = "mods/Kanto-Reforged/assets/regirock_front.png",
+    spriteBack = "mods/Kanto-Reforged/assets/regirock_back.png",
     frontSize = 7,
     dexEntry = {
       kind = "ROCK PEAK POKMON",
@@ -31989,8 +31989,8 @@ P.species = {
     },
     evolutions = {
     },
-    spriteFront = "mods/expansion_pack/assets/regice_front.png",
-    spriteBack = "mods/expansion_pack/assets/regice_back.png",
+    spriteFront = "mods/Kanto-Reforged/assets/regice_front.png",
+    spriteBack = "mods/Kanto-Reforged/assets/regice_back.png",
     frontSize = 7,
     dexEntry = {
       kind = "ICEBERG POKMON",
@@ -32125,8 +32125,8 @@ P.species = {
     },
     evolutions = {
     },
-    spriteFront = "mods/expansion_pack/assets/registeel_front.png",
-    spriteBack = "mods/expansion_pack/assets/registeel_back.png",
+    spriteFront = "mods/Kanto-Reforged/assets/registeel_front.png",
+    spriteBack = "mods/Kanto-Reforged/assets/registeel_back.png",
     frontSize = 7,
     dexEntry = {
       kind = "IRON POKMON",
@@ -32294,8 +32294,8 @@ P.species = {
     },
     evolutions = {
     },
-    spriteFront = "mods/expansion_pack/assets/latias_front.png",
-    spriteBack = "mods/expansion_pack/assets/latias_back.png",
+    spriteFront = "mods/Kanto-Reforged/assets/latias_front.png",
+    spriteBack = "mods/Kanto-Reforged/assets/latias_back.png",
     frontSize = 7,
     dexEntry = {
       kind = "EON POKMON",
@@ -32463,8 +32463,8 @@ P.species = {
     },
     evolutions = {
     },
-    spriteFront = "mods/expansion_pack/assets/latios_front.png",
-    spriteBack = "mods/expansion_pack/assets/latios_back.png",
+    spriteFront = "mods/Kanto-Reforged/assets/latios_front.png",
+    spriteBack = "mods/Kanto-Reforged/assets/latios_back.png",
     frontSize = 7,
     dexEntry = {
       kind = "EON POKMON",
@@ -32580,8 +32580,8 @@ P.species = {
     },
     evolutions = {
     },
-    spriteFront = "mods/expansion_pack/assets/kyogre_front.png",
-    spriteBack = "mods/expansion_pack/assets/kyogre_back.png",
+    spriteFront = "mods/Kanto-Reforged/assets/kyogre_front.png",
+    spriteBack = "mods/Kanto-Reforged/assets/kyogre_back.png",
     frontSize = 7,
     dexEntry = {
       kind = "SEA BASIN POKMON",
@@ -32728,8 +32728,8 @@ P.species = {
     },
     evolutions = {
     },
-    spriteFront = "mods/expansion_pack/assets/groudon_front.png",
-    spriteBack = "mods/expansion_pack/assets/groudon_back.png",
+    spriteFront = "mods/Kanto-Reforged/assets/groudon_front.png",
+    spriteBack = "mods/Kanto-Reforged/assets/groudon_back.png",
     frontSize = 7,
     dexEntry = {
       kind = "CONTINENT POKMON",
@@ -32881,8 +32881,8 @@ P.species = {
     },
     evolutions = {
     },
-    spriteFront = "mods/expansion_pack/assets/rayquaza_front.png",
-    spriteBack = "mods/expansion_pack/assets/rayquaza_back.png",
+    spriteFront = "mods/Kanto-Reforged/assets/rayquaza_front.png",
+    spriteBack = "mods/Kanto-Reforged/assets/rayquaza_back.png",
     frontSize = 7,
     dexEntry = {
       kind = "SKY HIGH POKMON",
@@ -33030,8 +33030,8 @@ P.species = {
     },
     evolutions = {
     },
-    spriteFront = "mods/expansion_pack/assets/jirachi_front.png",
-    spriteBack = "mods/expansion_pack/assets/jirachi_back.png",
+    spriteFront = "mods/Kanto-Reforged/assets/jirachi_front.png",
+    spriteBack = "mods/Kanto-Reforged/assets/jirachi_back.png",
     frontSize = 5,
     dexEntry = {
       kind = "WISH POKMON",
@@ -33180,8 +33180,8 @@ P.species = {
     },
     evolutions = {
     },
-    spriteFront = "mods/expansion_pack/assets/deoxys_normal_front.png",
-    spriteBack = "mods/expansion_pack/assets/deoxys_normal_back.png",
+    spriteFront = "mods/Kanto-Reforged/assets/deoxys_normal_front.png",
+    spriteBack = "mods/Kanto-Reforged/assets/deoxys_normal_back.png",
     frontSize = 7,
     dexEntry = {
       kind = "DNA POKMON",

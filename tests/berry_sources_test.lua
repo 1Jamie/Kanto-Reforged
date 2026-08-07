@@ -43,7 +43,7 @@ return function(T, Data, HeldItems, run)
   T.check(not martHas("CeladonMart5F", "TEXT_CELADONMART5F_CLERK2", "LEFTOVERS"),
     "Celadon vitamins clerk does not sell Leftovers")
 
-  local BerryFarm = require("mods.expansion_pack.berry_farm")
+  local BerryFarm = require("mods.Kanto-Reforged.berry_farm")
   T.eq(BerryFarm.GROW_STEPS, 320, "Base grow steps are 320")
   T.eq(BerryFarm.GROW_BY_RANK[3], 192, "Soil rank 3 speeds growth")
 
@@ -128,9 +128,9 @@ return function(T, Data, HeldItems, run)
   T.eq(Data.items.CHERI_BERRY.price, 600, "Status berry farm price")
   T.eq(Data.items.LUM_BERRY.price, 2000, "Lum farm price")
 
-  local BerryQuests = require("mods.expansion_pack.berry_quests")
+  local BerryQuests = require("mods.Kanto-Reforged.berry_quests")
   T.eq(BerryQuests.UNLOCK_SEED_GIFT, 3, "Unlock gifts 3 berries per type")
-  local mod = BerryFarm._mod or require("mods.expansion_pack.level_caps")._mod
+  local mod = BerryFarm._mod or require("mods.Kanto-Reforged.level_caps")._mod
   T.check(mod and mod.save, "berry farm has mod save")
   mod.save:set("unlocked_berries", { BERRY = true })
   mod.save:set("gifted_berry_seeds", {})

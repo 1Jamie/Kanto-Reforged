@@ -516,4 +516,4 @@ Legendary custom maps save return coordinates on enter and exit via warp hooks s
 
 Tests live under `tests/` and are pulled in by `tests/expansion_pack_test.lua`.
 
-Map PNG previews (optional local QA only; gitignored): `map_previews/` via `render_map_previews.py`.
+Map PNG previews (optional QA): `map_previews/` via `render_map_previews.py`.
