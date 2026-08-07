@@ -1252,6 +1252,159 @@ def drop_orphan_pixels(img, min_blob=4):
     return img
 
 
+def close_small_holes(img):
+    """Fill 1–2px transparent dents that sit between opaque neighbors (waist/hem bites)."""
+    img = img.convert("RGBA")
+    w, h = img.size
+    src = img.load()
+    out = img.copy()
+    dst = out.load()
+
+    def pick_fill(colors):
+        # Prefer body mid-tones over pure black so gap-fills do not blob the outline.
+        return max(colors, key=lambda c: 0.299 * c[0] + 0.587 * c[1] + 0.114 * c[2])
+
+    for y in range(h):
+        for x in range(w):
+            if src[x, y][3] >= 128:
+                continue
+            neighbors = []
+            for nx, ny in ((x - 1, y), (x + 1, y), (x, y - 1), (x, y + 1)):
+                if 0 <= nx < w and 0 <= ny < h and src[nx, ny][3] >= 128:
+                    neighbors.append(src[nx, ny])
+            left = x > 0 and src[x - 1, y][3] >= 128
+            right = x + 1 < w and src[x + 1, y][3] >= 128
+            # Horizontal pinch (classic waist chew) or 3+ opaque neighbors.
+            if (left and right) or len(neighbors) >= 3:
+                if left and right:
+                    dst[x, y] = pick_fill([src[x - 1, y], src[x + 1, y]])
+                elif left:
+                    # Prefer inward (right) if present among neighbors.
+                    dst[x, y] = pick_fill(neighbors) if neighbors else src[x - 1, y]
+                elif right:
+                    dst[x, y] = pick_fill(neighbors) if neighbors else src[x + 1, y]
+                else:
+                    dst[x, y] = pick_fill(neighbors)
+        # Second pass on this row: bridge 2px horizontal gaps (#..#).
+        x = 0
+        while x < w:
+            if src[x, y][3] >= 128:
+                x += 1
+                continue
+            start = x
+            while x < w and src[x, y][3] < 128:
+                x += 1
+            end = x  # exclusive
+            gap = end - start
+            if gap <= 2 and start > 0 and end < w:
+                if src[start - 1, y][3] >= 128 and src[end, y][3] >= 128:
+                    fill = pick_fill([src[start - 1, y], src[end, y]])
+                    for fx in range(start, end):
+                        dst[fx, y] = fill
+    return out
+
+
+def _pixel_luma(c):
+    return 0.299 * c[0] + 0.587 * c[1] + 0.114 * c[2]
+
+
+def thicken_narrow_stems(img, min_width=5):
+    """Widen thin mid-body rows without growing a 2px black outline blob.
+
+    Copies the edge outline one pixel outward, then backfills the old edge
+    with the inward body color when the edge was outline-dark.
+    """
+    img = img.convert("RGBA")
+    w, h = img.size
+    px = img.load()
+
+    def row_span(y):
+        xs = [x for x in range(w) if px[x, y][3] >= 128]
+        if not xs:
+            return None
+        return min(xs), max(xs)
+
+    spans = [row_span(y) for y in range(h)]
+    out = img.copy()
+    dst = out.load()
+    for y in range(1, h - 1):
+        cur = spans[y]
+        if not cur:
+            continue
+        left, right = cur
+        width = right - left + 1
+        if width >= min_width:
+            continue
+        above = spans[y - 1]
+        below = spans[y + 1]
+        wider = []
+        if above:
+            wider.append(above[1] - above[0] + 1)
+        if below:
+            wider.append(below[1] - below[0] + 1)
+        # Only thicken when this row is a constriction between wider rows.
+        if not wider or max(wider) < width + 2:
+            continue
+
+        if left > 0 and dst[left, y][3] >= 128:
+            edge = dst[left, y]
+            inward = (
+                dst[left + 1, y]
+                if left + 1 <= right and dst[left + 1, y][3] >= 128
+                else edge
+            )
+            dst[left - 1, y] = edge
+            if _pixel_luma(edge) < 60 and _pixel_luma(inward) > _pixel_luma(edge) + 25:
+                dst[left, y] = inward
+
+        if right + 1 < w and dst[right, y][3] >= 128:
+            edge = dst[right, y]
+            inward = (
+                dst[right - 1, y]
+                if right - 1 >= left and dst[right - 1, y][3] >= 128
+                else edge
+            )
+            dst[right + 1, y] = edge
+            if _pixel_luma(edge) < 60 and _pixel_luma(inward) > _pixel_luma(edge) + 25:
+                dst[right, y] = inward
+    return out
+
+
+def thin_outline_bulges(img):
+    """Knock 2px-thick exterior outline blobs back to a 1px rim."""
+    img = img.convert("RGBA")
+    w, h = img.size
+    src = img.load()
+    out = img.copy()
+    dst = out.load()
+
+    def opaque(x, y):
+        return 0 <= x < w and 0 <= y < h and src[x, y][3] >= 128
+
+    def dark(c):
+        return _pixel_luma(c) < 60
+
+    for y in range(h):
+        for x in range(w):
+            c = src[x, y]
+            if c[3] < 128 or not dark(c):
+                continue
+            for dx, dy in ((-1, 0), (1, 0), (0, -1), (0, 1)):
+                ox, oy = x + dx, y + dy
+                if opaque(ox, oy):
+                    continue  # not exterior in this direction
+                # (dx,dy) faces transparent; look inward the other way.
+                ix, iy = x - dx, y - dy
+                if not (opaque(ix, iy) and dark(src[ix, iy])):
+                    continue
+                jx, jy = ix - dx, iy - dy
+                # Keep a 1px black stem; only clear when there is body further in.
+                if opaque(jx, jy):
+                    dst[x, y] = (0, 0, 0, 0)
+                    break
+    return out
+
+
 def extract_species_palette(img):
     """4 RGB triples (lightest first) from opaque pixels — Gen 1 SGB shape.
 
@@ -1326,10 +1479,11 @@ def extract_species_palette(img):
     colors = colors[:4]
     colors.sort(key=lambda c: 0.299 * c[0] + 0.587 * c[1] + 0.114 * c[2], reverse=True)
 
-    # Gen 1 pals almost always pin a near-white highlight and near-black
-    # outline slot — nudge extremes so Advanced remap stays punchy.
-    if max(colors[0]) < 220:
-        colors[0] = tuple(min(255, int(c * 1.15 + 20)) for c in colors[0])
+    # Status-screen SGB zone behind the pic uses palette color 0 for the
+    # white UI tiles in that rect.  Vanilla Advanced/GBC mon pals pin this
+    # to pure white (255,255,255); the classic SGB off-white (255,239,255)
+    # reads as a pink/lilac box around Gen 2/3 pics.  Match GBC.
+    colors[0] = (255, 255, 255)
     if max(colors[3]) > 48:
         colors[3] = tuple(max(0, int(c * 0.35)) for c in colors[3])
     return colors
@@ -1395,6 +1549,7 @@ def process_sprite(input_path, output_path, target_size):
         # Thicken before any downscale so thin outlines / waists survive.
         if w > fit_w or h > fit_h:
             img = dilate_opaque(img)
+            img = close_small_holes(img)
             w, h = img.size
 
         ratio = min(fit_w / w, fit_h / h)
@@ -1403,6 +1558,9 @@ def process_sprite(input_path, output_path, target_size):
         new_w = min(new_w, fit_w)
         new_h = min(new_h, fit_h)
         img_resized = img.resize((new_w, new_h), Image.NEAREST)
+        img_resized = close_small_holes(img_resized)
+        img_resized = thicken_narrow_stems(img_resized)
+        img_resized = thin_outline_bulges(img_resized)
 
         # Backs: bottom-align above the Gen 1-style pad.  Fronts: center.
         new_img = Image.new("RGBA", target_size, (255, 255, 255, 0))
@@ -1412,6 +1570,8 @@ def process_sprite(input_path, output_path, target_size):
         else:
             y = (target_size[1] - new_h) // 2
         new_img.paste(img_resized, (x, y), img_resized)
+        new_img = close_small_holes(new_img)
+        new_img = thin_outline_bulges(new_img)
         new_img = drop_orphan_pixels(new_img)
 
         # Map each pixel to the nearest species-palette slot, then emit the
