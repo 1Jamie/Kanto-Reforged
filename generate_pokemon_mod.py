@@ -606,9 +606,16 @@ def map_move_effect(m_id, m_data):
         return "FLINCH_SIDE_EFFECT2" if flinch_chance >= 20 else "FLINCH_SIDE_EFFECT1", extra
 
     # Damaging + stat changes
+    # PokéAPI meta.category:
+    #   damage-raise  → changes the user's stats (Overheat, Close Combat,
+    #                   Metal Claw, Flame Charge, …)
+    #   damage-lower  → lowers the target's stats (Rock Tomb, Snarl, …)
+    # Do NOT key off "100% + all-negative" alone: foe drops like Rock Tomb
+    # are also 100% and were wrongly tagged as self-drops.
     if power > 0 and stat_changes:
+        self_stat = category == "damage-raise"
         # Self-stat drops after attacking (Overheat, Close Combat, Superpower)
-        if all(sc["change"] < 0 for sc in stat_changes) and stat_chance >= 100:
+        if self_stat and all(sc["change"] < 0 for sc in stat_changes):
             extra["statChanges"] = stat_changes
             extra["statTarget"] = "user"
             return "EXP_DAMAGE_USER_STAT_EFFECT", extra
@@ -618,9 +625,9 @@ def map_move_effect(m_id, m_data):
             extra["statChance"] = stat_chance or 10
             extra["statTarget"] = "user"
             return "EXP_DAMAGE_STAT_SIDE_EFFECT", extra
-        # Target stat drops (Shadow Ball, Crunch, Iron Tail)
+        # Target stat drops (Rock Tomb, Snarl, Shadow Ball, Crunch, …)
         mapped = side_stat_effect(stat_changes)
-        if mapped and len(stat_changes) == 1:
+        if mapped and len(stat_changes) == 1 and (stat_chance or 0) < 100:
             return mapped, extra
         extra["statChanges"] = stat_changes
         extra["statChance"] = stat_chance or 10
@@ -874,6 +881,51 @@ def write_ability_patches_lua(path, ability_patches):
         f.write("return P\n")
 
 
+def collect_special_stat_patches(start=1, end=151):
+    """Fetch PokeAPI SpA/SpD for Kanto species (pokemon endpoint stats[3]/[4]).
+
+    Vanilla Gen 1 only has baseStats.special; these fields power the optional
+    SP.ATK / SP.DEF toggle without changing the Gen 1 special base.
+    """
+    patches = {}
+    for pid in range(start, end + 1):
+        try:
+            poke_data = fetch_json(
+                f"https://pokeapi.co/api/v2/pokemon/{pid}/", "pokemon", pid
+            )
+            species_id = species_id_from_pokeapi_name(poke_data["name"])
+            stats = poke_data["stats"]
+            sp_attack = int(stats[3]["base_stat"])
+            sp_defense = int(stats[4]["base_stat"])
+            patches[species_id] = {
+                "sp_attack": sp_attack,
+                "sp_defense": sp_defense,
+            }
+            print(f"  #{pid} {species_id} -> SpA {sp_attack} SpD {sp_defense}")
+        except Exception as e:
+            print(f"Error fetching special stats for dex {pid}: {e}")
+    return patches
+
+
+def write_special_stat_patches_lua(path, patches):
+    """Write mods/Kanto-Reforged/special_stat_patches.lua."""
+    print(f"Writing {path}...")
+    with open(path, "w", encoding="utf-8") as f:
+        f.write("-- Generated SpA/SpD for Kanto species (PokeAPI)\n")
+        f.write("-- Applied onto vanilla Data.pokemon via pokemon:patch\n")
+        f.write("-- Leaves baseStats.special alone for Gen 1 mechanics.\n")
+        f.write("local P = {}\n\n")
+        f.write("P.stats = {\n")
+        for species_id in sorted(patches.keys()):
+            row = patches[species_id]
+            f.write(
+                f"  {species_id} = {{ sp_attack = {row['sp_attack']}, "
+                f"sp_defense = {row['sp_defense']} }},\n"
+            )
+        f.write("}\n\n")
+        f.write("return P\n")
+
+
 def species_id_from_pokeapi_name(name):
     """Map PokéAPI species name to engine id (nidoran-f -> NIDORAN_F)."""
     return name.upper().replace("-", "_")
@@ -1073,8 +1125,21 @@ def sanitize_text(text):
     text = text.encode("ascii", "ignore").decode("ascii")
     return " ".join(text.split())
 
+def pokeapi_cache_dir():
+    """PokéAPI JSON cache: tools/.cache/pokeapi under the game repo (not the mod)."""
+    candidates = [
+        os.path.join(os.path.dirname(os.path.dirname(MOD_ROOT)), "tools", ".cache", "pokeapi"),
+        os.path.join("tools", ".cache", "pokeapi"),
+    ]
+    for path in candidates:
+        parent = os.path.dirname(path)
+        if os.path.isdir(parent) or os.path.isdir(path):
+            return path
+    return candidates[0]
+
+
 def get_cache_path(category, filename):
-    return os.path.join("tools", ".cache", "pokeapi", category, f"{filename}.json")
+    return os.path.join(pokeapi_cache_dir(), category, f"{filename}.json")
 
 def fetch_json(url, cache_category, cache_name):
     cache_path = get_cache_path(cache_category, cache_name)
@@ -1219,6 +1284,815 @@ def dilate_opaque(img, radius=1):
     return img
 
 
+def extract_gap_mask(img):
+    """Binary mask of load-bearing negative space (bays + enclosed holes).
+
+    Used by the plated style: OR-pool through shrink, then force transparent
+    so limb/body gaps cannot be majority-filled with body midtone.
+    """
+    from collections import deque
+
+    img = img.convert("RGBA")
+    w, h = img.size
+    px = img.load()
+    mask = Image.new("1", (w, h), 0)
+    mp = mask.load()
+
+    def opaque(x, y):
+        return 0 <= x < w and 0 <= y < h and px[x, y][3] >= 128
+
+    for y in range(h):
+        for x in range(w):
+            if px[x, y][3] >= 128:
+                continue
+            if (opaque(x - 1, y) and opaque(x + 1, y)) or (
+                opaque(x, y - 1) and opaque(x, y + 1)
+            ):
+                mp[x, y] = 1
+
+    exterior = [[False] * w for _ in range(h)]
+    q = deque()
+    for x in range(w):
+        for y in (0, h - 1):
+            if px[x, y][3] < 128:
+                exterior[y][x] = True
+                q.append((x, y))
+    for y in range(h):
+        for x in (0, w - 1):
+            if px[x, y][3] < 128 and not exterior[y][x]:
+                exterior[y][x] = True
+                q.append((x, y))
+    while q:
+        x, y = q.popleft()
+        for nx, ny in ((x - 1, y), (x + 1, y), (x, y - 1), (x, y + 1)):
+            if (
+                0 <= nx < w
+                and 0 <= ny < h
+                and not exterior[ny][nx]
+                and px[nx, ny][3] < 128
+            ):
+                exterior[ny][nx] = True
+                q.append((nx, ny))
+    for y in range(h):
+        for x in range(w):
+            if px[x, y][3] < 128 and not exterior[y][x]:
+                mp[x, y] = 1
+    return mask
+
+
+def carve_gap_mask(img, gap_mask):
+    """Force gap-mask pixels to transparent on an RGBA image."""
+    img = img.convert("RGBA")
+    gap_mask = gap_mask.convert("1")
+    if gap_mask.size != img.size:
+        return img
+    out = img.copy()
+    px = out.load()
+    gp = gap_mask.load()
+    w, h = img.size
+    clear = (0, 0, 0, 0)
+    for y in range(h):
+        for x in range(w):
+            if gp[x, y]:
+                px[x, y] = clear
+    return out
+
+
+def carve_interior_seams_to_gaps(img, ink_mask):
+    """Turn fully-interior body↔body ink into transparent cutouts.
+
+    Prefer open_limb_gaps_along_ink for plated art — blind carving swiss-cheeses
+    plate lines.  Kept for small final-size cleanup of gap-adjacent seams.
+    """
+    img = img.convert("RGBA")
+    ink_mask = ink_mask.convert("1")
+    if ink_mask.size != img.size:
+        return img
+    w, h = img.size
+    src = img.load()
+    mp = ink_mask.load()
+    out = img.copy()
+    dst = out.load()
+    clear = (0, 0, 0, 0)
+
+    def opaque(x, y):
+        return 0 <= x < w and 0 <= y < h and src[x, y][3] >= 128
+
+    def is_body(x, y):
+        if not opaque(x, y):
+            return False
+        r, g, b, _ = src[x, y]
+        return r + g + b >= 40
+
+    for y in range(h):
+        for x in range(w):
+            if not mp[x, y]:
+                continue
+            if not opaque(x, y):
+                continue
+            horiz = is_body(x - 1, y) and is_body(x + 1, y)
+            vert = is_body(x, y - 1) and is_body(x, y + 1)
+            if not (horiz or vert):
+                continue
+            # Only carve when the seam is fully enclosed (not silhouette rim).
+            if opaque(x - 1, y) and opaque(x + 1, y) and opaque(x, y - 1) and opaque(
+                x, y + 1
+            ):
+                dst[x, y] = clear
+    return out
+
+
+def open_limb_gaps_along_ink(img, ink_mask, gap_mask=None, max_steps=24):
+    """Open limb/body cutouts by growing exterior bays along separating ink.
+
+    Emerald Metagross (and similar plated mons) draw leg joins as 1px black
+    seams on a continuous opaque silhouette — not as real transparent armpits.
+    After 4-shade collapse those seams freckle and midtone fills the join.
+    Growing from silhouette bays along body↔body ink turns the join into a
+    real gap the shrink OR-pool can preserve, without carving every plate line.
+    """
+    from collections import deque
+
+    img = img.convert("RGBA")
+    ink_mask = ink_mask.convert("1")
+    w, h = img.size
+    if gap_mask is None:
+        gap_mask = extract_gap_mask(img)
+    else:
+        gap_mask = gap_mask.convert("1").copy()
+    if ink_mask.size != (w, h) or gap_mask.size != (w, h):
+        return img, gap_mask, ink_mask
+
+    out = img.copy()
+    src = out.load()
+    working_ink = ink_mask.copy()
+    wip = working_ink.load()
+    gp = gap_mask.load()
+    clear = (0, 0, 0, 0)
+
+    def opaque(x, y):
+        return 0 <= x < w and 0 <= y < h and src[x, y][3] >= 128
+
+    def body_on_axis(x, y, dx, dy, max_skip=2):
+        """Find non-ink body within max_skip, skipping ink in between."""
+        for i in range(1, max_skip + 1):
+            nx, ny = x + dx * i, y + dy * i
+            if not (0 <= nx < w and 0 <= ny < h) or src[nx, ny][3] < 128:
+                return False
+            r, g, b, _ = src[nx, ny]
+            if r + g + b >= 40:
+                return True
+        return False
+
+    def separates_body(x, y):
+        return (
+            body_on_axis(x, y, -1, 0) and body_on_axis(x, y, 1, 0)
+        ) or (body_on_axis(x, y, 0, -1) and body_on_axis(x, y, 0, 1))
+
+    def carve_at(x, y):
+        src[x, y] = clear
+        wip[x, y] = 0
+        gp[x, y] = 1
+
+    q = deque()
+    # Seed A: existing bay / hole gap pixels.
+    for y in range(h):
+        for x in range(w):
+            if src[x, y][3] >= 128:
+                continue
+            pinched = (opaque(x - 1, y) and opaque(x + 1, y)) or (
+                opaque(x, y - 1) and opaque(x, y + 1)
+            )
+            if gp[x, y] or pinched:
+                gp[x, y] = 1
+                q.append((x, y, 0))
+
+    # Seed B: rim ink that already separates body and touches empty —
+    # the mouth of an armpit before any transparent bay exists.
+    for y in range(h):
+        for x in range(w):
+            if not wip[x, y] or not opaque(x, y):
+                continue
+            if not separates_body(x, y):
+                continue
+            touches_empty = False
+            for nx, ny in ((x - 1, y), (x + 1, y), (x, y - 1), (x, y + 1)):
+                if not (0 <= nx < w and 0 <= ny < h) or src[nx, ny][3] < 128:
+                    touches_empty = True
+                    break
+            if touches_empty:
+                carve_at(x, y)
+                q.append((x, y, 0))
+
+    while q:
+        x, y, steps = q.popleft()
+        if steps >= max_steps:
+            continue
+        for nx, ny in ((x - 1, y), (x + 1, y), (x, y - 1), (x, y + 1)):
+            if not (0 <= nx < w and 0 <= ny < h) or gp[nx, ny]:
+                continue
+            if not wip[nx, ny] or not opaque(nx, ny):
+                continue
+            if not separates_body(nx, ny):
+                continue
+            carve_at(nx, ny)
+            q.append((nx, ny, steps + 1))
+
+    return out, gap_mask, working_ink
+
+
+def open_ink_between_body_parts(img, ink_mask, gap_mask=None, min_part=28):
+    """Carve ink that separates two large body components into real gaps.
+
+    Metagross legs share one opaque silhouette with the torso — joins are
+    black seams, not exterior bays.  Treating ink as cuts and finding which
+    ink pixels border two different large body CCs opens those joins without
+    swiss-cheesing plate lines that stay inside one component.
+    """
+    from collections import deque
+
+    img = img.convert("RGBA")
+    ink_mask = ink_mask.convert("1")
+    w, h = img.size
+    if gap_mask is None:
+        gap_mask = Image.new("1", (w, h), 0)
+    else:
+        gap_mask = gap_mask.convert("1").copy()
+    if ink_mask.size != (w, h) or gap_mask.size != (w, h):
+        return img, gap_mask, ink_mask
+
+    src_img = img
+    src = src_img.load()
+    wip_ink = ink_mask.copy()
+    wip = wip_ink.load()
+    gp = gap_mask.load()
+
+    # Body = opaque non-ink.  Label connected components.
+    label = [[-1] * w for _ in range(h)]
+    sizes = {}
+    next_id = 0
+    for y in range(h):
+        for x in range(w):
+            if label[y][x] != -1:
+                continue
+            if src[x, y][3] < 128 or wip[x, y]:
+                continue
+            r, g, b, _ = src[x, y]
+            if r + g + b < 40:
+                continue
+            q = deque([(x, y)])
+            label[y][x] = next_id
+            n = 0
+            while q:
+                cx, cy = q.popleft()
+                n += 1
+                for nx, ny in (
+                    (cx - 1, cy),
+                    (cx + 1, cy),
+                    (cx, cy - 1),
+                    (cx, cy + 1),
+                ):
+                    if not (0 <= nx < w and 0 <= ny < h) or label[ny][nx] != -1:
+                        continue
+                    if src[nx, ny][3] < 128 or wip[nx, ny]:
+                        continue
+                    nr, ng, nb, _ = src[nx, ny]
+                    if nr + ng + nb < 40:
+                        continue
+                    label[ny][nx] = next_id
+                    q.append((nx, ny))
+            sizes[next_id] = n
+            next_id += 1
+
+    large = {i for i, n in sizes.items() if n >= min_part}
+    if len(large) < 2:
+        return img, gap_mask, ink_mask
+
+    out = img.copy()
+    dst = out.load()
+    clear = (0, 0, 0, 0)
+    for y in range(h):
+        for x in range(w):
+            if not wip[x, y] or src[x, y][3] < 128:
+                continue
+            neigh = set()
+            for nx, ny in ((x - 1, y), (x + 1, y), (x, y - 1), (x, y + 1)):
+                if not (0 <= nx < w and 0 <= ny < h):
+                    continue
+                lid = label[ny][nx]
+                if lid in large:
+                    neigh.add(lid)
+            if len(neigh) >= 2:
+                dst[x, y] = clear
+                wip[x, y] = 0
+                gp[x, y] = 1
+    return out, gap_mask, wip_ink
+
+
+def widen_gaps_into_separating_ink(img, ink_mask, gap_mask, passes=2):
+    """Widen limb cutouts by carving adjacent body↔body ink (not silhouette rim).
+
+    1px corridors vanish under majority shrink and read as freckles; a 2px
+    channel survives.  Never carve rim ink that merely touches exterior empty
+    without separating body — that eats claw/arm tips.
+    """
+    img = img.convert("RGBA")
+    ink_mask = ink_mask.convert("1")
+    gap_mask = gap_mask.convert("1").copy()
+    if ink_mask.size != img.size or gap_mask.size != img.size:
+        return img, gap_mask, ink_mask
+    w, h = img.size
+    out = img.copy()
+    src = out.load()
+    working_ink = ink_mask.copy()
+    wip = working_ink.load()
+    gp = gap_mask.load()
+    clear = (0, 0, 0, 0)
+
+    def body_on_axis(x, y, dx, dy, max_skip=2):
+        for i in range(1, max_skip + 1):
+            nx, ny = x + dx * i, y + dy * i
+            if not (0 <= nx < w and 0 <= ny < h) or src[nx, ny][3] < 128:
+                return False
+            r, g, b, _ = src[nx, ny]
+            if r + g + b >= 40:
+                return True
+        return False
+
+    def separates_body(x, y):
+        return (
+            body_on_axis(x, y, -1, 0) and body_on_axis(x, y, 1, 0)
+        ) or (body_on_axis(x, y, 0, -1) and body_on_axis(x, y, 0, 1))
+
+    for _ in range(max(1, passes)):
+        add = []
+        for y in range(h):
+            for x in range(w):
+                if not gp[x, y]:
+                    continue
+                for nx, ny in ((x - 1, y), (x + 1, y), (x, y - 1), (x, y + 1)):
+                    if not (0 <= nx < w and 0 <= ny < h):
+                        continue
+                    if gp[nx, ny] or not wip[nx, ny] or src[nx, ny][3] < 128:
+                        continue
+                    if separates_body(nx, ny):
+                        add.append((nx, ny))
+        for x, y in add:
+            src[x, y] = clear
+            wip[x, y] = 0
+            gp[x, y] = 1
+    return out, gap_mask, working_ink
+
+
+def ink_gap_rims(img, gap_mask, ink_mask=None):
+    """Paint black on opaque pixels that touch a gap so cutouts read as seams."""
+    img = img.convert("RGBA")
+    gap_mask = gap_mask.convert("1")
+    if gap_mask.size != img.size:
+        return img, ink_mask
+    w, h = img.size
+    out = img.copy()
+    src = out.load()
+    gp = gap_mask.load()
+    if ink_mask is None:
+        new_ink = Image.new("1", (w, h), 0)
+    else:
+        new_ink = ink_mask.convert("1").copy()
+    nmp = new_ink.load()
+    black = (0, 0, 0, 255)
+    for y in range(h):
+        for x in range(w):
+            if src[x, y][3] < 128 or gp[x, y]:
+                continue
+            for nx, ny in ((x - 1, y), (x + 1, y), (x, y - 1), (x, y + 1)):
+                if 0 <= nx < w and 0 <= ny < h and gp[nx, ny]:
+                    src[x, y] = black
+                    nmp[x, y] = 1
+                    break
+    return out, new_ink
+
+
+def deepen_pinched_gaps(img, gap_mask, passes=1):
+    """Widen O–gap–O pinches by carving one body pixel into each wall.
+
+    Natural Emerald armpits are often 1px; after 64→56 majority they fill.
+    Deepening only pinched corridors (not exterior silhouette) keeps claws
+    intact while making limb cutouts actually readable.
+    """
+    img = img.convert("RGBA")
+    gap_mask = gap_mask.convert("1").copy()
+    if gap_mask.size != img.size:
+        return img, gap_mask
+    w, h = img.size
+    out = img.copy()
+    src = out.load()
+    gp = gap_mask.load()
+    clear = (0, 0, 0, 0)
+
+    def is_body(x, y):
+        if not (0 <= x < w and 0 <= y < h) or src[x, y][3] < 128:
+            return False
+        r, g, b, _ = src[x, y]
+        return r + g + b >= 40
+
+    for _ in range(max(1, passes)):
+        add = []
+        for y in range(h):
+            for x in range(w):
+                if not gp[x, y] or src[x, y][3] >= 128:
+                    continue
+                if is_body(x - 1, y) and is_body(x + 1, y):
+                    add.append((x - 1, y))
+                    add.append((x + 1, y))
+                if is_body(x, y - 1) and is_body(x, y + 1):
+                    add.append((x, y - 1))
+                    add.append((x, y + 1))
+        for x, y in add:
+            if src[x, y][3] < 128:
+                continue
+            src[x, y] = clear
+            gp[x, y] = 1
+    return out, gap_mask
+
+
+def reinforce_interior_ink(img, ink_mask):
+    """Thicken interior ink one pixel so limb seams survive majority shrink."""
+    img = img.convert("RGBA")
+    ink_mask = ink_mask.convert("1")
+    if ink_mask.size != img.size:
+        return img, ink_mask
+    w, h = img.size
+    src = img.load()
+    mp = ink_mask.load()
+    out = img.copy()
+    dst = out.load()
+    new_mask = ink_mask.copy()
+    nmp = new_mask.load()
+    black = (0, 0, 0, 255)
+
+    def opaque(x, y):
+        return 0 <= x < w and 0 <= y < h and src[x, y][3] >= 128
+
+    def is_body(x, y):
+        if not opaque(x, y):
+            return False
+        r, g, b, _ = src[x, y]
+        return r + g + b >= 40
+
+    grow = []
+    for y in range(h):
+        for x in range(w):
+            if not mp[x, y]:
+                continue
+            if not (
+                opaque(x - 1, y)
+                and opaque(x + 1, y)
+                and opaque(x, y - 1)
+                and opaque(x, y + 1)
+            ):
+                continue
+            if is_body(x - 1, y) and is_body(x + 1, y):
+                for nx in (x - 1, x + 1):
+                    if is_body(nx, y) and not mp[nx, y]:
+                        grow.append((nx, y))
+            if is_body(x, y - 1) and is_body(x, y + 1):
+                for ny in (y - 1, y + 1):
+                    if is_body(x, ny) and not mp[x, ny]:
+                        grow.append((x, ny))
+    for x, y in grow:
+        dst[x, y] = black
+        nmp[x, y] = 1
+    return out, new_mask
+
+
+def extract_ink_mask(img, luma_max=48, soft_luma_max=70, contrast_delta=22):
+    """Binary mask of the artist's real dark outline / seam pixels.
+
+    Taken from full-resolution source *before* majority-vote shrink, which
+    otherwise outvotes 1px lines between same-colored limbs.
+
+    Near-black pixels (luma <= luma_max) always count.  Darker-than-body
+    stroke pixels (up to soft_luma_max) also count when they sit against a
+    distinctly lighter opaque neighbor or the silhouette edge — this catches
+    Metagross's dark-blue plate seams and Treecko's olive limb joins that
+    are line art, not flat black ink.
+
+    Returns a '1' mode image matching img's size.
+    """
+    img = img.convert("RGBA")
+    w, h = img.size
+    px = img.load()
+    luma = [[None] * w for _ in range(h)]
+    for y in range(h):
+        for x in range(w):
+            r, g, b, a = px[x, y]
+            if a >= 128:
+                luma[y][x] = _pixel_luma((r, g, b))
+
+    mask = Image.new("1", (w, h), 0)
+    mp = mask.load()
+    for y in range(h):
+        for x in range(w):
+            L = luma[y][x]
+            if L is None:
+                continue
+            if L <= luma_max:
+                mp[x, y] = 1
+                continue
+            if L > soft_luma_max:
+                continue
+            # Stroke against lighter body, or silhouette dark edge.
+            for dx, dy in ((-1, 0), (1, 0), (0, -1), (0, 1)):
+                nx, ny = x + dx, y + dy
+                if not (0 <= nx < w and 0 <= ny < h) or luma[ny][nx] is None:
+                    mp[x, y] = 1
+                    break
+                if luma[ny][nx] >= L + contrast_delta:
+                    mp[x, y] = 1
+                    break
+    return mask
+
+
+def filter_ink_mask(mask, min_blob=3):
+    """Drop tiny ink islands (AA freckles / stray dither), keep real seams.
+
+    Connected components smaller than min_blob are cleared.  One tunable
+    threshold — not a per-species override.
+    """
+    from collections import deque
+
+    mask = mask.convert("1")
+    w, h = mask.size
+    mp = mask.load()
+    seen = [[False] * w for _ in range(h)]
+    for y in range(h):
+        for x in range(w):
+            if seen[y][x] or not mp[x, y]:
+                continue
+            q = deque([(x, y)])
+            seen[y][x] = True
+            cells = []
+            while q:
+                cx, cy = q.popleft()
+                cells.append((cx, cy))
+                for nx, ny in ((cx - 1, cy), (cx + 1, cy), (cx, cy - 1), (cx, cy + 1)):
+                    if (
+                        0 <= nx < w
+                        and 0 <= ny < h
+                        and not seen[ny][nx]
+                        and mp[nx, ny]
+                    ):
+                        seen[ny][nx] = True
+                        q.append((nx, ny))
+            if len(cells) < min_blob:
+                for ox, oy in cells:
+                    mp[ox, oy] = 0
+    return mask
+
+
+def resize_ink_mask_or(mask, new_w, new_h):
+    """Downscale an ink mask with OR / max-pool logic.
+
+    If *any* source pixel in a block was ink, the output pixel is ink.
+    Opposite bias from majority-vote color shrink — correct for 1px line art.
+    """
+    mask = mask.convert("1")
+    w, h = mask.size
+    if (w, h) == (new_w, new_h):
+        return mask
+    if new_w >= w and new_h >= h:
+        return mask.resize((new_w, new_h), Image.NEAREST)
+
+    mp = mask.load()
+    out = Image.new("1", (new_w, new_h), 0)
+    op = out.load()
+    for y in range(new_h):
+        y0 = int(y * h / new_h)
+        y1 = max(y0 + 1, int((y + 1) * h / new_h))
+        for x in range(new_w):
+            x0 = int(x * w / new_w)
+            x1 = max(x0 + 1, int((x + 1) * w / new_w))
+            ink = False
+            for yy in range(y0, y1):
+                for xx in range(x0, x1):
+                    if mp[xx, yy]:
+                        ink = True
+                        break
+                if ink:
+                    break
+            if ink:
+                op[x, y] = 1
+    return out
+
+
+def composite_ink_mask(img, mask, only_opaque=True):
+    """Force mask pixels to pure black on the shaded RGBA image.
+
+    only_opaque: do not paint ink into intentional transparent gaps (armpits,
+    leg holes) — only re-ink seams that sit on the silhouette.
+    """
+    img = img.convert("RGBA")
+    mask = mask.convert("1")
+    if mask.size != img.size:
+        raise ValueError(
+            f"ink mask size {mask.size} != image size {img.size}"
+        )
+    w, h = img.size
+    out = img.copy()
+    px = out.load()
+    mp = mask.load()
+    black = (0, 0, 0, 255)
+    for y in range(h):
+        for x in range(w):
+            if not mp[x, y]:
+                continue
+            if only_opaque and px[x, y][3] < 128:
+                continue
+            px[x, y] = black
+    return out
+
+
+def _union_quantized_black_into_ink(mask, quantized, colors):
+    """OR palette-black pixels into an existing ink mask (same size)."""
+    mask = mask.convert("1")
+    quantized = quantized.convert("RGBA")
+    if mask.size != quantized.size:
+        return mask
+    ink = tuple(colors[3][:3]) if colors and len(colors) > 3 else (0, 0, 0)
+    w, h = mask.size
+    out = mask.copy()
+    mp = out.load()
+    qp = quantized.load()
+    for y in range(h):
+        for x in range(w):
+            r, g, b, a = qp[x, y]
+            if a >= 128 and (r, g, b) == ink:
+                mp[x, y] = 1
+    return out
+
+
+def force_indexed_ink(indexed_img, mask, ink_index=4):
+    """Force OR-pooled ink onto the indexed PNG (shade slot 3 / index 4)."""
+    mask = mask.convert("1")
+    if mask.size != indexed_img.size:
+        return indexed_img
+    w, h = indexed_img.size
+    out = indexed_img.copy()
+    px = out.load()
+    mp = mask.load()
+    for y in range(h):
+        for x in range(w):
+            if mp[x, y] and px[x, y] != 0:
+                px[x, y] = ink_index
+    return out
+
+
+def build_face_priority_mask(img):
+    """Upper-bbox face band + near-white eye clusters for majority boost.
+
+    Gen 1 readability lives in the face.  Mark the top ~40% of the opaque
+    silhouette and any bright sclera-like pixels in the top half so shrink
+    prefers eyes/forehead over torso mass.
+    """
+    img = img.convert("RGBA")
+    w, h = img.size
+    px = img.load()
+    ys = [y for y in range(h) for x in range(w) if px[x, y][3] >= 128]
+    if not ys:
+        return Image.new("1", (w, h), 0)
+    y_min, y_max = min(ys), max(ys)
+    face_cut = y_min + max(1, int((y_max - y_min + 1) * 0.42))
+    mid_y = y_min + max(1, int((y_max - y_min + 1) * 0.55))
+    mask = Image.new("1", (w, h), 0)
+    mp = mask.load()
+    for y in range(h):
+        for x in range(w):
+            r, g, b, a = px[x, y]
+            if a < 128:
+                continue
+            if y <= face_cut:
+                mp[x, y] = 1
+            elif y <= mid_y and min(r, g, b) >= 220:
+                mp[x, y] = 1
+    return mask
+
+
+def indexed_readability_metrics(indexed_img):
+    """Cheap Gen 1 readability proxies after Stage 6."""
+    from collections import deque
+
+    w, h = indexed_img.size
+    px = indexed_img.load()
+    opaque = 0
+    white = light = mid = ink = 0
+    upper_white = False
+    upper_cut = max(1, h // 3)
+    for y in range(h):
+        for x in range(w):
+            v = px[x, y]
+            if v == 0:
+                continue
+            opaque += 1
+            if v == 1:
+                white += 1
+                if y < upper_cut:
+                    upper_white = True
+            elif v == 2:
+                light += 1
+            elif v == 3:
+                mid += 1
+            elif v == 4:
+                ink += 1
+    if opaque == 0:
+        return {
+            "components": 0,
+            "perim_area": 0.0,
+            "has_upper_white": False,
+            "mid_frac": 1.0,
+            "light_frac": 0.0,
+            "ink_frac": 0.0,
+            "opaque": 0,
+        }
+
+    # Connected opaque components.
+    seen = [[False] * w for _ in range(h)]
+    comps = 0
+    for y in range(h):
+        for x in range(w):
+            if seen[y][x] or px[x, y] == 0:
+                continue
+            comps += 1
+            q = deque([(x, y)])
+            seen[y][x] = True
+            while q:
+                cx, cy = q.popleft()
+                for nx, ny in ((cx - 1, cy), (cx + 1, cy), (cx, cy - 1), (cx, cy + 1)):
+                    if (
+                        0 <= nx < w
+                        and 0 <= ny < h
+                        and not seen[ny][nx]
+                        and px[nx, ny] != 0
+                    ):
+                        seen[ny][nx] = True
+                        q.append((nx, ny))
+
+    # Silhouette perimeter (opaque next to empty / edge).
+    perim = 0
+    for y in range(h):
+        for x in range(w):
+            if px[x, y] == 0:
+                continue
+            for nx, ny in ((x - 1, y), (x + 1, y), (x, y - 1), (x, y + 1)):
+                if not (0 <= nx < w and 0 <= ny < h) or px[nx, ny] == 0:
+                    perim += 1
+                    break
+    return {
+        "components": comps,
+        "perim_area": perim / float(opaque),
+        "has_upper_white": upper_white,
+        "mid_frac": mid / float(opaque),
+        "light_frac": light / float(opaque),
+        "ink_frac": ink / float(opaque),
+        "opaque": opaque,
+    }
+
+
+def indexed_readability_score(metrics):
+    """Higher is more Gen 1-readable.  Used to pick primary vs soft fallback."""
+    if not metrics or metrics.get("opaque", 0) < 8:
+        return -99
+    score = 0
+    comps = metrics["components"]
+    if comps == 1:
+        score += 4
+    elif comps == 2:
+        score += 1
+    else:
+        score -= 3
+    if metrics["has_upper_white"]:
+        score += 4
+    else:
+        score -= 1  # many steel/rock mons lack bright sclera; soft penalty
+    # Flat mid mass + black rim = form is gone.
+    body_flat = metrics["light_frac"] + metrics["mid_frac"]
+    if body_flat >= 0.82 and metrics["mid_frac"] >= 0.55:
+        score -= 3
+    elif metrics["mid_frac"] <= 0.08 and metrics["light_frac"] >= 0.7:
+        score -= 1  # almost no dark mid structure
+    pa = metrics["perim_area"]
+    if pa > 0.55:
+        score -= 2  # noisy / freckled silhouette
+    elif pa < 0.10:
+        score -= 1  # over-blobbed
+    else:
+        score += 1
+    if 0.08 <= metrics["ink_frac"] <= 0.45:
+        score += 1
+    elif metrics["ink_frac"] > 0.55:
+        score -= 2  # ink soup
+    return score
+
+
 def drop_orphan_pixels(img, min_blob=4):
     """Clear tiny disconnected opaque blobs left by dilate + NEAREST scale.
 
@@ -1297,12 +2171,40 @@ def close_small_holes(img, max_gap=2):
     return out
 
 
-def resize_pixel_art(img, new_w, new_h):
+def resize_pixel_art(
+    img,
+    new_w,
+    new_h,
+    preserve_features=False,
+    boost_rgbs=None,
+    boost_mask=None,
+    preserve_gaps=False,
+    gap_mask=None,
+    boost_weight=8,
+):
     """Downscale by majority-color blocks so thin outlines / folds survive.
 
     NEAREST keeps one lucky source pixel per cell and drops the rest — on
     96→32 backs that erases most internal detail.  Majority vote (with a
     boost for near-black) keeps Gen 1-readable structure.
+
+    preserve_features: extra boost for pure white / pure black so 1–2px
+    eyes (white sclera + black pupil) survive the shrink.  Use after
+    quantize-to-palette so those slots are exact.  Also prefers keeping
+    transparent when a block is mostly empty — Metagross armpit / leg
+    gaps must not majority-fill into solid slabs.
+
+    boost_rgbs: optional extra RGB triples (e.g. accent gem) that get a
+    heavy vote weight so 1–2px chroma marks survive 64→48 majority blocks.
+
+    boost_mask: optional '1' mask (same size as img).  Opaque pixels under
+    the mask get an extra majority vote — used for the face/eye band.
+
+    preserve_gaps: stricter empty preference for plated/multi-limb art —
+    keep a cell transparent whenever empty ties or beats opaque count.
+
+    gap_mask: optional '1' mask; any block that overlaps it stays empty so
+    carved limb cutouts cannot majority-fill.
     """
     from collections import Counter
 
@@ -1312,6 +2214,23 @@ def resize_pixel_art(img, new_w, new_h):
         return img
     if new_w >= w and new_h >= h:
         return img.resize((new_w, new_h), Image.NEAREST)
+
+    boost = set()
+    if boost_rgbs:
+        for c in boost_rgbs:
+            boost.add(tuple(c[:3]))
+
+    bm = None
+    if boost_mask is not None:
+        boost_mask = boost_mask.convert("1")
+        if boost_mask.size == (w, h):
+            bm = boost_mask.load()
+
+    gm = None
+    if gap_mask is not None:
+        gap_mask = gap_mask.convert("1")
+        if gap_mask.size == (w, h):
+            gm = gap_mask.load()
 
     px = img.load()
     out = Image.new("RGBA", (new_w, new_h), (0, 0, 0, 0))
@@ -1323,16 +2242,858 @@ def resize_pixel_art(img, new_w, new_h):
             x0 = int(x * w / new_w)
             x1 = max(x0 + 1, int((x + 1) * w / new_w))
             counts = Counter()
+            empty = 0
+            cells = 0
+            gap_hit = False
             for yy in range(y0, y1):
                 for xx in range(x0, x1):
+                    cells += 1
+                    if gm is not None and gm[xx, yy]:
+                        gap_hit = True
                     c = px[xx, yy]
                     if c[3] < 128:
+                        empty += 1
                         continue
                     counts[c] += 1
-                    if c[0] + c[1] + c[2] < 80:
-                        counts[c] += 2
+                    rgb_sum = c[0] + c[1] + c[2]
+                    # Extra weight for ink / near-black so 1px jaw and limb
+                    # creases survive majority vote against surrounding body.
+                    if rgb_sum < 80:
+                        counts[c] += 6 if preserve_features else 2
+                    elif preserve_features and c[0] >= 250 and c[1] >= 250 and c[2] >= 250:
+                        counts[c] += 4  # eyes beat body in face band
+                    elif preserve_features and (c[0], c[1], c[2]) in boost:
+                        counts[c] += int(boost_weight)
+                    if bm is not None and bm[xx, yy]:
+                        counts[c] += 5
+            if gap_hit and preserve_gaps:
+                # Only force empty when the block is actually gap-dominated —
+                # a 1px bay clipping a majority-body cell must not punch a hole.
+                gap_n = 0
+                for yy in range(y0, y1):
+                    for xx in range(x0, x1):
+                        if gm[xx, yy]:
+                            gap_n += 1
+                if gap_n * 2 >= cells:
+                    continue
+            opaque_n = cells - empty
+            if preserve_gaps and empty >= opaque_n and not (
+                counts and min(c[0] + c[1] + c[2] for c in counts) < 40
+            ):
+                # Plated limb gaps: empty wins ties — don't majority-fill.
+                continue
+            if preserve_features and cells and empty * 2 >= cells and not (
+                counts and min(c[0] + c[1] + c[2] for c in counts) < 80
+            ):
+                # Majority-empty block → keep the gap (unless it held ink).
+                continue
             if counts:
                 op[x, y] = counts.most_common(1)[0][0]
+    return out
+
+
+def quantize_rgba_to_palette(img, colors):
+    """Snap every opaque pixel to the species' 4 SGB colors at full res.
+
+    Doing this BEFORE downscale (not after) is what keeps tiny features like
+    Treecko's eye — majority-block shrink then votes among already-clean
+    slots instead of blending yellow into green mush.
+    """
+    img = img.convert("RGBA")
+    w, h = img.size
+    px = img.load()
+    out = Image.new("RGBA", (w, h), (0, 0, 0, 0))
+    op = out.load()
+    for y in range(h):
+        for x in range(w):
+            r, g, b, a = px[x, y]
+            if a < 96:
+                continue
+            idx = nearest_palette_index(r, g, b, colors, hue_aware=True)
+            cr, cg, cb = colors[idx]
+            op[x, y] = (cr, cg, cb, 255)
+    return out
+
+
+def clean_quantized_freckles(img, colors, min_accent=14):
+    """Remove AA rim noise that snapped to the accent slot.
+
+    Emerald anti-aliased edges produce 1–3px freckles of belly-red / flame
+    orange around the silhouette.  Large accent masses (belly, horns) stay.
+
+    Also trims yellow→white eye fills: keep white only next to ink (pupil /
+    outline) so a full yellow sclera does not become a giant white cheek
+    after downscale — Gen 1 readable eyes are a small white+black cluster.
+    """
+    from collections import deque
+
+    img = img.convert("RGBA")
+    if len(colors) < 4:
+        return img
+    body = tuple(colors[1][:3])
+    accent = tuple(colors[2][:3])
+    ink = tuple(colors[3][:3])
+    white = tuple(colors[0][:3])
+    w, h = img.size
+    out = img.copy()
+    px = out.load()
+    seen = [[False] * w for _ in range(h)]
+
+    def opaque(x, y):
+        return 0 <= x < w and 0 <= y < h and px[x, y][3] >= 128
+
+    def near_ink(x, y, radius=2):
+        for dy in range(-radius, radius + 1):
+            for dx in range(-radius, radius + 1):
+                nx, ny = x + dx, y + dy
+                if opaque(nx, ny) and px[nx, ny][:3] == ink:
+                    return True
+        return False
+
+    for y0 in range(h):
+        for x0 in range(w):
+            if seen[y0][x0] or px[x0, y0][3] < 128 or px[x0, y0][:3] != accent:
+                continue
+            blob = []
+            q = deque([(x0, y0)])
+            seen[y0][x0] = True
+            while q:
+                x, y = q.popleft()
+                blob.append((x, y))
+                for dx, dy in ((-1, 0), (1, 0), (0, -1), (0, 1)):
+                    nx, ny = x + dx, y + dy
+                    if 0 <= nx < w and 0 <= ny < h and not seen[ny][nx]:
+                        if px[nx, ny][3] >= 128 and px[nx, ny][:3] == accent:
+                            seen[ny][nx] = True
+                            q.append((nx, ny))
+            if len(blob) >= min_accent:
+                continue
+            for x, y in blob:
+                body_n = ink_n = 0
+                rim = False
+                for dx, dy in (
+                    (-1, 0), (1, 0), (0, -1), (0, 1),
+                    (-1, -1), (1, -1), (-1, 1), (1, 1),
+                ):
+                    nx, ny = x + dx, y + dy
+                    if not opaque(nx, ny):
+                        rim = True
+                        continue
+                    c = px[nx, ny][:3]
+                    if c == body:
+                        body_n += 1
+                    elif c == ink:
+                        ink_n += 1
+                if rim and ink_n > body_n:
+                    px[x, y] = ink + (255,)
+                else:
+                    px[x, y] = body + (255,)
+
+    # Trim yellow→white eye fills that aren't next to a pupil/ink.  Only when
+    # white is a minority highlight (Treecko eyes) — skip when white is a
+    # primary body fill (Gardevoir gown, Blissey, …).
+    white_n = opaque_n = 0
+    for y in range(h):
+        for x in range(w):
+            if px[x, y][3] < 128:
+                continue
+            opaque_n += 1
+            if px[x, y][:3] == white:
+                white_n += 1
+    if opaque_n and white_n < opaque_n * 0.12:
+        for y in range(h):
+            for x in range(w):
+                if px[x, y][3] < 128 or px[x, y][:3] != white:
+                    continue
+                if not near_ink(x, y, radius=1):
+                    px[x, y] = body + (255,)
+    return out
+
+
+def clean_midtone_bleed(img, colors, min_blob=10):
+    """Scrub small body↔accent freckles (Metagross arm/body bleed).
+
+    After nearest-quantize, anti-aliased edges between two midtones spray
+    1–4px islands of the other color.  Drop islands smaller than min_blob
+    into the surrounding midtone.  Large masses (X plate, belly, claws) stay.
+    Then a 3x3 midtone majority pass kills leftover checkerboard bleed.
+    """
+    from collections import deque
+
+    img = img.convert("RGBA")
+    if len(colors) < 4:
+        return img
+    body = tuple(colors[1][:3])
+    accent = tuple(colors[2][:3])
+    w, h = img.size
+    out = img.copy()
+    px = out.load()
+
+    def scrub(target, fill):
+        seen = [[False] * w for _ in range(h)]
+        for y0 in range(h):
+            for x0 in range(w):
+                if seen[y0][x0] or px[x0, y0][3] < 128 or px[x0, y0][:3] != target:
+                    continue
+                blob = []
+                q = deque([(x0, y0)])
+                seen[y0][x0] = True
+                while q:
+                    x, y = q.popleft()
+                    blob.append((x, y))
+                    for dx, dy in ((-1, 0), (1, 0), (0, -1), (0, 1)):
+                        nx, ny = x + dx, y + dy
+                        if 0 <= nx < w and 0 <= ny < h and not seen[ny][nx]:
+                            if px[nx, ny][3] >= 128 and px[nx, ny][:3] == target:
+                                seen[ny][nx] = True
+                                q.append((nx, ny))
+                if len(blob) >= min_blob:
+                    continue
+                other = 0
+                for x, y in blob:
+                    for dx, dy in ((-1, 0), (1, 0), (0, -1), (0, 1)):
+                        nx, ny = x + dx, y + dy
+                        if 0 <= nx < w and 0 <= ny < h and px[nx, ny][3] >= 128:
+                            if px[nx, ny][:3] == fill:
+                                other += 1
+                if other >= max(1, len(blob)):
+                    for x, y in blob:
+                        px[x, y] = fill + (255,)
+
+    scrub(body, accent)
+    scrub(accent, body)
+
+    # 3x3 majority among body/accent only — collapses AA checkerboard
+    # without touching white/ink structure.  Rare accent marks (Sableye
+    # gems, Electrike sparks) must not be majority-voted into body.
+    accent_total = sum(
+        1
+        for y in range(h)
+        for x in range(w)
+        if px[x, y][3] >= 128 and px[x, y][:3] == accent
+    )
+    protect_rare_accent = accent_total > 0 and accent_total <= 12
+
+    src = out.copy()
+    sp = src.load()
+    for y in range(h):
+        for x in range(w):
+            c = sp[x, y]
+            if c[3] < 128 or c[:3] not in (body, accent):
+                continue
+            if protect_rare_accent and c[:3] == accent:
+                continue
+            bc = ac = 0
+            for dy in (-1, 0, 1):
+                for dx in (-1, 0, 1):
+                    nx, ny = x + dx, y + dy
+                    if not (0 <= nx < w and 0 <= ny < h):
+                        continue
+                    n = sp[nx, ny]
+                    if n[3] < 128:
+                        continue
+                    if n[:3] == body:
+                        bc += 1
+                    elif n[:3] == accent:
+                        ac += 1
+            if bc == 0 and ac == 0:
+                continue
+            if bc > ac:
+                px[x, y] = body + (255,)
+            elif ac > bc:
+                px[x, y] = accent + (255,)
+    return out
+
+
+def repair_eye_sclera(img, colors):
+    """Close W·W gaps so Treecko-style eyes stay a solid white mass.
+
+    After yellow→white + downscale, a 1px body speck often sits between two
+    white columns (W.W / WKW).  That reads as a broken socket, not an eye.
+    Flip body pixels sandwiched by white (orth) to white when white is still
+    a minority highlight, then strip stray interior ink that is not a clean
+    pupil slit.
+    """
+    img = img.convert("RGBA")
+    if len(colors) < 4:
+        return img
+    white = tuple(colors[0][:3])
+    body = tuple(colors[1][:3])
+    ink = tuple(colors[3][:3])
+    w, h = img.size
+    out = img.copy()
+    px = out.load()
+
+    white_n = opaque_n = 0
+    for y in range(h):
+        for x in range(w):
+            if px[x, y][3] < 128:
+                continue
+            opaque_n += 1
+            if px[x, y][:3] == white:
+                white_n += 1
+    if not opaque_n or white_n >= opaque_n * 0.12:
+        return out
+
+    # Close single-pixel body gaps between whites.
+    src = out.copy()
+    sp = src.load()
+    for y in range(h):
+        for x in range(w):
+            if sp[x, y][3] < 128 or sp[x, y][:3] != body:
+                continue
+            left = x > 0 and sp[x - 1, y][3] >= 128 and sp[x - 1, y][:3] == white
+            right = x + 1 < w and sp[x + 1, y][3] >= 128 and sp[x + 1, y][:3] == white
+            up = y > 0 and sp[x, y - 1][3] >= 128 and sp[x, y - 1][:3] == white
+            down = y + 1 < h and sp[x, y + 1][3] >= 128 and sp[x, y + 1][:3] == white
+            if (left and right) or (up and down):
+                px[x, y] = white + (255,)
+    return out
+
+
+def ensure_white_eye_pupils(img, colors, max_blob=24, max_bw=8, max_bh=6):
+    """Punch a black pupil into white eye blobs that lost their ink.
+
+    Yellow→white sclera + majority downscale often votes away the 1px
+    pupil, leaving an empty white oval (Treecko).  Repair W·W gaps first,
+    then place a short vertical slit in the blob interior — never treat
+    outline ink as a pupil.
+
+    max_blob / max_bw / max_bh: tighten on a second pass after outline/ink
+    so cheek whites are not treated as eyes.
+    """
+    from collections import deque
+
+    img = repair_eye_sclera(img, colors)
+    img = img.convert("RGBA")
+    if len(colors) < 4:
+        return img
+    white = tuple(colors[0][:3])
+    body = tuple(colors[1][:3])
+    ink = tuple(colors[3][:3])
+    w, h = img.size
+    out = img.copy()
+    px = out.load()
+
+    # Skip when white is a primary fill (gowns).
+    white_n = opaque_n = 0
+    for y in range(h):
+        for x in range(w):
+            if px[x, y][3] < 128:
+                continue
+            opaque_n += 1
+            if px[x, y][:3] == white:
+                white_n += 1
+    if not opaque_n or white_n >= opaque_n * 0.12:
+        return out
+
+    seen = [[False] * w for _ in range(h)]
+    for y0 in range(h):
+        for x0 in range(w):
+            if seen[y0][x0] or px[x0, y0][3] < 128 or px[x0, y0][:3] != white:
+                continue
+            blob = []
+            q = deque([(x0, y0)])
+            seen[y0][x0] = True
+            while q:
+                x, y = q.popleft()
+                blob.append((x, y))
+                for dx, dy in ((-1, 0), (1, 0), (0, -1), (0, 1)):
+                    nx, ny = x + dx, y + dy
+                    if 0 <= nx < w and 0 <= ny < h and not seen[ny][nx]:
+                        if px[nx, ny][3] >= 128 and px[nx, ny][:3] == white:
+                            seen[ny][nx] = True
+                            q.append((nx, ny))
+            if len(blob) < 2:
+                continue
+            xs = [p[0] for p in blob]
+            ys = [p[1] for p in blob]
+            bw = max(xs) - min(xs) + 1
+            bh = max(ys) - min(ys) + 1
+            # Eyes are compact.  Tall white snakes (sclera + cheek speck):
+            # keep the top band only.
+            if bw > max_bw or bh > max_bh or len(blob) > max_blob:
+                y_min = min(ys)
+                blob = [p for p in blob if p[1] <= y_min + 4]
+                if len(blob) < 2:
+                    continue
+            blob_set = set(blob)
+            xs = [p[0] for p in blob]
+            ys = [p[1] for p in blob]
+            cx = sum(xs) / len(blob)
+            y_lo, y_hi = min(ys), max(ys)
+
+            def is_outline_ink(ix, iy):
+                for dx, dy in ((-1, 0), (1, 0), (0, -1), (0, 1)):
+                    nx, ny = ix + dx, iy + dy
+                    if not (0 <= nx < w and 0 <= ny < h) or px[nx, ny][3] < 128:
+                        return True
+                return False
+
+            def side_white(ix, iy):
+                for sx in (ix - 1, ix + 1):
+                    if (sx, iy) in blob_set:
+                        return True
+                    if 0 <= sx < w and px[sx, iy][3] >= 128 and px[sx, iy][:3] == white:
+                        return True
+                return False
+
+            # Prefer an EXISTING interior pupil column (ink with sclera on a
+            # side).  Filling leftover side-whites instead is what turned a
+            # good WKW eye into a solid KKK block on the second pass.
+            pupil_cols = set()
+            for x in range(min(xs) - 1, max(xs) + 2):
+                if not (0 <= x < w):
+                    continue
+                for y in range(y_lo, y_hi + 1):
+                    if px[x, y][3] < 128 or px[x, y][:3] != ink:
+                        continue
+                    if is_outline_ink(x, y):
+                        continue
+                    if side_white(x, y):
+                        pupil_cols.add(x)
+                        break
+
+            if pupil_cols:
+                best_x = min(pupil_cols, key=lambda x: abs(x - cx))
+            else:
+                col_whites = {}
+                for x, y in blob:
+                    col_whites.setdefault(x, []).append(y)
+                best_x = min(
+                    col_whites.keys(),
+                    key=lambda x: (abs(x - cx), -len(col_whites[x])),
+                )
+
+            # Continuous top→bottom slit: always ink white/body holes in the
+            # pupil column across the eye's vertical span (fixes the "two
+            # dots with a white gap" look when row N is WKW but N-1 is KWK).
+            span_ys = [
+                y for y in range(y_lo, y_hi + 1)
+                if (best_x, y) in blob_set
+                or (
+                    0 <= best_x < w
+                    and px[best_x, y][3] >= 128
+                    and px[best_x, y][:3] == ink
+                    and not is_outline_ink(best_x, y)
+                )
+            ]
+            if not span_ys:
+                continue
+            y_a, y_b = min(span_ys), max(span_ys)
+            # Stretch through any white still sitting in this column inside
+            # the full eye band (trimmed blob may have dropped cheek rows
+            # that still leave a hole above the slit).
+            for y in range(y_lo, y_hi + 1):
+                if (best_x, y) in blob_set:
+                    y_a, y_b = min(y_a, y), max(y_b, y)
+            if y_b == y_a:
+                for ny in (y_a + 1, y_a - 1):
+                    if (best_x, ny) in blob_set:
+                        y_a, y_b = min(y_a, ny), max(y_b, ny)
+                        break
+
+            for y in range(y_a, y_b + 1):
+                if px[best_x, y][3] < 128:
+                    continue
+                if px[best_x, y][:3] == ink and is_outline_ink(best_x, y):
+                    continue
+                if px[best_x, y][:3] in (white, body, ink):
+                    px[best_x, y] = ink + (255,)
+    return out
+
+
+def bridge_same_tone_cracks(img, colors, max_gap=2):
+    """Rejoin hairline cracks that fragment a limb without closing armpits.
+
+    Metagross legs were splitting into a detached blue column with a white
+    hairline — majority-empty resize over-preserved those.  Fill a short
+    transparent run (1–max_gap px) when both ends are the *same* body/accent
+    midtone.  Wider openings and ink-bordered gaps stay open.
+    """
+    img = img.convert("RGBA")
+    if len(colors) < 4:
+        return img
+    body = tuple(colors[1][:3])
+    accent = tuple(colors[2][:3])
+    ink = tuple(colors[3][:3])
+    tones = (body, accent)
+    w, h = img.size
+    out = img.copy()
+    px = out.load()
+
+    def tone_at(x, y):
+        if not (0 <= x < w and 0 <= y < h):
+            return None
+        c = px[x, y]
+        if c[3] < 128 or c[:3] not in tones:
+            return None
+        return c[:3]
+
+    # Horizontal runs.
+    for y in range(h):
+        x = 0
+        while x < w:
+            if px[x, y][3] >= 128:
+                x += 1
+                continue
+            x0 = x
+            while x < w and px[x, y][3] < 128:
+                x += 1
+            gap = x - x0
+            if 1 <= gap <= max_gap:
+                left = tone_at(x0 - 1, y)
+                right = tone_at(x, y)
+                if left is not None and left == right:
+                    for fx in range(x0, x):
+                        px[fx, y] = left + (255,)
+    # Vertical runs.
+    for x in range(w):
+        y = 0
+        while y < h:
+            if px[x, y][3] >= 128:
+                y += 1
+                continue
+            y0 = y
+            while y < h and px[x, y][3] < 128:
+                y += 1
+            gap = y - y0
+            if 1 <= gap <= max_gap:
+                up = tone_at(x, y0 - 1)
+                down = tone_at(x, y)
+                if up is not None and up == down:
+                    for fy in range(y0, y):
+                        px[x, fy] = up + (255,)
+
+    # Jump a single ink pixel that splits a midtone run (outline sitting in
+    # a notch): tone | ink | gap | tone  → fill the gap with tone.
+    for y in range(h):
+        x = 1
+        while x < w - 1:
+            t_left = tone_at(x - 1, y)
+            if t_left is None:
+                x += 1
+                continue
+            if px[x, y][3] < 128 or px[x, y][:3] != ink:
+                x += 1
+                continue
+            # ink at x; scan gap after it
+            g0 = x + 1
+            g = g0
+            while g < w and px[g, y][3] < 128:
+                g += 1
+            gap = g - g0
+            if 1 <= gap <= max_gap and tone_at(g, y) == t_left:
+                for fx in range(g0, g):
+                    px[fx, y] = t_left + (255,)
+            x += 1
+    for x in range(w):
+        y = 1
+        while y < h - 1:
+            t_up = tone_at(x, y - 1)
+            if t_up is None:
+                y += 1
+                continue
+            if px[x, y][3] < 128 or px[x, y][:3] != ink:
+                y += 1
+                continue
+            g0 = y + 1
+            g = g0
+            while g < h and px[x, g][3] < 128:
+                g += 1
+            gap = g - g0
+            if 1 <= gap <= max_gap and tone_at(x, g) == t_up:
+                for fy in range(g0, g):
+                    px[x, fy] = t_up + (255,)
+            y += 1
+
+    # Small floating midtone islands next to a larger same-tone mass (often
+    # separated by a single outline pixel).  Bridge the shortest transparent
+    # gap so a detached Metagross claw/arm rejoins without filling armpits.
+    from collections import deque
+
+    def components(target):
+        seen = [[False] * w for _ in range(h)]
+        blobs = []
+        for y0 in range(h):
+            for x0 in range(w):
+                if seen[y0][x0] or px[x0, y0][3] < 128 or px[x0, y0][:3] != target:
+                    continue
+                blob = []
+                q = deque([(x0, y0)])
+                seen[y0][x0] = True
+                while q:
+                    x, y = q.popleft()
+                    blob.append((x, y))
+                    for dx, dy in ((-1, 0), (1, 0), (0, -1), (0, 1)):
+                        nx, ny = x + dx, y + dy
+                        if 0 <= nx < w and 0 <= ny < h and not seen[ny][nx]:
+                            if px[nx, ny][3] >= 128 and px[nx, ny][:3] == target:
+                                seen[ny][nx] = True
+                                q.append((nx, ny))
+                blobs.append(blob)
+        return blobs
+
+    for tone in tones:
+        blobs = components(tone)
+        if len(blobs) < 2:
+            continue
+        big = max(blobs, key=len)
+        if len(big) < 20:
+            continue
+        big_set = set(big)
+        for blob in blobs:
+            if len(blob) > 24 or len(blob) < 2:
+                continue
+            if set(blob) <= big_set:
+                continue
+            best = None
+            for x, y in blob:
+                for dx in range(-3, 4):
+                    for dy in range(-3, 4):
+                        if dx == 0 and dy == 0:
+                            continue
+                        nx, ny = x + dx, y + dy
+                        if (nx, ny) not in big_set:
+                            continue
+                        dist = abs(dx) + abs(dy)
+                        if best is None or dist < best[0]:
+                            best = (dist, x, y, nx, ny)
+            if best is None or best[0] > 4:
+                continue
+            _, x0, y0, x1, y1 = best
+            steps = max(abs(x1 - x0), abs(y1 - y0), 1)
+            for i in range(1, steps):
+                t = i / steps
+                fx = int(round(x0 + (x1 - x0) * t))
+                fy = int(round(y0 + (y1 - y0) * t))
+                if not (0 <= fx < w and 0 <= fy < h):
+                    continue
+                c = px[fx, fy]
+                if c[3] < 128 or c[:3] == ink:
+                    px[fx, fy] = tone + (255,)
+    return out
+
+
+def smooth_silhouette_stairs(img, ink_only=True):
+    """Mild chamfer of convex 2-step outer corners (Treecko head stairs).
+
+    One pass: if an opaque pixel is a convex silhouette corner (exactly two
+    adjacent orth neighbors opaque, open diagonal transparent), shave it.
+    Default ink_only keeps body mass and only rounds the black rim — enough
+    to kill harsh staircase without cartoon-blobbing the silhouette.
+    """
+    img = img.convert("RGBA")
+    w, h = img.size
+    src = img.load()
+    out = img.copy()
+    dst = out.load()
+
+    def opaque(x, y):
+        return 0 <= x < w and 0 <= y < h and src[x, y][3] >= 128
+
+    def is_ink(x, y):
+        c = src[x, y]
+        return c[3] >= 128 and c[0] + c[1] + c[2] < 48
+
+    # (dx1,dy1), (dx2,dy2) = the two orth dirs that are opaque;
+    # diagonal toward the open quadrant is (dx1+dx2, dy1+dy2).
+    corners = (
+        ((-1, 0), (0, -1)),
+        ((1, 0), (0, -1)),
+        ((-1, 0), (0, 1)),
+        ((1, 0), (0, 1)),
+    )
+    for y in range(h):
+        for x in range(w):
+            if not opaque(x, y):
+                continue
+            if ink_only and not is_ink(x, y):
+                continue
+            orth = []
+            for dx, dy in ((-1, 0), (1, 0), (0, -1), (0, 1)):
+                if opaque(x + dx, y + dy):
+                    orth.append((dx, dy))
+            if len(orth) != 2:
+                continue
+            (dx1, dy1), (dx2, dy2) = orth
+            # Must be a corner (perpendicular), not a straight edge.
+            if dx1 * dx2 != 0 or dy1 * dy2 != 0:
+                continue
+            # Open diagonal = into the empty quadrant.
+            ox, oy = x - dx1 - dx2, y - dy1 - dy2
+            if opaque(ox, oy):
+                continue
+            # Inward diagonal should be solid (real corner, not a 1px whisker).
+            ix, iy = x + dx1 + dx2, y + dy1 + dy2
+            if not opaque(ix, iy):
+                continue
+            dst[x, y] = (0, 0, 0, 0)
+    return out
+
+
+def ink_midtone_seams(img, colors):
+    """Draw 1px black creases where body and accent midtones meet.
+
+    Metagross silver X / blue body share AA edges; without a crease the two
+    midtones checkerboard into each other.  Only mark a pixel ink when it
+    has 2+ orthogonal neighbors of the *other* midtone (true seam, not a
+    single corner touch).
+    """
+    img = img.convert("RGBA")
+    if len(colors) < 4:
+        return img
+    body = tuple(colors[1][:3])
+    accent = tuple(colors[2][:3])
+    ink = tuple(colors[3][:3])
+    w, h = img.size
+    src = img.copy()
+    sp = src.load()
+    out = img.copy()
+    px = out.load()
+    for y in range(h):
+        for x in range(w):
+            c = sp[x, y]
+            if c[3] < 128 or c[:3] not in (body, accent):
+                continue
+            other = accent if c[:3] == body else body
+            n_other = 0
+            for dx, dy in ((-1, 0), (1, 0), (0, -1), (0, 1)):
+                nx, ny = x + dx, y + dy
+                if 0 <= nx < w and 0 <= ny < h and sp[nx, ny][3] >= 128:
+                    if sp[nx, ny][:3] == other:
+                        n_other += 1
+            if n_other >= 2:
+                px[x, y] = ink + (255,)
+    return out
+
+
+def ink_structure_creases(
+    quantized,
+    source,
+    colors,
+    dark_ratio=0.70,
+    min_contrast=26,
+    valley_delta=20,
+):
+    """Recover jaw / limb / fold lines lost when same-hue shades collapse.
+
+    Gen 2/3 art defines necks, jaws, and arm joins with *darker body* pixels
+    (Treecko olive jaw, Metagross deep blue armpits).  Nearest-4 snap maps
+    those onto the single body midtone, so the feature vanishes.  Read the
+    pre-quantize source luma and force midtone pixels to ink when they are:
+
+      • a local luma valley (H or V minimum with enough depth), or
+      • a very dark same-hue body shade with local contrast
+
+    Accent masses (belly red, silver X) stay chromatic unless they sit in a
+    true valley.  Isolated freckles near eye-white are dropped so sclera
+    does not grow a black halo.
+    """
+    if len(colors) < 4:
+        return quantized
+    q = quantized.convert("RGBA")
+    s = source.convert("RGBA")
+    if q.size != s.size:
+        return quantized
+    w, h = q.size
+    qp = q.load()
+    sp = s.load()
+    out = q.copy()
+    op = out.load()
+    body = tuple(colors[1][:3])
+    accent = tuple(colors[2][:3])
+    ink = tuple(colors[3][:3])
+    white = tuple(colors[0][:3])
+    body_l = _pixel_luma(body)
+    dark_cut = body_l * dark_ratio
+    mark = [[False] * w for _ in range(h)]
+
+    def src_luma(x, y):
+        c = sp[x, y]
+        if c[3] < 200:
+            return None
+        return _pixel_luma(c)
+
+    for y in range(1, h - 1):
+        for x in range(1, w - 1):
+            qc = qp[x, y]
+            if qc[3] < 128 or qc[:3] not in (body, accent):
+                continue
+            p = sp[x, y]
+            if p[3] < 200 or max(p[0], p[1], p[2]) < 40:
+                continue
+            L = _pixel_luma(p)
+            if L >= body_l - 8:
+                continue
+            is_accent = qc[:3] == accent
+            left = src_luma(x - 1, y)
+            right = src_luma(x + 1, y)
+            up = src_luma(x, y - 1)
+            down = src_luma(x, y + 1)
+            orth = [v for v in (left, right, up, down) if v is not None]
+            if len(orth) < 3:
+                continue
+
+            valley = False
+            if left is not None and right is not None:
+                if (
+                    L + 6 < left
+                    and L + 6 < right
+                    and (left + right) / 2 - L >= valley_delta
+                ):
+                    valley = True
+            if up is not None and down is not None:
+                if (
+                    L + 6 < up
+                    and L + 6 < down
+                    and (up + down) / 2 - L >= valley_delta
+                ):
+                    valley = True
+            if (
+                sum(1 for n in orth if n >= L + valley_delta) >= 3
+                and L <= dark_cut + 5
+            ):
+                valley = True
+
+            sat = max(p[0], p[1], p[2]) - min(p[0], p[1], p[2])
+            # Broad dark body shade only when very dark — mid face AA must
+            # not become a black freckle grid.
+            dark_shade = (
+                (not is_accent)
+                and L <= min(dark_cut, 105)
+                and sat >= 18
+                and (max(orth) - L) >= min_contrast
+            )
+            if valley or dark_shade:
+                mark[y][x] = True
+
+    for y in range(h):
+        for x in range(w):
+            if not mark[y][x]:
+                continue
+            n_mark = n_ink = n_white = 0
+            for dx, dy in (
+                (-1, 0), (1, 0), (0, -1), (0, 1),
+                (-1, -1), (1, -1), (-1, 1), (1, 1),
+            ):
+                nx, ny = x + dx, y + dy
+                if not (0 <= nx < w and 0 <= ny < h):
+                    continue
+                if mark[ny][nx]:
+                    n_mark += 1
+                nc = qp[nx, ny]
+                if nc[3] < 128:
+                    continue
+                if nc[:3] == ink:
+                    n_ink += 1
+                elif nc[:3] == white:
+                    n_white += 1
+            # Drop lone marks hugging sclera (eye AA), keep deep folds.
+            if n_white >= 2 and n_mark == 0 and _pixel_luma(sp[x, y]) > 100:
+                continue
+            if n_mark >= 1 or n_ink >= 1 or _pixel_luma(sp[x, y]) < 95:
+                op[x, y] = ink + (255,)
     return out
 
 
@@ -1513,6 +3274,11 @@ def ensure_selective_outline(img):
             if not (open_l or open_r or open_u or open_d):
                 continue
 
+            # Keep rim white (eye sclera / highlights) — converting it to ink
+            # is what makes Gen 2/3 faces read as empty sockets.
+            if min(src[x, y][0], src[x, y][1], src[x, y][2]) >= 230:
+                continue
+
             # Prefer a chromatic inward sample for lit-top softening.
             body = src[x, y]
             for nx, ny in (
@@ -1561,6 +3327,10 @@ def ensure_contrast_outline(img, luma_floor=110):
                 or not opaque(x, y + 1)
             ):
                 continue
+            # Never overwrite rim white — Treecko eyes sit on the head edge;
+            # inking them leaves an empty black socket.
+            if min(src[x, y][0], src[x, y][1], src[x, y][2]) >= 230:
+                continue
             body = src[x, y]
             for nx, ny in (
                 (x, y + 1), (x - 1, y), (x + 1, y), (x, y - 1),
@@ -1573,11 +3343,15 @@ def ensure_contrast_outline(img, luma_floor=110):
     return out
 
 
-def lift_near_black_body(img, lift_rgb=(56, 56, 88)):
+def lift_near_black_body(img, lift_rgb=(56, 56, 88), preserve_chroma_dither=False):
     """Raise interior near-black fills so dark mons keep a mid-tone body.
 
-    Emerald Murkrow / Sableye art is mostly near-black; without a lift the
+    Crystal Murkrow / Sableye art is mostly near-black; without a lift the
     DMG shade map collapses the whole body into outline ink.
+
+    preserve_chroma_dither: leave black pixels that sit next to chromatic
+    navy/purple alone — those are the shadow half of Crystal-style dither,
+    not solid fill.  Only lift contiguous black slabs.
     """
     img = img.convert("RGBA")
     w, h = img.size
@@ -1591,31 +3365,446 @@ def lift_near_black_body(img, lift_rgb=(56, 56, 88)):
             if a < 128 or r + g + b >= 48:
                 continue
             exterior = False
+            next_to_chroma = False
             for dx, dy in ((-1, 0), (1, 0), (0, -1), (0, 1)):
                 nx, ny = x + dx, y + dy
                 if not (0 <= nx < w and 0 <= ny < h) or src[nx, ny][3] < 128:
                     exterior = True
-                    break
-            # Leave silhouette edge black; lift everything inside.
-            if not exterior:
-                dst[x, y] = (lr, lg, lb, 255)
+                    continue
+                nr, ng, nb, _ = src[nx, ny]
+                nsat = max(nr, ng, nb) - min(nr, ng, nb)
+                if nsat >= 28 and nr + ng + nb >= 48:
+                    next_to_chroma = True
+            # Leave silhouette edge black; lift solid interior fills.
+            if exterior:
+                continue
+            if preserve_chroma_dither and next_to_chroma:
+                continue
+            dst[x, y] = (lr, lg, lb, 255)
     return out
+
+
+def thin_double_outline(img, body_rgb=(88, 88, 168)):
+    """Collapse Crystal-style 2px black rims to a 1px Gen 1 outline.
+
+    Inner-ring black that touches body on one side and an exterior black on
+    the other becomes body fill.  True silhouette ink and interior shadow
+    dither are left alone.
+    """
+    img = img.convert("RGBA")
+    w, h = img.size
+    src = img.load()
+    out = img.copy()
+    dst = out.load()
+    body = (int(body_rgb[0]), int(body_rgb[1]), int(body_rgb[2]), 255)
+
+    def opaque(x, y):
+        return 0 <= x < w and 0 <= y < h and src[x, y][3] >= 128
+
+    for y in range(h):
+        for x in range(w):
+            r, g, b, a = src[x, y]
+            if a < 128 or r + g + b >= 24:
+                continue
+            has_trans = False
+            has_body = False
+            has_exterior_black = False
+            for dx, dy in ((-1, 0), (1, 0), (0, -1), (0, 1)):
+                nx, ny = x + dx, y + dy
+                if not opaque(nx, ny):
+                    has_trans = True
+                    continue
+                nr, ng, nb, _ = src[nx, ny]
+                if nr + ng + nb < 24:
+                    for dx2, dy2 in ((-1, 0), (1, 0), (0, -1), (0, 1)):
+                        if not opaque(nx + dx2, ny + dy2):
+                            has_exterior_black = True
+                            break
+                elif nr + ng + nb >= 48:
+                    has_body = True
+            if has_body and has_exterior_black and not has_trans:
+                dst[x, y] = body
+    return out
+
+
+def clean_indexed_accent_ink(indexed_img, accent_index=3, ink_index=4):
+    """Pull stray ink out of yellow/red accent blobs (beak, gems).
+
+    If a black pixel is surrounded by mostly accent neighbors, it is almost
+    always resize noise — not a mouth line (those keep ≥1 non-accent side).
+    """
+    w, h = indexed_img.size
+    px = indexed_img.load()
+    fixes = []
+    for y in range(h):
+        for x in range(w):
+            if px[x, y] != ink_index:
+                continue
+            accent_n = 0
+            opaque_n = 0
+            for dx, dy in ((-1, 0), (1, 0), (0, -1), (0, 1)):
+                nx, ny = x + dx, y + dy
+                if not (0 <= nx < w and 0 <= ny < h):
+                    continue
+                v = px[nx, ny]
+                if v == 0:
+                    continue
+                opaque_n += 1
+                if v == accent_index:
+                    accent_n += 1
+            if opaque_n >= 3 and accent_n >= 3:
+                fixes.append((x, y))
+    for x, y in fixes:
+        px[x, y] = accent_index
+    return indexed_img
 
 
 # ---------------------------------------------------------------------------
 # Per-species sprite overrides
 #
-# Auto palette + the default outline/deblob pipeline work for most mons, but
-# a few need hand-tuned colors or a softer processing path.  Keys are species
-# ids as written in pokemon_data.lua.  Unknown keys fall through to defaults.
+# Prefer style profiles (GEN3_STYLE_PROFILES / GEN3_BACK_STYLE_PROFILES)
+# over listing every knob.  Pin fronts with "style"; backs with "back_style"
+# (falls back to "style" when unset).  Palette / lift / clean_accent stay
+# here as true one-offs.
 #
-# palette: 4 RGB triples light→dark (slots 0 and 3 are still forced W/B).
-# dilate / stem / depth gate the shared passes.
-# outline: "full" (default), "soft" (contrast-only), or "none".
-# orphan_min: drop_orphan_pixels blob size (default 4).
+# Gen 2 (dex 152–251): FAITHFUL_DEFAULTS — left alone.
+# Gen 3 (dex 252–386): GEN3_UNIFIED_DEFAULTS → style profile → override.
 # ---------------------------------------------------------------------------
+
+# Stage 0 chroma thresholds (channel sat = max-min, 0..255).
+LOW_CHROMA_MEAN_SAT = 50.0
+LOW_BODY_MID_SAT = 40.0
+# Clear accent (belly/mane/gem) — force nearest so body_mid cannot mute it.
+CLEAR_ACCENT_SAT = 55.0
+# 90th-percentile sat ≥ this ⇒ vibrant accent cluster (0.6 × 255).
+HIGH_SAT_P90 = 153.0
+# Midtone luma gap below this ⇒ needs_contrast_stretch (conservative).
+PALETTE_CONTRAST_MIN_MID_SPAN = 36.0
+
+# Crystal-faithful path (Gen 2 only for now).
+FAITHFUL_DEFAULTS = {
+    "shade": "nearest",
+    "outline": "soft",
+    "outline_luma": 100,
+    "depth": False,
+    "dilate": False,
+    "stem": False,
+    "seal": False,
+    "quantize_first": True,
+    "ink_midtone_seams": True,
+    "structure_creases": False,
+    "bridge_cracks": True,
+    "smooth_stairs": True,
+    "flat_dither": False,
+    "orphan_min": 2,
+    "close_gap": 0,
+}
+
+# Gen 3 fronts: Gen 1 *style* defaults (silhouette readability, not Emerald
+# fidelity).  Backs override locally to a heavier survival stack.
+GEN3_UNIFIED_DEFAULTS = {
+    "outline": "soft",
+    "outline_luma": 110,
+    "depth": False,
+    "dilate": False,  # only when shrink ≥1.4× (see bake)
+    "stem": True,
+    "seal": True,
+    "ink_midtone_seams": False,
+    "structure_creases": False,
+    "bridge_cracks": True,
+    "smooth_stairs": True,
+    "flat_dither": None,  # backs on by default
+    "orphan_min": 2,
+    "close_gap": 1,  # fronts keep intentional negative space
+    "lift_darks": False,
+    "preserve_ink": True,
+    "ink_luma_max": 48,
+    "ink_soft_luma_max": 62,  # plate seams (dark blue) without shading soup
+    "ink_contrast_delta": 26,
+    "ink_mask_min_blob": 3,
+    "readable_fallback": True,
+}
+
+# Gen 3 backs (32×32 from padded Emerald 64/96 sheets).  Same profile idea
+# as fronts, but tuned for steep shrink + no face-band: volume, ink survival,
+# tight crop, and front-palette borrow so Advanced colors stay consistent.
+#
+# Merge order: GEN3_BACK_UNIFIED_DEFAULTS → back profile → species override
+# (back_style pin wins over style for profile pick).
+GEN3_BACK_UNIFIED_DEFAULTS = {
+    "outline": "soft",
+    "outline_luma": 95,
+    "depth": True,
+    "dilate": True,
+    "stem": False,
+    "seal": True,
+    "ink_midtone_seams": True,
+    "structure_creases": True,
+    "bridge_cracks": True,
+    "smooth_stairs": True,
+    "flat_dither": True,
+    "orphan_min": 2,
+    "close_gap": 1,
+    "lift_darks": False,
+    "preserve_ink": True,
+    "preserve_gaps": False,
+    "carve_seams": False,
+    "reinforce_seams": False,
+    "tight_crop": True,
+    "prefer_front_palette": True,
+    "boost_light_mid": True,
+    "ink_luma_max": 48,
+    "ink_soft_luma_max": 60,
+    "ink_contrast_delta": 26,
+    "ink_mask_min_blob": 3,
+    "readable_fallback": True,
+}
+
+# Deprecated alias — Gen3 backs use GEN3_BACK_* via _process_sprite_gen3.
+GEN3_BACK_FAITHFUL_DEFAULTS = dict(GEN3_BACK_UNIFIED_DEFAULTS)
+
+# Named style branches — reusable filter sets for recurring Emerald→Gen1
+# failure modes.  Stage 0 picks one automatically; pin with
+# SPRITE_OVERRIDES[species]["style"] = "plated" when auto mis-classifies.
+#
+# Merge order: GEN3_UNIFIED_DEFAULTS → profile → species override.
+GEN3_STYLE_PROFILES = {
+    # Ordinary chromatic / mixed mons (Treecko, Torchic, …).
+    "default": {},
+    # High-contrast organic with a clear accent — prefer hue-aware nearest,
+    # light stem, soft rim.  Stage 0 shade already leans nearest here.
+    "organic": {
+        "outline": "soft",
+        "stem": True,
+        "seal": True,
+        "close_gap": 1,
+        "dilate": False,
+        "structure_creases": False,
+        "ink_soft_luma_max": 55,
+        "ink_mask_min_blob": 3,
+    },
+    # Stripe / patch / brush-tail mons (Zigzagoon): protect light bands,
+    # no stem fatten or midtone scrub that dissolves cream into brown mush.
+    "patterned": {
+        "outline": "soft",
+        "stem": False,
+        "seal": False,
+        "close_gap": 0,
+        "dilate": False,
+        "structure_creases": True,
+        "ink_midtone_seams": True,
+        "depth": False,
+        "bridge_cracks": False,
+        "boost_light_mid": True,
+        "skip_midtone_bleed": True,
+        "ink_soft_luma_max": 55,
+        "ink_mask_min_blob": 3,
+        "min_accent": 10,
+    },
+    # Plated / multi-limb mechanical (Metagross, Aggron): keep *source*
+    # negative space, define limb joins with reinforced black ink — never
+    # invent cutouts (that eats claws/toes and punches pink holes in arms).
+    "plated": {
+        "outline": "soft",
+        "outline_luma": 100,
+        "dilate": False,
+        "stem": False,
+        "seal": False,
+        "close_gap": 0,
+        "bridge_cracks": False,
+        "structure_creases": False,
+        "ink_midtone_seams": False,
+        "depth": False,
+        "preserve_ink": True,
+        "preserve_gaps": True,
+        "carve_seams": False,
+        "reinforce_seams": True,
+        "smooth_stairs": False,
+        "ink_soft_luma_max": 64,
+        "ink_contrast_delta": 24,
+        "ink_mask_min_blob": 3,
+        "readable_fallback": False,
+    },
+    # Near-black bodies (Sableye-class): lift midtone body, no fattening rim.
+    "dark_body": {
+        "outline": "none",
+        "dilate": False,
+        "stem": False,
+        "seal": False,
+        "close_gap": 0,
+        "lift_darks": True,
+        "preserve_dither": True,
+        "structure_creases": False,
+        "ink_midtone_seams": False,
+        "depth": False,
+        "ink_soft_luma_max": 50,
+        "ink_mask_min_blob": 4,
+    },
+    # Thin antennae / multi-leg insects: protect gaps, minimal thicken.
+    "delicate": {
+        "outline": "soft",
+        "dilate": False,
+        "stem": False,
+        "seal": False,
+        "close_gap": 0,
+        "bridge_cracks": False,
+        "structure_creases": False,
+        "ink_soft_luma_max": 55,
+        "ink_mask_min_blob": 3,
+    },
+}
+
+# Back-specific subsets (32×32).  Same names as fronts where the failure mode
+# matches; `patterned` is back-only for stripe/spot survival (Zigzagoon).
+GEN3_BACK_STYLE_PROFILES = {
+    "default": {},
+    # Starters / chromatic bipeds — limb and tail creases, volume, no sausage stems.
+    "organic": {
+        "structure_creases": True,
+        "ink_midtone_seams": True,
+        "depth": True,
+        "dilate": True,
+        "stem": False,
+        "seal": True,
+        "outline": "soft",
+        "outline_luma": 95,
+        "ink_soft_luma_max": 55,
+        "boost_light_mid": True,
+    },
+    # Stripe / patch / brush-tail mons — protect light mid, skip depth freckles.
+    "patterned": {
+        "structure_creases": True,
+        "ink_midtone_seams": True,
+        "depth": False,
+        "dilate": True,
+        "stem": False,
+        "seal": True,
+        "close_gap": 0,
+        "outline": "soft",
+        "boost_light_mid": True,
+        "ink_soft_luma_max": 58,
+        "flat_dither": False,
+    },
+    # Mechanical multi-limb — keep source gaps, reinforce ink, never fatten.
+    "plated": {
+        "outline": "soft",
+        "outline_luma": 100,
+        "dilate": False,
+        "stem": False,
+        "seal": False,
+        "close_gap": 0,
+        "bridge_cracks": False,
+        "structure_creases": False,
+        "ink_midtone_seams": False,
+        "depth": False,
+        "preserve_gaps": True,
+        "reinforce_seams": True,
+        "carve_seams": False,
+        "smooth_stairs": False,
+        "boost_light_mid": False,
+        "readable_fallback": False,
+        "ink_soft_luma_max": 64,
+    },
+    "dark_body": {
+        "outline": "none",
+        "dilate": False,
+        "stem": False,
+        "seal": False,
+        "close_gap": 0,
+        "lift_darks": True,
+        "preserve_dither": True,
+        "structure_creases": False,
+        "ink_midtone_seams": False,
+        "depth": False,
+        "boost_light_mid": False,
+        "ink_soft_luma_max": 50,
+    },
+    "delicate": {
+        "outline": "soft",
+        "dilate": False,
+        "stem": False,
+        "seal": False,
+        "close_gap": 0,
+        "bridge_cracks": False,
+        "structure_creases": True,
+        "preserve_gaps": True,
+        "depth": True,
+        "boost_light_mid": True,
+        "ink_soft_luma_max": 55,
+    },
+}
+
+# Soft retry when readability metrics fail (still no per-species hand path).
+GEN3_SOFT_FALLBACK = {
+    "dilate": False,
+    "stem": False,
+    "seal": False,
+    "outline": "soft",
+    "structure_creases": False,
+    "ink_midtone_seams": False,
+    "depth": False,
+    "close_gap": 1,
+    "ink_soft_luma_max": 50,
+    "ink_mask_min_blob": 4,
+    "preserve_ink": True,
+}
+
+# Back-compat alias
+GEN2_FAITHFUL_DEFAULTS = FAITHFUL_DEFAULTS
+
+
 SPRITE_OVERRIDES = {
-    # Accents (eyes / markings) stole the mid palette slots from the body.
+    # Curated Advanced palettes where auto-extract is weak.
+    "TREECKO": {
+        "palette": [
+            (255, 255, 255),
+            (152, 208, 72),   # lime body
+            (208, 80, 56),    # brick-red belly
+            (0, 0, 0),
+        ],
+        "back_style": "organic",
+    },
+    "ZIGZAGOON": {
+        "palette": [
+            (255, 255, 255),
+            (224, 208, 168),  # cream stripes / brush tail
+            (168, 120, 88),   # brown body
+            (0, 0, 0),
+        ],
+        "style": "patterned",
+        "back_style": "patterned",
+    },
+    "LINOONE": {
+        "style": "patterned",
+        "back_style": "patterned",
+    },
+    "METAGROSS": {
+        "style": "plated",
+        "palette": [
+            (255, 255, 255),
+            (144, 136, 144),  # silver X / metal mid
+            (56, 96, 176),    # steel blue body
+            (0, 0, 0),
+        ],
+    },
+    "METANG": {
+        "style": "plated",
+    },
+    "BELDUM": {
+        "style": "plated",
+    },
+    "AGGRON": {
+        "style": "plated",
+    },
+    "LAIRON": {
+        "style": "plated",
+    },
+    "ARON": {
+        "style": "plated",
+    },
+    "REGISTEEL": {
+        "style": "plated",
+    },
     "LUNATONE": {
         "palette": [
             (255, 255, 255),
@@ -1656,47 +3845,297 @@ SPRITE_OVERRIDES = {
             (0, 0, 0),
         ],
     },
-    # Dark / gem-heavy sprites: full selective outline + depth read as a blob.
+    # Gen 2 dark-body escape hatch (Gen 2 pipeline left unchanged).
     "MURKROW": {
+        "faithful": False,
         "dilate": False,
         "stem": False,
         "depth": False,
         "seal": False,
-        "outline": "soft",
-        "outline_luma": 150,
+        "outline": "none",
         "orphan_min": 2,
-        "shade": "body_mid",
-        "lift_darks": True,
+        "shade": "nearest",
+        "lift_darks": False,
+        "flat_dither": False,
         "palette": [
             (255, 255, 255),
-            (214, 214, 40),   # yellow beak
-            (72, 72, 152),    # blue-black body accent
+            (214, 214, 25),   # yellow face/feet
+            (58, 58, 140),    # navy body
             (0, 0, 0),
         ],
     },
+    # Near-black body — dark_body profile + tiny-gem knobs.
     "SABLEYE": {
-        "dilate": False,
-        "stem": False,
-        "depth": False,
-        "seal": False,
-        "outline": "soft",
-        "outline_luma": 150,
-        "orphan_min": 2,
-        "shade": "body_mid",
-        "lift_darks": True,
+        "style": "dark_body",
+        "thin_outline": True,
+        "clean_accent": True,
+        "flat_dither": False,
+        "min_accent": 3,
+        "midtone_min_blob": 1,
+        "midtone_min_blob_small": 1,
+        "contrast_stretch": False,
+        "shade": "nearest",
         "palette": [
             (255, 255, 255),
-            (152, 136, 208),  # purple body
-            (232, 72, 72),    # gem red
+            (168, 136, 200),  # purple BODY → DMG shade 1
+            (232, 72, 72),    # gem red → DMG shade 2
             (0, 0, 0),
         ],
     },
 }
+
+
+def dex_from_sprite_path(path):
+    """Parse `{dex}_front.png` / `{dex}_back.png` cache names."""
+    import re
+    m = re.search(r"(?:^|[/\\])(\d+)_(?:front|back)\.png$", str(path))
+    return int(m.group(1)) if m else None
+
+
+def is_gen2_dex(dex):
+    return dex is not None and 152 <= int(dex) <= 251
+
+
+def is_gen3_dex(dex):
+    return dex is not None and 252 <= int(dex) <= 386
+
+
 def sprite_override(species_id):
     if not species_id:
         return {}
-    return SPRITE_OVERRIDES.get(str(species_id).upper(), {})
+    return dict(SPRITE_OVERRIDES.get(str(species_id).upper(), {}))
 
+
+def resolve_sprite_opts(species_id=None, dex=None, input_path=None):
+    """Merge generation defaults with per-species overrides.
+
+    Overrides win.  Gen 2 → FAITHFUL_DEFAULTS; Gen 3 → GEN3_UNIFIED_DEFAULTS
+    only (style profiles are applied later in _process_sprite_gen3 once the
+    source image is available for auto-classification).
+    """
+    if dex is None and input_path:
+        dex = dex_from_sprite_path(input_path)
+    opts = {}
+    override = sprite_override(species_id)
+    if is_gen3_dex(dex):
+        opts.update(GEN3_UNIFIED_DEFAULTS)
+    elif is_gen2_dex(dex) and override.get("faithful", True):
+        opts.update(FAITHFUL_DEFAULTS)
+    # Defer style/profile merge for Gen 3; still apply non-style override keys
+    # so callers that only use resolve_sprite_opts see palette etc.
+    for key, value in override.items():
+        if key == "style":
+            continue
+        opts[key] = value
+    return opts
+
+
+def count_interior_transparent_holes(img):
+    """Count fully enclosed transparent pockets inside the silhouette.
+
+    Exterior background (touches the image edge) is ignored.  Used to detect
+    plated / multi-limb art whose negative space is load-bearing (Metagross
+    armpits, Aggron legs).
+    """
+    from collections import deque
+
+    img = img.convert("RGBA")
+    w, h = img.size
+    px = img.load()
+    exterior = [[False] * w for _ in range(h)]
+    q = deque()
+    for x in range(w):
+        for y in (0, h - 1):
+            if px[x, y][3] < 128 and not exterior[y][x]:
+                exterior[y][x] = True
+                q.append((x, y))
+    for y in range(h):
+        for x in (0, w - 1):
+            if px[x, y][3] < 128 and not exterior[y][x]:
+                exterior[y][x] = True
+                q.append((x, y))
+    while q:
+        x, y = q.popleft()
+        for nx, ny in ((x - 1, y), (x + 1, y), (x, y - 1), (x, y + 1)):
+            if (
+                0 <= nx < w
+                and 0 <= ny < h
+                and not exterior[ny][nx]
+                and px[nx, ny][3] < 128
+            ):
+                exterior[ny][nx] = True
+                q.append((nx, ny))
+
+    seen = [[False] * w for _ in range(h)]
+    holes = 0
+    for y in range(h):
+        for x in range(w):
+            if seen[y][x] or exterior[y][x] or px[x, y][3] >= 128:
+                continue
+            holes += 1
+            qq = deque([(x, y)])
+            seen[y][x] = True
+            while qq:
+                cx, cy = qq.popleft()
+                for nx, ny in ((cx - 1, cy), (cx + 1, cy), (cx, cy - 1), (cx, cy + 1)):
+                    if (
+                        0 <= nx < w
+                        and 0 <= ny < h
+                        and not seen[ny][nx]
+                        and not exterior[ny][nx]
+                        and px[nx, ny][3] < 128
+                    ):
+                        seen[ny][nx] = True
+                        qq.append((nx, ny))
+    return holes
+
+
+def count_silhouette_bays(img):
+    """Count transparent pixels pinched between opaque on opposite sides.
+
+    Metagross armpits / Aggron leg gaps usually open to the exterior, so they
+    are not enclosed holes — but they are still load-bearing negative space.
+    A horizontal or vertical opaque–empty–opaque pinch is a 'bay'.
+    """
+    img = img.convert("RGBA")
+    w, h = img.size
+    px = img.load()
+
+    def opaque(x, y):
+        return 0 <= x < w and 0 <= y < h and px[x, y][3] >= 128
+
+    bays = 0
+    for y in range(h):
+        for x in range(w):
+            if px[x, y][3] >= 128:
+                continue
+            if opaque(x - 1, y) and opaque(x + 1, y):
+                bays += 1
+            elif opaque(x, y - 1) and opaque(x, y + 1):
+                bays += 1
+    return bays
+
+
+def mean_opaque_luma(img):
+    img = img.convert("RGBA")
+    px = img.load()
+    w, h = img.size
+    total = 0.0
+    n = 0
+    for y in range(h):
+        for x in range(w):
+            r, g, b, a = px[x, y]
+            if a < 128:
+                continue
+            total += _pixel_luma((r, g, b))
+            n += 1
+    return (total / n) if n else 255.0
+
+
+def choose_gen3_style(img, decision, override=None):
+    """Pick a GEN3_STYLE_PROFILES key from measurements (or a pinned override)."""
+    override = override or {}
+    pinned = override.get("style")
+    if pinned:
+        name = str(pinned).lower()
+        if name in GEN3_STYLE_PROFILES:
+            return name
+    holes = count_interior_transparent_holes(img)
+    bays = count_silhouette_bays(img)
+    mean_luma = mean_opaque_luma(img)
+    decision["interior_holes"] = holes
+    decision["silhouette_bays"] = bays
+    decision["mean_luma"] = mean_luma
+
+    # Near-black fills: dark_body before plated (Sableye has gaps too).
+    if mean_luma < 58 and decision.get("mean_sat", 99) < 70:
+        return "dark_body"
+    # Low-chroma + pinched limb gaps + mid/dark overall → plated mechanical.
+    # Skip bright gowns (Gardevoir) that trip low_chroma via gray dress mids.
+    gappy = holes >= 2 or bays >= 12
+    if (
+        decision.get("low_chroma")
+        and gappy
+        and mean_luma < 140
+        and decision.get("body_sat", 99) < 55
+    ):
+        return "plated"
+    if bays >= 24 and decision.get("body_sat", 99) < 45 and mean_luma < 130:
+        return "plated"
+    # Chromatic identity accent → organic; muted cream/tan stripe accents
+    # → patterned so midtone scrub cannot dissolve the bands.
+    if decision.get("clear_accent") and not decision.get("low_chroma"):
+        if decision.get("accent_sat", 99) < 100:
+            return "patterned"
+        return "organic"
+    return "default"
+
+
+def choose_gen3_back_style(img, decision, override=None):
+    """Pick a GEN3_BACK_STYLE_PROFILES key (or pinned back_style / style)."""
+    override = override or {}
+    pinned = override.get("back_style") or override.get("style")
+    if pinned:
+        name = str(pinned).lower()
+        if name in GEN3_BACK_STYLE_PROFILES:
+            return name
+        # Front-only pin name unknown on backs → fall through to measure.
+    holes = count_interior_transparent_holes(img)
+    bays = count_silhouette_bays(img)
+    mean_luma = mean_opaque_luma(img)
+    decision["interior_holes"] = holes
+    decision["silhouette_bays"] = bays
+    decision["mean_luma"] = mean_luma
+
+    if mean_luma < 58 and decision.get("mean_sat", 99) < 70:
+        return "dark_body"
+    gappy = holes >= 2 or bays >= 12
+    if (
+        decision.get("low_chroma")
+        and gappy
+        and mean_luma < 140
+        and decision.get("body_sat", 99) < 55
+    ):
+        return "plated"
+    if bays >= 24 and decision.get("body_sat", 99) < 45 and mean_luma < 130:
+        return "plated"
+    # Light identity accent on a back → patterned (stripes/patches/tail tip).
+    if decision.get("clear_accent") and not decision.get("low_chroma"):
+        light = decision.get("accent_is_light")
+        if light is None:
+            # Cream/tan accents read as patterned; vivid chroma → organic.
+            light = decision.get("accent_sat", 99) < 90
+        return "patterned" if light else "organic"
+    if bays >= 16:
+        return "delicate"
+    return "default"
+
+
+def apply_gen3_style_profile(override, style_name):
+    """GEN3_UNIFIED_DEFAULTS → style profile → species override (minus style)."""
+    opts = dict(GEN3_UNIFIED_DEFAULTS)
+    profile = GEN3_STYLE_PROFILES.get(style_name) or {}
+    opts.update(profile)
+    for key, value in (override or {}).items():
+        if key in ("style", "back_style"):
+            continue
+        opts[key] = value
+    opts["style"] = style_name
+    return opts
+
+
+def apply_gen3_back_style_profile(override, style_name):
+    """GEN3_BACK_UNIFIED_DEFAULTS → back profile → species override."""
+    opts = dict(GEN3_BACK_UNIFIED_DEFAULTS)
+    profile = GEN3_BACK_STYLE_PROFILES.get(style_name) or {}
+    opts.update(profile)
+    for key, value in (override or {}).items():
+        if key in ("style", "back_style"):
+            continue
+        opts[key] = value
+    opts["style"] = style_name
+    opts["back_style"] = style_name
+    return opts
 
 def gen1_depth_pass(img, strong=False):
     """Sparse interior ink + top highlights (Raticate-level, not ink flood)."""
@@ -1758,10 +4197,15 @@ def gen1_depth_pass(img, strong=False):
     return out
 
 
-def dither_indexed_flats(indexed_img):
-    """Very sparse black grit in flat mid fills — Raticate fur, not hatch."""
+def dither_indexed_flats(indexed_img, density=8):
+    """Sparse black grit in flat mid fills — Raticate fur, not hatch.
+
+    density: modulo period for grit marks (lower = denser).  Dark birds like
+    Murkrow need denser grit so lifted body flats still read in B&W.
+    """
     w, h = indexed_img.size
     px = indexed_img.load()
+    density = max(2, int(density))
     marks = []
     for y in range(2, h - 2):
         for x in range(2, w - 2):
@@ -1777,7 +4221,7 @@ def dither_indexed_flats(indexed_img):
                 for dx, dy in ((-2, 0), (2, 0), (0, -2), (0, 2))
             ):
                 continue
-            if (x * 5 + y * 11) % 8 == 0:
+            if (x * 5 + y * 11) % density == 0:
                 marks.append((x, y))
     for x, y in marks:
         px[x, y] = 4
@@ -1824,65 +4268,37 @@ def seal_outline_breaks(img):
     return out
 
 
-def extract_species_palette(img):
-    """4 RGB triples (lightest first) from opaque pixels — Gen 1 SGB shape.
+def extract_crystal_palette(img):
+    """Pull the sheet's own ≤4 tones when Crystal art is already indexed.
 
-    Unknown Gen 2/3 species otherwise fall through to MEWMON (peach + purple),
-    which is why Cyndaquil went blue and Ralts went muddled purple in Advanced
-    color mode.  These colors are registered as the species' own palette and
-    the grayscale pic is shaded by nearest-palette-color, not raw luminance.
+    Returns light→dark RGB triples, or None if the source is continuous-tone
+    (Gen 3 Emerald, etc.) and needs body/accent clustering.
     """
+    from collections import Counter
+
     img = img.convert("RGBA")
-    w, h = img.size
-    px = img.load()
-    opaque = []
-    for y in range(h):
-        for x in range(w):
-            r, g, b, a = px[x, y]
-            if a >= 128:
-                opaque.append((r, g, b))
-    if not opaque:
-        return [(255, 255, 255), (170, 170, 170), (85, 85, 85), (0, 0, 0)]
-
-    # Boost saturated accent pixels (Ralts horns, Cyndaquil flames, …) so
-    # MEDIANCUT does not fold them into a neighboring muddy mid-tone.
-    weighted = []
-    for r, g, b in opaque:
-        weighted.append((r, g, b))
-        sat = max(r, g, b) - min(r, g, b)
-        if sat >= 48:
-            weighted.extend([(r, g, b)] * 4)
-
-    side = max(8, int(len(weighted) ** 0.5) + 1)
-    canvas = Image.new("RGB", (side, side), (0, 0, 0))
-    canvas.putdata(weighted + [(0, 0, 0)] * (side * side - len(weighted)))
-
-    colors = []
-    methods = [Image.Quantize.MAXCOVERAGE, Image.Quantize.MEDIANCUT]
-    for method in methods:
-        try:
-            quantized = canvas.quantize(colors=4, method=method)
-            raw = quantized.getpalette() or []
-            colors = []
-            has_real_black = any(max(p) < 24 for p in opaque)
-            for i in range(0, min(12, len(raw)), 3):
-                c = (raw[i], raw[i + 1], raw[i + 2])
-                # Drop the padded black filler if it was not in the art.
-                if c == (0, 0, 0) and not has_real_black:
-                    continue
-                if c not in colors:
-                    colors.append(c)
-            if len(colors) >= 3:
-                break
-        except Exception:
+    counts = Counter()
+    for r, g, b, a in img.getdata():
+        if a < 128:
             continue
+        # Flat white/off-white matte is keyed out; do not treat as a body tone.
+        if r >= 248 and g >= 248 and b >= 248:
+            continue
+        counts[(r, g, b)] += 1
+    if not counts or len(counts) > 6:
+        return None
 
-    if not colors:
-        # Fallback: most common unique colors by luminance buckets.
-        colors = [(255, 255, 255), (170, 170, 170), (85, 85, 85), (0, 0, 0)]
-
+    colors = [c for c, _ in counts.most_common()]
+    colors.sort(
+        key=lambda c: 0.299 * c[0] + 0.587 * c[1] + 0.114 * c[2],
+        reverse=True,
+    )
+    # Ensure SGB endpoints exist, then pin them.
+    if not any(r + g + b >= 720 for r, g, b in colors):
+        colors.insert(0, (255, 255, 255))
+    if not any(r + g + b <= 48 for r, g, b in colors):
+        colors.append((0, 0, 0))
     while len(colors) < 4:
-        # Split the largest luminance gap with a midpoint.
         ordered = sorted(
             colors,
             key=lambda c: 0.299 * c[0] + 0.587 * c[1] + 0.114 * c[2],
@@ -1894,24 +4310,408 @@ def extract_species_palette(img):
             if lb - la > best_gap:
                 best_gap, best_i = lb - la, i
         a, b = ordered[best_i], ordered[best_i + 1]
-        colors.append(((a[0] + b[0]) // 2, (a[1] + b[1]) // 2, (a[2] + b[2]) // 2))
+        mid = ((a[0] + b[0]) // 2, (a[1] + b[1]) // 2, (a[2] + b[2]) // 2)
+        if mid not in colors:
+            colors.append(mid)
+        else:
+            colors.append((85, 85, 85))
     colors = colors[:4]
-    colors.sort(key=lambda c: 0.299 * c[0] + 0.587 * c[1] + 0.114 * c[2], reverse=True)
-
-    # Status-screen SGB zone behind the pic uses palette color 0 for the
-    # white UI tiles in that rect.  Vanilla Advanced/GBC mon pals pin this
-    # to pure white (255,255,255); the classic SGB off-white (255,239,255)
-    # reads as a pink/lilac box around Gen 2/3 pics.  Match GBC.
+    colors.sort(
+        key=lambda c: 0.299 * c[0] + 0.587 * c[1] + 0.114 * c[2],
+        reverse=True,
+    )
     colors[0] = (255, 255, 255)
-    # Gen 1 battle outlines read as true black (DMG shade 3 / SGB color 3).
     colors[3] = (0, 0, 0)
     return colors
 
 
-def nearest_palette_index(r, g, b, colors):
+def _rgb_luma(c):
+    return 0.299 * c[0] + 0.587 * c[1] + 0.114 * c[2]
+
+
+def _rgb_sat(c):
+    return max(c[0], c[1], c[2]) - min(c[0], c[1], c[2])
+
+
+def _rgb_hue(c):
+    r, g, b = c[0] / 255.0, c[1] / 255.0, c[2] / 255.0
+    mx, mn = max(r, g, b), min(r, g, b)
+    d = mx - mn
+    if d < 1e-6:
+        return None
+    if mx == r:
+        h = (g - b) / d
+    elif mx == g:
+        h = 2.0 + (b - r) / d
+    else:
+        h = 4.0 + (r - g) / d
+    return (h * 60.0) % 360.0
+
+
+def _hue_dist(a, b):
+    if a is None or b is None:
+        return 0.0
+    d = abs(a - b)
+    return min(d, 360.0 - d)
+
+
+def extract_emerald_palette(img):
+    """Body + accent from continuous-tone Emerald art → 4 SGB colors.
+
+    Still forced to white / mid / mid / black.  Picks the largest chromatic
+    body mass, then a real-area accent (silver X, horns) — not 7px eyes.
+    Cluster color is the mode of source pixels so Metagross stays steel-blue
+    instead of a mean-shifted royal blue.
+    """
+    import math
+    from collections import Counter, defaultdict
+
+    img = img.convert("RGBA")
+    pixels = []
+    for r, g, b, a in img.getdata():
+        if a < 128:
+            continue
+        if r + g + b < 24:
+            continue
+        if _rgb_luma((r, g, b)) >= 242:
+            continue
+        pixels.append((r, g, b))
+    if not pixels:
+        return [(255, 255, 255), (170, 170, 170), (85, 85, 85), (0, 0, 0)]
+
+    side = max(8, int(len(pixels) ** 0.5) + 1)
+    canvas = Image.new("RGB", (side, side), (0, 0, 0))
+    canvas.putdata(pixels + [(0, 0, 0)] * (side * side - len(pixels)))
+    try:
+        quantized = canvas.quantize(colors=10, method=Image.Quantize.MAXCOVERAGE)
+    except Exception:
+        quantized = canvas.quantize(colors=8)
+    raw = quantized.getpalette() or []
+    centers = [(raw[i], raw[i + 1], raw[i + 2]) for i in range(0, min(30, len(raw)), 3)]
+    if not centers:
+        return [(255, 255, 255), (170, 170, 170), (85, 85, 85), (0, 0, 0)]
+
+    buckets = defaultdict(list)
+    for p in pixels:
+        best_i, best_d = 0, None
+        for i, c in enumerate(centers):
+            d = (p[0] - c[0]) ** 2 + (p[1] - c[1]) ** 2 + (p[2] - c[2]) ** 2
+            if best_d is None or d < best_d:
+                best_i, best_d = i, d
+        buckets[best_i].append(p)
+
+    def cluster_rgb(pts):
+        """Most common mid-band source color (true sheet swatch, not a mean)."""
+        if not pts:
+            return (85, 85, 85)
+        # Include lime / cream bodies (luma up to ~210); only drop near-white.
+        mid = [p for p in pts if 45 <= _rgb_luma(p) <= 210]
+        use = mid if len(mid) >= max(3, len(pts) // 5) else pts
+        return Counter(use).most_common(1)[0][0]
+
+    n = len(pixels)
+    min_cluster = max(3, int(n * 0.006))
+    # Accents need real surface area (Metagross X, Ralts horn) — not 7px eyes.
+    min_accent = max(12, int(n * 0.018))
+    clusters = []
+    for pts in buckets.values():
+        if len(pts) < min_cluster:
+            continue
+        rgb = cluster_rgb(pts)
+        if _rgb_luma(rgb) >= 242 or sum(rgb) < 30:
+            continue
+        clusters.append(
+            {
+                "rgb": rgb,
+                "n": len(pts),
+                "sat": _rgb_sat(rgb),
+                "luma": _rgb_luma(rgb),
+                "hue": _rgb_hue(rgb),
+            }
+        )
+    if not clusters:
+        return [(255, 255, 255), (170, 170, 170), (85, 85, 85), (0, 0, 0)]
+
+    chromatic = [c for c in clusters if c["sat"] >= 28]
+    pool = chromatic if chromatic else clusters
+
+    def body_score(c):
+        return c["n"] * (0.85 + 0.15 * min(c["luma"], 200) / 200.0) * (
+            1.0 + 0.15 * min(c["sat"], 100) / 100.0
+        )
+
+    body = max(pool, key=body_score)
+    # Prefer a vivid identity color when a large dull mass (dress gray) wins
+    # on area alone — Ralts hair green vs lavender dress.
+    vivid = [c for c in pool if c["sat"] >= 55]
+    if vivid:
+        top_vivid = max(vivid, key=body_score)
+        if top_vivid["n"] >= body["n"] * 0.32 and top_vivid["sat"] >= body["sat"] + 12:
+            body = top_vivid
+
+    accent = None
+    best = -1.0
+    for c in clusters:
+        if c is body:
+            continue
+        if c["n"] < min_accent:
+            continue
+        # Near-black ink/shadow is not an accent (Metagross had a 16,16,16 blob).
+        if c["luma"] < 42 or sum(c["rgb"]) < 70:
+            continue
+        hd = _hue_dist(body["hue"], c["hue"])
+        # Same hue = body highlight/shadow. Neutrals (hue None) are never
+        # "same family" — silver X / gray metal must compete as accents.
+        same_family = (
+            body["hue"] is not None
+            and c["hue"] is not None
+            and hd < 30
+        )
+        luma_sep = abs(c["luma"] - body["luma"])
+        chroma = c["sat"] / 255.0
+        # Area matters as much as chroma — silver X beats 7 red eye pixels.
+        score = (
+            math.log(c["n"] + 1.0) * 18.0
+            + chroma * 55.0
+            + hd * 0.3
+            + min(luma_sep, 80) * 0.15
+            + (12.0 if c["sat"] >= 90 else 0.0)
+        )
+        if same_family:
+            # Darker/lighter shade of the same body hue is shading, not an accent.
+            score *= 0.08
+        if c["sat"] < 28:
+            # Metallic / silver accents (Metagross X) when luma-separated.
+            if luma_sep >= 28 and c["n"] >= max(min_accent, int(body["n"] * 0.05)):
+                score *= 1.15
+            else:
+                score *= 0.3
+        # Prefer true hue accents over a second body shade.
+        if hd >= 40:
+            score *= 1.2
+        if score > best:
+            best, accent = score, c
+
+    if accent is None:
+        others = [c for c in clusters if c is not body and c["n"] >= min_accent]
+        if not others:
+            others = [c for c in clusters if c is not body]
+        accent = max(others, key=lambda c: c["n"]) if others else {"rgb": (85, 85, 85)}
+
+    def dist2(a, b):
+        return (a[0] - b[0]) ** 2 + (a[1] - b[1]) ** 2 + (a[2] - b[2]) ** 2
+
+    mids = [body["rgb"], accent["rgb"]]
+    if dist2(mids[0], mids[1]) < 40 * 40:
+        for c in sorted(clusters, key=lambda x: dist2(x["rgb"], body["rgb"]), reverse=True):
+            if c is body or c["n"] < min_accent:
+                continue
+            if dist2(c["rgb"], body["rgb"]) >= 40 * 40:
+                mids[1] = c["rgb"]
+                break
+    mids.sort(key=_rgb_luma, reverse=True)
+    return [(255, 255, 255), mids[0], mids[1], (0, 0, 0)]
+
+
+def opaque_saturation_stats(img):
+    """Return (mean_sat, p90_sat, n) over opaque source pixels."""
+    img = img.convert("RGBA")
+    px = img.load()
+    w, h = img.size
+    sats = []
+    for y in range(h):
+        for x in range(w):
+            r, g, b, a = px[x, y]
+            if a < 128:
+                continue
+            sats.append(max(r, g, b) - min(r, g, b))
+    if not sats:
+        return 0.0, 0.0, 0
+    sats.sort()
+    n = len(sats)
+    mean_sat = sum(sats) / n
+    p90_sat = float(sats[min(n - 1, int(0.9 * (n - 1)))])
+    return mean_sat, p90_sat, n
+
+
+def mean_opaque_saturation(img):
+    """Average chroma (max-min channel) over opaque source pixels."""
+    mean_sat, _p90, _n = opaque_saturation_stats(img)
+    return mean_sat
+
+
+def palette_mid_luma_span(colors):
+    """Luma gap between the two mid palette slots (1 and 2)."""
+    if not colors or len(colors) < 3:
+        return 0.0
+    return abs(_rgb_luma(colors[1]) - _rgb_luma(colors[2]))
+
+
+def analyze_sprite_decisions(img, colors):
+    """Stage 0 — measure source art; return shade_mode + contrast flag.
+
+    Decision record drives every Gen 3 pipeline choice downstream.  Overrides
+    may still pin shade_mode; this is the automatic baseline.
+    """
+    mean_sat, p90_sat, _n = opaque_saturation_stats(img)
+    body_sat = _rgb_sat(colors[1]) if colors and len(colors) > 1 else 0.0
+    accent_sat = _rgb_sat(colors[2]) if colors and len(colors) > 2 else 0.0
+    mid_span = palette_mid_luma_span(colors)
+    clear_accent = accent_sat >= CLEAR_ACCENT_SAT
+
+    # Desaturated mass, or gray/silver body mid (Metagross: blue pulls mean
+    # up but slot-1 silver is still low-chroma structure).
+    low_chroma = mean_sat < LOW_CHROMA_MEAN_SAT or body_sat < LOW_BODY_MID_SAT
+
+    # Clear identity accent (red belly, yellow mane, gem) on a chromatic body
+    # → nearest.  Gray/silver body + blue accent (Metagross) stays body_mid;
+    # its sat≥80 gate already protects the accent.
+    if clear_accent and body_sat >= LOW_BODY_MID_SAT:
+        low_chroma = False
+
+    # Edge case: large gray body + tiny vibrant accents can drag the mean
+    # down.  If p90 shows a real high-sat cluster AND the body mid itself
+    # is chromatic, prefer nearest so accents stay hue-matched.
+    if (
+        p90_sat >= HIGH_SAT_P90
+        and body_sat >= LOW_BODY_MID_SAT
+        and mean_sat >= 35.0
+    ):
+        low_chroma = False
+
+    # Stretch only when the palette is truly collapsed *and* low-chroma —
+    # stretching a saturated accent palette desaturates identity colors.
+    needs_stretch = bool(low_chroma and mid_span < PALETTE_CONTRAST_MIN_MID_SPAN)
+
+    return {
+        "shade_mode": "body_mid" if low_chroma else "nearest",
+        "needs_contrast_stretch": needs_stretch,
+        "low_chroma": low_chroma,
+        "clear_accent": clear_accent,
+        "mean_sat": mean_sat,
+        "p90_sat": p90_sat,
+        "body_sat": body_sat,
+        "accent_sat": accent_sat,
+        "mid_luma_span": mid_span,
+    }
+
+
+def stretch_palette_contrast(colors, min_span=110):
+    """Widen midtone luma gaps when the 4-color pick is too clustered.
+
+    Brushed-metal / flat Emerald art often yields four colors sitting in a
+    narrow luma band — shade mapping then collapses to 2–3 effective tones.
+    Keep endpoints pinned to white/black; redistribute slots 1–2 across a
+    healthier span.  No-ops when the palette already has enough contrast.
+
+    Prefer calling this only when Stage 0 set needs_contrast_stretch, and
+    ideally after downscale so majority-vote shrink sees natural gradients.
+    """
+    if not colors or len(colors) < 4:
+        return colors
+    cols = [tuple(c[:3]) for c in colors[:4]]
+    cols[0] = (255, 255, 255)
+    cols[3] = (0, 0, 0)
+    lumas = [_rgb_luma(c) for c in cols]
+    # Span between the two mids (ignore forced W/B which always span ~255).
+    mid_span = abs(lumas[1] - lumas[2])
+    full_span = lumas[0] - lumas[3]
+    if mid_span >= min_span * 0.45 and full_span >= min_span:
+        return cols
+
+    # Target ladder: white → light mid → dark mid → black.
+    targets = [255.0, 170.0, 85.0, 0.0]
+    out = [cols[0], None, None, cols[3]]
+    for i in (1, 2):
+        r, g, b = cols[i]
+        L = lumas[i] if lumas[i] > 1 else 1.0
+        # Preserve hue/chroma; scale toward target luma.
+        scale = targets[i] / L
+        # Blend so we don't nuke accent chroma entirely.
+        nr = int(max(0, min(255, r * scale * 0.65 + targets[i] * 0.35)))
+        ng = int(max(0, min(255, g * scale * 0.65 + targets[i] * 0.35)))
+        nb = int(max(0, min(255, b * scale * 0.65 + targets[i] * 0.35)))
+        out[i] = (nr, ng, nb)
+    # Ensure slot1 is lighter than slot2 after stretch.
+    if _rgb_luma(out[1]) < _rgb_luma(out[2]):
+        out[1], out[2] = out[2], out[1]
+    return out
+
+
+def extract_species_palette(img, stretch=False):
+    """4 RGB triples (lightest first) from opaque pixels — Gen 1 SGB shape.
+
+    Crystal sheets: use the indexed tones as-is.
+    Emerald sheets: body + accent clustering (not raw MEDIANCUT).
+
+    stretch=False by default so Stage 0 can measure the natural midtone
+    span; Gen 3 applies stretch_palette_contrast only when flagged, and
+    after downscale.  Pass stretch=True for callers that want the old
+    eager-widen behavior.
+    """
+    crystal = extract_crystal_palette(img)
+    colors = crystal if crystal else extract_emerald_palette(img)
+    if stretch:
+        return stretch_palette_contrast(colors)
+    return [tuple(c[:3]) for c in colors[:4]]
+
+
+def nearest_palette_index(r, g, b, colors, hue_aware=False):
     best_i, best_d = 0, None
+    pix = (r, g, b)
+    pix_sat = _rgb_sat(pix)
+    pix_luma = _rgb_luma(pix)
+    pix_hue = _rgb_hue(pix) if pix_sat >= 28 else None
+
+    # Bright yellow eyes → white sclera.  Lime body is RGB-near yellow so
+    # raw nearest collapses the eye into green.  Keep this NARROW (true
+    # yellow only) — orange belly-adjacent rim pixels must stay off white
+    # or the whole cheek becomes a white blob.  Skip when accent itself is
+    # yellow (Ampharos) so the accent slot still receives those pixels.
+    if (
+        hue_aware
+        and pix_sat >= 80
+        and pix_luma >= 175
+        and pix_hue is not None
+        and 32 <= pix_hue <= 55
+        and len(colors) >= 3
+    ):
+        accent = colors[2]
+        accent_sat = _rgb_sat(accent)
+        accent_hue = _rgb_hue(accent) if accent_sat >= 28 else None
+        accent_is_yellow = accent_hue is not None and 28 <= accent_hue <= 70
+        if not accent_is_yellow:
+            return 0
+
     for i, (cr, cg, cb) in enumerate(colors):
         d = (r - cr) * (r - cr) + (g - cg) * (g - cg) + (b - cb) * (b - cb)
+        if hue_aware and pix_sat >= 28 and pix_luma >= 50 and i == 3:
+            # Chromatic mid-tones must not collapse into outline ink just
+            # because black is an un-penalized RGB neighbor.
+            d += 90 * 90
+        if hue_aware and pix_sat >= 28 and pix_luma < 200 and i == 0:
+            # Chromatic body/shadow must not flee to white either — teal
+            # Treecko-tail shadows are hue-far from lime body, so without
+            # this the hue gate below dumps them on white and the tail
+            # grows a highlight blob.
+            d += 100 * 100
+        # Chromatic pixels must stay on the matching hue family — otherwise
+        # Treecko olive shadows snap to belly-red by raw RGB distance.
+        if hue_aware and pix_hue is not None and i not in (0, 3):
+            cs = _rgb_sat((cr, cg, cb))
+            ch = _rgb_hue((cr, cg, cb))
+            if cs >= 28 and ch is not None:
+                hd = _hue_dist(pix_hue, ch)
+                if hd > 55:
+                    # Soft penalty inside the same broad green/blue family
+                    # (teal shadow vs lime body); hard penalty across families
+                    # (olive vs belly-red).
+                    same_green = 70 <= pix_hue <= 170 and 70 <= ch <= 170
+                    same_blue = 170 <= pix_hue <= 260 and 170 <= ch <= 260
+                    if same_green or same_blue:
+                        d += int((hd * 2) ** 2)
+                    else:
+                        d += int((hd * 5) ** 2)
         if best_d is None or d < best_d:
             best_i, best_d = i, d
     return best_i
@@ -1920,18 +4720,29 @@ def nearest_palette_index(r, g, b, colors):
 def shade_for_pixel(r, g, b, colors, mode=None):
     """Map a source pixel to a 0..3 shade index.
 
-    High-chroma accents (horns, flames) snap to the nearest palette color.
-    Low-chroma structure uses a white / mid / black ramp (slots 0, 1, 3) so
-    folds survive without painting dress shadows into the accent slot (2).
+    Explicit modes only — there is no silent 3-band fallback:
 
-    mode=\"body_mid\": dark body stays on mid palette slots instead of pure
-    black ink — needed for Murkrow / Sableye style sprites that otherwise
-    collapse into an unreadable silhouette.
+      luma       — classic v1.0.0 brightness bands (Gen 3 backs).
+      body_mid   — 4-band luma ramp with high-chroma accent gate.
+      nearest    — hue-aware nearest palette slot; for normal_chroma.
+      keep_chroma — Gen 2 dark-bird escape hatch (Murkrow).
+
+    Unknown / None mode resolves to nearest so nothing falls through a
+    gap-having default ramp.
     """
     if r + g + b < 24:
         return 3
     sat = max(r, g, b) - min(r, g, b)
     luma = 0.299 * r + 0.587 * g + 0.114 * b
+    if mode == "luma":
+        # Exact v1.0.0 thresholds.
+        if luma > 192:
+            return 0
+        if luma > 128:
+            return 1
+        if luma > 64:
+            return 2
+        return 3
     if mode == "body_mid":
         # Keep near-black as ink; everything else stays on body/accent slots so
         # dark purple/blue mons do not collapse into a solid silhouette.
@@ -1945,16 +4756,24 @@ def shade_for_pixel(r, g, b, colors, mode=None):
         if luma >= 90:
             return 1
         return 2
-    if sat >= 48:
-        if luma < 75:
-            return 3  # deep chroma folds → black ink
-        return nearest_palette_index(r, g, b, colors)
-    # Pale body (white / lavender) must stay on the white slot.
-    if luma >= 175 or min(r, g, b) >= 170:
-        return 0
-    if luma >= 100:
+    if mode == "keep_chroma":
+        # Crystal-era dark birds (Murkrow): body is chromatic navy, not ink.
+        # Never force saturated darks to black — that erases hat/wing dither.
+        # Slot 1 is body mid; slot 2 is the yellow/red accent.
+        if r + g + b < 28:
+            return 3
+        if sat >= 28:
+            idx = nearest_palette_index(r, g, b, colors)
+            if idx == 3 and r + g + b >= 28:
+                return 1
+            return idx
+        if luma >= 175 or min(r, g, b) >= 170:
+            return 0
+        if luma >= 110:
+            return 1
         return 1
-    return 3
+    # nearest (default): hue-aware snap to the species' 4 SGB colors.
+    return nearest_palette_index(r, g, b, colors, hue_aware=True)
 
 
 # Backs are 32x32.  Shift feet DOWN by this many pixels so the bottom of the
@@ -1971,29 +4790,481 @@ DMG_SHADE_RGB = [
 ]
 
 
-def process_sprite(input_path, output_path, target_size, species_id=None):
+
+# Gen 1 battle fronts are 40 / 48 / 56 px (frontSize 5 / 6 / 7 tiles).
+# Kanto Reforged sprites used to be force-fitted to 56x56, so small mons like
+# Aron drew as large as Onix. Map dex height onto those three buckets so
+# proportions roughly match Gen 1 (Geodude-sized rocks stay small).
+
+
+def ensure_silhouette_outline(img, protect_white=True):
+    """Hard 1px black rim on every exterior opaque pixel.
+
+    Unlike ensure_selective_outline, lit chromatic tops are NOT left soft —
+    Gen 3 v1 bakes otherwise leave Treecko's crown / arm tops open against
+    the white battle BG.
+    """
+    img = img.convert("RGBA")
+    w, h = img.size
+    src = img.load()
+    out = img.copy()
+    dst = out.load()
+    black = (0, 0, 0, 255)
+
+    def opaque(x, y):
+        return 0 <= x < w and 0 <= y < h and src[x, y][3] >= 128
+
+    for y in range(h):
+        for x in range(w):
+            if src[x, y][3] < 128:
+                continue
+            if not (
+                not opaque(x - 1, y)
+                or not opaque(x + 1, y)
+                or not opaque(x, y - 1)
+                or not opaque(x, y + 1)
+            ):
+                continue
+            if protect_white and min(src[x, y][0], src[x, y][1], src[x, y][2]) >= 230:
+                continue
+            dst[x, y] = black
+    return out
+
+
+def demote_small_midtone_islands(indexed_img, mid_index=3, body_index=2):
+    """Keep only the largest mid-shade blob; fold the rest into body.
+
+    Indexed PNG: 0=transparent, 1..4 = white→black.  When cheeks and belly
+    share shade-2, Advanced paints both with the accent — keep the belly.
+    """
+    from collections import deque
+
+    w, h = indexed_img.size
+    px = indexed_img.load()
+    seen = [[False] * w for _ in range(h)]
+    comps = []
+    for y in range(h):
+        for x in range(w):
+            if seen[y][x] or px[x, y] != mid_index:
+                continue
+            q = deque([(x, y)])
+            seen[y][x] = True
+            cells = []
+            while q:
+                cx, cy = q.popleft()
+                cells.append((cx, cy))
+                for nx, ny in ((cx - 1, cy), (cx + 1, cy), (cx, cy - 1), (cx, cy + 1)):
+                    if (
+                        0 <= nx < w
+                        and 0 <= ny < h
+                        and not seen[ny][nx]
+                        and px[nx, ny] == mid_index
+                    ):
+                        seen[ny][nx] = True
+                        q.append((nx, ny))
+            comps.append(cells)
+    if len(comps) <= 1:
+        return indexed_img
+    comps.sort(key=len, reverse=True)
+    for cells in comps[1:]:
+        for x, y in cells:
+            px[x, y] = body_index
+    return indexed_img
+
+
+def ink_treecko_face_guides(indexed_img):
+    """Add jaw / mouth / cheek creases under Treecko's eye whites.
+
+    Runs on the indexed PNG (1=white … 4=black).  Applies a short stroke
+    under every substantial eye blob — the near-eye jaw row is often already
+    ink from structure_creases, so the far eye still needs the pass.
+    """
+    from collections import deque
+
+    w, h = indexed_img.size
+    px = indexed_img.load()
+    WHITE, BODY, INK = 1, 2, 4
+
+    seen = [[False] * w for _ in range(h)]
+    eyes = []
+    for y0 in range(h):
+        for x0 in range(w):
+            if seen[y0][x0] or px[x0, y0] != WHITE:
+                continue
+            blob = []
+            q = deque([(x0, y0)])
+            seen[y0][x0] = True
+            while q:
+                x, y = q.popleft()
+                blob.append((x, y))
+                for dx, dy in ((-1, 0), (1, 0), (0, -1), (0, 1)):
+                    nx, ny = x + dx, y + dy
+                    if (
+                        0 <= nx < w
+                        and 0 <= ny < h
+                        and not seen[ny][nx]
+                        and px[nx, ny] == WHITE
+                    ):
+                        seen[ny][nx] = True
+                        q.append((nx, ny))
+            if len(blob) >= 2:
+                eyes.append(blob)
+    if not eyes:
+        return indexed_img
+
+    def set_ink(x, y):
+        if 0 <= x < w and 0 <= y < h and px[x, y] == BODY:
+            px[x, y] = INK
+
+    eyes.sort(key=len, reverse=True)
+    for blob in eyes:
+        if len(blob) < 4:
+            # Tiny far-eye sliver: just keep a 1px mark, no long jaw.
+            continue
+        xs = [p[0] for p in blob]
+        ys = [p[1] for p in blob]
+        x0, x1 = min(xs), max(xs)
+        y_bot = max(ys)
+        jaw_y = y_bot + 2
+        if jaw_y >= h:
+            continue
+        # Jaw under the eye, extended slightly toward the snout ( +x ).
+        for x in range(max(0, x0 - 1), min(w, x1 + 4)):
+            set_ink(x, jaw_y)
+        mid = (x0 + x1) // 2
+        mouth_y = jaw_y + 1
+        if mouth_y < h:
+            for x in range(mid - 1, mid + 3):
+                set_ink(x, mouth_y)
+        # Cheek crease behind the eye.
+        for y in range(y_bot, min(h, y_bot + 4)):
+            set_ink(x0 - 1, y)
+            set_ink(x0 - 2, y)
+
+    return indexed_img
+
+
+def accent_slot_coverage(img, colors):
+    """Fraction of opaque pixels nearest the accent slot (colors[2]).
+
+    Used on backs: front-curated palettes often put a belly/mane accent in
+    slot 2 that never appears on the rear view.  Luma-band midtones then
+    become that accent in Advanced (Treecko shadows → pink).
+    """
+    if not colors or len(colors) < 3:
+        return 0.0
+    img = img.convert("RGBA")
+    px = img.load()
+    w, h = img.size
+    accent = tuple(colors[2][:3])
+    accent_sat = max(accent) - min(accent)
+    accent_n = 0
+    opaque_n = 0
+    for y in range(h):
+        for x in range(w):
+            r, g, b, a = px[x, y]
+            if a < 128:
+                continue
+            opaque_n += 1
+            if nearest_palette_index(r, g, b, colors, hue_aware=True) != 2:
+                continue
+            # Require the pixel to actually look like the accent (not a
+            # dark body shade that merely lost a nearest-slot tie).
+            sat = max(r, g, b) - min(r, g, b)
+            if accent_sat >= 40 and sat < max(28, accent_sat // 3):
+                continue
+            accent_n += 1
+    if opaque_n == 0:
+        return 0.0
+    return accent_n / float(opaque_n)
+
+
+def accent_missing_on_view(view_img, colors, front_img=None):
+    """True when slot-2 accent is a front-only color for this view."""
+    view_c = accent_slot_coverage(view_img, colors)
+    if view_c >= 0.05:
+        return False
+    if front_img is None:
+        return view_c < 0.05
+    front_c = accent_slot_coverage(front_img, colors)
+    # Front has a real accent; this view barely does.
+    if front_c >= 0.05 and view_c < front_c * 0.35:
+        return True
+    return view_c < 0.04
+
+
+def process_sprite_v1(
+    input_path,
+    output_path,
+    target_size,
+    palette_override=None,
+    shade_mode="nearest",
+    demote_small_mids=False,
+    outline="full",
+    close_gap=1,
+    structure_creases=False,
+    face_guides=False,
+    crease_dark_ratio=0.75,
+    crease_valley_delta=16,
+    crease_min_contrast=24,
+    avoid_accent_slot=False,
+    guard_edge_white=False,
+):
+    """v1.0.0 geometry (nearest scale) + hue-aware palette shade assignment.
+
+    Layout matches original v1.0.0 (crop → NEAREST fit → center).  Shades are
+    chosen by snapping to the species palette (not raw luma).  close_gap fills
+    thin silhouette bites NEAREST often opens (Metagross body↔leg joins).
+
+    avoid_accent_slot: when the shared Advanced palette's accent (slot 2) is
+    absent from this view, never write DMG shade 2 — those pixels would paint
+    as the wrong hue (Treecko back midtones → belly red).  Midtones become a
+    body↔ink dither instead of a flat fill.
+
+    guard_edge_white: demote silhouette-edge "white" to body so AA glitter
+    does not read as stray highlights.
+    """
+    try:
+        img = key_out_flat_background(Image.open(input_path))
+
+        if palette_override:
+            display_colors = [tuple(c) for c in palette_override[:4]]
+            while len(display_colors) < 4:
+                display_colors.append((0, 0, 0))
+            display_colors[0] = (255, 255, 255)
+            display_colors[3] = (0, 0, 0)
+        else:
+            display_colors = extract_species_palette(img)
+
+        # Crop transparency border (v1.0.0 — no 1px halo).
+        bbox = img.getbbox()
+        if bbox:
+            img = img.crop(bbox)
+
+        # Scale nearest neighbor to preserve sharp pixel art edges
+        w, h = img.size
+        ratio = min(target_size[0] / w, target_size[1] / h)
+        new_w, new_h = int(w * ratio), int(h * ratio)
+        if new_w < 1:
+            new_w = 1
+        if new_h < 1:
+            new_h = 1
+        img_resized = img.resize((new_w, new_h), Image.NEAREST)
+
+        # Center in target frame
+        new_img = Image.new("RGBA", target_size, (255, 255, 255, 0))
+        x = (target_size[0] - new_w) // 2
+        y = (target_size[1] - new_h) // 2
+        new_img.paste(img_resized, (x, y))
+
+        # Rejoin thin bridges NEAREST dropped (body↔limb bites).
+        if close_gap and close_gap > 0:
+            new_img = close_small_holes(new_img, max_gap=int(close_gap))
+
+        # Optional source-luma creases (jaw / folds) before the rim pass.
+        if structure_creases:
+            src_resized = new_img.copy()
+            snapped = quantize_rgba_to_palette(new_img, display_colors)
+            new_img = ink_structure_creases(
+                snapped,
+                src_resized,
+                display_colors,
+                dark_ratio=float(crease_dark_ratio),
+                min_contrast=int(crease_min_contrast),
+                valley_delta=int(crease_valley_delta),
+            )
+
+        # Outer rim before shade map so ink lands on DMG shade 3.
+        if outline == "full":
+            new_img = ensure_silhouette_outline(new_img)
+        elif outline == "selective":
+            new_img = ensure_selective_outline(new_img)
+        elif outline == "soft":
+            new_img = ensure_contrast_outline(new_img)
+
+        # Palette-aware shade map (hue gate keeps body/accent families apart).
+        px = new_img.load()
+        tw, th = target_size
+        indexed_img = Image.new("P", target_size, 0)
+
+        def touches_empty(x, y):
+            for nx, ny in ((x - 1, y), (x + 1, y), (x, y - 1), (x, y + 1)):
+                if not (0 <= nx < tw and 0 <= ny < th) or px[nx, ny][3] < 128:
+                    return True
+            return False
+
+        for py in range(th):
+            for px_x in range(tw):
+                r, g, b, a = px[px_x, py]
+                if a < 128:
+                    indexed_img.putpixel((px_x, py), 0)
+                elif r + g + b < 24:
+                    indexed_img.putpixel((px_x, py), 4)
+                else:
+                    shade = shade_for_pixel(
+                        r, g, b, display_colors, mode=shade_mode
+                    )
+                    luma = 0.299 * r + 0.587 * g + 0.114 * b
+                    # Edge AA often reads as "white highlight" and looks like
+                    # glitter on lime bodies — keep white for interior only.
+                    if shade == 0 and (guard_edge_white or avoid_accent_slot):
+                        if touches_empty(px_x, py) or luma < 220:
+                            shade = 1
+                    # Shared Advanced palette: shade 2 == accent slot.  If this
+                    # view has no accent, fake a mid with body↔ink dither so
+                    # the body is not a flat slab and we never paint pink.
+                    if avoid_accent_slot and shade == 2:
+                        prefer_ink = luma < 100
+                        if ((px_x + py) & 1) == (0 if prefer_ink else 1):
+                            shade = 3
+                        else:
+                            shade = 1
+                    indexed_img.putpixel((px_x, py), shade + 1)
+
+        if demote_small_mids:
+            indexed_img = demote_small_midtone_islands(indexed_img)
+        if face_guides:
+            indexed_img = ink_treecko_face_guides(indexed_img)
+
+        palette = [
+            255, 255, 255,  # 0: Transparent
+            255, 255, 255,  # 1: White
+            170, 170, 170,  # 2: Light Gray
+            85, 85, 85,     # 3: Dark Gray
+            0, 0, 0,        # 4: Black
+        ]
+        palette += [0] * (768 - len(palette))
+        indexed_img.putpalette(palette)
+
+        os.makedirs(os.path.dirname(output_path) or ".", exist_ok=True)
+        indexed_img.save(output_path, transparency=0)
+        return True, display_colors
+    except Exception as e:
+        print(f"Failed processing sprite {input_path}: {e}")
+        return False, None
+
+
+
+def resolve_species_palette(input_path, override=None, prefer_front=False):
+    """Pick the 4-color Advanced palette for a sprite bake.
+
+    Order: species override → optional front-sheet extract (backs) →
+    extract from this image.
+    """
+    override = override or {}
+    if override.get("palette"):
+        return _normalize_palette(override["palette"])
+    if prefer_front and input_path and "_back." in str(input_path):
+        front_path = str(input_path).replace("_back.", "_front.")
+        if os.path.exists(front_path):
+            try:
+                front_img = key_out_flat_background(Image.open(front_path))
+                return _normalize_palette(
+                    extract_species_palette(front_img, stretch=True)
+                )
+            except Exception:
+                pass
+    img = key_out_flat_background(Image.open(input_path))
+    return _normalize_palette(extract_species_palette(img, stretch=True))
+
+
+def process_sprite(input_path, output_path, target_size, species_id=None, dex=None):
     """Build a Gen 1-style 4-shade sprite.
 
     Returns (ok, palette) where palette is 4 RGB triples lightest-first, or
     (False, None) on failure.  Callers register `palette` under the species
     id so Advanced color mode stops falling through to MEWMON.
 
-    `species_id` selects optional SPRITE_OVERRIDES (palette / outline / depth).
+    Gen 3 fronts → measurement-driven unified pipeline + style profiles.
+    Gen 3 backs  → v1.0.0 NEAREST geometry + luma bands (was readable);
+                   palette still from override / front / extract for Advanced.
+    Gen 2        → Crystal-faithful quantize path (unchanged).
+    Else         → v1.0.0 geometry path.
     """
-    opts = sprite_override(species_id)
+    if dex is None:
+        dex = dex_from_sprite_path(input_path)
+    override = sprite_override(species_id)
+    is_back = target_size == (32, 32)
+    if is_gen3_dex(dex):
+        if is_back:
+            # v1.0.0 backs were good — keep that geometry.  Palette still
+            # comes from override / front so Advanced matches the species.
+            # If the accent slot is absent on this rear view, scrub shade 2
+            # so midtones do not paint as belly/mane color (Treecko pink).
+            palette = resolve_species_palette(
+                input_path, override, prefer_front=True
+            )
+            src = key_out_flat_background(Image.open(input_path))
+            front_img = None
+            if "_back." in str(input_path):
+                fp = str(input_path).replace("_back.", "_front.")
+                if os.path.exists(fp):
+                    try:
+                        front_img = key_out_flat_background(Image.open(fp))
+                    except Exception:
+                        front_img = None
+            avoid_accent = accent_missing_on_view(src, palette, front_img)
+            return process_sprite_v1(
+                input_path,
+                output_path,
+                target_size,
+                palette_override=palette,
+                shade_mode="luma",
+                outline="none",
+                close_gap=0,
+                avoid_accent_slot=avoid_accent,
+                guard_edge_white=True,
+            )
+        opts = resolve_sprite_opts(species_id=species_id, dex=dex, input_path=input_path)
+        return _process_sprite_gen3(
+            input_path, output_path, target_size, opts, override=override
+        )
+    if is_gen2_dex(dex):
+        opts = resolve_sprite_opts(species_id=species_id, dex=dex, input_path=input_path)
+        return _process_sprite_faithful(
+            input_path, output_path, target_size, opts, override=override
+        )
+    return process_sprite_v1(
+        input_path,
+        output_path,
+        target_size,
+        palette_override=override.get("palette"),
+        shade_mode=override.get("shade", "nearest"),
+        demote_small_mids=bool(override.get("demote_small_mids")),
+        outline=override.get("outline", "full"),
+        close_gap=int(override["close_gap"]) if override.get("close_gap") is not None else 1,
+        structure_creases=bool(override.get("structure_creases")),
+        face_guides=bool(override.get("face_guides")),
+        crease_dark_ratio=float(override.get("crease_dark_ratio", 0.75)),
+        crease_valley_delta=int(override.get("crease_valley_delta", 16)),
+        crease_min_contrast=int(override.get("crease_min_contrast", 24)),
+    )
+
+
+def _process_sprite_faithful(input_path, output_path, target_size, opts, override=None):
+    """Gen 2 Crystal-faithful quantize path (shared helper body)."""
+    override = override or {}
     try:
         img = key_out_flat_background(Image.open(input_path))
+        quantize_first = bool(opts.get("quantize_first", False))
+        shade_mode = opts.get("shade", "nearest")
 
         # Crop transparency, but keep a 1px halo so tight silhouettes are
         # not shaved by getbbox before the dilate / resize.
-        bbox = img.getbbox()
-        if bbox:
-            l, t, r, b = bbox
-            l = max(0, l - 1)
-            t = max(0, t - 1)
-            r = min(img.size[0], r + 1)
-            b = min(img.size[1], b + 1)
-            img = img.crop((l, t, r, b))
+        # Faithful Gen2 path: SKIP tight crop when quantize_first — Crystal
+        # sheets are already square; cropping then scaling makes a
+        # non-integer ratio that majority-votes tiny features away.
+        # Gen 3 backs opt back in via tight_crop (padded Emerald sheets).
+        is_back = target_size == (32, 32)
+        if (not quantize_first) or opts.get("tight_crop"):
+            bbox = img.getbbox()
+            if bbox:
+                l, t, r, b = bbox
+                l = max(0, l - 1)
+                t = max(0, t - 1)
+                r = min(img.size[0], r + 1)
+                b = min(img.size[1], b + 1)
+                img = img.crop((l, t, r, b))
 
         # Pull the species' 4 colors from the (still-hued) art BEFORE we
         # destroy chroma.  Same palette is what Advanced mode will reapply.
@@ -2003,11 +5274,26 @@ def process_sprite(input_path, output_path, target_size, species_id=None):
                 species_colors.append((0, 0, 0))
             species_colors[0] = (255, 255, 255)
             species_colors[3] = (0, 0, 0)
+        elif opts.get("prefer_front_palette") and is_back:
+            # Emerald backs are often flatter / more shaded than fronts —
+            # auto-extract can collapse cream stripes into mud.  Borrow the
+            # front sheet's colors when the cache has one.
+            species_colors = None
+            front_path = None
+            if input_path and "_back." in str(input_path):
+                front_path = str(input_path).replace("_back.", "_front.")
+            if front_path and os.path.exists(front_path):
+                try:
+                    front_img = key_out_flat_background(Image.open(front_path))
+                    species_colors = extract_species_palette(front_img, stretch=True)
+                except Exception:
+                    species_colors = None
+            if not species_colors:
+                species_colors = extract_species_palette(img, stretch=True)
         else:
-            species_colors = extract_species_palette(img)
+            species_colors = extract_species_palette(img, stretch=True)
 
         w, h = img.size
-        is_back = target_size == (32, 32)
         # Backs may render taller than 32 then shift down so feet clip off.
         clip = BACK_BOTTOM_CLIP if is_back else 0
         fit_w = target_size[0]
@@ -2020,11 +5306,51 @@ def process_sprite(input_path, output_path, target_size, species_id=None):
         outline_mode = opts.get("outline", "full")
         outline_luma = int(opts.get("outline_luma", 110))
         orphan_min = int(opts.get("orphan_min", 4))
-        shade_mode = opts.get("shade")
+        # 0 = skip hole-fill (keeps Metagross leg gaps / intentional bites).
+        close_gap = opts.get("close_gap")
+        if close_gap is None:
+            close_gap = 0 if quantize_first else (2 if not is_back else 1)
+        close_gap = int(close_gap)
 
-        # Light pre-dilate on fronts only — backs lose detail if fattened
-        # before a heavy 96→32 shrink.
-        if (w > fit_w or h > fit_h) and not is_back and do_dilate:
+        # Gen 2 detail path: lock to 4 colors at full res BEFORE shrink so
+        # eyes / horns / tiny marks are already clean slots the majority vote
+        # can preserve (with white/black boost).  Scrub AA accent freckles,
+        # then restore same-hue shadow creases (jaw, limb joins) from source.
+        src_for_creases = img.copy() if quantize_first else None
+        if quantize_first:
+            img = quantize_rgba_to_palette(img, species_colors)
+            img = clean_quantized_freckles(
+                img,
+                species_colors,
+                min_accent=int(opts.get("min_accent", 14)),
+            )
+            img = clean_midtone_bleed(
+                img,
+                species_colors,
+                min_blob=int(opts.get("midtone_min_blob", 10)),
+            )
+            if opts.get("structure_creases", False):
+                img = ink_structure_creases(
+                    img,
+                    src_for_creases,
+                    species_colors,
+                    dark_ratio=float(opts.get("crease_dark_ratio", 0.70)),
+                    min_contrast=int(opts.get("crease_min_contrast", 26)),
+                    valley_delta=int(opts.get("crease_valley_delta", 20)),
+                )
+            if opts.get("ink_midtone_seams", False):
+                img = ink_midtone_seams(img, species_colors)
+            # Solidify eyes at FULL res before shrink — yellow→white sclera
+            # is only a few px and majority-vote otherwise leaves W·W gaps.
+            img = ensure_white_eye_pupils(img, species_colors)
+            w, h = img.size
+
+        # Light pre-dilate — fronts when dilate=True; Gen3 backs when
+        # back_dilate so thin limbs survive ~3× shrink after tight crop.
+        want_dilate = bool(do_dilate) if not is_back else bool(
+            opts.get("back_dilate") or do_dilate
+        )
+        if (w > fit_w or h > fit_h) and want_dilate:
             img = dilate_opaque(img)
             img = close_small_holes(img, max_gap=1)
             w, h = img.size
@@ -2034,8 +5360,28 @@ def process_sprite(input_path, output_path, target_size, species_id=None):
         new_w = min(new_w, fit_w)
         new_h = min(new_h, fit_h)
         # Majority-block shrink keeps folds; NEAREST alone drops them.
-        img_resized = resize_pixel_art(img, new_w, new_h)
-        img_resized = close_small_holes(img_resized, max_gap=2 if not is_back else 1)
+        # Gen3 backs: boost the light mid (cream stripes, pale belly) so
+        # majority vote does not bury it under body brown/green.
+        boost = None
+        if is_back and quantize_first and len(species_colors) >= 2:
+            boost = [species_colors[1]]
+        img_resized = resize_pixel_art(
+            img,
+            new_w,
+            new_h,
+            preserve_features=quantize_first,
+            boost_rgbs=boost,
+        )
+        if close_gap > 0:
+            img_resized = close_small_holes(img_resized, max_gap=close_gap)
+        if quantize_first:
+            img_resized = clean_midtone_bleed(
+                img_resized,
+                species_colors,
+                min_blob=int(opts.get("midtone_min_blob_small", 6)),
+            )
+            if opts.get("bridge_cracks", True):
+                img_resized = bridge_same_tone_cracks(img_resized, species_colors)
         if not is_back and do_stem:
             img_resized = thicken_narrow_stems(img_resized, min_width=7)
             if do_seal:
@@ -2049,7 +5395,18 @@ def process_sprite(input_path, output_path, target_size, species_id=None):
         else:
             y = (target_size[1] - new_h) // 2
         new_img.paste(img_resized, (x, y), img_resized)
-        new_img = close_small_holes(new_img, max_gap=2 if not is_back else 1)
+        if close_gap > 0:
+            new_img = close_small_holes(new_img, max_gap=close_gap)
+        if quantize_first:
+            new_img = clean_midtone_bleed(
+                new_img,
+                species_colors,
+                min_blob=int(opts.get("midtone_min_blob_small", 6)),
+            )
+            if opts.get("bridge_cracks", True):
+                new_img = bridge_same_tone_cracks(new_img, species_colors)
+            if opts.get("ink_midtone_seams", False):
+                new_img = ink_midtone_seams(new_img, species_colors)
         if not is_back and do_stem:
             if do_seal:
                 new_img = seal_outline_breaks(new_img)
@@ -2059,7 +5416,22 @@ def process_sprite(input_path, output_path, target_size, species_id=None):
         if do_depth:
             new_img = gen1_depth_pass(new_img, strong=is_back)
         if opts.get("lift_darks"):
-            new_img = lift_near_black_body(new_img)
+            lift_rgb = (56, 56, 88)
+            if opts.get("lift_rgb") and len(opts["lift_rgb"]) >= 3:
+                lift_rgb = tuple(int(v) for v in opts["lift_rgb"][:3])
+            elif opts.get("palette") and len(opts["palette"]) >= 2:
+                # Default: lift toward palette shade-1 body (index 1).
+                # Dark birds that put accent in slot 1 should set lift_rgb.
+                slot = int(opts.get("lift_palette_slot", 1))
+                slot = max(1, min(2, slot))
+                lift_rgb = tuple(int(v) for v in opts["palette"][slot][:3])
+            new_img = lift_near_black_body(
+                new_img,
+                lift_rgb=lift_rgb,
+                preserve_chroma_dither=bool(opts.get("preserve_dither", False)),
+            )
+            if opts.get("thin_outline"):
+                new_img = thin_double_outline(new_img, body_rgb=lift_rgb)
         new_img = drop_orphan_pixels(new_img, min_blob=orphan_min)
         if do_seal:
             new_img = seal_outline_breaks(new_img)
@@ -2068,6 +5440,16 @@ def process_sprite(input_path, output_path, target_size, species_id=None):
         elif outline_mode == "soft":
             new_img = ensure_contrast_outline(new_img, luma_floor=outline_luma)
         # outline_mode == "none": keep sealed silhouette only
+
+        # Mild stair chamfer on the rim (after outline so we round the final
+        # black edge, not pre-outline body stairs).
+        if opts.get("smooth_stairs", False):
+            new_img = smooth_silhouette_stairs(new_img, ink_only=True)
+
+        # Last: punch pupils into empty white eye blobs (after every pass that
+        # might otherwise swallow the 1px ink).
+        if quantize_first:
+            new_img = ensure_white_eye_pupils(new_img, species_colors)
 
         # Map pixels → DMG shades.  Accents keep hue; structure uses luma so
         # backs are not a flat green/white blob.
@@ -2084,8 +5466,21 @@ def process_sprite(input_path, output_path, target_size, species_id=None):
                     shade = shade_for_pixel(r, g, b, species_colors, mode=shade_mode)
                     indexed_img.putpixel((px_x, py), shade + 1)
 
-        if is_back:
-            indexed_img = dither_indexed_flats(indexed_img)
+        if opts.get("clean_accent"):
+            # Yellow/red accents land on shade 2 → PNG index 3 when body is shade 1.
+            accent_png = int(opts.get("accent_index", 3))
+            indexed_img = clean_indexed_accent_ink(
+                indexed_img, accent_index=accent_png, ink_index=4
+            )
+
+        # Sparse grit: backs default on; Gen 2 faithful sets flat_dither False.
+        do_flat = opts.get("flat_dither")
+        if do_flat is None:
+            do_flat = is_back
+        if do_flat:
+            indexed_img = dither_indexed_flats(
+                indexed_img, density=int(opts.get("flat_dither_density", 8))
+            )
 
         palette = [
             255, 255, 255,  # 0: Transparent
@@ -2098,6 +5493,462 @@ def process_sprite(input_path, output_path, target_size, species_id=None):
         indexed_img.putpalette(palette)
 
         os.makedirs(os.path.dirname(output_path), exist_ok=True)
+        indexed_img.save(output_path, transparency=0)
+        return True, species_colors
+    except Exception as e:
+        print(f"Failed processing sprite {input_path}: {e}")
+        return False, None
+
+
+def _normalize_palette(colors):
+    cols = [tuple(c[:3]) for c in (colors or [])[:4]]
+    while len(cols) < 4:
+        cols.append((0, 0, 0))
+    cols[0] = (255, 255, 255)
+    cols[3] = (0, 0, 0)
+    return cols
+
+
+def _process_sprite_gen3(input_path, output_path, target_size, opts, override=None):
+    """Gen 3 unified pipeline — Stage 0 analysis drives shade + stretch.
+
+    Stages:
+      0 Analyze   — palette + sat/luma metrics → decision record + style
+      1 Prep      — halo crop, quantize, freckle/crease/eye cleanup
+      2 Pre-dilate— fronts only when shrink is steep; backs per profile
+      3 Shrink    — majority-vote color + OR-pool ink mask
+      4 Compose   — paste, post-clean, depth, lift, outline
+      5 Shade     — body_mid (low_chroma) or nearest (normal);
+                    composite preserved ink as forced black
+      6 Finish    — eye re-punch, accent clean, dither, indexed PNG
+    """
+    override = override or {}
+    is_back = target_size == (32, 32)
+    try:
+        img = key_out_flat_background(Image.open(input_path))
+
+        # ---- Stage 0: Analyze ------------------------------------------------
+        # Seed colors for measurement; final palette may prefer the front sheet
+        # on backs so Advanced mode stays consistent with belly/stripe identity.
+        if override.get("palette"):
+            measure_colors = _normalize_palette(override["palette"])
+        else:
+            measure_colors = _normalize_palette(
+                extract_species_palette(img, stretch=False)
+            )
+
+        decision = analyze_sprite_decisions(img, measure_colors)
+        if is_back:
+            style_name = choose_gen3_back_style(img, decision, override)
+            opts = apply_gen3_back_style_profile(override, style_name)
+        else:
+            style_name = choose_gen3_style(img, decision, override)
+            opts = apply_gen3_style_profile(override, style_name)
+
+        if opts.get("palette"):
+            species_colors = _normalize_palette(opts["palette"])
+        elif is_back and opts.get("prefer_front_palette"):
+            species_colors = None
+            front_path = None
+            if input_path and "_back." in str(input_path):
+                front_path = str(input_path).replace("_back.", "_front.")
+            if front_path and os.path.exists(front_path):
+                try:
+                    front_img = key_out_flat_background(Image.open(front_path))
+                    species_colors = _normalize_palette(
+                        extract_species_palette(front_img, stretch=True)
+                    )
+                except Exception:
+                    species_colors = None
+            if not species_colors:
+                species_colors = _normalize_palette(
+                    extract_species_palette(img, stretch=True)
+                )
+        else:
+            species_colors = _normalize_palette(
+                extract_species_palette(img, stretch=False)
+            )
+
+        shade_mode = override.get("shade") or decision["shade_mode"]
+        needs_stretch = bool(decision["needs_contrast_stretch"])
+        # Hand-pinned shade wins; stretch still follows measurement unless
+        # the override explicitly disables it.
+        if "contrast_stretch" in override:
+            needs_stretch = bool(override["contrast_stretch"])
+
+        # Low-chroma metal/rock: creases + front depth + midtone seams read as
+        # freckle noise on flat brushed surfaces.  Keep them for chromatic mons.
+        # Back profiles that already set these win; only auto-clear on fronts.
+        if shade_mode == "body_mid" and not is_back:
+            if "structure_creases" not in override:
+                opts["structure_creases"] = False
+            if "depth" not in override:
+                opts["depth"] = False
+            if "ink_midtone_seams" not in override:
+                opts["ink_midtone_seams"] = False
+
+        # ---- Stage 1: Prep (full resolution) ---------------------------------
+        # Fronts: keep pre-framed Emerald 64×64 / 96×96 so 64→48 stays an
+        # exact 3/4 majority block.  Backs: always tight-crop padded sheets
+        # or the art shrinks to a postage stamp in 32×32.
+        sw, sh = img.size
+        do_tight_crop = bool(opts.get("tight_crop")) or not (
+            sw == sh and sw in (64, 96, 128)
+        )
+        if is_back:
+            do_tight_crop = True
+        if do_tight_crop:
+            bbox = img.getbbox()
+            if bbox:
+                l, t, r, b = bbox
+                l = max(0, l - 1)
+                t = max(0, t - 1)
+                r = min(img.size[0], r + 1)
+                b = min(img.size[1], b + 1)
+                img = img.crop((l, t, r, b))
+
+        src_for_creases = img.copy()
+        # Artist ink seams — extracted before quantize/shrink so majority-vote
+        # cannot erase 1px limb/plate boundaries.  OR-pooled later.
+        ink_mask = None
+        gap_mask = None
+        if opts.get("preserve_ink", True):
+            ink_mask = filter_ink_mask(
+                extract_ink_mask(
+                    src_for_creases,
+                    luma_max=int(opts.get("ink_luma_max", 48)),
+                    soft_luma_max=int(opts.get("ink_soft_luma_max", 62)),
+                    contrast_delta=int(opts.get("ink_contrast_delta", 26)),
+                ),
+                min_blob=int(opts.get("ink_mask_min_blob", 3)),
+            )
+        if opts.get("preserve_gaps", False) or opts.get("carve_seams", False):
+            gap_mask = extract_gap_mask(src_for_creases)
+
+        img = quantize_rgba_to_palette(img, species_colors)
+        # Fold palette-black into the ink mask — seams that snapped to ink
+        # during quantize but sat above the soft luma cut still count.
+        if ink_mask is not None:
+            ink_mask = _union_quantized_black_into_ink(
+                ink_mask, img, species_colors
+            )
+            ink_mask = filter_ink_mask(
+                ink_mask, min_blob=int(opts.get("ink_mask_min_blob", 3))
+            )
+            if opts.get("carve_seams", False):
+                # Optional aggressive cutouts — off for plated (eats toes/arms).
+                # Kept for experiments / future delicate multi-leg work.
+                img, gap_mask, ink_mask = open_limb_gaps_along_ink(
+                    img,
+                    ink_mask,
+                    gap_mask,
+                    max_steps=int(opts.get("gap_grow_steps", 8)),
+                )
+                img, ink_mask = ink_gap_rims(img, gap_mask, ink_mask)
+            elif opts.get("reinforce_seams", False) or opts.get(
+                "preserve_gaps", False
+            ):
+                # Plated default: thicken body↔body ink so joins stay black
+                # after shrink, without carving the silhouette open.
+                img, ink_mask = reinforce_interior_ink(img, ink_mask)
+                if gap_mask is not None:
+                    img, ink_mask = ink_gap_rims(img, gap_mask, ink_mask)
+
+        img = clean_quantized_freckles(
+            img,
+            species_colors,
+            min_accent=int(opts.get("min_accent", 14)),
+        )
+        # Midtone bleed dissolves thin cream stripes into body brown — skip
+        # for patterned mons (and when carving seams open).
+        if not opts.get("carve_seams", False) and not opts.get(
+            "skip_midtone_bleed", False
+        ):
+            img = clean_midtone_bleed(
+                img,
+                species_colors,
+                min_blob=int(opts.get("midtone_min_blob", 10)),
+            )
+        if opts.get("structure_creases", False):
+            img = ink_structure_creases(
+                img,
+                src_for_creases,
+                species_colors,
+                dark_ratio=float(opts.get("crease_dark_ratio", 0.70)),
+                min_contrast=int(opts.get("crease_min_contrast", 26)),
+                valley_delta=int(opts.get("crease_valley_delta", 20)),
+            )
+        if opts.get("ink_midtone_seams", False):
+            img = ink_midtone_seams(img, species_colors)
+        img = ensure_white_eye_pupils(img, species_colors)
+
+        w, h = img.size
+        is_back = target_size == (32, 32)
+        clip = BACK_BOTTOM_CLIP if is_back else 0
+        fit_w = target_size[0]
+        fit_h = target_size[1] + clip
+        close_gap = int(opts.get("close_gap", 1))
+        do_dilate = bool(opts.get("dilate", False))
+        do_stem = bool(opts.get("stem", True))
+        do_depth = bool(opts.get("depth", False))
+        do_seal = bool(opts.get("seal", True))
+        outline_mode = opts.get("outline", "soft")
+        outline_luma = int(opts.get("outline_luma", 110))
+        orphan_min = int(opts.get("orphan_min", 2))
+
+        # Back survival knobs live in GEN3_BACK_* profiles — do not clobber
+        # plated/patterned choices with the old hard-coded 32×32 stack.
+        if not is_back:
+            close_gap = min(1, close_gap)
+        else:
+            close_gap = min(2, close_gap)
+
+        # Stem width scales with canvas — 7 on 56px only; thinner on 48.
+        if is_back:
+            stem_min = 6
+        elif fit_w >= 56:
+            stem_min = 7
+        elif fit_w >= 48:
+            stem_min = 6
+        else:
+            stem_min = 5
+
+        # ---- Stage 2: Pre-dilate (backs always if enabled; fronts only ≥1.4×)
+        shrink_ratio = max(w / float(fit_w), h / float(fit_h))
+        shrink_steep = shrink_ratio >= 1.4
+        if do_dilate and (is_back or shrink_steep):
+            img = dilate_opaque(img)
+            img = close_small_holes(img, max_gap=1)
+            w, h = img.size
+
+        # ---- Stage 3: Shrink -------------------------------------------------
+        ratio = min(fit_w / w, fit_h / h)
+        new_w = min(fit_w, max(1, int(round(w * ratio))))
+        new_h = min(fit_h, max(1, int(round(h * ratio))))
+        face_mask = None if is_back else build_face_priority_mask(img)
+        boost = [species_colors[2]]
+        boost_weight = 8
+        if opts.get("boost_light_mid") and len(species_colors) >= 2:
+            boost = [species_colors[1], species_colors[2]]
+            boost_weight = 14
+        img_resized = resize_pixel_art(
+            img,
+            new_w,
+            new_h,
+            preserve_features=True,
+            boost_rgbs=boost,
+            boost_mask=face_mask,
+            preserve_gaps=bool(opts.get("preserve_gaps", False)),
+            gap_mask=gap_mask,
+            boost_weight=boost_weight,
+        )
+        ink_resized = None
+        if ink_mask is not None:
+            ink_resized = resize_ink_mask_or(ink_mask, new_w, new_h)
+        gap_resized = None
+        if gap_mask is not None:
+            gap_resized = resize_ink_mask_or(gap_mask, new_w, new_h)
+            img_resized = carve_gap_mask(img_resized, gap_resized)
+        if close_gap > 0:
+            img_resized = close_small_holes(img_resized, max_gap=close_gap)
+        if not opts.get("carve_seams", False) and not opts.get(
+            "skip_midtone_bleed", False
+        ):
+            img_resized = clean_midtone_bleed(
+                img_resized,
+                species_colors,
+                min_blob=int(opts.get("midtone_min_blob_small", 6)),
+            )
+        if opts.get("bridge_cracks", True):
+            img_resized = bridge_same_tone_cracks(img_resized, species_colors)
+        if do_stem:
+            img_resized = thicken_narrow_stems(img_resized, min_width=stem_min)
+            if do_seal:
+                img_resized = seal_outline_breaks(img_resized)
+
+        # ---- Stage 4: Compose ------------------------------------------------
+        new_img = Image.new("RGBA", target_size, (255, 255, 255, 0))
+        x = (target_size[0] - new_w) // 2
+        if is_back:
+            y = target_size[1] - new_h + clip
+        else:
+            y = (target_size[1] - new_h) // 2
+        new_img.paste(img_resized, (x, y), img_resized)
+
+        # Place OR-pooled ink / gaps on the canvas at the same origin as the art.
+        ink_canvas = None
+        if ink_resized is not None:
+            ink_canvas = Image.new("1", target_size, 0)
+            ink_canvas.paste(ink_resized, (x, y))
+        gap_canvas = None
+        if gap_resized is not None:
+            gap_canvas = Image.new("1", target_size, 0)
+            gap_canvas.paste(gap_resized, (x, y))
+            new_img = carve_gap_mask(new_img, gap_canvas)
+
+        if close_gap > 0:
+            new_img = close_small_holes(new_img, max_gap=close_gap)
+        if not opts.get("carve_seams", False) and not opts.get(
+            "skip_midtone_bleed", False
+        ):
+            new_img = clean_midtone_bleed(
+                new_img,
+                species_colors,
+                min_blob=int(opts.get("midtone_min_blob_small", 6)),
+            )
+        if opts.get("bridge_cracks", True):
+            new_img = bridge_same_tone_cracks(new_img, species_colors)
+        if opts.get("ink_midtone_seams", False):
+            new_img = ink_midtone_seams(new_img, species_colors)
+        # Second stem pass: backs only (or extremely steep fronts).  Front
+        # double-stem is what turns limbs into sausages.
+        if is_back and do_stem and do_seal:
+            new_img = seal_outline_breaks(new_img)
+            new_img = thicken_narrow_stems(new_img, min_width=stem_min)
+        elif shrink_steep and do_stem and do_seal and not is_back:
+            new_img = seal_outline_breaks(new_img)
+
+        if do_depth:
+            new_img = gen1_depth_pass(new_img, strong=is_back)
+        elif is_back:
+            # Low-chroma fronts disable depth; backs still need volume.
+            new_img = gen1_depth_pass(new_img, strong=True)
+        if opts.get("lift_darks"):
+            lift_rgb = (56, 56, 88)
+            if opts.get("lift_rgb") and len(opts["lift_rgb"]) >= 3:
+                lift_rgb = tuple(int(v) for v in opts["lift_rgb"][:3])
+            elif opts.get("palette") and len(opts["palette"]) >= 2:
+                slot = int(opts.get("lift_palette_slot", 1))
+                slot = max(1, min(2, slot))
+                lift_rgb = tuple(int(v) for v in opts["palette"][slot][:3])
+            new_img = lift_near_black_body(
+                new_img,
+                lift_rgb=lift_rgb,
+                preserve_chroma_dither=bool(opts.get("preserve_dither", False)),
+            )
+            if opts.get("thin_outline"):
+                new_img = thin_double_outline(new_img, body_rgb=lift_rgb)
+
+        new_img = drop_orphan_pixels(new_img, min_blob=orphan_min)
+        if do_seal:
+            new_img = seal_outline_breaks(new_img)
+        if outline_mode == "full":
+            new_img = ensure_selective_outline(new_img)
+        elif outline_mode == "soft":
+            new_img = ensure_contrast_outline(new_img, luma_floor=outline_luma)
+        if opts.get("smooth_stairs", True):
+            new_img = smooth_silhouette_stairs(new_img, ink_only=True)
+
+        # Stage 6 lead-in: re-punch pupils after outline/depth may have eaten them.
+        new_img = ensure_white_eye_pupils(new_img, species_colors)
+
+        # Re-apply artist ink LAST so no prior pass can erase plate/limb seams.
+        # only_opaque keeps intentional gaps (Metagross armpits) open.
+        if ink_canvas is not None:
+            new_img = composite_ink_mask(new_img, ink_canvas, only_opaque=True)
+        # Re-carve gaps after ink so OR-pooled ink cannot re-clog limb joins.
+        if gap_canvas is not None:
+            new_img = carve_gap_mask(new_img, gap_canvas)
+        if ink_canvas is not None or gap_canvas is not None:
+            # Stricter second eye pass after forced ink / gap carve.
+            new_img = ensure_white_eye_pupils(
+                new_img, species_colors, max_blob=14, max_bw=6, max_bh=5
+            )
+        else:
+            new_img = ensure_white_eye_pupils(
+                new_img, species_colors, max_blob=16, max_bw=7, max_bh=5
+            )
+
+        # Contrast stretch AFTER downscale (edge case 2) so majority-vote
+        # worked on natural gradients.  Curated hand palettes skip stretch
+        # unless contrast_stretch is explicitly True in the override.
+        if needs_stretch and not override.get("palette"):
+            species_colors = stretch_palette_contrast(species_colors)
+        elif override.get("contrast_stretch"):
+            species_colors = stretch_palette_contrast(species_colors)
+
+        # ---- Stage 5: Shade mapping -----------------------------------------
+        px = new_img.load()
+        indexed_img = Image.new("P", target_size, 0)
+        for py in range(target_size[1]):
+            for px_x in range(target_size[0]):
+                r, g, b, a = px[px_x, py]
+                if a < 128:
+                    indexed_img.putpixel((px_x, py), 0)
+                elif r + g + b < 24:
+                    indexed_img.putpixel((px_x, py), 4)
+                else:
+                    shade = shade_for_pixel(r, g, b, species_colors, mode=shade_mode)
+                    indexed_img.putpixel((px_x, py), shade + 1)
+
+        # Belt-and-suspenders: ink mask wins over shade choices on those pixels.
+        if ink_canvas is not None:
+            indexed_img = force_indexed_ink(indexed_img, ink_canvas)
+
+        # ---- Stage 6: Finish -------------------------------------------------
+        if opts.get("clean_accent"):
+            accent_png = int(opts.get("accent_index", 3))
+            indexed_img = clean_indexed_accent_ink(
+                indexed_img, accent_index=accent_png, ink_index=4
+            )
+
+        do_flat = opts.get("flat_dither")
+        if do_flat is None:
+            do_flat = is_back
+        if do_flat:
+            indexed_img = dither_indexed_flats(
+                indexed_img, density=int(opts.get("flat_dither_density", 8))
+            )
+
+        palette = [
+            255, 255, 255,  # 0: Transparent
+            255, 255, 255,  # 1: White
+            170, 170, 170,  # 2: Light Gray
+            85, 85, 85,     # 3: Dark Gray
+            0, 0, 0,        # 4: Black
+        ]
+        palette += [0] * (768 - len(palette))
+        indexed_img.putpalette(palette)
+
+        # Readability self-check: if the primary front bake is muddy, retry
+        # with the soft option set and keep whichever scores higher.
+        if (
+            not is_back
+            and not opts.get("_gen3_soft")
+            and opts.get("readable_fallback", True)
+        ):
+            score = indexed_readability_score(
+                indexed_readability_metrics(indexed_img)
+            )
+            if score < 0:
+                soft_opts = dict(opts)
+                soft_opts.update(GEN3_SOFT_FALLBACK)
+                soft_opts.update(override)
+                soft_opts["_gen3_soft"] = True
+                tmp_path = output_path + ".soft.tmp.png"
+                ok2, colors2 = _process_sprite_gen3(
+                    input_path,
+                    tmp_path,
+                    target_size,
+                    soft_opts,
+                    override=override,
+                )
+                if ok2:
+                    try:
+                        soft_img = Image.open(tmp_path)
+                        score2 = indexed_readability_score(
+                            indexed_readability_metrics(soft_img)
+                        )
+                        if score2 > score:
+                            os.replace(tmp_path, output_path)
+                            return True, colors2
+                    finally:
+                        try:
+                            os.remove(tmp_path)
+                        except OSError:
+                            pass
+
+        os.makedirs(os.path.dirname(output_path) or ".", exist_ok=True)
         indexed_img.save(output_path, transparency=0)
         return True, species_colors
     except Exception as e:
@@ -2121,6 +5972,20 @@ def front_size_for_height_dm(height_dm):
 def front_size_for_dex_entry(height_ft, height_in):
     inches = (height_ft or 0) * 12 + (height_in or 0)
     return front_size_for_height_dm(inches / 3.937)
+
+
+def resolve_front_size(height_ft, height_in, species_id=None, dex=None):
+    """Height bucket, then SPRITE_OVERRIDES front_size, then Gen2/3 floor.
+
+    Gen 2/3 faithful path benefits from a 48px floor so eyes/jaws survive.
+    """
+    front_size = front_size_for_dex_entry(height_ft, height_in)
+    opts = sprite_override(species_id) if species_id else {}
+    if opts.get("front_size"):
+        front_size = int(opts["front_size"])
+    elif dex is not None and (is_gen2_dex(dex) or is_gen3_dex(dex)):
+        front_size = max(front_size, 6)
+    return max(5, min(7, front_size))
 
 
 def front_canvas_px(front_size):
@@ -2216,13 +6081,14 @@ def ensure_palette_field(body, species_id):
     return f'    palette = "{species_id}",\n' + body
 
 
-def resprite_kanto_reforged(outdir, only=None):
+def resprite_kanto_reforged(outdir, only=None, gen=None):
     """Re-bake front sprites from the PokéAPI cache using height-based
     frontSize, and rewrite frontSize fields in pokemon_data.lua.
     Does not re-fetch species tables.
 
     `only` is an optional set of SPECIES_IDs to process (others keep current
     assets / palette entries).
+    `gen` is 2 or 3 to limit by dex band (152–251 / 252–386).
     """
     import re
 
@@ -2260,11 +6126,19 @@ def resprite_kanto_reforged(outdir, only=None):
             continue
 
         dex = int(dex_m.group(1))
-        front_size = front_size_for_dex_entry(int(ft_m.group(1)), int(in_m.group(1)))
+        front_size = resolve_front_size(
+            int(ft_m.group(1)), int(in_m.group(1)), species_id=name, dex=dex
+        )
         counts[front_size] = counts.get(front_size, 0) + 1
         canvas = front_canvas_px(front_size)
 
         if only_set is not None and name not in only_set:
+            out_parts.append(f"\n  {name} = {{{body}")
+            continue
+        if gen == 2 and not (152 <= dex <= 251):
+            out_parts.append(f"\n  {name} = {{{body}")
+            continue
+        if gen == 3 and not (252 <= dex <= 386):
             out_parts.append(f"\n  {name} = {{{body}")
             continue
 
@@ -2274,7 +6148,8 @@ def resprite_kanto_reforged(outdir, only=None):
         back_mod = os.path.join(outdir, "assets", f"{name.lower()}_back.png")
         if os.path.exists(front_cache):
             ok, colors = process_sprite(
-                front_cache, front_mod, (canvas, canvas), species_id=name,
+                front_cache, front_mod, (canvas, canvas),
+                species_id=name, dex=dex,
             )
             if ok:
                 resprited += 1
@@ -2287,7 +6162,8 @@ def resprite_kanto_reforged(outdir, only=None):
 
         if os.path.exists(back_cache):
             ok_b, colors_b = process_sprite(
-                back_cache, back_mod, (32, 32), species_id=name,
+                back_cache, back_mod, (32, 32),
+                species_id=name, dex=dex,
             )
             if ok_b and colors_b and name not in species_palettes:
                 species_palettes[name] = colors_b
@@ -2300,10 +6176,15 @@ def resprite_kanto_reforged(outdir, only=None):
                 f_mod = os.path.join(outdir, "assets", f"castform_{form_suffix}_front.png")
                 b_mod = os.path.join(outdir, "assets", f"castform_{form_suffix}_back.png")
                 if os.path.exists(f_cache):
-                    process_sprite(f_cache, f_mod, (canvas, canvas), species_id=name)
+                    process_sprite(
+                        f_cache, f_mod, (canvas, canvas),
+                        species_id=name, dex=form_dex,
+                    )
                 if os.path.exists(b_cache):
-                    process_sprite(b_cache, b_mod, (32, 32), species_id=name)
-
+                    process_sprite(
+                        b_cache, b_mod, (32, 32),
+                        species_id=name, dex=form_dex,
+                    )
         body = re.sub(r'frontSize\s*=\s*\d+', f'frontSize = {front_size}', body, count=1)
         if not re.search(r'frontSize\s*=', body):
             if re.search(r'spriteBack\s*=', body):
@@ -2330,6 +6211,8 @@ def resprite_kanto_reforged(outdir, only=None):
         print(f"Wrote {len(species_palettes)} species palettes")
 
     scope = f"only {sorted(only_set)}" if only_set else "all"
+    if gen:
+        scope = f"gen{gen}" + (f" {scope}" if only_set else "")
     print(
         f"Resprited {resprited} fronts by dex height ({scope}) "
         f"(5={counts.get(5,0)} 6={counts.get(6,0)} 7={counts.get(7,0)})"
@@ -2577,6 +6460,11 @@ def main():
         help="Only regenerate Kanto Gen 3 ability patches (no species/sprites)",
     )
     parser.add_argument(
+        "--special-stat-patches-only",
+        action="store_true",
+        help="Only regenerate Kanto SpA/SpD patches for the SP.ATK/SP.DEF toggle",
+    )
+    parser.add_argument(
         "--gender-patches-only",
         action="store_true",
         help="Only regenerate genderRate patches for dex 1-386 (no species/sprites)",
@@ -2605,6 +6493,14 @@ def main():
         help="Comma-separated SPECIES_IDs to resprite (requires --resprite). "
              "Example: --resprite --only LUNATONE,MURKROW,SABLEYE",
     )
+    parser.add_argument(
+        "--gen",
+        type=int,
+        choices=[2, 3],
+        default=None,
+        help="With --resprite, only bake that generation (2=Johto 152–251, "
+             "3=Hoenn 252–386). Gen 2 defaults to Crystal-faithful quantize.",
+    )
     args = parser.parse_args()
     
     os.makedirs(args.outdir, exist_ok=True)
@@ -2615,7 +6511,7 @@ def main():
 
     if args.resprite:
         only = [s.strip() for s in args.only.split(",") if s.strip()] or None
-        resprite_kanto_reforged(args.outdir, only=only)
+        resprite_kanto_reforged(args.outdir, only=only, gen=args.gen)
         return
 
     if args.ability_patches_only:
@@ -2626,6 +6522,16 @@ def main():
             ability_patches,
         )
         print(f"Done: {len(ability_patches)} Kanto ability patches")
+        return
+
+    if args.special_stat_patches_only:
+        print("Collecting SpA/SpD patches for Kanto species...")
+        special_patches = collect_special_stat_patches(1, 151)
+        write_special_stat_patches_lua(
+            os.path.join(args.outdir, "special_stat_patches.lua"),
+            special_patches,
+        )
+        print(f"Done: {len(special_patches)} Kanto SpA/SpD patches")
         return
 
     if args.gender_patches_only:
@@ -2759,8 +6665,13 @@ def main():
                 back_url = poke_data["sprites"].get("back_default")
                 
             # Process sprites — canvas size follows Gen 1 frontSize buckets
-            # derived from dex height (not always 56x56).
-            front_size = front_size_for_height_dm(poke_data.get("height") or 0)
+            # (height + Gen2/3 floor + per-species override).
+            h_dm = poke_data.get("height") or 0
+            inches = h_dm * 3.937
+            front_size = resolve_front_size(
+                int(inches // 12), int(round(inches % 12)),
+                species_id=p_name, dex=pid,
+            )
             front_px = front_canvas_px(front_size)
 
             front_cache_path = os.path.join("tools", ".cache", "sprites", f"{pid}_front.png")
@@ -2773,14 +6684,14 @@ def main():
             if front_url and download_sprite_file(front_url, front_cache_path):
                 ok, colors = process_sprite(
                     front_cache_path, front_mod_path, (front_px, front_px),
-                    species_id=p_name,
+                    species_id=p_name, dex=pid,
                 )
                 if ok and colors:
                     species_palette = colors
             if back_url and download_sprite_file(back_url, back_cache_path):
                 ok_b, colors_b = process_sprite(
                     back_cache_path, back_mod_path, (32, 32),
-                    species_id=p_name,
+                    species_id=p_name, dex=pid,
                 )
                 if ok_b and colors_b and not species_palette:
                     species_palette = colors_b
@@ -2811,12 +6722,12 @@ def main():
                     if form_front and download_sprite_file(form_front, f_front_cache):
                         process_sprite(
                             f_front_cache, f_front_mod, (front_px, front_px),
-                            species_id=p_name,
+                            species_id=p_name, dex=form_id,
                         )
                     if form_back and download_sprite_file(form_back, f_back_cache):
                         process_sprite(
                             f_back_cache, f_back_mod, (32, 32),
-                            species_id=p_name,
+                            species_id=p_name, dex=form_id,
                         )
                         
             # Moves and level-up learnset (remap Gen 1 ids to engine names)
@@ -2943,6 +6854,12 @@ def main():
         if filtered:
             evolutions_map[species_id] = filtered
         else:
+            evolutions_map.pop(species_id, None)
+
+    # Drop evolution *sources* outside Gen 1–3 (Gen 4 babies like Bonsly).
+    # Keeping those edges would mark adults as mid-stage with no catchable baby.
+    for species_id in list(evolutions_map.keys()):
+        if species_id not in allowed_species:
             evolutions_map.pop(species_id, None)
 
     # 2. Fetch custom types and generate matchups

@@ -251,7 +251,7 @@ T.check(cardOk and type(card) == "table", "mod.card returns a table")
 T.check(type(card.summary) == "string" and #card.summary > 0, "mod.card has a summary")
 T.check(card.author ~= nil and card.author ~= "", "mod.card names an author")
 local schema = run.loader.optionSchemas["Kanto-Reforged"]
-T.check(schema ~= nil and #schema >= 3, "Kanto-Reforged option schema registered")
+T.check(schema ~= nil and #schema >= 5, "Kanto-Reforged option schema registered")
 T.eq(schema[1].key, "full_spawn_random", "spawn toggle key")
 T.eq(schema[1].type, "toggle", "spawn toggle is a toggle")
 T.eq(schema[1].default, false, "FULL SPAWN MIX defaults off")
@@ -262,6 +262,14 @@ T.eq(schema[2].label, "XP SHARE (SLOT 2)", "slot-2 XP share label")
 T.eq(schema[3].key, "smarter_ai", "smarter AI toggle key")
 T.eq(schema[3].type, "toggle", "smarter AI is a toggle")
 T.eq(schema[3].default, true, "SMARTER AI defaults on")
+T.eq(schema[4].key, "split_special", "split special toggle key")
+T.eq(schema[4].type, "toggle", "split special is a toggle")
+T.eq(schema[4].default, false, "SP.ATK / SP.DEF defaults off")
+T.eq(schema[4].label, "SP.ATK / SP.DEF", "split special label")
+T.eq(schema[5].key, "dexnav_mode", "DexNav mode key")
+T.eq(schema[5].type, "choice", "DexNav mode is a choice")
+T.eq(schema[5].default, "dexnav", "DexNav defaults to DEXNAV label")
+T.eq(schema[5].label, "DEXNAV", "DexNav option label")
 
 -- Full Gen1–3 random mode rewrites unprotected slots from baselines
 local apiShim = {
@@ -310,8 +318,60 @@ for _, slot in ipairs(curatedAgain) do
     if meta then T.eq(meta.stage, 0, "curated Route 1 stays base forms") end
   end
 end
-T.check(curatedMixed >= 1 and curatedMixed <= 3,
-  "curated mode only mixes a few Route 1 slots")
+T.check(curatedMixed >= 1 and curatedMixed <= 10,
+  "curated mode mixes a bounded set of Route 1 slots")
+
+-- Coverage pass: every non-legendary pack line is obtainable — catch a
+-- base (or gift/rod root), then evolve / breed. Mid/finals need not all
+-- appear in grass. Shedinja stays NEVER_WILD via Nincada.
+do
+  local wild = {}
+  for mapId, enc in pairs(Data.encounters) do
+    for _, block in pairs(enc) do
+      if type(block) == "table" and block.slots then
+        for _, slot in ipairs(block.slots) do
+          if slot.species then wild[slot.species] = true end
+        end
+      end
+    end
+  end
+  local missing = {}
+  for id, meta in pairs(encIndex.meta) do
+    if meta.stage == 0 and not meta.rare and not wild[id] then
+      missing[#missing + 1] = id
+    end
+  end
+  table.sort(missing)
+  T.eq(#missing, 0,
+    "curated coverage places every non-legendary base (missing: "
+      .. table.concat(missing, ",") .. ")")
+  T.check(wild.ARON, "Aron has a curated wild slot for Pokédex AREA")
+
+  local unobtainable = {}
+  for id, _ in pairs(packData.species) do
+    local meta = encIndex.meta[id]
+    local rare = meta and meta.rare
+    if ExpEncounters.NEVER_WILD[id] then
+      if not ExpEncounters.lineObtainable(id, encIndex, wild) then
+        unobtainable[#unobtainable + 1] = id
+      end
+    elseif not rare and not ExpEncounters.lineObtainable(id, encIndex, wild) then
+      unobtainable[#unobtainable + 1] = id
+    end
+  end
+  table.sort(unobtainable)
+  T.eq(#unobtainable, 0,
+    "every non-legendary line is obtainable via wild/gift/rod + evo (missing: "
+      .. table.concat(unobtainable, ",") .. ")")
+  T.eq(encIndex.meta.SUDOWOODO.stage, 0,
+    "Sudowoodo is a wild base (Gen4 baby parent ignored)")
+  T.check(ExpEncounters.lineObtainable("ESPEON", encIndex, wild),
+    "Espeon obtainable via Eevee gift")
+  T.check(ExpEncounters.lineObtainable("POLITOED", encIndex, wild),
+    "Politoed obtainable via Good Rod Poliwag line")
+  T.check(ExpEncounters.lineObtainable("SHEDINJA", encIndex, wild),
+    "Shedinja obtainable via wild Nincada")
+end
 
 -- Early maps: no evolved forms at all
 for _, mapId in ipairs({ "ROUTE_1", "ROUTE_2", "ROUTE_22", "VIRIDIAN_FOREST", "MT_MOON_1F" }) do
@@ -801,10 +861,48 @@ T.eq(Data.moves.BELLY_DRUM.effect, "EXP_BELLY_DRUM_EFFECT", "Belly Drum register
 T.eq(Data.moves.EXTREME_SPEED.priority, 2, "Extreme Speed has priority +2")
 T.eq(Data.moves.DRAGON_DANCE.effect, "EXP_STAT_CHANGES_EFFECT", "Dragon Dance multi-stat setup")
 T.check(Data.moves.DRAGON_DANCE.statChanges ~= nil, "Dragon Dance carries statChanges")
+-- Foe drops (Rock Tomb / Snarl) must not be tagged as self-stat USER_STAT effects.
+T.eq(Data.moves.ROCK_TOMB.effect, "EXP_DAMAGE_STAT_SIDE_EFFECT",
+  "Rock Tomb is a foe Speed drop, not a user-stat move")
+T.eq(Data.moves.ROCK_TOMB.statTarget, "target", "Rock Tomb statTarget is the foe")
+T.eq(Data.moves.ROCK_TOMB.statChance, 100, "Rock Tomb always drops Speed")
+T.eq(Data.moves.SNARL.effect, "EXP_DAMAGE_STAT_SIDE_EFFECT",
+  "Snarl is a foe Special drop, not a user-stat move")
+T.eq(Data.moves.SNARL.statTarget, "target", "Snarl statTarget is the foe")
+T.eq(Data.moves.OVERHEAT.effect, "EXP_DAMAGE_USER_STAT_EFFECT",
+  "Overheat still lowers the user's Special")
+T.eq(Data.moves.OVERHEAT.statTarget, "user", "Overheat statTarget is the user")
 T.eq(Data.moves.WILL_O_WISP.effect, "EXP_BURN_EFFECT", "Will-O-Wisp burns")
 T.check(Data.move_effects.EXP_WEATHER_SUNNY ~= nil, "EXP weather effect registered")
 T.check(Data.move_effects.EXP_PROTECT_EFFECT ~= nil, "EXP protect effect registered")
 T.check(Data.move_effects.EXP_BELLY_DRUM_EFFECT ~= nil, "EXP belly drum effect registered")
+
+-- Rock Tomb / Snarl side effects apply stages to the target, not the user.
+do
+  local user = {
+    name = "Aron", isPlayer = true, mon = {}, stages = { speed = 0, special = 0 },
+  }
+  local foe = {
+    name = "Foe", isPlayer = false, mon = {}, stages = { speed = 0, special = 0 },
+  }
+  local function stageCtx(move)
+    return {
+      user = user, target = foe, move = move,
+      battle = {},
+      rng = function() return 0 end, -- always pass the chance roll
+      changeStage = function(who, stat, delta)
+        who.stages[stat] = (who.stages[stat] or 0) + delta
+        return { "stage" }
+      end,
+    }
+  end
+  Data.move_effects.EXP_DAMAGE_STAT_SIDE_EFFECT.run(stageCtx(Data.moves.ROCK_TOMB))
+  T.eq(foe.stages.speed, -1, "Rock Tomb lowers foe Speed")
+  T.eq(user.stages.speed, 0, "Rock Tomb does not lower user Speed")
+  Data.move_effects.EXP_DAMAGE_STAT_SIDE_EFFECT.run(stageCtx(Data.moves.SNARL))
+  T.eq(foe.stages.special, -1, "Snarl lowers foe Special")
+  T.eq(user.stages.special, 0, "Snarl does not lower user Special")
+end
 
 -- Protect forces an accuracy miss
 local protHit = Runtime.call("battle.accuracy", function(c) return true end, {
@@ -1756,6 +1854,7 @@ require("mods.Kanto-Reforged.tests.rollout_test")(T, Data, run)
 require("mods.Kanto-Reforged.tests.move_anims_test")(T, Data, run)
 require("mods.Kanto-Reforged.tests.species_icons_test")(T, Data, run)
 require("mods.Kanto-Reforged.tests.modern_xp_share_test")(T, Data, run)
+require("mods.Kanto-Reforged.tests.split_special_test")(T, Data, run)
 require("mods.Kanto-Reforged.tests.trainer_ai_test")(T, Data, run)
 require("mods.Kanto-Reforged.tests.level_caps_test")(T, Data, run)
 

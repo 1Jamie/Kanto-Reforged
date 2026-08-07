@@ -4,6 +4,9 @@
 --   * Mid / final forms only when the slot level is at (or above) the
 --     evolve-into level, and the route's level band allows that stage.
 --   * Legendaries / mythicals stay in rare slots only.
+--   * Curated mode finishes with a coverage pass so every non-legendary
+--     line is obtainable: catch the base (or an earlier stage), then evolve
+--     / breed. Not every mid/final needs its own wild slot.
 
 local Encounters = {}
 
@@ -46,8 +49,8 @@ local MAPS = {
   MT_MOON_1F = { habitats = { "cave" }, kinds = { "grass" } },
   MT_MOON_B1F = { habitats = { "cave" }, kinds = { "grass" } },
   MT_MOON_B2F = { habitats = { "cave" }, kinds = { "grass" } },
-  ROCK_TUNNEL_1F = { habitats = { "cave" }, kinds = { "grass" } },
-  ROCK_TUNNEL_B1F = { habitats = { "cave" }, kinds = { "grass" } },
+  ROCK_TUNNEL_1F = { habitats = { "cave", "mountain" }, kinds = { "grass" } },
+  ROCK_TUNNEL_B1F = { habitats = { "cave", "mountain" }, kinds = { "grass" } },
   VICTORY_ROAD_1F = { habitats = { "cave", "mountain" }, kinds = { "grass" } },
   VICTORY_ROAD_2F = { habitats = { "cave", "mountain" }, kinds = { "grass" } },
   VICTORY_ROAD_3F = { habitats = { "cave", "mountain" }, kinds = { "grass" } },
@@ -62,7 +65,16 @@ local MAPS = {
 }
 
 local NEVER_WILD = {
-  SHEDINJA = true, -- only via Nincada evolution
+  SHEDINJA = true, -- only via Nincada evolution (Nincada must stay wild)
+}
+
+-- Gen 4+ baby stubs may appear in pokemon_data.evolutions without a species
+-- row. Counting them as parents wrongly marks Sudowoodo / Mantine / etc. as
+-- mid-stage so curated coverage never places the adult. Vanilla Gen 1 parents
+-- (Eevee, Chansey, …) are kept so Gen 2/3 evolutions stay staged correctly.
+local SKIP_EVO_PARENTS = {
+  BONSLY = true, BUDEW = true, CHINGLING = true, MANTYKE = true,
+  MIMEJR = true, MIME_JR = true, HAPPINY = true, MUNCHLAX = true,
 }
 
 local function baseStatTotal(spec)
@@ -78,6 +90,7 @@ function Encounters.buildIndex(pokemon_data)
 
   local function noteEvo(fromId, evo)
     if not evo or not evo.species then return end
+    if SKIP_EVO_PARENTS[fromId] then return end
     parents[evo.species] = fromId
     if evo.method == "LEVEL" and evo.level then
       local prev = minInto[evo.species]
@@ -313,7 +326,177 @@ local function applyMinLevel(index, slot, speciesId)
   end
 end
 
--- Curated: replace a few slots with Gen 2/3 (default).
+-- Count Gen 2/3 species currently sitting in mixed maps (for coverage).
+local function countGen23Placements(mod, index)
+  local counts = {}
+  for mapId, mapDef in pairs(MAPS) do
+    local enc = mod.content.encounters:get(mapId)
+    if enc then
+      for _, kind in ipairs(mapDef.kinds) do
+        local block = enc[kind]
+        if block and block.slots then
+          for _, slot in ipairs(block.slots) do
+            local id = slot.species
+            if id and index.meta[id] then
+              counts[id] = (counts[id] or 0) + 1
+            end
+          end
+        end
+      end
+    end
+  end
+  return counts
+end
+
+-- Extra slot indices used only when the normal curated plan cannot host every
+-- stage-0 form. Prefer mid-table commons; never touch vanilla-protected rares.
+local COVERAGE_OVERFLOW_SLOTS = { 1, 2, 4, 5, 7, 8, 10 }
+
+-- After the stride-based curated mix, guarantee every non-legendary base form
+-- in this pack has at least one wild slot. Mid / final forms do not need their
+-- own grass entries when the base is catchable (evolve / breed from there).
+-- Legendaries stay rare-slot only; Shedinja stays NEVER_WILD (from Nincada).
+--
+-- Never demote a Gen 2/3 species that only has one slot. Prefer vanilla
+-- commons, then duplicate Gen 2/3 picks.
+local function ensureBaseCoverage(mod, index)
+  local mapIds = {}
+  for id in pairs(MAPS) do mapIds[#mapIds + 1] = id end
+  table.sort(mapIds)
+
+  local function habitatMatch(mapDef, habitat)
+    for _, hab in ipairs(mapDef.habitats) do
+      if hab == habitat then return true end
+    end
+    return false
+  end
+
+  local function stealScore(counts, speciesId)
+    if not speciesId or VANILLA_RARES[speciesId] then return -1 end
+    local meta = index.meta[speciesId]
+    if meta and meta.rare then return -1 end -- keep legendary / mythical slots
+    if not meta then return 100 end -- vanilla common
+    return counts[speciesId] or 0
+  end
+
+  -- minScore: 2 = duplicates only; 1 = allow unique demotion (last resort unused);
+  -- 100 threshold via vanilla score.
+  local function tryPlace(counts, claimed, speciesId, mapId, kind, slotIndex, slots, avg, maxLv, minScore)
+    local key = mapId .. "|" .. kind .. "|" .. slotIndex
+    if claimed[key] then return false end
+    local slot = slots[slotIndex]
+    if not slot then return false end
+    local score = stealScore(counts, slot.species)
+    if score < minScore then return false end
+
+    local pool = Encounters.eligible(
+      index, MAPS[mapId].habitats, slot.level, avg, maxLv, {
+        allowRare = false, rareOnly = false, preferStage = 0,
+      })
+    local ok = false
+    for _, id in ipairs(pool) do
+      if id == speciesId then ok = true break end
+    end
+    if not ok then return false end
+
+    local prev = slot.species
+    if index.meta[prev] then
+      counts[prev] = (counts[prev] or 1) - 1
+      if counts[prev] <= 0 then counts[prev] = nil end
+    end
+    slot.species = speciesId
+    applyMinLevel(index, slot, speciesId)
+    counts[speciesId] = (counts[speciesId] or 0) + 1
+    claimed[key] = true
+    return true
+  end
+
+  local function missingList(counts)
+    local missing = {}
+    for id, meta in pairs(index.meta) do
+      if meta.stage == 0 and not meta.rare and (counts[id] or 0) == 0 then
+        missing[#missing + 1] = id
+      end
+    end
+    table.sort(missing)
+    return missing
+  end
+
+  local function placeOne(counts, claimed, speciesId, minScore, useOverflow)
+    local meta = index.meta[speciesId]
+    for _, mapId in ipairs(mapIds) do
+      local mapDef = MAPS[mapId]
+      if habitatMatch(mapDef, meta.habitat) then
+        for _, kind in ipairs(mapDef.kinds) do
+          local enc = mod.content.encounters:get(mapId)
+          local block = enc and enc[kind]
+          local slots = block and block.slots
+          if slots and #slots > 0 then
+            local avg, maxLv = slotStats(slots)
+            local candidates = {}
+            local function consider(idx)
+              local slot = slots[idx]
+              if not slot then return end
+              local score = stealScore(counts, slot.species)
+              if score >= minScore then
+                candidates[#candidates + 1] = { index = idx, score = score }
+              end
+            end
+            local plan = replacementPlan(mapDef, avg, maxLv, slots)
+            for _, step in ipairs(plan) do
+              if not step.rareOnly then consider(step.index) end
+            end
+            if useOverflow then
+              for _, idx in ipairs(COVERAGE_OVERFLOW_SLOTS) do
+                consider(idx)
+              end
+            end
+            table.sort(candidates, function(a, b)
+              if a.score ~= b.score then return a.score > b.score end
+              return a.index < b.index
+            end)
+            for _, cand in ipairs(candidates) do
+              if tryPlace(counts, claimed, speciesId, mapId, kind, cand.index,
+                  slots, avg, maxLv, minScore) then
+                mod.content.encounters:patch(mapId, { [kind] = { slots = slots } })
+                return true
+              end
+            end
+          end
+        end
+      end
+    end
+    return false
+  end
+
+  -- Repeat until every base form is placed or a full pass makes no progress.
+  for _ = 1, 8 do
+    local counts = countGen23Placements(mod, index)
+    local missing = missingList(counts)
+    if #missing == 0 then return end
+    local claimed = {}
+    local progress = false
+    -- Prefer taking vanilla commons / duplicates on plan + overflow slots.
+    for _, speciesId in ipairs(missing) do
+      if placeOne(counts, claimed, speciesId, 2, true) then
+        progress = true
+      end
+    end
+    if not progress then
+      -- Still stuck: take any vanilla common (score 100 already >= 2).
+      -- Lower minScore to 100 only via vanilla; use minScore 100 by requiring
+      -- vanilla exclusively when duplicates are exhausted.
+      for _, speciesId in ipairs(missingList(counts)) do
+        if placeOne(counts, claimed, speciesId, 100, true) then
+          progress = true
+        end
+      end
+    end
+    if not progress then return end
+  end
+end
+
+-- Curated: replace a few slots with Gen 2/3 (default), then cover gaps.
 local function mixCurated(mod, index)
   local mapIds = {}
   for id in pairs(MAPS) do mapIds[#mapIds + 1] = id end
@@ -347,6 +530,8 @@ local function mixCurated(mod, index)
       end
     end
   end
+
+  ensureBaseCoverage(mod, index)
 end
 
 -- Full mix: every unprotected slot is a pick from Gen 1 locals on that
@@ -432,5 +617,37 @@ end
 
 Encounters.MAPS = MAPS
 Encounters.VANILLA_RARES = VANILLA_RARES
+Encounters.NEVER_WILD = NEVER_WILD
+
+-- Vanilla Gen 1 sources that unlock pack evolutions without a grass slot:
+-- gifts, rods, or mid-stages that evolve from those.
+local OUTSIDE_GRASS_ROOTS = {
+  EEVEE = true,      -- Celadon Mansion roof gift
+  PORYGON = true,    -- Game Corner prize
+  POLIWAG = true,    -- Good Rod
+  POLIWHIRL = true,  -- from Poliwag (rod) → Politoed
+  MAGIKARP = true,   -- Old Rod
+  GOLDEEN = true,    -- Good Rod
+}
+
+-- True when a pack species (or its earlier evo / gift root) is obtainable
+-- without needing that exact form in grass. Used by tests / debugging.
+function Encounters.lineObtainable(speciesId, index, wildSet)
+  if not speciesId then return false end
+  if NEVER_WILD[speciesId] then
+    -- Shedinja: special split from Nincada.
+    return wildSet and wildSet.NINCADA and true or false
+  end
+  if wildSet and wildSet[speciesId] then return true end
+  local cur, seen = speciesId, {}
+  while index and index.parents and index.parents[cur] and not seen[cur] do
+    seen[cur] = true
+    cur = index.parents[cur]
+    if wildSet and wildSet[cur] then return true end
+    if OUTSIDE_GRASS_ROOTS[cur] then return true end
+  end
+  if OUTSIDE_GRASS_ROOTS[speciesId] or OUTSIDE_GRASS_ROOTS[cur] then return true end
+  return false
+end
 
 return Encounters

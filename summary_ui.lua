@@ -10,6 +10,7 @@ local TextBox = require("src.render.TextBox")
 local HeldItems = require("mods.Kanto-Reforged.held_items")
 local AbilityText = require("mods.Kanto-Reforged.ability_text")
 local Gender = require("mods.Kanto-Reforged.gender")
+local SplitSpecial = require("mods.Kanto-Reforged.split_special")
 
 local SummaryUi = {}
 
@@ -61,6 +62,32 @@ local function redrawNameWithGender(self)
   love.graphics.rectangle("fill", 72, 8, 88, 8)
   love.graphics.setColor(0, 0, 0, 1)
   Font.draw(monDisplayName(mon, def), 72, 8)
+  love.graphics.setColor(1, 1, 1, 1)
+end
+
+-- Compact 5-stat redraw when SP.ATK / SP.DEF is on (fits the Gen1 10x10 box).
+local function redrawSplitSpecialStats(self)
+  local mon = self.mon
+  local def = self.game.data.pokemon[mon.species]
+  local stats = mon.stats or {}
+  local sp = SplitSpecial.calcSpStats(def, mon)
+  -- Wipe interior of stats box (0,8) 10x10 → pixels 0..79 x 64..143
+  love.graphics.setColor(1, 1, 1, 1)
+  love.graphics.rectangle("fill", 8, 72, 64, 64)
+  love.graphics.setColor(0, 0, 0, 1)
+  -- Short labels so five rows + values fit the classic box without crowding.
+  local rows = {
+    { "ATK.", stats.attack },
+    { "DEF.", stats.defense },
+    { "SPD.", stats.speed },
+    { "SP.A", sp and sp.sp_attack or stats.special },
+    { "SP.D", sp and sp.sp_defense or stats.special },
+  }
+  for i, s in ipairs(rows) do
+    local y = 72 + (i - 1) * 12
+    Font.draw(Strings(s[1]), 8, y)
+    Font.draw(("%3d"):format(s[2] or 0), 48, y)
+  end
   love.graphics.setColor(1, 1, 1, 1)
 end
 
@@ -153,6 +180,9 @@ function SummaryUi.register(mod)
         if self.page <= 2 then
           baseDraw(self)
           redrawNameWithGender(self)
+          if self.page == 1 and SplitSpecial.enabled(mod) then
+            redrawSplitSpecialStats(self)
+          end
         else
           drawAbilityPage(self)
         end

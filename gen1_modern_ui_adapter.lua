@@ -2,6 +2,7 @@
 -- No-op when gen1_modern_ui is not installed; native Gen1 screens stay as-is.
 
 local SummaryUi = require("mods.Kanto-Reforged.summary_ui")
+local SplitSpecial = require("mods.Kanto-Reforged.split_special")
 local TypeChart = require("src.battle.TypeChart")
 local Growth = require("src.pokemon.Growth")
 local Gender = require("mods.Kanto-Reforged.gender")
@@ -82,7 +83,7 @@ local function movePp(move, moveDef)
   return ("%d/%d"):format(move.pp or 0, maxPP)
 end
 
-local function summaryModel(game, state)
+local function summaryModel(mod, game, state)
   local data = (game and game.data) or (state.game and state.game.data) or {}
   local mon = state.mon
   local def = data.pokemon and data.pokemon[mon.species]
@@ -111,19 +112,41 @@ local function summaryModel(game, state)
       { label = "ATTACK", value = tostring(stats.attack or "-"), enabled = false },
       { label = "DEFENSE", value = tostring(stats.defense or "-"), enabled = false },
       { label = "SPEED", value = tostring(stats.speed or "-"), enabled = false },
-      { label = "SPECIAL", value = tostring(stats.special or "-"), enabled = false },
-      {
-        label = "ID No.",
-        value = ("%05d"):format(mon.otId or (game.save and game.save.player
-          and game.save.player.id) or 0),
+    }
+    if SplitSpecial.enabled(mod) then
+      -- Match native summary abbreviations when five stats are shown.
+      rows[5].label = "ATK."
+      rows[6].label = "DEF."
+      rows[7].label = "SPD."
+      local sp = SplitSpecial.calcSpStats(def, mon)
+      rows[#rows + 1] = {
+        label = "SP.A",
+        value = tostring(sp and sp.sp_attack or stats.special or "-"),
         enabled = false,
-      },
-      {
-        label = "OT",
-        value = mon.ot or (game.save and game.save.player and game.save.player.name)
-          or "-----",
+      }
+      rows[#rows + 1] = {
+        label = "SP.D",
+        value = tostring(sp and sp.sp_defense or stats.special or "-"),
         enabled = false,
-      },
+      }
+    else
+      rows[#rows + 1] = {
+        label = "SPECIAL",
+        value = tostring(stats.special or "-"),
+        enabled = false,
+      }
+    end
+    rows[#rows + 1] = {
+      label = "ID No.",
+      value = ("%05d"):format(mon.otId or (game.save and game.save.player
+        and game.save.player.id) or 0),
+      enabled = false,
+    }
+    rows[#rows + 1] = {
+      label = "OT",
+      value = mon.ot or (game.save and game.save.player and game.save.player.name)
+        or "-----",
+      enabled = false,
     }
   elseif page == 2 then
     local nextExp = 0
@@ -183,6 +206,8 @@ return function(mod)
     return false, "Gen1 Modern UI is not installed"
   end
 
+  SplitSpecial.installModernUiPartyPatch(mod)
+
   mod.exports.gen1ModernUi = {
     apiVersion = 1,
     screens = {
@@ -219,7 +244,9 @@ return function(mod)
       -- native Gen1 while page 3 alone uses the modern list presenter.
       KantoSummary = {
         match = summaryMatches,
-        model = summaryModel,
+        model = function(game, state)
+          return summaryModel(mod, game, state)
+        end,
         actions = {
           select = summaryAdvance,
           back = summaryAdvance,

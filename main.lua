@@ -3,6 +3,7 @@ local ExpMoveEffects = require("mods.Kanto-Reforged.move_effects")
 local HeldItems = require("mods.Kanto-Reforged.held_items")
 local Gender = require("mods.Kanto-Reforged.gender")
 local ModernXpShare = require("mods.Kanto-Reforged.modern_xp_share")
+local SplitSpecial = require("mods.Kanto-Reforged.split_special")
 local TrainerAi = require("mods.Kanto-Reforged.trainer_ai")
 local ExpTrainers = require("mods.Kanto-Reforged.trainers")
 local Strings = require("src.core.Strings")
@@ -12,34 +13,6 @@ local function battlerHasType(battler, typeId)
     if t == typeId then return true end
   end
   return false
-end
-
--- Helper to calculate battle Special Attack and Special Defense stats
-local function getSpecialStat(battler, isAttack)
-  local mon = battler.mon
-  local def = battler.def
-  if not def or not (def.sp_attack or def.sp_defense) then
-    return battler.curStats.special
-  end
-  
-  if not battler.sp_attack or not battler.sp_defense then
-    local dvs = mon.dvs or {}
-    local statExp = mon.statExp or {}
-    local level = mon.level or 1
-    
-    local special_dv = dvs.special or 0
-    local special_ev = statExp.special or 0
-    
-    local ev = math.floor(math.min(255, math.ceil(math.sqrt(special_ev))) / 4)
-    
-    local base_sp_atk = def.sp_attack or def.baseStats.special
-    local base_sp_def = def.sp_defense or def.baseStats.special
-    
-    battler.sp_attack = math.floor(((base_sp_atk + special_dv) * 2 + ev) * level / 100) + 5
-    battler.sp_defense = math.floor(((base_sp_def + special_dv) * 2 + ev) * level / 100) + 5
-  end
-  
-  return isAttack and battler.sp_attack or battler.sp_defense
 end
 
 local mixEncounters = require("mods.Kanto-Reforged.encounters").mix
@@ -70,6 +43,8 @@ return function(mod)
     },
     ModernXpShare.OPTION,
     TrainerAi.OPTION,
+    SplitSpecial.OPTION,
+    require("mods.Kanto-Reforged.dexnav").OPTION,
   })
 
   -- Register Gen 2/3 move effects before content that references them
@@ -481,6 +456,24 @@ return function(mod)
       mod.log:warn("ability_patches.lua missing; Kanto abilities skipped")
     end
 
+    -- SpA/SpD bases for optional SP.ATK / SP.DEF toggle (vanilla Kanto)
+    local okSp, special_stat_patches = pcall(require, "mods.Kanto-Reforged.special_stat_patches")
+    if okSp and special_stat_patches and special_stat_patches.stats then
+      local nSp = 0
+      for speciesId, row in pairs(special_stat_patches.stats) do
+        if type(row) == "table" and row.sp_attack and row.sp_defense then
+          mod.content.pokemon:patch(speciesId, {
+            sp_attack = row.sp_attack,
+            sp_defense = row.sp_defense,
+          })
+          nSp = nSp + 1
+        end
+      end
+      mod.log:info("Patched SpA/SpD onto %d Kanto species", nSp)
+    else
+      mod.log:warn("special_stat_patches.lua missing; Kanto SpA/SpD skipped")
+    end
+
     -- Gender rates (PokéAPI female eighths; -1 = genderless)
     local okGender, gender_patches = pcall(require, "mods.Kanto-Reforged.gender_patches")
     if okGender and gender_patches and gender_patches.rates then
@@ -527,6 +520,9 @@ return function(mod)
   if require("mods.Kanto-Reforged.gen1_modern_ui_adapter")(mod) then
     mod.log:info("Gen1 Modern UI adapter registered")
   end
+  -- Party/PC detail SPC→SAT/SDF patch may need a late bind if Modern UI
+  -- loads after us; installModernUiPartyPatch watches render.hud once.
+  SplitSpecial.installModernUiPartyPatch(mod)
 
   -- 4. Hook into battle damage pipeline (SpA/SpD + abilities +
   --    variable-power Gen 2/3 moves)
@@ -650,12 +646,12 @@ return function(mod)
     local category = move.category or TypeChart.category(move.type) or "physical"
     local isSpecial = category == "special"
 
-    if isSpecial then
+    if isSpecial and SplitSpecial.enabled(mod) then
       local oldUserSpecial = user.curStats.special
       local oldTargetSpecial = target.curStats.special
 
-      user.curStats.special = getSpecialStat(user, true)
-      target.curStats.special = getSpecialStat(target, false)
+      user.curStats.special = SplitSpecial.getBattleStat(user, true)
+      target.curStats.special = SplitSpecial.getBattleStat(target, false)
 
       local damage, info = Abilities.onDamage(next, ctx)
 

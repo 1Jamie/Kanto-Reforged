@@ -443,11 +443,16 @@ function MoveEffects.register(mod)
     end,
   })
 
+  -- Guaranteed post-hit stage change. Default target is the user (Overheat /
+  -- Close Combat); moves may set statTarget = "target" instead. Prefer
+  -- EXP_DAMAGE_STAT_SIDE_EFFECT + chance for foe drops like Rock Tomb.
   mod.content.move_effects:register("EXP_DAMAGE_USER_STAT_EFFECT", {
     kind = "full",
     afterDamage = function(ctx)
       if not ctx.move.statChanges then return end
-      local msgs = applyStages(ctx, ctx.user, ctx.move.statChanges, false)
+      local targetSelf = (ctx.move.statTarget or "user") == "user"
+      local who = targetSelf and ctx.user or ctx.target
+      local msgs = applyStages(ctx, who, ctx.move.statChanges, not targetSelf)
       for _, m in ipairs(msgs) do ctx.say(m) end
     end,
   })

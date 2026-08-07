@@ -96,6 +96,21 @@ return function(T, Data, run)
   T.eq(r21Footer, "No Old/Good Rod.", "ROUTE_21 fishable footer")
 
   -- Start-menu hook: gated on EVENT_GOT_POKEDEX, directly under POKéDEX
+  local schema = run.loader.optionSchemas["Kanto-Reforged"]
+  local dexOpt
+  for _, opt in ipairs(schema or {}) do
+    if opt.key == DexNav.OPTION_KEY then dexOpt = opt break end
+  end
+  T.check(dexOpt ~= nil, "DEXNAV option schema registered")
+  T.eq(dexOpt.type, "choice", "DEXNAV option is a choice")
+  T.eq(dexOpt.default, DexNav.MODE_DEFAULT, "DEXNAV defaults to DEXNAV label")
+  T.eq(#dexOpt.choices, 3, "DEXNAV has three modes")
+
+  run.loader.modOptions["Kanto-Reforged"] =
+    run.loader.modOptions["Kanto-Reforged"] or {}
+  local savedMode = run.loader.modOptions["Kanto-Reforged"][DexNav.OPTION_KEY]
+  run.loader.modOptions["Kanto-Reforged"][DexNav.OPTION_KEY] = DexNav.MODE_DEFAULT
+
   local vanilla = {
     { label = "POKéDEX" },
     { label = "POKéMON" },
@@ -109,7 +124,7 @@ return function(T, Data, run)
     { { label = "SAVE" } })
   local hasDexNav = false
   for _, row in ipairs(noDex) do
-    if row.label == "DEXNAV" then hasDexNav = true end
+    if row.label == "DEXNAV" or row.label == "DEXNAV-KR" then hasDexNav = true end
   end
   T.eq(hasDexNav, false, "DEXNAV absent without EVENT_GOT_POKEDEX")
 
@@ -126,6 +141,41 @@ return function(T, Data, run)
   T.check(idxDexNav ~= nil, "DEXNAV present with EVENT_GOT_POKEDEX")
   T.eq(idxDexNav, idxDex + 1, "DEXNAV is immediately after POKéDEX")
   T.eq(idxPokemon, idxDexNav + 1, "POKéMON stays after DEXNAV")
+
+  run.loader.modOptions["Kanto-Reforged"][DexNav.OPTION_KEY] = DexNav.MODE_KR
+  local withKr = Runtime.call("ui.start_menu.items",
+    function(_, items) return items end,
+    { save = { flags = { EVENT_GOT_POKEDEX = true } }, data = Data },
+    {
+      { label = "POKéDEX" },
+      { label = "POKéMON" },
+    })
+  local hasKr, hasPlain = false, false
+  for _, row in ipairs(withKr) do
+    if row.label == "DEXNAV-KR" then hasKr = true end
+    if row.label == "DEXNAV" then hasPlain = true end
+  end
+  T.check(hasKr, "DEXNAV-KR label when mode is dexnav_kr")
+  T.eq(hasPlain, false, "plain DEXNAV hidden in dexnav_kr mode")
+  T.eq(DexNav.mapTitle("ROUTE_1", {
+    options = { get = function() return DexNav.MODE_KR end },
+  }), "DEXNAV-KR ROUTE 1", "screen title uses DEXNAV-KR prefix")
+
+  run.loader.modOptions["Kanto-Reforged"][DexNav.OPTION_KEY] = DexNav.MODE_OFF
+  local withOff = Runtime.call("ui.start_menu.items",
+    function(_, items) return items end,
+    { save = { flags = { EVENT_GOT_POKEDEX = true } }, data = Data },
+    {
+      { label = "POKéDEX" },
+      { label = "POKéMON" },
+    })
+  local offShown = false
+  for _, row in ipairs(withOff) do
+    if row.label == "DEXNAV" or row.label == "DEXNAV-KR" then offShown = true end
+  end
+  T.eq(offShown, false, "DEXNAV hidden when mode is off")
+
+  run.loader.modOptions["Kanto-Reforged"][DexNav.OPTION_KEY] = savedMode
 
   -- Screen factory resolves; fishable maps use fewer rows so footer clears list
   local Screens = require("src.ui.Screens")

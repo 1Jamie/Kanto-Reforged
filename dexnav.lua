@@ -1,9 +1,33 @@
 -- Route DexNav: START-menu list of wild species on the current map.
 -- Progressive reveal: ???? (unseen) → name (seen) → per-method levels (owned).
--- Text-only; Super Rod only for fishing; Old/Good Rod omitted with a
+-- Fish-only; Super Rod only for fishing; Old/Good Rod omitted with a
 -- conditional footer on fishable maps.
+--
+-- Mod option `dexnav_mode`:
+--   dexnav    — start-menu label DEXNAV (default)
+--   dexnav_kr — label DEXNAV-KR (disambiguate vs another DexNav mod)
+--   off       — do not add the start-menu entry
 
 local DexNav = {}
+
+DexNav.OPTION_KEY = "dexnav_mode"
+DexNav.MODE_DEFAULT = "dexnav"
+DexNav.MODE_KR = "dexnav_kr"
+DexNav.MODE_OFF = "off"
+DexNav.OPTION = {
+  key = DexNav.OPTION_KEY,
+  label = "DEXNAV",
+  type = "choice",
+  default = DexNav.MODE_DEFAULT,
+  choices = {
+    { "DEXNAV", DexNav.MODE_DEFAULT },
+    { "DEXNAV-KR", DexNav.MODE_KR },
+    { "OFF", DexNav.MODE_OFF },
+  },
+}
+
+-- Labels the Roaming Radar (and similar) can anchor after.
+DexNav.MENU_LABELS = { "DEXNAV", "DEXNAV-KR" }
 
 local SCREEN = "ExpDexNav"
 local METHOD_ORDER = { "grass", "water", "fish" }
@@ -14,6 +38,21 @@ local NO_WILD = "No wild Pokemon here."
 -- Keep the note to a single glyph-row and shrink visible rows when it shows.
 local ROWS_WITH_FOOTER = 6
 local ROWS_DEFAULT = 7
+
+function DexNav.mode(mod)
+  if not mod or not mod.options then return DexNav.MODE_DEFAULT end
+  local value = mod.options:get(DexNav.OPTION_KEY)
+  if value == DexNav.MODE_KR or value == DexNav.MODE_OFF
+      or value == DexNav.MODE_DEFAULT then
+    return value
+  end
+  return DexNav.MODE_DEFAULT
+end
+
+function DexNav.menuLabel(mod)
+  if DexNav.mode(mod) == DexNav.MODE_KR then return "DEXNAV-KR" end
+  return "DEXNAV"
+end
 
 local function absorb(byId, method, slots)
   if not slots then return end
@@ -115,9 +154,10 @@ function DexNav.currentMapId(game)
   return nil
 end
 
-function DexNav.mapTitle(mapId)
-  if not mapId then return "DEXNAV" end
-  return "DEXNAV " .. mapId:gsub("_", " ")
+function DexNav.mapTitle(mapId, mod)
+  local prefix = DexNav.menuLabel(mod)
+  if not mapId then return prefix end
+  return prefix .. " " .. mapId:gsub("_", " ")
 end
 
 function DexNav.buildItems(data, mapId, pokedex, roamers)
@@ -163,7 +203,7 @@ function DexNav.register(mod)
       if #items == 0 then
         items = { { label = NO_WILD, right = "", value = nil } }
       end
-      return mod.ui.ListMenu.new(game, DexNav.mapTitle(mapId), items, {
+      return mod.ui.ListMenu.new(game, DexNav.mapTitle(mapId, mod), items, {
         pageJump = true,
         footer = footer,
         rows = footer and ROWS_WITH_FOOTER or ROWS_DEFAULT,
@@ -175,12 +215,13 @@ function DexNav.register(mod)
   mod.hooks:wrap("ui.start_menu.items", function(next, game, items)
     local out = next(game, items)
     if type(out) ~= "table" then return out end
+    if DexNav.mode(mod) == DexNav.MODE_OFF then return out end
     local flags = game and game.save and game.save.flags
     if not (flags and flags.EVENT_GOT_POKEDEX) then
       return out
     end
     return mod.ui.insertAfter(out, "POKéDEX", {
-      label = "DEXNAV",
+      label = DexNav.menuLabel(mod),
       onSelect = function() mod.ui.push(game, SCREEN) end,
     })
   end)

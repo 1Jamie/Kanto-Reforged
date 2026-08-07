@@ -18,9 +18,16 @@ return function(T, Data, run)
       end,
     },
   }
+  local optValues = {}
   local withUi = {
     id = "Kanto-Reforged",
     exports = {},
+    options = {
+      get = function(_, key)
+        if optValues[key] ~= nil then return optValues[key] end
+        return false
+      end,
+    },
     find = function(id)
       if id == "gen1_modern_ui" then return fakeUi end
       return nil
@@ -81,6 +88,27 @@ return function(T, Data, run)
   })
   T.eq(page1.title, "STATUS", "page 1 title")
   T.check(#page1.rows >= 8, "page 1 has status rows")
+  local function rowLabel(rows, label)
+    for _, r in ipairs(rows) do
+      if r.label == label then return r end
+    end
+    return nil
+  end
+  T.check(rowLabel(page1.rows, "SPECIAL") ~= nil, "default page 1 shows SPECIAL")
+  T.check(rowLabel(page1.rows, "SP.A") == nil, "default page 1 hides SP.A")
+
+  optValues.split_special = true
+  local page1Split = sumScreen.model(fakeGame, {
+    screenId = "SummaryMenu", _expMaxPage = 3, page = 1, mon = mon,
+  })
+  T.check(rowLabel(page1Split.rows, "SPECIAL") == nil,
+    "split on: page 1 hides SPECIAL")
+  T.check(rowLabel(page1Split.rows, "SP.A") ~= nil, "split on: page 1 shows SP.A")
+  T.check(rowLabel(page1Split.rows, "SP.D") ~= nil, "split on: page 1 shows SP.D")
+  T.check(rowLabel(page1Split.rows, "ATK.") ~= nil, "split on: abbreviated ATK.")
+  T.check(rowLabel(page1Split.rows, "DEF.") ~= nil, "split on: abbreviated DEF.")
+  T.check(rowLabel(page1Split.rows, "SPD.") ~= nil, "split on: abbreviated SPD.")
+  optValues.split_special = false
 
   local page2 = sumScreen.model(fakeGame, {
     screenId = "SummaryMenu", _expMaxPage = 3, page = 2, mon = mon,

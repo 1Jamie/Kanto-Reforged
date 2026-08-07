@@ -15,6 +15,7 @@ One important heads up before anything else: **static legendaries despawn if you
    - **XP SHARE (SLOT 2)** (default on): fighters get most of the XP pool, party slot 2 gets a share. Ignores the old EXP.ALL behavior while its on.
    - **SMARTER AI** (default on): trainers play less dumb. Turn off if you want classic gen1 chaos.
    - **FULL SPAWN MIX** (default off): fully random gen1-3 wilds. It rewrites encounter tables, so flip it before a long run if you care.
+   - **SP.ATK / SP.DEF** (default off): special damage and the summary use Sp.Atk / Sp.Def instead of Gen 1 Special. Leave off for classic mechanics.
 3. After Oak gives you the Pokédex, open the start menu. **DexNav** shows up under Pokédex. It lists whats on the current map (`????` until seen, more detail once owned). If a roamer is here it also shows a ROAM row later.
 
 **Level caps are opt-in.** In Viridian, stand outside the Poké Mart and look east along the path. Theres a kid offering Rare Candies. If you accept:

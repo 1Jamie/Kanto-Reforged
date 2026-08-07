@@ -26,7 +26,7 @@ Has support for Gen1 Modern UI mod
 
 - Optional smarter trainer AI, slot-2 XP Share (70% pool to fighters, up to 30% to party slot 2, never more than a solo share total), and story level caps (you opt in by taking Rare Candies from an NPC in Viridian).
 - There is an NPC in Viridian next to the pokemart, talking to him he will ask you if you want some rare candies, you do not have to take them, you can say no, it wont give them, however as soon as you take any amount of them from him the level cap system will kick in. Its basically just a level cap that expands with the story/gyms as you progress to prevent you from over leveling with rare candies and trivializing the progression
-- DexNav on the start menu after you get the Pokedex (shows whats on the current route; more info once youve seen/caught them).
+- DexNav on the start menu after you get the Pokedex (shows whats on the current route; more info once youve seen/caught them). Mod setting **DEXNAV**: default label, **DEXNAV-KR** to tell it apart from another DexNav, or **OFF** to hide it.
 
 ![DexNav on the current map](screen-shots/dexnav.png)
 
@@ -130,6 +130,7 @@ The Route 5 Day Care house (same building as vanilla) is Gen 3-style when this m
 - FULL SPAWN MIX (default off): random Gen 1 through 3 wild tables
 - XP SHARE (SLOT 2) (default on): fighters split 70% of the Gen 1 XP pool; party slot 2 gets up to 30% (clamped below actives)
 - SMARTER AI (default on): prefer useful damage, skip moves that would fail
+- SP.ATK / SP.DEF (default off): use separate Special Attack / Special Defense from PokeAPI for special damage and summary UI; off keeps Gen 1 single Special
 
 ## Generating the data files
 
@@ -155,6 +156,7 @@ Other flags if you only need one piece:
 ```bash
 python3 generate_pokemon_mod.py --berry-farm-only
 python3 generate_pokemon_mod.py --ability-patches-only
+python3 generate_pokemon_mod.py --special-stat-patches-only
 python3 generate_pokemon_mod.py --gender-patches-only
 python3 generate_pokemon_mod.py --breeding-patches-only
 python3 generate_pokemon_mod.py --learnset-patches-only

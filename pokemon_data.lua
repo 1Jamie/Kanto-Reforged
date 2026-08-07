@@ -5,8 +5,9 @@ P.moves = {
   ACID_SPRAY = {
     id = "ACID_SPRAY", name = "ACID SPRAY", type = "POISON",
     power = 40, accuracy = 100, pp = 20,
-    category = "special", effect = "EXP_DAMAGE_USER_STAT_EFFECT",
-    statTarget = "user",
+    category = "special", effect = "EXP_DAMAGE_STAT_SIDE_EFFECT",
+    statChance = 100,
+    statTarget = "target",
     statChanges = {
       { stat = "special", change = -2 },
     }
@@ -214,8 +215,9 @@ P.moves = {
   BREAKING_SWIPE = {
     id = "BREAKING_SWIPE", name = "BREAKING SWIPE", type = "DRAGON",
     power = 60, accuracy = 100, pp = 15,
-    category = "physical", effect = "EXP_DAMAGE_USER_STAT_EFFECT",
-    statTarget = "user",
+    category = "physical", effect = "EXP_DAMAGE_STAT_SIDE_EFFECT",
+    statChance = 100,
+    statTarget = "target",
     statChanges = {
       { stat = "attack", change = -1 },
     }
@@ -258,8 +260,9 @@ P.moves = {
   BULLDOZE = {
     id = "BULLDOZE", name = "BULLDOZE", type = "GROUND",
     power = 60, accuracy = 100, pp = 20,
-    category = "physical", effect = "EXP_DAMAGE_USER_STAT_EFFECT",
-    statTarget = "user",
+    category = "physical", effect = "EXP_DAMAGE_STAT_SIDE_EFFECT",
+    statChance = 100,
+    statTarget = "target",
     statChanges = {
       { stat = "speed", change = -1 },
     }
@@ -631,8 +634,9 @@ P.moves = {
   ELECTROWEB = {
     id = "ELECTROWEB", name = "ELECTROWEB", type = "ELECTRIC",
     power = 55, accuracy = 95, pp = 15,
-    category = "special", effect = "EXP_DAMAGE_USER_STAT_EFFECT",
-    statTarget = "user",
+    category = "special", effect = "EXP_DAMAGE_STAT_SIDE_EFFECT",
+    statChance = 100,
+    statTarget = "target",
     statChanges = {
       { stat = "speed", change = -1 },
     }
@@ -1106,8 +1110,9 @@ P.moves = {
   ICY_WIND = {
     id = "ICY_WIND", name = "ICY WIND", type = "ICE",
     power = 55, accuracy = 95, pp = 15,
-    category = "special", effect = "EXP_DAMAGE_USER_STAT_EFFECT",
-    statTarget = "user",
+    category = "special", effect = "EXP_DAMAGE_STAT_SIDE_EFFECT",
+    statChance = 100,
+    statTarget = "target",
     statChanges = {
       { stat = "speed", change = -1 },
     }
@@ -1231,8 +1236,9 @@ P.moves = {
   LOW_SWEEP = {
     id = "LOW_SWEEP", name = "LOW SWEEP", type = "FIGHTING",
     power = 65, accuracy = 100, pp = 20,
-    category = "physical", effect = "EXP_DAMAGE_USER_STAT_EFFECT",
-    statTarget = "user",
+    category = "physical", effect = "EXP_DAMAGE_STAT_SIDE_EFFECT",
+    statChance = 100,
+    statTarget = "target",
     statChanges = {
       { stat = "speed", change = -1 },
     }
@@ -1245,8 +1251,9 @@ P.moves = {
   LUNGE = {
     id = "LUNGE", name = "LUNGE", type = "BUG",
     power = 80, accuracy = 100, pp = 15,
-    category = "physical", effect = "EXP_DAMAGE_USER_STAT_EFFECT",
-    statTarget = "user",
+    category = "physical", effect = "EXP_DAMAGE_STAT_SIDE_EFFECT",
+    statChance = 100,
+    statTarget = "target",
     statChanges = {
       { stat = "attack", change = -1 },
     }
@@ -1441,8 +1448,9 @@ P.moves = {
   MUD_SHOT = {
     id = "MUD_SHOT", name = "MUD SHOT", type = "GROUND",
     power = 55, accuracy = 95, pp = 15,
-    category = "special", effect = "EXP_DAMAGE_USER_STAT_EFFECT",
-    statTarget = "user",
+    category = "special", effect = "EXP_DAMAGE_STAT_SIDE_EFFECT",
+    statChance = 100,
+    statTarget = "target",
     statChanges = {
       { stat = "speed", change = -1 },
     }
@@ -1450,8 +1458,9 @@ P.moves = {
   MUD_SLAP = {
     id = "MUD_SLAP", name = "MUD SLAP", type = "GROUND",
     power = 20, accuracy = 100, pp = 10,
-    category = "special", effect = "EXP_DAMAGE_USER_STAT_EFFECT",
-    statTarget = "user",
+    category = "special", effect = "EXP_DAMAGE_STAT_SIDE_EFFECT",
+    statChance = 100,
+    statTarget = "target",
     statChanges = {
       { stat = "accuracy", change = -1 },
     }
@@ -1464,8 +1473,9 @@ P.moves = {
   MYSTICAL_FIRE = {
     id = "MYSTICAL_FIRE", name = "MYSTICAL FIRE", type = "FIRE",
     power = 75, accuracy = 100, pp = 10,
-    category = "special", effect = "EXP_DAMAGE_USER_STAT_EFFECT",
-    statTarget = "user",
+    category = "special", effect = "EXP_DAMAGE_STAT_SIDE_EFFECT",
+    statChance = 100,
+    statTarget = "target",
     statChanges = {
       { stat = "special", change = -1 },
     }
@@ -1856,8 +1866,9 @@ P.moves = {
   ROCK_TOMB = {
     id = "ROCK_TOMB", name = "ROCK TOMB", type = "ROCK",
     power = 60, accuracy = 95, pp = 15,
-    category = "physical", effect = "EXP_DAMAGE_USER_STAT_EFFECT",
-    statTarget = "user",
+    category = "physical", effect = "EXP_DAMAGE_STAT_SIDE_EFFECT",
+    statChance = 100,
+    statTarget = "target",
     statChanges = {
       { stat = "speed", change = -1 },
     }
@@ -2022,8 +2033,9 @@ P.moves = {
   SKITTER_SMACK = {
     id = "SKITTER_SMACK", name = "SKITTER SMACK", type = "BUG",
     power = 70, accuracy = 90, pp = 10,
-    category = "physical", effect = "EXP_DAMAGE_USER_STAT_EFFECT",
-    statTarget = "user",
+    category = "physical", effect = "EXP_DAMAGE_STAT_SIDE_EFFECT",
+    statChance = 100,
+    statTarget = "target",
     statChanges = {
       { stat = "special", change = -1 },
     }
@@ -2076,8 +2088,9 @@ P.moves = {
   SNARL = {
     id = "SNARL", name = "SNARL", type = "DARK",
     power = 55, accuracy = 95, pp = 15,
-    category = "special", effect = "EXP_DAMAGE_USER_STAT_EFFECT",
-    statTarget = "user",
+    category = "special", effect = "EXP_DAMAGE_STAT_SIDE_EFFECT",
+    statChance = 100,
+    statTarget = "target",
     statChanges = {
       { stat = "special", change = -1 },
     }
@@ -2199,8 +2212,9 @@ P.moves = {
   STRUGGLE_BUG = {
     id = "STRUGGLE_BUG", name = "STRUGGLE BUG", type = "BUG",
     power = 50, accuracy = 100, pp = 20,
-    category = "special", effect = "EXP_DAMAGE_USER_STAT_EFFECT",
-    statTarget = "user",
+    category = "special", effect = "EXP_DAMAGE_STAT_SIDE_EFFECT",
+    statChance = 100,
+    statTarget = "target",
     statChanges = {
       { stat = "special", change = -1 },
     }
@@ -3059,7 +3073,7 @@ P.species = {
     },
     spriteFront = "mods/Kanto-Reforged/assets/cyndaquil_front.png",
     spriteBack = "mods/Kanto-Reforged/assets/cyndaquil_back.png",
-    frontSize = 5,
+    frontSize = 6,
     palette = "CYNDAQUIL",
     dexEntry = {
       kind = "FIRE MOUSE POKMON",
@@ -3467,7 +3481,7 @@ P.species = {
     },
     spriteFront = "mods/Kanto-Reforged/assets/totodile_front.png",
     spriteBack = "mods/Kanto-Reforged/assets/totodile_back.png",
-    frontSize = 5,
+    frontSize = 6,
     palette = "TOTODILE",
     dexEntry = {
       kind = "BIG JAW POKMON",
@@ -4191,7 +4205,7 @@ P.species = {
     },
     spriteFront = "mods/Kanto-Reforged/assets/hoothoot_front.png",
     spriteBack = "mods/Kanto-Reforged/assets/hoothoot_back.png",
-    frontSize = 5,
+    frontSize = 6,
     palette = "HOOTHOOT",
     dexEntry = {
       kind = "OWL POKMON",
@@ -4672,7 +4686,7 @@ P.species = {
     },
     spriteFront = "mods/Kanto-Reforged/assets/spinarak_front.png",
     spriteBack = "mods/Kanto-Reforged/assets/spinarak_back.png",
-    frontSize = 5,
+    frontSize = 6,
     palette = "SPINARAK",
     dexEntry = {
       kind = "STRING SPIT POKMON",
@@ -5060,7 +5074,7 @@ P.species = {
     },
     spriteFront = "mods/Kanto-Reforged/assets/chinchou_front.png",
     spriteBack = "mods/Kanto-Reforged/assets/chinchou_back.png",
-    frontSize = 5,
+    frontSize = 6,
     palette = "CHINCHOU",
     dexEntry = {
       kind = "ANGLER POKMON",
@@ -5314,7 +5328,7 @@ P.species = {
     },
     spriteFront = "mods/Kanto-Reforged/assets/pichu_front.png",
     spriteBack = "mods/Kanto-Reforged/assets/pichu_back.png",
-    frontSize = 5,
+    frontSize = 6,
     palette = "PICHU",
     dexEntry = {
       kind = "TINY MOUSE POKMON",
@@ -5458,7 +5472,7 @@ P.species = {
     },
     spriteFront = "mods/Kanto-Reforged/assets/cleffa_front.png",
     spriteBack = "mods/Kanto-Reforged/assets/cleffa_back.png",
-    frontSize = 5,
+    frontSize = 6,
     palette = "CLEFFA",
     dexEntry = {
       kind = "STAR SHAPE POKMON",
@@ -5587,7 +5601,7 @@ P.species = {
     },
     spriteFront = "mods/Kanto-Reforged/assets/igglybuff_front.png",
     spriteBack = "mods/Kanto-Reforged/assets/igglybuff_back.png",
-    frontSize = 5,
+    frontSize = 6,
     palette = "IGGLYBUFF",
     dexEntry = {
       kind = "BALLOON POKMON",
@@ -5725,7 +5739,7 @@ P.species = {
     },
     spriteFront = "mods/Kanto-Reforged/assets/togepi_front.png",
     spriteBack = "mods/Kanto-Reforged/assets/togepi_back.png",
-    frontSize = 5,
+    frontSize = 6,
     palette = "TOGEPI",
     dexEntry = {
       kind = "SPIKE BALL POKMON",
@@ -5888,7 +5902,7 @@ P.species = {
     },
     spriteFront = "mods/Kanto-Reforged/assets/togetic_front.png",
     spriteBack = "mods/Kanto-Reforged/assets/togetic_back.png",
-    frontSize = 5,
+    frontSize = 6,
     palette = "TOGETIC",
     dexEntry = {
       kind = "HAPPINESS POKMON",
@@ -6008,7 +6022,7 @@ P.species = {
     },
     spriteFront = "mods/Kanto-Reforged/assets/natu_front.png",
     spriteBack = "mods/Kanto-Reforged/assets/natu_back.png",
-    frontSize = 5,
+    frontSize = 6,
     palette = "NATU",
     dexEntry = {
       kind = "TINY BIRD POKMON",
@@ -6254,7 +6268,7 @@ P.species = {
     },
     spriteFront = "mods/Kanto-Reforged/assets/mareep_front.png",
     spriteBack = "mods/Kanto-Reforged/assets/mareep_back.png",
-    frontSize = 5,
+    frontSize = 6,
     palette = "MAREEP",
     dexEntry = {
       kind = "WOOL POKMON",
@@ -6678,7 +6692,7 @@ P.species = {
     },
     spriteFront = "mods/Kanto-Reforged/assets/bellossom_front.png",
     spriteBack = "mods/Kanto-Reforged/assets/bellossom_back.png",
-    frontSize = 5,
+    frontSize = 6,
     palette = "BELLOSSOM",
     dexEntry = {
       kind = "FLOWER POKMON",
@@ -6829,7 +6843,7 @@ P.species = {
     },
     spriteFront = "mods/Kanto-Reforged/assets/marill_front.png",
     spriteBack = "mods/Kanto-Reforged/assets/marill_back.png",
-    frontSize = 5,
+    frontSize = 6,
     palette = "MARILL",
     dexEntry = {
       kind = "AQUA MOUSE POKMON",
@@ -7411,7 +7425,7 @@ P.species = {
     },
     spriteFront = "mods/Kanto-Reforged/assets/hoppip_front.png",
     spriteBack = "mods/Kanto-Reforged/assets/hoppip_back.png",
-    frontSize = 5,
+    frontSize = 6,
     palette = "HOPPIP",
     dexEntry = {
       kind = "COTTONWEED POKMON",
@@ -7534,7 +7548,7 @@ P.species = {
     },
     spriteFront = "mods/Kanto-Reforged/assets/skiploom_front.png",
     spriteBack = "mods/Kanto-Reforged/assets/skiploom_back.png",
-    frontSize = 5,
+    frontSize = 6,
     palette = "SKIPLOOM",
     dexEntry = {
       kind = "COTTONWEED POKMON",
@@ -7910,7 +7924,7 @@ P.species = {
     },
     spriteFront = "mods/Kanto-Reforged/assets/sunkern_front.png",
     spriteBack = "mods/Kanto-Reforged/assets/sunkern_back.png",
-    frontSize = 5,
+    frontSize = 6,
     palette = "SUNKERN",
     dexEntry = {
       kind = "SEED POKMON",
@@ -8284,7 +8298,7 @@ P.species = {
     },
     spriteFront = "mods/Kanto-Reforged/assets/wooper_front.png",
     spriteBack = "mods/Kanto-Reforged/assets/wooper_back.png",
-    frontSize = 5,
+    frontSize = 6,
     palette = "WOOPER",
     dexEntry = {
       kind = "WATER FISH POKMON",
@@ -8897,7 +8911,7 @@ P.species = {
     },
     spriteFront = "mods/Kanto-Reforged/assets/murkrow_front.png",
     spriteBack = "mods/Kanto-Reforged/assets/murkrow_back.png",
-    frontSize = 5,
+    frontSize = 6,
     palette = "MURKROW",
     dexEntry = {
       kind = "DARKNESS POKMON",
@@ -9225,7 +9239,7 @@ P.species = {
     },
     spriteFront = "mods/Kanto-Reforged/assets/misdreavus_front.png",
     spriteBack = "mods/Kanto-Reforged/assets/misdreavus_back.png",
-    frontSize = 5,
+    frontSize = 6,
     palette = "MISDREAVUS",
     dexEntry = {
       kind = "SCREECH POKMON",
@@ -9266,7 +9280,7 @@ P.species = {
     },
     spriteFront = "mods/Kanto-Reforged/assets/unown_front.png",
     spriteBack = "mods/Kanto-Reforged/assets/unown_back.png",
-    frontSize = 5,
+    frontSize = 6,
     palette = "UNOWN",
     dexEntry = {
       kind = "SYMBOL POKMON",
@@ -9605,7 +9619,7 @@ P.species = {
     },
     spriteFront = "mods/Kanto-Reforged/assets/pineco_front.png",
     spriteBack = "mods/Kanto-Reforged/assets/pineco_back.png",
-    frontSize = 5,
+    frontSize = 6,
     palette = "PINECO",
     dexEntry = {
       kind = "BAGWORM POKMON",
@@ -10389,7 +10403,7 @@ P.species = {
     },
     spriteFront = "mods/Kanto-Reforged/assets/snubbull_front.png",
     spriteBack = "mods/Kanto-Reforged/assets/snubbull_back.png",
-    frontSize = 5,
+    frontSize = 6,
     palette = "SNUBBULL",
     dexEntry = {
       kind = "FAIRY POKMON",
@@ -10704,7 +10718,7 @@ P.species = {
     },
     spriteFront = "mods/Kanto-Reforged/assets/qwilfish_front.png",
     spriteBack = "mods/Kanto-Reforged/assets/qwilfish_back.png",
-    frontSize = 5,
+    frontSize = 6,
     palette = "QWILFISH",
     dexEntry = {
       kind = "BALLOON POKMON",
@@ -10980,7 +10994,7 @@ P.species = {
     },
     spriteFront = "mods/Kanto-Reforged/assets/shuckle_front.png",
     spriteBack = "mods/Kanto-Reforged/assets/shuckle_back.png",
-    frontSize = 5,
+    frontSize = 6,
     palette = "SHUCKLE",
     dexEntry = {
       kind = "MOLD POKMON",
@@ -11437,7 +11451,7 @@ P.species = {
     },
     spriteFront = "mods/Kanto-Reforged/assets/teddiursa_front.png",
     spriteBack = "mods/Kanto-Reforged/assets/teddiursa_back.png",
-    frontSize = 5,
+    frontSize = 6,
     palette = "TEDDIURSA",
     dexEntry = {
       kind = "LITTLE BEAR POKMON",
@@ -11711,7 +11725,7 @@ P.species = {
     },
     spriteFront = "mods/Kanto-Reforged/assets/slugma_front.png",
     spriteBack = "mods/Kanto-Reforged/assets/slugma_back.png",
-    frontSize = 5,
+    frontSize = 6,
     palette = "SLUGMA",
     dexEntry = {
       kind = "LAVA POKMON",
@@ -11970,7 +11984,7 @@ P.species = {
     },
     spriteFront = "mods/Kanto-Reforged/assets/swinub_front.png",
     spriteBack = "mods/Kanto-Reforged/assets/swinub_back.png",
-    frontSize = 5,
+    frontSize = 6,
     palette = "SWINUB",
     dexEntry = {
       kind = "PIG POKMON",
@@ -12243,7 +12257,7 @@ P.species = {
     },
     spriteFront = "mods/Kanto-Reforged/assets/corsola_front.png",
     spriteBack = "mods/Kanto-Reforged/assets/corsola_back.png",
-    frontSize = 5,
+    frontSize = 6,
     palette = "CORSOLA",
     dexEntry = {
       kind = "CORAL POKMON",
@@ -12357,7 +12371,7 @@ P.species = {
     },
     spriteFront = "mods/Kanto-Reforged/assets/remoraid_front.png",
     spriteBack = "mods/Kanto-Reforged/assets/remoraid_back.png",
-    frontSize = 5,
+    frontSize = 6,
     palette = "REMORAID",
     dexEntry = {
       kind = "JET POKMON",
@@ -13019,7 +13033,7 @@ P.species = {
     },
     spriteFront = "mods/Kanto-Reforged/assets/houndour_front.png",
     spriteBack = "mods/Kanto-Reforged/assets/houndour_back.png",
-    frontSize = 5,
+    frontSize = 6,
     palette = "HOUNDOUR",
     dexEntry = {
       kind = "DARK POKMON",
@@ -13415,7 +13429,7 @@ P.species = {
     },
     spriteFront = "mods/Kanto-Reforged/assets/phanpy_front.png",
     spriteBack = "mods/Kanto-Reforged/assets/phanpy_back.png",
-    frontSize = 5,
+    frontSize = 6,
     palette = "PHANPY",
     dexEntry = {
       kind = "LONG NOSE POKMON",
@@ -13699,7 +13713,7 @@ P.species = {
     },
     spriteFront = "mods/Kanto-Reforged/assets/porygon2_front.png",
     spriteBack = "mods/Kanto-Reforged/assets/porygon2_back.png",
-    frontSize = 5,
+    frontSize = 6,
     palette = "PORYGON2",
     dexEntry = {
       kind = "VIRTUAL POKMON",
@@ -13976,7 +13990,7 @@ P.species = {
     },
     spriteFront = "mods/Kanto-Reforged/assets/tyrogue_front.png",
     spriteBack = "mods/Kanto-Reforged/assets/tyrogue_back.png",
-    frontSize = 5,
+    frontSize = 6,
     palette = "TYROGUE",
     dexEntry = {
       kind = "SCUFFLE POKMON",
@@ -14244,7 +14258,7 @@ P.species = {
     },
     spriteFront = "mods/Kanto-Reforged/assets/smoochum_front.png",
     spriteBack = "mods/Kanto-Reforged/assets/smoochum_back.png",
-    frontSize = 5,
+    frontSize = 6,
     palette = "SMOOCHUM",
     dexEntry = {
       kind = "KISS POKMON",
@@ -14369,7 +14383,7 @@ P.species = {
     },
     spriteFront = "mods/Kanto-Reforged/assets/elekid_front.png",
     spriteBack = "mods/Kanto-Reforged/assets/elekid_back.png",
-    frontSize = 5,
+    frontSize = 6,
     palette = "ELEKID",
     dexEntry = {
       kind = "ELECTRIC POKMON",
@@ -14492,7 +14506,7 @@ P.species = {
     },
     spriteFront = "mods/Kanto-Reforged/assets/magby_front.png",
     spriteBack = "mods/Kanto-Reforged/assets/magby_back.png",
-    frontSize = 5,
+    frontSize = 6,
     palette = "MAGBY",
     dexEntry = {
       kind = "LIVE COAL POKMON",
@@ -15360,7 +15374,7 @@ P.species = {
     },
     spriteFront = "mods/Kanto-Reforged/assets/larvitar_front.png",
     spriteBack = "mods/Kanto-Reforged/assets/larvitar_back.png",
-    frontSize = 5,
+    frontSize = 6,
     palette = "LARVITAR",
     dexEntry = {
       kind = "ROCK SKIN POKMON",
@@ -16152,7 +16166,7 @@ P.species = {
     },
     spriteFront = "mods/Kanto-Reforged/assets/celebi_front.png",
     spriteBack = "mods/Kanto-Reforged/assets/celebi_back.png",
-    frontSize = 5,
+    frontSize = 6,
     palette = "CELEBI",
     dexEntry = {
       kind = "TIME TRAVEL POKMON",
@@ -16280,8 +16294,9 @@ P.species = {
     },
     spriteFront = "mods/Kanto-Reforged/assets/treecko_front.png",
     spriteBack = "mods/Kanto-Reforged/assets/treecko_back.png",
-    frontSize = 5,
+    frontSize = 6,
     palette = "TREECKO",
+    backPalette = "TREECKO_BACK",
     dexEntry = {
       kind = "WOOD GECKO POKMON",
       heightFt = 1,
@@ -16717,7 +16732,7 @@ P.species = {
     },
     spriteFront = "mods/Kanto-Reforged/assets/torchic_front.png",
     spriteBack = "mods/Kanto-Reforged/assets/torchic_back.png",
-    frontSize = 5,
+    frontSize = 6,
     palette = "TORCHIC",
     dexEntry = {
       kind = "CHICK POKMON",
@@ -17162,7 +17177,7 @@ P.species = {
     },
     spriteFront = "mods/Kanto-Reforged/assets/mudkip_front.png",
     spriteBack = "mods/Kanto-Reforged/assets/mudkip_back.png",
-    frontSize = 5,
+    frontSize = 6,
     palette = "MUDKIP",
     dexEntry = {
       kind = "MUD FISH POKMON",
@@ -17306,7 +17321,7 @@ P.species = {
     },
     spriteFront = "mods/Kanto-Reforged/assets/marshtomp_front.png",
     spriteBack = "mods/Kanto-Reforged/assets/marshtomp_back.png",
-    frontSize = 5,
+    frontSize = 6,
     palette = "MARSHTOMP",
     dexEntry = {
       kind = "MUD FISH POKMON",
@@ -17586,7 +17601,7 @@ P.species = {
     },
     spriteFront = "mods/Kanto-Reforged/assets/poochyena_front.png",
     spriteBack = "mods/Kanto-Reforged/assets/poochyena_back.png",
-    frontSize = 5,
+    frontSize = 6,
     palette = "POOCHYENA",
     dexEntry = {
       kind = "BITE POKMON",
@@ -17834,7 +17849,7 @@ P.species = {
     },
     spriteFront = "mods/Kanto-Reforged/assets/zigzagoon_front.png",
     spriteBack = "mods/Kanto-Reforged/assets/zigzagoon_back.png",
-    frontSize = 5,
+    frontSize = 6,
     palette = "ZIGZAGOON",
     dexEntry = {
       kind = "TINY RACCOON POKMON",
@@ -17970,7 +17985,7 @@ P.species = {
     },
     spriteFront = "mods/Kanto-Reforged/assets/linoone_front.png",
     spriteBack = "mods/Kanto-Reforged/assets/linoone_back.png",
-    frontSize = 5,
+    frontSize = 6,
     palette = "LINOONE",
     dexEntry = {
       kind = "RUSHING POKMON",
@@ -18017,7 +18032,7 @@ P.species = {
     },
     spriteFront = "mods/Kanto-Reforged/assets/wurmple_front.png",
     spriteBack = "mods/Kanto-Reforged/assets/wurmple_back.png",
-    frontSize = 5,
+    frontSize = 6,
     palette = "WURMPLE",
     dexEntry = {
       kind = "WORM POKMON",
@@ -18063,7 +18078,7 @@ P.species = {
     },
     spriteFront = "mods/Kanto-Reforged/assets/silcoon_front.png",
     spriteBack = "mods/Kanto-Reforged/assets/silcoon_back.png",
-    frontSize = 5,
+    frontSize = 6,
     palette = "SILCOON",
     dexEntry = {
       kind = "COCOON POKMON",
@@ -18219,7 +18234,7 @@ P.species = {
     },
     spriteFront = "mods/Kanto-Reforged/assets/cascoon_front.png",
     spriteBack = "mods/Kanto-Reforged/assets/cascoon_back.png",
-    frontSize = 5,
+    frontSize = 6,
     palette = "CASCOON",
     dexEntry = {
       kind = "COCOON POKMON",
@@ -18440,7 +18455,7 @@ P.species = {
     },
     spriteFront = "mods/Kanto-Reforged/assets/lotad_front.png",
     spriteBack = "mods/Kanto-Reforged/assets/lotad_back.png",
-    frontSize = 5,
+    frontSize = 6,
     palette = "LOTAD",
     dexEntry = {
       kind = "WATER WEED POKMON",
@@ -18855,7 +18870,7 @@ P.species = {
     },
     spriteFront = "mods/Kanto-Reforged/assets/seedot_front.png",
     spriteBack = "mods/Kanto-Reforged/assets/seedot_back.png",
-    frontSize = 5,
+    frontSize = 6,
     palette = "SEEDOT",
     dexEntry = {
       kind = "ACORN POKMON",
@@ -19302,7 +19317,7 @@ P.species = {
     },
     spriteFront = "mods/Kanto-Reforged/assets/taillow_front.png",
     spriteBack = "mods/Kanto-Reforged/assets/taillow_back.png",
-    frontSize = 5,
+    frontSize = 6,
     palette = "TAILLOW",
     dexEntry = {
       kind = "TINY SWALLOW POKMON",
@@ -19394,7 +19409,7 @@ P.species = {
     },
     spriteFront = "mods/Kanto-Reforged/assets/swellow_front.png",
     spriteBack = "mods/Kanto-Reforged/assets/swellow_back.png",
-    frontSize = 5,
+    frontSize = 6,
     palette = "SWELLOW",
     dexEntry = {
       kind = "SWALLOW POKMON",
@@ -19510,7 +19525,7 @@ P.species = {
     },
     spriteFront = "mods/Kanto-Reforged/assets/wingull_front.png",
     spriteBack = "mods/Kanto-Reforged/assets/wingull_back.png",
-    frontSize = 5,
+    frontSize = 6,
     palette = "WINGULL",
     dexEntry = {
       kind = "SEAGULL POKMON",
@@ -19797,7 +19812,7 @@ P.species = {
     },
     spriteFront = "mods/Kanto-Reforged/assets/ralts_front.png",
     spriteBack = "mods/Kanto-Reforged/assets/ralts_back.png",
-    frontSize = 5,
+    frontSize = 6,
     palette = "RALTS",
     dexEntry = {
       kind = "FEELING POKMON",
@@ -20229,7 +20244,7 @@ P.species = {
     },
     spriteFront = "mods/Kanto-Reforged/assets/surskit_front.png",
     spriteBack = "mods/Kanto-Reforged/assets/surskit_back.png",
-    frontSize = 5,
+    frontSize = 6,
     palette = "SURSKIT",
     dexEntry = {
       kind = "POND SKATER POKMON",
@@ -20481,7 +20496,7 @@ P.species = {
     },
     spriteFront = "mods/Kanto-Reforged/assets/shroomish_front.png",
     spriteBack = "mods/Kanto-Reforged/assets/shroomish_back.png",
-    frontSize = 5,
+    frontSize = 6,
     palette = "SHROOMISH",
     dexEntry = {
       kind = "MUSHROOM POKMON",
@@ -21193,7 +21208,7 @@ P.species = {
     },
     spriteFront = "mods/Kanto-Reforged/assets/nincada_front.png",
     spriteBack = "mods/Kanto-Reforged/assets/nincada_back.png",
-    frontSize = 5,
+    frontSize = 6,
     palette = "NINCADA",
     dexEntry = {
       kind = "TRAINEE POKMON",
@@ -21533,7 +21548,7 @@ P.species = {
     },
     spriteFront = "mods/Kanto-Reforged/assets/whismur_front.png",
     spriteBack = "mods/Kanto-Reforged/assets/whismur_back.png",
-    frontSize = 5,
+    frontSize = 6,
     palette = "WHISMUR",
     dexEntry = {
       kind = "WHISPER POKMON",
@@ -22173,7 +22188,7 @@ P.species = {
     },
     spriteFront = "mods/Kanto-Reforged/assets/azurill_front.png",
     spriteBack = "mods/Kanto-Reforged/assets/azurill_back.png",
-    frontSize = 5,
+    frontSize = 6,
     palette = "AZURILL",
     dexEntry = {
       kind = "POLKA DOT POKMON",
@@ -22401,7 +22416,7 @@ P.species = {
     },
     spriteFront = "mods/Kanto-Reforged/assets/skitty_front.png",
     spriteBack = "mods/Kanto-Reforged/assets/skitty_back.png",
-    frontSize = 5,
+    frontSize = 6,
     palette = "SKITTY",
     dexEntry = {
       kind = "KITTEN POKMON",
@@ -22692,7 +22707,7 @@ P.species = {
     },
     spriteFront = "mods/Kanto-Reforged/assets/sableye_front.png",
     spriteBack = "mods/Kanto-Reforged/assets/sableye_back.png",
-    frontSize = 5,
+    frontSize = 6,
     palette = "SABLEYE",
     dexEntry = {
       kind = "DARKNESS POKMON",
@@ -22831,7 +22846,7 @@ P.species = {
     },
     spriteFront = "mods/Kanto-Reforged/assets/mawile_front.png",
     spriteBack = "mods/Kanto-Reforged/assets/mawile_back.png",
-    frontSize = 5,
+    frontSize = 6,
     palette = "MAWILE",
     dexEntry = {
       kind = "DECEIVER POKMON",
@@ -22940,7 +22955,7 @@ P.species = {
     },
     spriteFront = "mods/Kanto-Reforged/assets/aron_front.png",
     spriteBack = "mods/Kanto-Reforged/assets/aron_back.png",
-    frontSize = 5,
+    frontSize = 6,
     palette = "ARON",
     dexEntry = {
       kind = "IRON ARMOR POKMON",
@@ -23358,7 +23373,7 @@ P.species = {
     },
     spriteFront = "mods/Kanto-Reforged/assets/meditite_front.png",
     spriteBack = "mods/Kanto-Reforged/assets/meditite_back.png",
-    frontSize = 5,
+    frontSize = 6,
     palette = "MEDITITE",
     dexEntry = {
       kind = "MEDITATE POKMON",
@@ -23618,7 +23633,7 @@ P.species = {
     },
     spriteFront = "mods/Kanto-Reforged/assets/electrike_front.png",
     spriteBack = "mods/Kanto-Reforged/assets/electrike_back.png",
-    frontSize = 5,
+    frontSize = 6,
     palette = "ELECTRIKE",
     dexEntry = {
       kind = "LIGHTNING POKMON",
@@ -23855,7 +23870,7 @@ P.species = {
     },
     spriteFront = "mods/Kanto-Reforged/assets/plusle_front.png",
     spriteBack = "mods/Kanto-Reforged/assets/plusle_back.png",
-    frontSize = 5,
+    frontSize = 6,
     palette = "PLUSLE",
     dexEntry = {
       kind = "CHEERING POKMON",
@@ -23976,7 +23991,7 @@ P.species = {
     },
     spriteFront = "mods/Kanto-Reforged/assets/minun_front.png",
     spriteBack = "mods/Kanto-Reforged/assets/minun_back.png",
-    frontSize = 5,
+    frontSize = 6,
     palette = "MINUN",
     dexEntry = {
       kind = "CHEERING POKMON",
@@ -24108,7 +24123,7 @@ P.species = {
     },
     spriteFront = "mods/Kanto-Reforged/assets/volbeat_front.png",
     spriteBack = "mods/Kanto-Reforged/assets/volbeat_back.png",
-    frontSize = 5,
+    frontSize = 6,
     palette = "VOLBEAT",
     dexEntry = {
       kind = "FIREFLY POKMON",
@@ -24237,7 +24252,7 @@ P.species = {
     },
     spriteFront = "mods/Kanto-Reforged/assets/illumise_front.png",
     spriteBack = "mods/Kanto-Reforged/assets/illumise_back.png",
-    frontSize = 5,
+    frontSize = 6,
     palette = "ILLUMISE",
     dexEntry = {
       kind = "FIREFLY POKMON",
@@ -24351,7 +24366,7 @@ P.species = {
     },
     spriteFront = "mods/Kanto-Reforged/assets/roselia_front.png",
     spriteBack = "mods/Kanto-Reforged/assets/roselia_back.png",
-    frontSize = 5,
+    frontSize = 6,
     palette = "ROSELIA",
     dexEntry = {
       kind = "THORN POKMON",
@@ -24467,7 +24482,7 @@ P.species = {
     },
     spriteFront = "mods/Kanto-Reforged/assets/gulpin_front.png",
     spriteBack = "mods/Kanto-Reforged/assets/gulpin_back.png",
-    frontSize = 5,
+    frontSize = 6,
     palette = "GULPIN",
     dexEntry = {
       kind = "STOMACH POKMON",
@@ -25195,7 +25210,7 @@ P.species = {
     },
     spriteFront = "mods/Kanto-Reforged/assets/numel_front.png",
     spriteBack = "mods/Kanto-Reforged/assets/numel_back.png",
-    frontSize = 5,
+    frontSize = 6,
     palette = "NUMEL",
     dexEntry = {
       kind = "NUMB POKMON",
@@ -25470,7 +25485,7 @@ P.species = {
     },
     spriteFront = "mods/Kanto-Reforged/assets/torkoal_front.png",
     spriteBack = "mods/Kanto-Reforged/assets/torkoal_back.png",
-    frontSize = 5,
+    frontSize = 6,
     palette = "TORKOAL",
     dexEntry = {
       kind = "COAL POKMON",
@@ -25598,7 +25613,7 @@ P.species = {
     },
     spriteFront = "mods/Kanto-Reforged/assets/spoink_front.png",
     spriteBack = "mods/Kanto-Reforged/assets/spoink_back.png",
-    frontSize = 5,
+    frontSize = 6,
     palette = "SPOINK",
     dexEntry = {
       kind = "BOUNCE POKMON",
@@ -25972,7 +25987,7 @@ P.species = {
     },
     spriteFront = "mods/Kanto-Reforged/assets/trapinch_front.png",
     spriteBack = "mods/Kanto-Reforged/assets/trapinch_back.png",
-    frontSize = 5,
+    frontSize = 6,
     palette = "TRAPINCH",
     dexEntry = {
       kind = "ANT PIT POKMON",
@@ -26433,7 +26448,7 @@ P.species = {
     },
     spriteFront = "mods/Kanto-Reforged/assets/cacnea_front.png",
     spriteBack = "mods/Kanto-Reforged/assets/cacnea_back.png",
-    frontSize = 5,
+    frontSize = 6,
     palette = "CACNEA",
     dexEntry = {
       kind = "CACTUS POKMON",
@@ -26701,7 +26716,7 @@ P.species = {
     },
     spriteFront = "mods/Kanto-Reforged/assets/swablu_front.png",
     spriteBack = "mods/Kanto-Reforged/assets/swablu_back.png",
-    frontSize = 5,
+    frontSize = 6,
     palette = "SWABLU",
     dexEntry = {
       kind = "COTTON BIRD POKMON",
@@ -27546,7 +27561,7 @@ P.species = {
     },
     spriteFront = "mods/Kanto-Reforged/assets/barboach_front.png",
     spriteBack = "mods/Kanto-Reforged/assets/barboach_back.png",
-    frontSize = 5,
+    frontSize = 6,
     palette = "BARBOACH",
     dexEntry = {
       kind = "WHISKERS POKMON",
@@ -27807,7 +27822,7 @@ P.species = {
     },
     spriteFront = "mods/Kanto-Reforged/assets/corphish_front.png",
     spriteBack = "mods/Kanto-Reforged/assets/corphish_back.png",
-    frontSize = 5,
+    frontSize = 6,
     palette = "CORPHISH",
     dexEntry = {
       kind = "RUFFIAN POKMON",
@@ -28078,7 +28093,7 @@ P.species = {
     },
     spriteFront = "mods/Kanto-Reforged/assets/baltoy_front.png",
     spriteBack = "mods/Kanto-Reforged/assets/baltoy_back.png",
-    frontSize = 5,
+    frontSize = 6,
     palette = "BALTOY",
     dexEntry = {
       kind = "CLAY DOLL POKMON",
@@ -28544,7 +28559,7 @@ P.species = {
     },
     spriteFront = "mods/Kanto-Reforged/assets/anorith_front.png",
     spriteBack = "mods/Kanto-Reforged/assets/anorith_back.png",
-    frontSize = 5,
+    frontSize = 6,
     palette = "ANORITH",
     dexEntry = {
       kind = "OLD SHRIMP POKMON",
@@ -28750,7 +28765,7 @@ P.species = {
     },
     spriteFront = "mods/Kanto-Reforged/assets/feebas_front.png",
     spriteBack = "mods/Kanto-Reforged/assets/feebas_back.png",
-    frontSize = 5,
+    frontSize = 6,
     palette = "FEEBAS",
     dexEntry = {
       kind = "FISH POKMON",
@@ -28980,7 +28995,7 @@ P.species = {
     },
     spriteFront = "mods/Kanto-Reforged/assets/castform_front.png",
     spriteBack = "mods/Kanto-Reforged/assets/castform_back.png",
-    frontSize = 5,
+    frontSize = 6,
     palette = "CASTFORM",
     dexEntry = {
       kind = "WEATHER POKMON",
@@ -29233,7 +29248,7 @@ P.species = {
     },
     spriteFront = "mods/Kanto-Reforged/assets/shuppet_front.png",
     spriteBack = "mods/Kanto-Reforged/assets/shuppet_back.png",
-    frontSize = 5,
+    frontSize = 6,
     palette = "SHUPPET",
     dexEntry = {
       kind = "PUPPET POKMON",
@@ -29936,7 +29951,7 @@ P.species = {
     },
     spriteFront = "mods/Kanto-Reforged/assets/chimecho_front.png",
     spriteBack = "mods/Kanto-Reforged/assets/chimecho_back.png",
-    frontSize = 5,
+    frontSize = 6,
     palette = "CHIMECHO",
     dexEntry = {
       kind = "WIND CHIME POKMON",
@@ -30146,7 +30161,7 @@ P.species = {
     },
     spriteFront = "mods/Kanto-Reforged/assets/wynaut_front.png",
     spriteBack = "mods/Kanto-Reforged/assets/wynaut_back.png",
-    frontSize = 5,
+    frontSize = 6,
     palette = "WYNAUT",
     dexEntry = {
       kind = "BRIGHT POKMON",
@@ -30254,7 +30269,7 @@ P.species = {
     },
     spriteFront = "mods/Kanto-Reforged/assets/snorunt_front.png",
     spriteBack = "mods/Kanto-Reforged/assets/snorunt_back.png",
-    frontSize = 5,
+    frontSize = 6,
     palette = "SNORUNT",
     dexEntry = {
       kind = "SNOW HAT POKMON",
@@ -30805,7 +30820,7 @@ P.species = {
     },
     spriteFront = "mods/Kanto-Reforged/assets/clamperl_front.png",
     spriteBack = "mods/Kanto-Reforged/assets/clamperl_back.png",
-    frontSize = 5,
+    frontSize = 6,
     palette = "CLAMPERL",
     dexEntry = {
       kind = "BIVALVE POKMON",
@@ -31225,7 +31240,7 @@ P.species = {
     },
     spriteFront = "mods/Kanto-Reforged/assets/luvdisc_front.png",
     spriteBack = "mods/Kanto-Reforged/assets/luvdisc_back.png",
-    frontSize = 5,
+    frontSize = 6,
     palette = "LUVDISC",
     dexEntry = {
       kind = "RENDEZVOUS POKMON",
@@ -31339,7 +31354,7 @@ P.species = {
     },
     spriteFront = "mods/Kanto-Reforged/assets/bagon_front.png",
     spriteBack = "mods/Kanto-Reforged/assets/bagon_back.png",
-    frontSize = 5,
+    frontSize = 6,
     palette = "BAGON",
     dexEntry = {
       kind = "ROCK HEAD POKMON",
@@ -31663,7 +31678,7 @@ P.species = {
     },
     spriteFront = "mods/Kanto-Reforged/assets/beldum_front.png",
     spriteBack = "mods/Kanto-Reforged/assets/beldum_back.png",
-    frontSize = 5,
+    frontSize = 6,
     palette = "BELDUM",
     dexEntry = {
       kind = "IRON BALL POKMON",
@@ -33265,7 +33280,7 @@ P.species = {
     },
     spriteFront = "mods/Kanto-Reforged/assets/jirachi_front.png",
     spriteBack = "mods/Kanto-Reforged/assets/jirachi_back.png",
-    frontSize = 5,
+    frontSize = 6,
     palette = "JIRACHI",
     dexEntry = {
       kind = "WISH POKMON",

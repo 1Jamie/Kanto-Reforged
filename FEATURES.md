@@ -48,6 +48,7 @@ Configured in the mod manager / F10 options:
 | **FULL SPAWN MIX** | Off | Rebuilds wild tables from the full Gen 1–3 pool instead of curated mixes. Flip **before** a long session; it rewrites encounter data. |
 | **XP SHARE (SLOT 2)** | On | Splits the Gen 1 XP pool: ~70% to fighters, up to ~30% to party slot 2 (never more than a solo share total). Replaces EXP.ALL while enabled. |
 | **SMARTER AI** | On | Trainers (and wild scoring hooks) prefer useful damage and skip moves that would fail. |
+| **SP.ATK / SP.DEF** | Off | Special moves use separate Sp.Atk / Sp.Def bases (PokeAPI) instead of Gen 1 Special. Summary and Modern UI party/PC detail show both stats (`SAT` / `SDF`). Stages, DVs, and Calcium stay Gen 1 (one shared Special). |
 
 ---
 
@@ -93,7 +94,7 @@ Cute Charm / Attract / Captivate interact with the gender system (below).
 
 ### Wilds
 
-Default mode is **curated**: habitats and levels mix Gen 2–3 species into Kanto routes without replacing the whole table. Optional **FULL SPAWN MIX** randomizes from Gen 1–3.
+Default mode is **curated**: habitats and levels mix Gen 2–3 species into Kanto routes without replacing the whole table. A coverage pass then ensures every non-legendary **line** is obtainable (catch the base — or a gift/rod root — then evolve / breed); mid and final forms do not all need their own grass slots. Optional **FULL SPAWN MIX** randomizes from Gen 1–3.
 
 Wilds can hold berries (~**5%** chance). The berry is rolled only from types you have already **unlocked** for the farm. Catching the mon keeps `heldItem`; use party **TAKE** to move it to the bag.
 
@@ -293,7 +294,7 @@ Step cool-down between crafts: **640** farm steps (480 at soil rank 3). No berry
 
 - **Pockets:** Items, Balls, Key Items, TMs & HMs, Berries.
 - Bag capacity **60**.
-- **DexNav** on the start menu after you have the Pokédex: current map species (more detail once seen/caught). Footer notes Super Rod on fishable maps. If a roamer is on this map, an optional **ROAM** row appears.
+- **DexNav** on the start menu after you have the Pokédex: current map species (more detail once seen/caught). Footer notes Super Rod on fishable maps. If a roamer is on this map, an optional **ROAM** row appears. Mod setting **DEXNAV**: `DEXNAV` (default), `DEXNAV-KR` (rename to tell it apart from another DexNav mod), or `OFF` (hide KR’s entry).
 - **Summary** page shows ability, held item, and gender glyph.
 - **Optional [Gen1 Modern UI](https://github.com/ArmstrongThomas/gen1-modern-ui):** when that mod is installed, bag pockets and the summary ability page use its presenters; DexNav and party Give/Take keep working through the existing start-menu / party submenu hooks. With Modern UI absent, all of this still draws and plays as stock Gen 1 UI.
 
@@ -507,7 +508,8 @@ Legendary custom maps save return coordinates on enter and exit via warp hooks s
 | `held_items.lua` / `competitive_items.lua` / `overworld_loot.lua` | Items + finds |
 | `berry_farm.lua` / `berry_quests.lua` | Farm map, merchant, blender, soil |
 | `gender.lua` / `breeding.lua` / `daycare.lua` | Gender + eggs |
-| `level_caps.lua` / `modern_xp_share.lua` | Caps + slot-2 XP |
+| `level_caps.lua` / `modern_xp_share.lua` / `split_special.lua` | Caps + slot-2 XP + optional SpA/SpD |
+| `special_stat_patches.lua` | Generated Kanto SpA/SpD for the split toggle |
 | `bag_pockets.lua` / `dexnav.lua` / `summary_ui.lua` / `gen1_modern_ui_adapter.lua` | QoL UI (+ optional Modern UI) |
 | `house_npcs.lua` | Object-index claims + shared NPC helpers |
 | `battle_clubs.lua` / `judge_npc.lua` / `trades_extra.lua` | Clubs, judge, trades |

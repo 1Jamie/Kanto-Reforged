@@ -77,15 +77,20 @@ function RoamingRadar.register(mod)
     local out = next(game, items)
     if type(out) ~= "table" then return out end
     if not mod.save:get("got_roaming_radar", false) then return out end
-    local inserted = mod.ui.insertAfter(out, "DEXNAV", {
-      label = Strings("RADAR"),
-      onSelect = function() mod.ui.push(game, SCREEN) end,
-    })
-    if inserted then return inserted end
-    out[#out + 1] = {
+    local DexNav = require("mods.Kanto-Reforged.dexnav")
+    local radar = {
       label = Strings("RADAR"),
       onSelect = function() mod.ui.push(game, SCREEN) end,
     }
+    for _, label in ipairs(DexNav.MENU_LABELS) do
+      for i, row in ipairs(out) do
+        if row.label == label then
+          table.insert(out, i + 1, radar)
+          return out
+        end
+      end
+    end
+    out[#out + 1] = radar
     return out
   end)
 end
