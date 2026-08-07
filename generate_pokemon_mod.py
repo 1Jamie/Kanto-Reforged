@@ -1252,8 +1252,8 @@ def drop_orphan_pixels(img, min_blob=4):
     return img
 
 
-def close_small_holes(img):
-    """Fill 1–2px transparent dents that sit between opaque neighbors (waist/hem bites)."""
+def close_small_holes(img, max_gap=2):
+    """Fill short transparent dents between opaque neighbors (waist / hem bites)."""
     img = img.convert("RGBA")
     w, h = img.size
     src = img.load()
@@ -1261,7 +1261,6 @@ def close_small_holes(img):
     dst = out.load()
 
     def pick_fill(colors):
-        # Prefer body mid-tones over pure black so gap-fills do not blob the outline.
         return max(colors, key=lambda c: 0.299 * c[0] + 0.587 * c[1] + 0.114 * c[2])
 
     for y in range(h):
@@ -1274,18 +1273,12 @@ def close_small_holes(img):
                     neighbors.append(src[nx, ny])
             left = x > 0 and src[x - 1, y][3] >= 128
             right = x + 1 < w and src[x + 1, y][3] >= 128
-            # Horizontal pinch (classic waist chew) or 3+ opaque neighbors.
             if (left and right) or len(neighbors) >= 3:
                 if left and right:
                     dst[x, y] = pick_fill([src[x - 1, y], src[x + 1, y]])
-                elif left:
-                    # Prefer inward (right) if present among neighbors.
-                    dst[x, y] = pick_fill(neighbors) if neighbors else src[x - 1, y]
-                elif right:
-                    dst[x, y] = pick_fill(neighbors) if neighbors else src[x + 1, y]
-                else:
+                elif neighbors:
                     dst[x, y] = pick_fill(neighbors)
-        # Second pass on this row: bridge 2px horizontal gaps (#..#).
+        # Bridge short horizontal gaps (disconnected hem flares).
         x = 0
         while x < w:
             if src[x, y][3] >= 128:
@@ -1294,9 +1287,9 @@ def close_small_holes(img):
             start = x
             while x < w and src[x, y][3] < 128:
                 x += 1
-            end = x  # exclusive
+            end = x
             gap = end - start
-            if gap <= 2 and start > 0 and end < w:
+            if 1 <= gap <= max_gap and start > 0 and end < w:
                 if src[start - 1, y][3] >= 128 and src[end, y][3] >= 128:
                     fill = pick_fill([src[start - 1, y], src[end, y]])
                     for fx in range(start, end):
@@ -1304,11 +1297,50 @@ def close_small_holes(img):
     return out
 
 
+def resize_pixel_art(img, new_w, new_h):
+    """Downscale by majority-color blocks so thin outlines / folds survive.
+
+    NEAREST keeps one lucky source pixel per cell and drops the rest — on
+    96→32 backs that erases most internal detail.  Majority vote (with a
+    boost for near-black) keeps Gen 1-readable structure.
+    """
+    from collections import Counter
+
+    img = img.convert("RGBA")
+    w, h = img.size
+    if (w, h) == (new_w, new_h):
+        return img
+    if new_w >= w and new_h >= h:
+        return img.resize((new_w, new_h), Image.NEAREST)
+
+    px = img.load()
+    out = Image.new("RGBA", (new_w, new_h), (0, 0, 0, 0))
+    op = out.load()
+    for y in range(new_h):
+        y0 = int(y * h / new_h)
+        y1 = max(y0 + 1, int((y + 1) * h / new_h))
+        for x in range(new_w):
+            x0 = int(x * w / new_w)
+            x1 = max(x0 + 1, int((x + 1) * w / new_w))
+            counts = Counter()
+            for yy in range(y0, y1):
+                for xx in range(x0, x1):
+                    c = px[xx, yy]
+                    if c[3] < 128:
+                        continue
+                    counts[c] += 1
+                    if c[0] + c[1] + c[2] < 80:
+                        counts[c] += 2
+            if counts:
+                op[x, y] = counts.most_common(1)[0][0]
+    return out
+
+
 def _pixel_luma(c):
     return 0.299 * c[0] + 0.587 * c[1] + 0.114 * c[2]
 
 
-def thicken_narrow_stems(img, min_width=5):
+def thicken_narrow_stems(img, min_width=7):
     """Widen thin mid-body rows without growing a 2px black outline blob.
 
     Copies the edge outline one pixel outward, then backfills the old edge
@@ -1342,7 +1374,6 @@ def thicken_narrow_stems(img, min_width=5):
             wider.append(above[1] - above[0] + 1)
         if below:
             wider.append(below[1] - below[0] + 1)
-        # Only thicken when this row is a constriction between wider rows.
         if not wider or max(wider) < width + 2:
             continue
 
@@ -1370,38 +1401,261 @@ def thicken_narrow_stems(img, min_width=5):
     return out
 
 
-def thin_outline_bulges(img):
-    """Knock 2px-thick exterior outline blobs back to a 1px rim."""
+def despeckle_interior(img, passes=2):
+    """Smooth noisy interior pixels left by NEAREST downscale (backs especially)."""
+    img = img.convert("RGBA")
+    for _ in range(passes):
+        w, h = img.size
+        src = img.load()
+        out = img.copy()
+        dst = out.load()
+        for y in range(1, h - 1):
+            for x in range(1, w - 1):
+                c = src[x, y]
+                if c[3] < 128:
+                    continue
+                # Skip silhouette edge — outline pass owns those.
+                if any(
+                    src[x + dx, y + dy][3] < 128
+                    for dx, dy in ((-1, 0), (1, 0), (0, -1), (0, 1))
+                ):
+                    continue
+                neighbors = [
+                    src[x + dx, y + dy]
+                    for dy in (-1, 0, 1)
+                    for dx in (-1, 0, 1)
+                    if not (dx == 0 and dy == 0) and src[x + dx, y + dy][3] >= 128
+                ]
+                if len(neighbors) < 5:
+                    continue
+                # Bucket by coarse luma; replace outliers with the mode bucket's
+                # median-ish member (first neighbor in that bucket).
+                buckets = {}
+                for n in neighbors:
+                    key = int(_pixel_luma(n) // 64)
+                    buckets.setdefault(key, []).append(n)
+                mode_key = max(buckets.keys(), key=lambda k: len(buckets[k]))
+                if len(buckets[mode_key]) < 4:
+                    continue
+                my_key = int(_pixel_luma(c) // 64)
+                if my_key != mode_key:
+                    dst[x, y] = buckets[mode_key][0]
+        img = out
+    return img
+
+
+def clean_interior_ink(img):
+    """Remove stray interior black blobs that are not real facial features.
+
+    Isolated / nearly-isolated dark pixels inside the body read as mud on
+    heavily downscaled backs.  Keeps dark runs with 2+ dark neighbors (eyes,
+    mouth lines, folds).
+    """
     img = img.convert("RGBA")
     w, h = img.size
     src = img.load()
     out = img.copy()
     dst = out.load()
+    for y in range(1, h - 1):
+        for x in range(1, w - 1):
+            c = src[x, y]
+            if c[3] < 128 or _pixel_luma(c) >= 50:
+                continue
+            if any(
+                src[x + dx, y + dy][3] < 128
+                for dx, dy in ((-1, 0), (1, 0), (0, -1), (0, 1))
+            ):
+                continue  # silhouette ink
+            dark_n = 0
+            body = []
+            for dy in (-1, 0, 1):
+                for dx in (-1, 0, 1):
+                    if dx == 0 and dy == 0:
+                        continue
+                    n = src[x + dx, y + dy]
+                    if n[3] < 128:
+                        continue
+                    if _pixel_luma(n) < 50:
+                        dark_n += 1
+                    else:
+                        body.append(n)
+            if dark_n <= 1 and len(body) >= 4:
+                dst[x, y] = max(body, key=_pixel_luma)
+    return out
+
+
+def ensure_selective_outline(img):
+    """Readable Gen 1 rim: full silhouette ink, soft only on lit color tops.
+
+    Raticate can drop outline on lit tan edges because tan still reads on a
+    white battle BG.  Ralts' white gown cannot — those exterior whites vanish
+    without ink.  Soften only the lit top of chromatic fills (green hair);
+    every other exterior pixel gets a 1px black rim.
+    """
+    img = img.convert("RGBA")
+    w, h = img.size
+    src = img.load()
+    out = img.copy()
+    dst = out.load()
+    black = (0, 0, 0, 255)
 
     def opaque(x, y):
         return 0 <= x < w and 0 <= y < h and src[x, y][3] >= 128
 
-    def dark(c):
-        return _pixel_luma(c) < 60
+    for y in range(h):
+        for x in range(w):
+            if src[x, y][3] < 128:
+                continue
+            open_l = not opaque(x - 1, y)
+            open_r = not opaque(x + 1, y)
+            open_u = not opaque(x, y - 1)
+            open_d = not opaque(x, y + 1)
+            if not (open_l or open_r or open_u or open_d):
+                continue
+
+            # Prefer a chromatic inward sample for lit-top softening.
+            body = src[x, y]
+            for nx, ny in (
+                (x, y + 1), (x - 1, y), (x + 1, y), (x, y - 1),
+                (x - 1, y + 1), (x + 1, y + 1),
+            ):
+                if opaque(nx, ny):
+                    body = src[nx, ny]
+                    break
+
+            sat = max(body[0], body[1], body[2]) - min(body[0], body[1], body[2])
+            lit_top = open_u and not open_d
+            # Soft lit crown only for saturated mid colors (hair/leaves).
+            if lit_top and sat >= 48 and 60 <= _pixel_luma(body) <= 190:
+                dst[x, y] = body
+            else:
+                dst[x, y] = black
+    return out
+
+
+def gen1_depth_pass(img, strong=False):
+    """Sparse interior ink + top highlights (Raticate-level, not ink flood)."""
+    img = img.convert("RGBA")
+    w, h = img.size
+    src = img.load()
+    luma = [[None] * w for _ in range(h)]
+    satm = [[0] * w for _ in range(h)]
+    for y in range(h):
+        for x in range(w):
+            r, g, b, a = src[x, y]
+            if a >= 128:
+                luma[y][x] = _pixel_luma((r, g, b))
+                satm[y][x] = max(r, g, b) - min(r, g, b)
+
+    ys = [y for y in range(h) for x in range(w) if luma[y][x] is not None]
+    if not ys:
+        return img
+    y_min, y_max = min(ys), max(ys)
+    hi_band = y_min + max(2, int((y_max - y_min) * 0.35))
+    step = 34 if strong else 42
+
+    out = img.copy()
+    dst = out.load()
+    black = (0, 0, 0, 255)
+    white = (255, 255, 255, 255)
 
     for y in range(h):
         for x in range(w):
-            c = src[x, y]
-            if c[3] < 128 or not dark(c):
+            L = luma[y][x]
+            if L is None:
                 continue
+            exterior = any(
+                not (0 <= x + dx < w and 0 <= y + dy < h)
+                or luma[y + dy][x + dx] is None
+                for dx, dy in ((-1, 0), (1, 0), (0, -1), (0, 1))
+            )
+            neighbors = []
             for dx, dy in ((-1, 0), (1, 0), (0, -1), (0, 1)):
-                ox, oy = x + dx, y + dy
-                if opaque(ox, oy):
-                    continue  # not exterior in this direction
-                # (dx,dy) faces transparent; look inward the other way.
-                ix, iy = x - dx, y - dy
-                if not (opaque(ix, iy) and dark(src[ix, iy])):
+                nx, ny = x + dx, y + dy
+                if 0 <= nx < w and 0 <= ny < h and luma[ny][nx] is not None:
+                    neighbors.append(luma[ny][nx])
+            if not neighbors:
+                continue
+
+            chroma = satm[y][x]
+            if not exterior and any(L < n - step for n in neighbors):
+                if L < (90 if chroma >= 40 else 110):
+                    dst[x, y] = black
                     continue
-                jx, jy = ix - dx, iy - dy
-                # Keep a 1px black stem; only clear when there is body further in.
-                if opaque(jx, jy):
-                    dst[x, y] = (0, 0, 0, 0)
-                    break
+            if (
+                chroma < 40
+                and y <= hi_band
+                and L >= 175
+                and L >= max(neighbors) - 2
+                and not exterior
+            ):
+                dst[x, y] = white
+    return out
+
+
+def dither_indexed_flats(indexed_img):
+    """Very sparse black grit in flat mid fills — Raticate fur, not hatch."""
+    w, h = indexed_img.size
+    px = indexed_img.load()
+    marks = []
+    for y in range(2, h - 2):
+        for x in range(2, w - 2):
+            if px[x, y] != 2:
+                continue
+            if any(
+                px[x + dx, y + dy] != 2
+                for dx, dy in ((-1, 0), (1, 0), (0, -1), (0, 1))
+            ):
+                continue
+            if any(
+                px[x + dx, y + dy] == 0
+                for dx, dy in ((-2, 0), (2, 0), (0, -2), (0, 2))
+            ):
+                continue
+            if (x * 5 + y * 11) % 8 == 0:
+                marks.append((x, y))
+    for x, y in marks:
+        px[x, y] = 4
+    return indexed_img
+
+
+def seal_outline_breaks(img):
+    """Fill 1px outline gaps on the silhouette (classic left-waist chew).
+
+    If a transparent cell sits between two opaque cells on a row, and either
+    neighbor is outline-dark, paint the gap black so white body cannot bleed
+    into a white UI background.
+    """
+    img = img.convert("RGBA")
+    w, h = img.size
+    src = img.load()
+    out = img.copy()
+    dst = out.load()
+    black = (0, 0, 0, 255)
+    for y in range(h):
+        for x in range(1, w - 1):
+            if src[x, y][3] >= 128:
+                continue
+            left, right = src[x - 1, y], src[x + 1, y]
+            if left[3] < 128 or right[3] < 128:
+                continue
+            if _pixel_luma(left) < 80 or _pixel_luma(right) < 80:
+                dst[x, y] = black
+        # Also seal vertical 1px bites on the left/right profile.
+        for x in range(w):
+            if src[x, y][3] >= 128:
+                continue
+            up = src[x, y - 1] if y > 0 else None
+            down = src[x, y + 1] if y + 1 < h else None
+            if not up or not down or up[3] < 128 or down[3] < 128:
+                continue
+            # Only when this column is on the exterior profile (side open).
+            left_open = x == 0 or src[x - 1, y][3] < 128
+            right_open = x + 1 >= w or src[x + 1, y][3] < 128
+            if (left_open or right_open) and (
+                _pixel_luma(up) < 80 or _pixel_luma(down) < 80
+            ):
+                dst[x, y] = black
     return out
 
 
@@ -1484,8 +1738,8 @@ def extract_species_palette(img):
     # to pure white (255,255,255); the classic SGB off-white (255,239,255)
     # reads as a pink/lilac box around Gen 2/3 pics.  Match GBC.
     colors[0] = (255, 255, 255)
-    if max(colors[3]) > 48:
-        colors[3] = tuple(max(0, int(c * 0.35)) for c in colors[3])
+    # Gen 1 battle outlines read as true black (DMG shade 3 / SGB color 3).
+    colors[3] = (0, 0, 0)
     return colors
 
 
@@ -1498,12 +1752,32 @@ def nearest_palette_index(r, g, b, colors):
     return best_i
 
 
-# Gen 1 extracted backs are 32x32 with a median of 4 transparent rows under
-# the feet (see assets/generated/battle/back).  The battle drawer pins feet
-# at y=96 and lets that pad hang into the menu, which is the classic
-# "cut off by the FIGHT box" look.  Our old fit-to-32 path left pad=0 so
-# expansion backs floated above the menu.
-BACK_BOTTOM_PAD = 4
+def shade_for_pixel(r, g, b, colors):
+    """Map a source pixel to a 0..3 shade index.
+
+    High-chroma accents (horns, flames) snap to the nearest palette color.
+    Low-chroma structure uses a white / mid / black ramp (slots 0, 1, 3) so
+    folds survive without painting dress shadows into the accent slot (2).
+    """
+    if r + g + b < 24:
+        return 3
+    sat = max(r, g, b) - min(r, g, b)
+    luma = 0.299 * r + 0.587 * g + 0.114 * b
+    if sat >= 48:
+        if luma < 75:
+            return 3  # deep chroma folds → black ink
+        return nearest_palette_index(r, g, b, colors)
+    # Pale body (white / lavender) must stay on the white slot.
+    if luma >= 175 or min(r, g, b) >= 170:
+        return 0
+    if luma >= 100:
+        return 1
+    return 3
+
+
+# Backs are 32x32.  Shift feet DOWN by this many pixels so the bottom of the
+# art is intentionally clipped (Gen 1 battle "cut by the FIGHT box" feel).
+BACK_BOTTOM_CLIP = 5
 
 # DMG shade indices written into the indexed PNG (1..4).  Runtime Advanced
 # color remaps these via the species' 4-color SGB palette (light→dark).
@@ -1542,41 +1816,50 @@ def process_sprite(input_path, output_path, target_size):
 
         w, h = img.size
         is_back = target_size == (32, 32)
-        bottom_pad = BACK_BOTTOM_PAD if is_back else 0
+        # Backs may render taller than 32 then shift down so feet clip off.
+        clip = BACK_BOTTOM_CLIP if is_back else 0
         fit_w = target_size[0]
-        fit_h = target_size[1] - bottom_pad
+        fit_h = target_size[1] + clip
 
-        # Thicken before any downscale so thin outlines / waists survive.
-        if w > fit_w or h > fit_h:
+        # Light pre-dilate on fronts only — backs lose detail if fattened
+        # before a heavy 96→32 shrink.
+        if (w > fit_w or h > fit_h) and not is_back:
             img = dilate_opaque(img)
-            img = close_small_holes(img)
+            img = close_small_holes(img, max_gap=1)
             w, h = img.size
 
         ratio = min(fit_w / w, fit_h / h)
         new_w, new_h = max(1, int(round(w * ratio))), max(1, int(round(h * ratio)))
-        # Never exceed the fit box after rounding.
         new_w = min(new_w, fit_w)
         new_h = min(new_h, fit_h)
-        img_resized = img.resize((new_w, new_h), Image.NEAREST)
-        img_resized = close_small_holes(img_resized)
-        img_resized = thicken_narrow_stems(img_resized)
-        img_resized = thin_outline_bulges(img_resized)
+        # Majority-block shrink keeps folds; NEAREST alone drops them.
+        img_resized = resize_pixel_art(img, new_w, new_h)
+        img_resized = close_small_holes(img_resized, max_gap=2 if not is_back else 1)
+        if not is_back:
+            img_resized = thicken_narrow_stems(img_resized, min_width=7)
+            img_resized = seal_outline_breaks(img_resized)
 
-        # Backs: bottom-align above the Gen 1-style pad.  Fronts: center.
+        # Backs: shift down so the bottom `clip` rows fall off the canvas.
         new_img = Image.new("RGBA", target_size, (255, 255, 255, 0))
         x = (target_size[0] - new_w) // 2
-        if bottom_pad:
-            y = target_size[1] - bottom_pad - new_h
+        if is_back:
+            y = target_size[1] - new_h + clip
         else:
             y = (target_size[1] - new_h) // 2
         new_img.paste(img_resized, (x, y), img_resized)
-        new_img = close_small_holes(new_img)
-        new_img = thin_outline_bulges(new_img)
+        new_img = close_small_holes(new_img, max_gap=2 if not is_back else 1)
+        if not is_back:
+            new_img = seal_outline_breaks(new_img)
+            new_img = thicken_narrow_stems(new_img, min_width=7)
+        # Venusaur-style volume: interior black crevices + white top hits +
+        # stipple.  Stronger on backs, which otherwise read as flat slabs.
+        new_img = gen1_depth_pass(new_img, strong=is_back)
         new_img = drop_orphan_pixels(new_img)
+        new_img = seal_outline_breaks(new_img)
+        new_img = ensure_selective_outline(new_img)
 
-        # Map each pixel to the nearest species-palette slot, then emit the
-        # matching DMG gray.  Brightness-only banding was what made green
-        # hair and pink body collapse into the same MEWMON purple/peach.
+        # Map pixels → DMG shades.  Accents keep hue; structure uses luma so
+        # backs are not a flat green/white blob.
         px = new_img.load()
         indexed_img = Image.new("P", target_size, 0)
         for py in range(target_size[1]):
@@ -1584,9 +1867,14 @@ def process_sprite(input_path, output_path, target_size):
                 r, g, b, a = px[px_x, py]
                 if a < 128:
                     indexed_img.putpixel((px_x, py), 0)
+                elif r + g + b < 24:
+                    indexed_img.putpixel((px_x, py), 4)
                 else:
-                    shade = nearest_palette_index(r, g, b, species_colors)
+                    shade = shade_for_pixel(r, g, b, species_colors)
                     indexed_img.putpixel((px_x, py), shade + 1)
+
+        if is_back:
+            indexed_img = dither_indexed_flats(indexed_img)
 
         palette = [
             255, 255, 255,  # 0: Transparent
@@ -2048,7 +2336,7 @@ def main():
         "--resprite",
         action="store_true",
         help="Re-bake battle fronts/backs from sprite cache using dex-height "
-             "frontSize (40/48/56), Gen 1 back bottom-pad, outline dilate so "
+             "frontSize (40/48/56), back feet clipped 2px, outline dilate so "
              "thin waists/edges survive, and rewrite frontSize in pokemon_data.lua",
     )
     args = parser.parse_args()
