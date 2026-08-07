@@ -1533,6 +1533,171 @@ def ensure_selective_outline(img):
     return out
 
 
+def ensure_contrast_outline(img, luma_floor=110):
+    """Light outline for dark / busy sprites (Murkrow, Sableye, …).
+
+    Only ink exterior pixels that would vanish on a white battle BG.  Dark
+    body already reads against white, so forcing a full black rim just
+    thickens the silhouette into an unreadable blob.
+    """
+    img = img.convert("RGBA")
+    w, h = img.size
+    src = img.load()
+    out = img.copy()
+    dst = out.load()
+    black = (0, 0, 0, 255)
+
+    def opaque(x, y):
+        return 0 <= x < w and 0 <= y < h and src[x, y][3] >= 128
+
+    for y in range(h):
+        for x in range(w):
+            if src[x, y][3] < 128:
+                continue
+            if not (
+                not opaque(x - 1, y)
+                or not opaque(x + 1, y)
+                or not opaque(x, y - 1)
+                or not opaque(x, y + 1)
+            ):
+                continue
+            body = src[x, y]
+            for nx, ny in (
+                (x, y + 1), (x - 1, y), (x + 1, y), (x, y - 1),
+            ):
+                if opaque(nx, ny):
+                    body = src[nx, ny]
+                    break
+            if _pixel_luma(body) >= luma_floor:
+                dst[x, y] = black
+    return out
+
+
+def lift_near_black_body(img, lift_rgb=(56, 56, 88)):
+    """Raise interior near-black fills so dark mons keep a mid-tone body.
+
+    Emerald Murkrow / Sableye art is mostly near-black; without a lift the
+    DMG shade map collapses the whole body into outline ink.
+    """
+    img = img.convert("RGBA")
+    w, h = img.size
+    src = img.load()
+    out = img.copy()
+    dst = out.load()
+    lr, lg, lb = lift_rgb
+    for y in range(h):
+        for x in range(w):
+            r, g, b, a = src[x, y]
+            if a < 128 or r + g + b >= 48:
+                continue
+            exterior = False
+            for dx, dy in ((-1, 0), (1, 0), (0, -1), (0, 1)):
+                nx, ny = x + dx, y + dy
+                if not (0 <= nx < w and 0 <= ny < h) or src[nx, ny][3] < 128:
+                    exterior = True
+                    break
+            # Leave silhouette edge black; lift everything inside.
+            if not exterior:
+                dst[x, y] = (lr, lg, lb, 255)
+    return out
+
+
+# ---------------------------------------------------------------------------
+# Per-species sprite overrides
+#
+# Auto palette + the default outline/deblob pipeline work for most mons, but
+# a few need hand-tuned colors or a softer processing path.  Keys are species
+# ids as written in pokemon_data.lua.  Unknown keys fall through to defaults.
+#
+# palette: 4 RGB triples light→dark (slots 0 and 3 are still forced W/B).
+# dilate / stem / depth gate the shared passes.
+# outline: "full" (default), "soft" (contrast-only), or "none".
+# orphan_min: drop_orphan_pixels blob size (default 4).
+# ---------------------------------------------------------------------------
+SPRITE_OVERRIDES = {
+    # Accents (eyes / markings) stole the mid palette slots from the body.
+    "LUNATONE": {
+        "palette": [
+            (255, 255, 255),
+            (232, 208, 120),  # cream moon rock
+            (144, 96, 56),    # warm brown crater
+            (0, 0, 0),
+        ],
+    },
+    "ELECTRIKE": {
+        "palette": [
+            (255, 255, 255),
+            (72, 176, 88),    # green body
+            (232, 216, 40),   # yellow mane / sparks
+            (0, 0, 0),
+        ],
+    },
+    "GULPIN": {
+        "palette": [
+            (255, 255, 255),
+            (112, 192, 72),   # leaf green body
+            (56, 128, 48),    # darker green
+            (0, 0, 0),
+        ],
+    },
+    "SEVIPER": {
+        "palette": [
+            (255, 255, 255),
+            (216, 176, 120),  # tan / cream belly
+            (104, 56, 128),   # purple body
+            (0, 0, 0),
+        ],
+    },
+    "SOLROCK": {
+        "palette": [
+            (255, 255, 255),
+            (240, 184, 56),   # gold sun rock
+            (192, 96, 40),    # orange face
+            (0, 0, 0),
+        ],
+    },
+    # Dark / gem-heavy sprites: full selective outline + depth read as a blob.
+    "MURKROW": {
+        "dilate": False,
+        "stem": False,
+        "depth": False,
+        "seal": False,
+        "outline": "soft",
+        "outline_luma": 150,
+        "orphan_min": 2,
+        "shade": "body_mid",
+        "lift_darks": True,
+        "palette": [
+            (255, 255, 255),
+            (214, 214, 40),   # yellow beak
+            (72, 72, 152),    # blue-black body accent
+            (0, 0, 0),
+        ],
+    },
+    "SABLEYE": {
+        "dilate": False,
+        "stem": False,
+        "depth": False,
+        "seal": False,
+        "outline": "soft",
+        "outline_luma": 150,
+        "orphan_min": 2,
+        "shade": "body_mid",
+        "lift_darks": True,
+        "palette": [
+            (255, 255, 255),
+            (152, 136, 208),  # purple body
+            (232, 72, 72),    # gem red
+            (0, 0, 0),
+        ],
+    },
+}
+def sprite_override(species_id):
+    if not species_id:
+        return {}
+    return SPRITE_OVERRIDES.get(str(species_id).upper(), {})
+
+
 def gen1_depth_pass(img, strong=False):
     """Sparse interior ink + top highlights (Raticate-level, not ink flood)."""
     img = img.convert("RGBA")
@@ -1752,17 +1917,34 @@ def nearest_palette_index(r, g, b, colors):
     return best_i
 
 
-def shade_for_pixel(r, g, b, colors):
+def shade_for_pixel(r, g, b, colors, mode=None):
     """Map a source pixel to a 0..3 shade index.
 
     High-chroma accents (horns, flames) snap to the nearest palette color.
     Low-chroma structure uses a white / mid / black ramp (slots 0, 1, 3) so
     folds survive without painting dress shadows into the accent slot (2).
+
+    mode=\"body_mid\": dark body stays on mid palette slots instead of pure
+    black ink — needed for Murkrow / Sableye style sprites that otherwise
+    collapse into an unreadable silhouette.
     """
     if r + g + b < 24:
         return 3
     sat = max(r, g, b) - min(r, g, b)
     luma = 0.299 * r + 0.587 * g + 0.114 * b
+    if mode == "body_mid":
+        # Keep near-black as ink; everything else stays on body/accent slots so
+        # dark purple/blue mons do not collapse into a solid silhouette.
+        if r + g + b < 30:
+            return 3
+        if sat >= 80 and luma >= 90:
+            idx = nearest_palette_index(r, g, b, colors)
+            return 2 if idx == 3 else idx
+        if luma >= 170:
+            return 0
+        if luma >= 90:
+            return 1
+        return 2
     if sat >= 48:
         if luma < 75:
             return 3  # deep chroma folds → black ink
@@ -1789,13 +1971,16 @@ DMG_SHADE_RGB = [
 ]
 
 
-def process_sprite(input_path, output_path, target_size):
+def process_sprite(input_path, output_path, target_size, species_id=None):
     """Build a Gen 1-style 4-shade sprite.
 
     Returns (ok, palette) where palette is 4 RGB triples lightest-first, or
     (False, None) on failure.  Callers register `palette` under the species
     id so Advanced color mode stops falling through to MEWMON.
+
+    `species_id` selects optional SPRITE_OVERRIDES (palette / outline / depth).
     """
+    opts = sprite_override(species_id)
     try:
         img = key_out_flat_background(Image.open(input_path))
 
@@ -1812,7 +1997,14 @@ def process_sprite(input_path, output_path, target_size):
 
         # Pull the species' 4 colors from the (still-hued) art BEFORE we
         # destroy chroma.  Same palette is what Advanced mode will reapply.
-        species_colors = extract_species_palette(img)
+        if opts.get("palette"):
+            species_colors = [tuple(c) for c in opts["palette"][:4]]
+            while len(species_colors) < 4:
+                species_colors.append((0, 0, 0))
+            species_colors[0] = (255, 255, 255)
+            species_colors[3] = (0, 0, 0)
+        else:
+            species_colors = extract_species_palette(img)
 
         w, h = img.size
         is_back = target_size == (32, 32)
@@ -1821,9 +2013,18 @@ def process_sprite(input_path, output_path, target_size):
         fit_w = target_size[0]
         fit_h = target_size[1] + clip
 
+        do_dilate = opts.get("dilate", True)
+        do_stem = opts.get("stem", True)
+        do_depth = opts.get("depth", True)
+        do_seal = opts.get("seal", True)
+        outline_mode = opts.get("outline", "full")
+        outline_luma = int(opts.get("outline_luma", 110))
+        orphan_min = int(opts.get("orphan_min", 4))
+        shade_mode = opts.get("shade")
+
         # Light pre-dilate on fronts only — backs lose detail if fattened
         # before a heavy 96→32 shrink.
-        if (w > fit_w or h > fit_h) and not is_back:
+        if (w > fit_w or h > fit_h) and not is_back and do_dilate:
             img = dilate_opaque(img)
             img = close_small_holes(img, max_gap=1)
             w, h = img.size
@@ -1835,9 +2036,10 @@ def process_sprite(input_path, output_path, target_size):
         # Majority-block shrink keeps folds; NEAREST alone drops them.
         img_resized = resize_pixel_art(img, new_w, new_h)
         img_resized = close_small_holes(img_resized, max_gap=2 if not is_back else 1)
-        if not is_back:
+        if not is_back and do_stem:
             img_resized = thicken_narrow_stems(img_resized, min_width=7)
-            img_resized = seal_outline_breaks(img_resized)
+            if do_seal:
+                img_resized = seal_outline_breaks(img_resized)
 
         # Backs: shift down so the bottom `clip` rows fall off the canvas.
         new_img = Image.new("RGBA", target_size, (255, 255, 255, 0))
@@ -1848,15 +2050,24 @@ def process_sprite(input_path, output_path, target_size):
             y = (target_size[1] - new_h) // 2
         new_img.paste(img_resized, (x, y), img_resized)
         new_img = close_small_holes(new_img, max_gap=2 if not is_back else 1)
-        if not is_back:
-            new_img = seal_outline_breaks(new_img)
+        if not is_back and do_stem:
+            if do_seal:
+                new_img = seal_outline_breaks(new_img)
             new_img = thicken_narrow_stems(new_img, min_width=7)
         # Venusaur-style volume: interior black crevices + white top hits +
         # stipple.  Stronger on backs, which otherwise read as flat slabs.
-        new_img = gen1_depth_pass(new_img, strong=is_back)
-        new_img = drop_orphan_pixels(new_img)
-        new_img = seal_outline_breaks(new_img)
-        new_img = ensure_selective_outline(new_img)
+        if do_depth:
+            new_img = gen1_depth_pass(new_img, strong=is_back)
+        if opts.get("lift_darks"):
+            new_img = lift_near_black_body(new_img)
+        new_img = drop_orphan_pixels(new_img, min_blob=orphan_min)
+        if do_seal:
+            new_img = seal_outline_breaks(new_img)
+        if outline_mode == "full":
+            new_img = ensure_selective_outline(new_img)
+        elif outline_mode == "soft":
+            new_img = ensure_contrast_outline(new_img, luma_floor=outline_luma)
+        # outline_mode == "none": keep sealed silhouette only
 
         # Map pixels → DMG shades.  Accents keep hue; structure uses luma so
         # backs are not a flat green/white blob.
@@ -1870,7 +2081,7 @@ def process_sprite(input_path, output_path, target_size):
                 elif r + g + b < 24:
                     indexed_img.putpixel((px_x, py), 4)
                 else:
-                    shade = shade_for_pixel(r, g, b, species_colors)
+                    shade = shade_for_pixel(r, g, b, species_colors, mode=shade_mode)
                     indexed_img.putpixel((px_x, py), shade + 1)
 
         if is_back:
@@ -1936,9 +2147,10 @@ def sprite_cache_dir():
 def write_species_palettes_lua(path, palettes_by_species):
     """Write mods/.../species_palettes.lua — id -> 4 RGB triples, lightest first."""
     with open(path, "w", encoding="utf-8") as f:
-        f.write("-- Generated by generate_pokemon_mod.py. DO NOT EDIT.\n")
-        f.write("-- Per-species SGB palettes extracted from source art so Advanced\n")
-        f.write("-- color mode does not fall through to MEWMON (peach/purple).\n")
+        f.write("-- Generated by generate_pokemon_mod.py. DO NOT EDIT by hand;\n")
+        f.write("-- tune SPRITE_OVERRIDES in generate_pokemon_mod.py and --resprite.\n")
+        f.write("-- Per-species SGB palettes so Advanced color mode does not fall\n")
+        f.write("-- through to MEWMON (peach/purple).\n")
         f.write("return {\n")
         for species_id in sorted(palettes_by_species.keys()):
             colors = palettes_by_species[species_id]
@@ -1947,6 +2159,33 @@ def write_species_palettes_lua(path, palettes_by_species):
                 f.write(f"    {{ {int(r)}, {int(g)}, {int(b)} }},\n")
             f.write("  },\n")
         f.write("}\n")
+
+
+def load_species_palettes_lua(path):
+    """Best-effort parse of species_palettes.lua into {id: [(r,g,b)*4]}."""
+    import re
+    if not os.path.exists(path):
+        return {}
+    text = open(path, "r", encoding="utf-8").read()
+    out = {}
+    for m in re.finditer(
+        r"([A-Z0-9_]+)\s*=\s*\{\s*"
+        r"\{\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*\}\s*,\s*"
+        r"\{\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*\}\s*,\s*"
+        r"\{\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*\}\s*,\s*"
+        r"\{\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*\}\s*,?\s*"
+        r"\}",
+        text,
+    ):
+        name = m.group(1)
+        nums = [int(m.group(i)) for i in range(2, 14)]
+        out[name] = [
+            (nums[0], nums[1], nums[2]),
+            (nums[3], nums[4], nums[5]),
+            (nums[6], nums[7], nums[8]),
+            (nums[9], nums[10], nums[11]),
+        ]
+    return out
 
 
 def ensure_palette_field(body, species_id):
@@ -1977,10 +2216,14 @@ def ensure_palette_field(body, species_id):
     return f'    palette = "{species_id}",\n' + body
 
 
-def resprite_kanto_reforged(outdir):
+def resprite_kanto_reforged(outdir, only=None):
     """Re-bake front sprites from the PokéAPI cache using height-based
     frontSize, and rewrite frontSize fields in pokemon_data.lua.
-    Does not re-fetch species tables."""
+    Does not re-fetch species tables.
+
+    `only` is an optional set of SPECIES_IDs to process (others keep current
+    assets / palette entries).
+    """
     import re
 
     lua_path = os.path.join(outdir, "pokemon_data.lua")
@@ -1994,7 +2237,9 @@ def resprite_kanto_reforged(outdir):
     counts = {5: 0, 6: 0, 7: 0}
     missing = []
     cache_dir = sprite_cache_dir()
-    species_palettes = {}
+    palette_path = os.path.join(outdir, "species_palettes.lua")
+    species_palettes = load_species_palettes_lua(palette_path)
+    only_set = {s.upper() for s in only} if only else None
 
     # Walk each P.species entry for id/dex/height.
     species_chunks = re.split(r'\n  ([A-Z0-9_]+) = \{', lua)
@@ -2019,12 +2264,18 @@ def resprite_kanto_reforged(outdir):
         counts[front_size] = counts.get(front_size, 0) + 1
         canvas = front_canvas_px(front_size)
 
+        if only_set is not None and name not in only_set:
+            out_parts.append(f"\n  {name} = {{{body}")
+            continue
+
         front_cache = os.path.join(cache_dir, f"{dex}_front.png")
         front_mod = os.path.join(outdir, "assets", f"{name.lower()}_front.png")
         back_cache = os.path.join(cache_dir, f"{dex}_back.png")
         back_mod = os.path.join(outdir, "assets", f"{name.lower()}_back.png")
         if os.path.exists(front_cache):
-            ok, colors = process_sprite(front_cache, front_mod, (canvas, canvas))
+            ok, colors = process_sprite(
+                front_cache, front_mod, (canvas, canvas), species_id=name,
+            )
             if ok:
                 resprited += 1
                 if colors:
@@ -2033,51 +2284,59 @@ def resprite_kanto_reforged(outdir):
                 missing.append(name)
         else:
             missing.append(name)
+
         if os.path.exists(back_cache):
-            ok_b, colors_b = process_sprite(back_cache, back_mod, (32, 32))
-            # Prefer front-derived palette; fall back to back if front missing.
+            ok_b, colors_b = process_sprite(
+                back_cache, back_mod, (32, 32), species_id=name,
+            )
             if ok_b and colors_b and name not in species_palettes:
                 species_palettes[name] = colors_b
 
-        # Castform weather forms share Castform's height/canvas.
+        # Castform weather forms (same as full gen path).
         if name == "CASTFORM":
-            for form_suffix, form_id in [("sunny", 10013), ("rainy", 10014), ("snowy", 10015)]:
-                f_cache = os.path.join(cache_dir, f"{form_id}_front.png")
+            for form_suffix, form_dex in [("sunny", 10013), ("rainy", 10014), ("snowy", 10015)]:
+                f_cache = os.path.join(cache_dir, f"{form_dex}_front.png")
+                b_cache = os.path.join(cache_dir, f"{form_dex}_back.png")
                 f_mod = os.path.join(outdir, "assets", f"castform_{form_suffix}_front.png")
-                if os.path.exists(f_cache):
-                    process_sprite(f_cache, f_mod, (canvas, canvas))
-                b_cache = os.path.join(cache_dir, f"{form_id}_back.png")
                 b_mod = os.path.join(outdir, "assets", f"castform_{form_suffix}_back.png")
+                if os.path.exists(f_cache):
+                    process_sprite(f_cache, f_mod, (canvas, canvas), species_id=name)
                 if os.path.exists(b_cache):
-                    process_sprite(b_cache, b_mod, (32, 32))
+                    process_sprite(b_cache, b_mod, (32, 32), species_id=name)
 
-        body = re.sub(
-            r'frontSize = \d+',
-            f'frontSize = {front_size}',
-            body,
-            count=1,
-        )
-        if name in species_palettes:
-            body = ensure_palette_field(body, name)
+        body = re.sub(r'frontSize\s*=\s*\d+', f'frontSize = {front_size}', body, count=1)
+        if not re.search(r'frontSize\s*=', body):
+            if re.search(r'spriteBack\s*=', body):
+                body = re.sub(
+                    r'(spriteBack\s*=\s*"[^"]*",)',
+                    rf'\1\n    frontSize = {front_size},',
+                    body,
+                    count=1,
+                )
+            else:
+                body = f'    frontSize = {front_size},\n' + body
+        body = ensure_palette_field(body, name)
         out_parts.append(f"\n  {name} = {{{body}")
+
+    # Remainder after last body (closing of return table etc.)
+    if i < len(species_chunks):
+        out_parts.append(species_chunks[i])
 
     with open(lua_path, "w", encoding="utf-8") as f:
         f.write("".join(out_parts))
 
     if species_palettes:
-        write_species_palettes_lua(
-            os.path.join(outdir, "species_palettes.lua"),
-            species_palettes,
-        )
+        write_species_palettes_lua(palette_path, species_palettes)
         print(f"Wrote {len(species_palettes)} species palettes")
 
+    scope = f"only {sorted(only_set)}" if only_set else "all"
     print(
-        f"Resprited {resprited} fronts by dex height "
-        f"(40px={counts.get(5,0)}, 48px={counts.get(6,0)}, 56px={counts.get(7,0)})"
+        f"Resprited {resprited} fronts by dex height ({scope}) "
+        f"(5={counts.get(5,0)} 6={counts.get(6,0)} 7={counts.get(7,0)})"
     )
     if missing:
-        print(f"  skipped {len(missing)} (no cache): {', '.join(missing[:8])}"
-              f"{'...' if len(missing) > 8 else ''}")
+        print(f"Missing cache for {len(missing)} species (first 8): {missing[:8]}")
+
 
 def key_out_matte(img, matte=BERRY_TREE_MATTE):
     """RGBA copy of img with every exact-matte pixel made transparent."""
@@ -2339,6 +2598,13 @@ def main():
              "frontSize (40/48/56), back feet clipped 2px, outline dilate so "
              "thin waists/edges survive, and rewrite frontSize in pokemon_data.lua",
     )
+    parser.add_argument(
+        "--only",
+        type=str,
+        default="",
+        help="Comma-separated SPECIES_IDs to resprite (requires --resprite). "
+             "Example: --resprite --only LUNATONE,MURKROW,SABLEYE",
+    )
     args = parser.parse_args()
     
     os.makedirs(args.outdir, exist_ok=True)
@@ -2348,7 +2614,8 @@ def main():
         return
 
     if args.resprite:
-        resprite_kanto_reforged(args.outdir)
+        only = [s.strip() for s in args.only.split(",") if s.strip()] or None
+        resprite_kanto_reforged(args.outdir, only=only)
         return
 
     if args.ability_patches_only:
@@ -2504,11 +2771,17 @@ def main():
 
             species_palette = None
             if front_url and download_sprite_file(front_url, front_cache_path):
-                ok, colors = process_sprite(front_cache_path, front_mod_path, (front_px, front_px))
+                ok, colors = process_sprite(
+                    front_cache_path, front_mod_path, (front_px, front_px),
+                    species_id=p_name,
+                )
                 if ok and colors:
                     species_palette = colors
             if back_url and download_sprite_file(back_url, back_cache_path):
-                ok_b, colors_b = process_sprite(back_cache_path, back_mod_path, (32, 32))
+                ok_b, colors_b = process_sprite(
+                    back_cache_path, back_mod_path, (32, 32),
+                    species_id=p_name,
+                )
                 if ok_b and colors_b and not species_palette:
                     species_palette = colors_b
                 
@@ -2536,9 +2809,15 @@ def main():
                     f_back_mod = os.path.join(args.outdir, "assets", f"castform_{form_suffix}_back.png")
                     
                     if form_front and download_sprite_file(form_front, f_front_cache):
-                        process_sprite(f_front_cache, f_front_mod, (front_px, front_px))
+                        process_sprite(
+                            f_front_cache, f_front_mod, (front_px, front_px),
+                            species_id=p_name,
+                        )
                     if form_back and download_sprite_file(form_back, f_back_cache):
-                        process_sprite(f_back_cache, f_back_mod, (32, 32))
+                        process_sprite(
+                            f_back_cache, f_back_mod, (32, 32),
+                            species_id=p_name,
+                        )
                         
             # Moves and level-up learnset (remap Gen 1 ids to engine names)
             learnset_list = []
