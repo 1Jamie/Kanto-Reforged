@@ -12,7 +12,9 @@
     "engine_internals"
   ],
   "dependencies": [],
-  "optional_dependencies": [],
+  "optional_dependencies": [
+    "gen1_modern_ui"
+  ],
   "conflicts": [],
   "description": "Gen 2-3 Pokemon, moves, abilities & more.",
   "github": "1Jamie/Kanto-Reforged",

@@ -295,6 +295,7 @@ Step cool-down between crafts: **640** farm steps (480 at soil rank 3). No berry
 - Bag capacity **60**.
 - **DexNav** on the start menu after you have the Pokédex: current map species (more detail once seen/caught). Footer notes Super Rod on fishable maps. If a roamer is on this map, an optional **ROAM** row appears.
 - **Summary** page shows ability, held item, and gender glyph.
+- **Optional [Gen1 Modern UI](https://github.com/ArmstrongThomas/gen1-modern-ui):** when that mod is installed, bag pockets and the summary ability page use its presenters; DexNav and party Give/Take keep working through the existing start-menu / party submenu hooks. With Modern UI absent, all of this still draws and plays as stock Gen 1 UI.
 
 ![DexNav (Cerulean City)](screen-shots/dexnav.png)
 
@@ -507,7 +508,7 @@ Legendary custom maps save return coordinates on enter and exit via warp hooks s
 | `berry_farm.lua` / `berry_quests.lua` | Farm map, merchant, blender, soil |
 | `gender.lua` / `breeding.lua` / `daycare.lua` | Gender + eggs |
 | `level_caps.lua` / `modern_xp_share.lua` | Caps + slot-2 XP |
-| `bag_pockets.lua` / `dexnav.lua` / `summary_ui.lua` | QoL UI |
+| `bag_pockets.lua` / `dexnav.lua` / `summary_ui.lua` / `gen1_modern_ui_adapter.lua` | QoL UI (+ optional Modern UI) |
 | `house_npcs.lua` | Object-index claims + shared NPC helpers |
 | `battle_clubs.lua` / `judge_npc.lua` / `trades_extra.lua` | Clubs, judge, trades |
 | `move_hub.lua` / `item_smith.lua` / `fossils_gen3.lua` | Tutor hub, smith, fossils |

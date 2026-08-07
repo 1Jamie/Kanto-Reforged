@@ -1,6 +1,10 @@
 -- Bag pockets + larger capacity for Kanto Reforged.
 -- Keeps flat save.inventory; filters Bag.order while the bag is open so the
 -- stock BagMenu USE/TOSS flows keep working.
+--
+-- Also stamps Useful Bag–compatible public fields (__pocketIndex, __pocketIds,
+-- gen1ModernUi) so Gen1 Modern UI can present the bag without changing native
+-- draw/input when that mod is absent.
 
 local ItemEffects = require("src.inventory.ItemEffects")
 local HeldItems = require("mods.Kanto-Reforged.held_items")
@@ -22,6 +26,14 @@ BagPockets.POCKETS = {
 local pocketIndex = 1
 local filterActive = false
 local originalOrder
+
+local function pocketIds()
+  local ids = {}
+  for _, pocket in ipairs(BagPockets.POCKETS) do
+    ids[#ids + 1] = pocket.id
+  end
+  return ids
+end
 
 function BagPockets.current()
   return BagPockets.POCKETS[pocketIndex]
@@ -68,6 +80,27 @@ local function rebuildRows(game)
   return items
 end
 
+local function syncScroll(list)
+  local rows = list.rows or 7
+  if list.index - list.scroll > rows then
+    list.scroll = list.index - rows
+  end
+  if list.index - list.scroll < 1 then
+    list.scroll = list.index - 1
+  end
+end
+
+local function applyPocket(list, game, delta)
+  BagPockets.cycle(delta or 0)
+  list.title = BagPockets.current().label
+  list.items = rebuildRows(game)
+  list.index = 1
+  list.scroll = 0
+  list.swapIndex = nil
+  list.__pocketIndex = pocketIndex
+  list.__pocketIds = pocketIds()
+end
+
 function BagPockets.register(mod)
   Bag.CAPACITY = BagPockets.CAPACITY
   mod.content.constants:patch("bagSize", BagPockets.CAPACITY)
@@ -102,24 +135,46 @@ function BagPockets.register(mod)
       -- SELECT reorder is ambiguous across filtered views; leave unused.
       list.onSelectKey = nil
 
+      -- Public projection for Gen1 Modern UI (ignored when that mod is absent).
+      list.__pocketIndex = pocketIndex
+      list.__pocketIds = pocketIds()
+      list.gen1ModernUi = {
+        moveCursor = function(_, delta)
+          local n = #list.items
+          if n == 0 then return false end
+          list.index = math.max(1, math.min(n, (list.index or 1) + (delta or 0)))
+          syncScroll(list)
+          return true
+        end,
+        switchPocket = function(_, delta)
+          applyPocket(list, game, delta or 0)
+          return true
+        end,
+        select = function(_)
+          local item = list.items[list.index]
+          if list.onChoose then
+            return list.onChoose(item, list)
+          end
+          return false
+        end,
+        back = function(_)
+          -- Match ListMenu B: pop, then onCancel (clears pocket filter).
+          if list.game.stack:top() == list then
+            list.game.stack:pop()
+          end
+          if list.onCancel then list.onCancel() end
+          return true
+        end,
+      }
+
       local baseUpdate = list.update
       function list:update(dt)
         local input = self.game.input
         if input:wasPressed("left") then
-          BagPockets.cycle(-1)
-          self.title = BagPockets.current().label
-          self.items = rebuildRows(game)
-          self.index = 1
-          self.scroll = 0
-          self.swapIndex = nil
+          applyPocket(self, game, -1)
           return
         elseif input:wasPressed("right") then
-          BagPockets.cycle(1)
-          self.title = BagPockets.current().label
-          self.items = rebuildRows(game)
-          self.index = 1
-          self.scroll = 0
-          self.swapIndex = nil
+          applyPocket(self, game, 1)
           return
         end
         baseUpdate(self, dt)

@@ -72,4 +72,21 @@ return function(T, Data, run)
   T.check(AbilityText.describe("RUN_AWAY"):find("escape", 1, true),
     "Run Away has a summary blurb")
   T.eq(AbilityText.describe(nil), "No special ability.", "nil ability blurb")
+
+  local page = SummaryUi.abilityPage(mon, Data)
+  T.eq(page.gender, "♂", "abilityPage gender")
+  T.eq(page.heldItem, "MAGNET", "abilityPage held item label")
+  T.eq(page.ability, "STATIC", "abilityPage ability label")
+  T.check(type(page.description) == "table", "abilityPage description lines")
+
+  if ok and menu then
+    T.check(type(menu.advance) == "function", "summary exposes advance()")
+    menu.page = 2
+    menu:advance()
+    T.eq(menu.page, 3, "advance moves to ability page")
+    local popped = false
+    fakeGame.stack.pop = function() popped = true end
+    menu:advance()
+    T.check(popped, "advance on last page closes summary")
+  end
 end

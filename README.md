@@ -4,6 +4,8 @@ Gen 2 and 3 content for Red/Blue on this engine. Same Kanto story, more Pokemon,
 
 Mod id is `Kanto-Reforged`. Turn it on in the launcher Mods tab or the F10 manager.
 
+Has support for Gen1 Modern UI mod 
+
 ## What it looks like
 
 ![Party with Johto/Hoenn mons](screen-shots/party-menu.png)
@@ -29,6 +31,8 @@ Mod id is `Kanto-Reforged`. Turn it on in the launcher Mods tab or the F10 manag
 ![DexNav on the current map](screen-shots/dexnav.png)
 
 - Party summary page for ability and held item (and gender glyph on the name).
+- Optional Gen1 Modern UI support for bag pockets and the summary ability page (DexNav / party Give-Take keep working via existing menu hooks). Without that mod, everything still uses the normal Gen 1 screens.
+[https://github.com/ArmstrongThomas/gen1-modern-ui/](https://github.com/ArmstrongThomas/gen1-modern-ui/)
 
 ![Summary page with ability text](screen-shots/summary-ability.png)
 

@@ -1,5 +1,8 @@
 -- Extra SummaryMenu page: ability + held item (Gen 2/3 Kanto Reforged fields).
 -- Wraps the builtin two-page status screen without editing src/.
+--
+-- Publishes a read-only page-3 snapshot + advance() for Gen1 Modern UI when
+-- that mod is present. Native Gen1 draw/input is unchanged when it is absent.
 
 local Font = require("src.render.Font")
 local Strings = require("src.core.Strings")
@@ -32,6 +35,22 @@ local function genderLabel(mon)
   if g == "M" then return "♂" end
   if g == "F" then return "♀" end
   return "-----"
+end
+
+-- Read-only ability/held/gender snapshot for page 3 (native draw + Modern UI).
+function SummaryUi.abilityPage(mon, data)
+  data = data or {}
+  local def = data.pokemon and mon and data.pokemon[mon.species]
+  local abilityId = def and def.ability
+  local desc = AbilityText.describe(abilityId)
+  local pages = TextBox.paginate(desc, 18)
+  return {
+    gender = genderLabel(mon),
+    heldItem = heldLabel(mon, data) or "-----",
+    abilityId = abilityId,
+    ability = abilityLabel(abilityId) or "-----",
+    description = pages[1] or {},
+  }
 end
 
 -- Wipe + redraw the summary name line with an optional gender glyph.
@@ -75,7 +94,7 @@ local function drawAbilityPage(self)
 
   local mon = self.mon
   local data = self.game.data
-  local def = data.pokemon[mon.species]
+  local page = SummaryUi.abilityPage(mon, data)
   local HudTiles = require("src.render.HudTiles")
 
   -- Same right-edge bracket the other pages use around the info column.
@@ -88,19 +107,16 @@ local function drawAbilityPage(self)
 
   -- Top info column: gender + held item (STATUS/ slot on page 1).
   Font.draw(Strings("GENDER/"), 72, 24)
-  Font.draw(genderLabel(mon), 80, 32)
+  Font.draw(page.gender, 80, 32)
   Font.draw(Strings("ITEM/"), 72, 40)
-  Font.draw(heldLabel(mon, data) or "-----", 80, 48)
+  Font.draw(page.heldItem, 80, 48)
 
   -- Ability + description fill the bottom box (types already on page 1).
   Font.drawBox(0, 8, 20, 10)
-  local abilityId = def and def.ability
   Font.draw(Strings("ABILITY/"), 8, 72)
-  Font.draw(abilityLabel(abilityId) or "-----", 16, 80)
+  Font.draw(page.ability, 16, 80)
 
-  local desc = AbilityText.describe(abilityId)
-  local pages = TextBox.paginate(desc, 18)
-  local lines = pages[1] or {}
+  local lines = page.description or {}
   local maxLines = 5
   for i = 1, math.min(#lines, maxLines) do
     Font.draw(lines[i], 8, 88 + (i - 1) * 8)
@@ -116,14 +132,19 @@ function SummaryUi.register(mod)
       local self = Builtin.new(game, mon)
       self._expMaxPage = 3
 
+      -- Same A/B page flow, callable from Gen1 Modern UI semantic actions.
+      function self:advance()
+        if self.page < self._expMaxPage then
+          self.page = self.page + 1
+        else
+          self.game.stack:pop()
+        end
+      end
+
       function self:update(_dt)
         local input = self.game.input
         if input:wasPressed("a") or input:wasPressed("b") then
-          if self.page < self._expMaxPage then
-            self.page = self.page + 1
-          else
-            self.game.stack:pop()
-          end
+          self:advance()
         end
       end
 

@@ -522,7 +522,12 @@ return function(mod)
 
   local BagPockets = require("mods.Kanto-Reforged.bag_pockets")
   BagPockets.register(mod)
-  
+
+  -- Optional Gen1 Modern UI adapter (no-op when that mod is absent).
+  if require("mods.Kanto-Reforged.gen1_modern_ui_adapter")(mod) then
+    mod.log:info("Gen1 Modern UI adapter registered")
+  end
+
   -- 4. Hook into battle damage pipeline (SpA/SpD + abilities +
   --    variable-power Gen 2/3 moves)
   mod.hooks:wrap("battle.damage", function(next, ctx)
