@@ -252,6 +252,22 @@ return function(mod)
     local highestDex = 151
     local DexEntries = require("mods.Kanto-Reforged.dex_entries")
     local dexTexts = DexEntries.bindAll(mod, pokemon_data.species)
+
+    -- Register per-species SGB palettes BEFORE the pokemon records that
+    -- reference them.  Without this, Advanced color falls through to MEWMON
+    -- (peach + purple) for every Gen 2/3 mon.
+    local okPals, species_palettes = pcall(require, "mods.Kanto-Reforged.species_palettes")
+    if okPals and type(species_palettes) == "table" then
+      local n = 0
+      for id, colors in pairs(species_palettes) do
+        mod.content.palettes:register(id, colors)
+        n = n + 1
+      end
+      mod.log:info("Registered %d species palettes", n)
+    else
+      mod.log:warn("species_palettes.lua missing — Gen 2/3 mons will use MEWMON")
+    end
+
     for id, record in pairs(pokemon_data.species) do
       mod.content.pokemon:register(id, record)
       species_registered = species_registered + 1

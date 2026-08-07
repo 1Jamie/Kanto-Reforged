@@ -6,6 +6,23 @@ import requests
 import time
 from PIL import Image
 
+# This script lives in the mod folder.  The game loads assets via
+# mods/<folder>/..., and the launcher installs zips to mods/<manifest.id>/,
+# so the folder name must match the mod id (Kanto-Reforged).
+MOD_ROOT = os.path.dirname(os.path.abspath(__file__))
+MOD_ID = os.path.basename(MOD_ROOT)
+ASSET_PREFIX = f"mods/{MOD_ID}"
+
+
+def game_rel_mod_dir(outdir):
+    """Game-relative mod path for spriteFront/spriteBack in pokemon_data.lua.
+
+    Always mods/<folder-name>, never an absolute --outdir path.
+    """
+    name = os.path.basename(os.path.abspath(outdir).rstrip(r"\/"))
+    return f"mods/{name}"
+
+
 VANILLA_TYPES = {
     "NORMAL", "FIGHTING", "FLYING", "POISON", "GROUND", "ROCK", "BUG", "GHOST",
     "FIRE", "WATER", "GRASS", "ELECTRIC", "PSYCHIC_TYPE", "ICE", "DRAGON"
@@ -643,9 +660,9 @@ def load_vanilla_moves(repo_root="."):
     return ids
 
 
-def load_kanto_reforged_move_powers(outdir="mods/Kanto-Reforged"):
+def load_kanto_reforged_move_powers(outdir=None):
     """Parse power for each Kanto Reforged move from pokemon_data.lua (0 = status)."""
-    path = os.path.join(outdir, "pokemon_data.lua")
+    path = os.path.join(outdir or MOD_ROOT, "pokemon_data.lua")
     powers = {}
     if not os.path.exists(path):
         return powers
@@ -666,7 +683,7 @@ def load_kanto_reforged_move_powers(outdir="mods/Kanto-Reforged"):
     return powers
 
 
-def collect_kanto_move_patches(registered_moves, start=1, end=151, outdir="mods/Kanto-Reforged"):
+def collect_kanto_move_patches(registered_moves, start=1, end=151, outdir=None):
     """Diff Gen 2/3 learnsets/TMs against Gen 1 for Kanto species.
 
     Returns (learnset_patches, tmhm_patches) where each maps species id ->
@@ -1169,69 +1186,264 @@ def key_out_flat_background(img):
     return img
 
 
+def dilate_opaque(img, radius=1):
+    """Expand opaque pixels into neighboring transparent cells.
+
+    Gen 2/3 sheets ship 1px black outlines and pin-thin white waist stems.
+    Fitting those into a Gen 1 32x32 back with NEAREST drops the stem rows
+    and the battle pic looks like it lost its waist / edges.  A 1px dilate
+    before the resize keeps silhouettes connected after scaling.
+    """
+    img = img.convert("RGBA")
+    w, h = img.size
+    px = img.load()
+    seeds = []
+    for y in range(h):
+        for x in range(w):
+            r, g, b, a = px[x, y]
+            if a >= 128:
+                seeds.append((x, y, (r, g, b, a)))
+    extras = {}
+    for x, y, color in seeds:
+        for dy in range(-radius, radius + 1):
+            for dx in range(-radius, radius + 1):
+                if dx == 0 and dy == 0:
+                    continue
+                if abs(dx) + abs(dy) > radius:
+                    continue
+                nx, ny = x + dx, y + dy
+                if 0 <= nx < w and 0 <= ny < h and px[nx, ny][3] < 128:
+                    extras.setdefault((nx, ny), color)
+    for (x, y), color in extras.items():
+        px[x, y] = color
+    return img
+
+
+def drop_orphan_pixels(img, min_blob=4):
+    """Clear tiny disconnected opaque blobs left by dilate + NEAREST scale.
+
+    Keeps every component with >= min_blob pixels so a briefly-split waist
+    is not erased, but 1-2px 'orphans' on the dress edge disappear.
+    """
+    from collections import deque
+
+    img = img.convert("RGBA")
+    w, h = img.size
+    px = img.load()
+    seen = [[False] * w for _ in range(h)]
+    for y in range(h):
+        for x in range(w):
+            if seen[y][x] or px[x, y][3] < 128:
+                continue
+            q = deque([(x, y)])
+            seen[y][x] = True
+            cells = []
+            while q:
+                cx, cy = q.popleft()
+                cells.append((cx, cy))
+                for nx, ny in ((cx - 1, cy), (cx + 1, cy), (cx, cy - 1), (cx, cy + 1)):
+                    if 0 <= nx < w and 0 <= ny < h and not seen[ny][nx] and px[nx, ny][3] >= 128:
+                        seen[ny][nx] = True
+                        q.append((nx, ny))
+            if len(cells) < min_blob:
+                for ox, oy in cells:
+                    r, g, b, _ = px[ox, oy]
+                    px[ox, oy] = (r, g, b, 0)
+    return img
+
+
+def extract_species_palette(img):
+    """4 RGB triples (lightest first) from opaque pixels — Gen 1 SGB shape.
+
+    Unknown Gen 2/3 species otherwise fall through to MEWMON (peach + purple),
+    which is why Cyndaquil went blue and Ralts went muddled purple in Advanced
+    color mode.  These colors are registered as the species' own palette and
+    the grayscale pic is shaded by nearest-palette-color, not raw luminance.
+    """
+    img = img.convert("RGBA")
+    w, h = img.size
+    px = img.load()
+    opaque = []
+    for y in range(h):
+        for x in range(w):
+            r, g, b, a = px[x, y]
+            if a >= 128:
+                opaque.append((r, g, b))
+    if not opaque:
+        return [(255, 255, 255), (170, 170, 170), (85, 85, 85), (0, 0, 0)]
+
+    # Boost saturated accent pixels (Ralts horns, Cyndaquil flames, …) so
+    # MEDIANCUT does not fold them into a neighboring muddy mid-tone.
+    weighted = []
+    for r, g, b in opaque:
+        weighted.append((r, g, b))
+        sat = max(r, g, b) - min(r, g, b)
+        if sat >= 48:
+            weighted.extend([(r, g, b)] * 4)
+
+    side = max(8, int(len(weighted) ** 0.5) + 1)
+    canvas = Image.new("RGB", (side, side), (0, 0, 0))
+    canvas.putdata(weighted + [(0, 0, 0)] * (side * side - len(weighted)))
+
+    colors = []
+    methods = [Image.Quantize.MAXCOVERAGE, Image.Quantize.MEDIANCUT]
+    for method in methods:
+        try:
+            quantized = canvas.quantize(colors=4, method=method)
+            raw = quantized.getpalette() or []
+            colors = []
+            has_real_black = any(max(p) < 24 for p in opaque)
+            for i in range(0, min(12, len(raw)), 3):
+                c = (raw[i], raw[i + 1], raw[i + 2])
+                # Drop the padded black filler if it was not in the art.
+                if c == (0, 0, 0) and not has_real_black:
+                    continue
+                if c not in colors:
+                    colors.append(c)
+            if len(colors) >= 3:
+                break
+        except Exception:
+            continue
+
+    if not colors:
+        # Fallback: most common unique colors by luminance buckets.
+        colors = [(255, 255, 255), (170, 170, 170), (85, 85, 85), (0, 0, 0)]
+
+    while len(colors) < 4:
+        # Split the largest luminance gap with a midpoint.
+        ordered = sorted(
+            colors,
+            key=lambda c: 0.299 * c[0] + 0.587 * c[1] + 0.114 * c[2],
+        )
+        best_i, best_gap = 0, -1
+        for i in range(len(ordered) - 1):
+            la = 0.299 * ordered[i][0] + 0.587 * ordered[i][1] + 0.114 * ordered[i][2]
+            lb = 0.299 * ordered[i + 1][0] + 0.587 * ordered[i + 1][1] + 0.114 * ordered[i + 1][2]
+            if lb - la > best_gap:
+                best_gap, best_i = lb - la, i
+        a, b = ordered[best_i], ordered[best_i + 1]
+        colors.append(((a[0] + b[0]) // 2, (a[1] + b[1]) // 2, (a[2] + b[2]) // 2))
+    colors = colors[:4]
+    colors.sort(key=lambda c: 0.299 * c[0] + 0.587 * c[1] + 0.114 * c[2], reverse=True)
+
+    # Gen 1 pals almost always pin a near-white highlight and near-black
+    # outline slot — nudge extremes so Advanced remap stays punchy.
+    if max(colors[0]) < 220:
+        colors[0] = tuple(min(255, int(c * 1.15 + 20)) for c in colors[0])
+    if max(colors[3]) > 48:
+        colors[3] = tuple(max(0, int(c * 0.35)) for c in colors[3])
+    return colors
+
+
+def nearest_palette_index(r, g, b, colors):
+    best_i, best_d = 0, None
+    for i, (cr, cg, cb) in enumerate(colors):
+        d = (r - cr) * (r - cr) + (g - cg) * (g - cg) + (b - cb) * (b - cb)
+        if best_d is None or d < best_d:
+            best_i, best_d = i, d
+    return best_i
+
+
+# Gen 1 extracted backs are 32x32 with a median of 4 transparent rows under
+# the feet (see assets/generated/battle/back).  The battle drawer pins feet
+# at y=96 and lets that pad hang into the menu, which is the classic
+# "cut off by the FIGHT box" look.  Our old fit-to-32 path left pad=0 so
+# expansion backs floated above the menu.
+BACK_BOTTOM_PAD = 4
+
+# DMG shade indices written into the indexed PNG (1..4).  Runtime Advanced
+# color remaps these via the species' 4-color SGB palette (light→dark).
+DMG_SHADE_RGB = [
+    (255, 255, 255),  # shade 0 / index 1
+    (170, 170, 170),  # shade 1 / index 2
+    (85, 85, 85),     # shade 2 / index 3
+    (0, 0, 0),        # shade 3 / index 4
+]
+
+
 def process_sprite(input_path, output_path, target_size):
+    """Build a Gen 1-style 4-shade sprite.
+
+    Returns (ok, palette) where palette is 4 RGB triples lightest-first, or
+    (False, None) on failure.  Callers register `palette` under the species
+    id so Advanced color mode stops falling through to MEWMON.
+    """
     try:
         img = key_out_flat_background(Image.open(input_path))
-        
-        # Crop transparency border
+
+        # Crop transparency, but keep a 1px halo so tight silhouettes are
+        # not shaved by getbbox before the dilate / resize.
         bbox = img.getbbox()
         if bbox:
-            img = img.crop(bbox)
-            
-        # Scale nearest neighbor to preserve sharp pixel art edges
+            l, t, r, b = bbox
+            l = max(0, l - 1)
+            t = max(0, t - 1)
+            r = min(img.size[0], r + 1)
+            b = min(img.size[1], b + 1)
+            img = img.crop((l, t, r, b))
+
+        # Pull the species' 4 colors from the (still-hued) art BEFORE we
+        # destroy chroma.  Same palette is what Advanced mode will reapply.
+        species_colors = extract_species_palette(img)
+
         w, h = img.size
-        ratio = min(target_size[0] / w, target_size[1] / h)
-        new_w, new_h = int(w * ratio), int(h * ratio)
+        is_back = target_size == (32, 32)
+        bottom_pad = BACK_BOTTOM_PAD if is_back else 0
+        fit_w = target_size[0]
+        fit_h = target_size[1] - bottom_pad
+
+        # Thicken before any downscale so thin outlines / waists survive.
+        if w > fit_w or h > fit_h:
+            img = dilate_opaque(img)
+            w, h = img.size
+
+        ratio = min(fit_w / w, fit_h / h)
+        new_w, new_h = max(1, int(round(w * ratio))), max(1, int(round(h * ratio)))
+        # Never exceed the fit box after rounding.
+        new_w = min(new_w, fit_w)
+        new_h = min(new_h, fit_h)
         img_resized = img.resize((new_w, new_h), Image.NEAREST)
-        
-        # Center in target frame
+
+        # Backs: bottom-align above the Gen 1-style pad.  Fronts: center.
         new_img = Image.new("RGBA", target_size, (255, 255, 255, 0))
         x = (target_size[0] - new_w) // 2
-        y = (target_size[1] - new_h) // 2
-        new_img.paste(img_resized, (x, y))
-        
-        # Convert to 4-color indexed palette
+        if bottom_pad:
+            y = target_size[1] - bottom_pad - new_h
+        else:
+            y = (target_size[1] - new_h) // 2
+        new_img.paste(img_resized, (x, y), img_resized)
+        new_img = drop_orphan_pixels(new_img)
+
+        # Map each pixel to the nearest species-palette slot, then emit the
+        # matching DMG gray.  Brightness-only banding was what made green
+        # hair and pink body collapse into the same MEWMON purple/peach.
         px = new_img.load()
         indexed_img = Image.new("P", target_size, 0)
-        
-        # Palette:
-        # Index 0: Transparent (represented as white, but trans index 0)
-        # Index 1: White
-        # Index 2: Light Gray
-        # Index 3: Dark Gray
-        # Index 4: Black
         for py in range(target_size[1]):
             for px_x in range(target_size[0]):
                 r, g, b, a = px[px_x, py]
                 if a < 128:
                     indexed_img.putpixel((px_x, py), 0)
                 else:
-                    brightness = 0.299 * r + 0.587 * g + 0.114 * b
-                    if brightness > 192:
-                        indexed_img.putpixel((px_x, py), 1)
-                    elif brightness > 128:
-                        indexed_img.putpixel((px_x, py), 2)
-                    elif brightness > 64:
-                        indexed_img.putpixel((px_x, py), 3)
-                    else:
-                        indexed_img.putpixel((px_x, py), 4)
-                        
+                    shade = nearest_palette_index(r, g, b, species_colors)
+                    indexed_img.putpixel((px_x, py), shade + 1)
+
         palette = [
-            255, 255, 255, # 0: Transparent
-            255, 255, 255, # 1: White
-            170, 170, 170, # 2: Light Gray
-            85, 85, 85,    # 3: Dark Gray
-            0, 0, 0        # 4: Black
+            255, 255, 255,  # 0: Transparent
+            255, 255, 255,  # 1: White
+            170, 170, 170,  # 2: Light Gray
+            85, 85, 85,     # 3: Dark Gray
+            0, 0, 0,        # 4: Black
         ]
         palette += [0] * (768 - len(palette))
         indexed_img.putpalette(palette)
-        
+
         os.makedirs(os.path.dirname(output_path), exist_ok=True)
         indexed_img.save(output_path, transparency=0)
-        return True
+        return True, species_colors
     except Exception as e:
         print(f"Failed processing sprite {input_path}: {e}")
-        return False
+        return False, None
 
 
 # Gen 1 battle fronts are 40 / 48 / 56 px (frontSize 5 / 6 / 7 tiles).
@@ -1256,6 +1468,67 @@ def front_canvas_px(front_size):
     return front_size * 8
 
 
+def sprite_cache_dir():
+    """PokéAPI sprite cache: tools/.cache/sprites under the game repo.
+
+    Prefer the repo that owns this mod (../.. from MOD_ROOT); fall back to
+    cwd so `python3 generate_pokemon_mod.py --resprite` still works when
+    run from the gen1recomp tree.
+    """
+    candidates = [
+        os.path.join(os.path.dirname(os.path.dirname(MOD_ROOT)), "tools", ".cache", "sprites"),
+        os.path.join("tools", ".cache", "sprites"),
+    ]
+    for path in candidates:
+        if os.path.isdir(path):
+            return path
+    return candidates[0]
+
+
+def write_species_palettes_lua(path, palettes_by_species):
+    """Write mods/.../species_palettes.lua — id -> 4 RGB triples, lightest first."""
+    with open(path, "w", encoding="utf-8") as f:
+        f.write("-- Generated by generate_pokemon_mod.py. DO NOT EDIT.\n")
+        f.write("-- Per-species SGB palettes extracted from source art so Advanced\n")
+        f.write("-- color mode does not fall through to MEWMON (peach/purple).\n")
+        f.write("return {\n")
+        for species_id in sorted(palettes_by_species.keys()):
+            colors = palettes_by_species[species_id]
+            f.write(f"  {species_id} = {{\n")
+            for r, g, b in colors:
+                f.write(f"    {{ {int(r)}, {int(g)}, {int(b)} }},\n")
+            f.write("  },\n")
+        f.write("}\n")
+
+
+def ensure_palette_field(body, species_id):
+    """Insert or replace `palette = \"SPECIES\"` inside a pokemon_data species body."""
+    import re
+    if re.search(r'\bpalette\s*=', body):
+        return re.sub(
+            r'palette\s*=\s*"[^"]*"',
+            f'palette = "{species_id}"',
+            body,
+            count=1,
+        )
+    # Place after frontSize when present, else after spriteBack.
+    if re.search(r'frontSize\s*=\s*\d+', body):
+        return re.sub(
+            r'(frontSize\s*=\s*\d+,)',
+            rf'\1\n    palette = "{species_id}",',
+            body,
+            count=1,
+        )
+    if re.search(r'spriteBack\s*=', body):
+        return re.sub(
+            r'(spriteBack\s*=\s*"[^"]*",)',
+            rf'\1\n    palette = "{species_id}",',
+            body,
+            count=1,
+        )
+    return f'    palette = "{species_id}",\n' + body
+
+
 def resprite_kanto_reforged(outdir):
     """Re-bake front sprites from the PokéAPI cache using height-based
     frontSize, and rewrite frontSize fields in pokemon_data.lua.
@@ -1272,6 +1545,8 @@ def resprite_kanto_reforged(outdir):
 
     counts = {5: 0, 6: 0, 7: 0}
     missing = []
+    cache_dir = sprite_cache_dir()
+    species_palettes = {}
 
     # Walk each P.species entry for id/dex/height.
     species_chunks = re.split(r'\n  ([A-Z0-9_]+) = \{', lua)
@@ -1296,28 +1571,34 @@ def resprite_kanto_reforged(outdir):
         counts[front_size] = counts.get(front_size, 0) + 1
         canvas = front_canvas_px(front_size)
 
-        front_cache = os.path.join("tools", ".cache", "sprites", f"{dex}_front.png")
+        front_cache = os.path.join(cache_dir, f"{dex}_front.png")
         front_mod = os.path.join(outdir, "assets", f"{name.lower()}_front.png")
-        back_cache = os.path.join("tools", ".cache", "sprites", f"{dex}_back.png")
+        back_cache = os.path.join(cache_dir, f"{dex}_back.png")
         back_mod = os.path.join(outdir, "assets", f"{name.lower()}_back.png")
         if os.path.exists(front_cache):
-            if process_sprite(front_cache, front_mod, (canvas, canvas)):
+            ok, colors = process_sprite(front_cache, front_mod, (canvas, canvas))
+            if ok:
                 resprited += 1
+                if colors:
+                    species_palettes[name] = colors
             else:
                 missing.append(name)
         else:
             missing.append(name)
         if os.path.exists(back_cache):
-            process_sprite(back_cache, back_mod, (32, 32))
+            ok_b, colors_b = process_sprite(back_cache, back_mod, (32, 32))
+            # Prefer front-derived palette; fall back to back if front missing.
+            if ok_b and colors_b and name not in species_palettes:
+                species_palettes[name] = colors_b
 
         # Castform weather forms share Castform's height/canvas.
         if name == "CASTFORM":
             for form_suffix, form_id in [("sunny", 10013), ("rainy", 10014), ("snowy", 10015)]:
-                f_cache = os.path.join("tools", ".cache", "sprites", f"{form_id}_front.png")
+                f_cache = os.path.join(cache_dir, f"{form_id}_front.png")
                 f_mod = os.path.join(outdir, "assets", f"castform_{form_suffix}_front.png")
                 if os.path.exists(f_cache):
                     process_sprite(f_cache, f_mod, (canvas, canvas))
-                b_cache = os.path.join("tools", ".cache", "sprites", f"{form_id}_back.png")
+                b_cache = os.path.join(cache_dir, f"{form_id}_back.png")
                 b_mod = os.path.join(outdir, "assets", f"castform_{form_suffix}_back.png")
                 if os.path.exists(b_cache):
                     process_sprite(b_cache, b_mod, (32, 32))
@@ -1328,10 +1609,19 @@ def resprite_kanto_reforged(outdir):
             body,
             count=1,
         )
+        if name in species_palettes:
+            body = ensure_palette_field(body, name)
         out_parts.append(f"\n  {name} = {{{body}")
 
     with open(lua_path, "w", encoding="utf-8") as f:
         f.write("".join(out_parts))
+
+    if species_palettes:
+        write_species_palettes_lua(
+            os.path.join(outdir, "species_palettes.lua"),
+            species_palettes,
+        )
+        print(f"Wrote {len(species_palettes)} species palettes")
 
     print(
         f"Resprited {resprited} fronts by dex height "
@@ -1566,9 +1856,9 @@ def main():
     parser.add_argument("--start", type=int, default=152)
     parser.add_argument("--end", type=int, default=386)
     # Default to this script's directory so "unzip → run script → rezip" works
-    # without knowing the repo layout.
-    _mod_root = os.path.dirname(os.path.abspath(__file__))
-    parser.add_argument("--outdir", type=str, default=_mod_root)
+    # without knowing the repo layout.  Sprite paths written into
+    # pokemon_data.lua still use mods/<folder>/ via game_rel_mod_dir().
+    parser.add_argument("--outdir", type=str, default=MOD_ROOT)
     parser.add_argument(
         "--learnset-patches-only",
         action="store_true",
@@ -1598,8 +1888,8 @@ def main():
         "--resprite",
         action="store_true",
         help="Re-bake battle fronts/backs from sprite cache using dex-height "
-             "frontSize (40/48/56), keying out opaque Gen 2 mattes, and rewrite "
-             "frontSize in pokemon_data.lua",
+             "frontSize (40/48/56), Gen 1 back bottom-pad, outline dilate so "
+             "thin waists/edges survive, and rewrite frontSize in pokemon_data.lua",
     )
     args = parser.parse_args()
     
@@ -1763,11 +2053,16 @@ def main():
             
             front_mod_path = os.path.join(args.outdir, "assets", f"{p_name.lower()}_front.png")
             back_mod_path = os.path.join(args.outdir, "assets", f"{p_name.lower()}_back.png")
-            
+
+            species_palette = None
             if front_url and download_sprite_file(front_url, front_cache_path):
-                process_sprite(front_cache_path, front_mod_path, (front_px, front_px))
+                ok, colors = process_sprite(front_cache_path, front_mod_path, (front_px, front_px))
+                if ok and colors:
+                    species_palette = colors
             if back_url and download_sprite_file(back_url, back_cache_path):
-                process_sprite(back_cache_path, back_mod_path, (32, 32))
+                ok_b, colors_b = process_sprite(back_cache_path, back_mod_path, (32, 32))
+                if ok_b and colors_b and not species_palette:
+                    species_palette = colors_b
                 
             # Castform weather forms sprite downloading
             if p_name == "CASTFORM":
@@ -1894,6 +2189,7 @@ def main():
                     "text": dex_text
                 },
                 "frontSize": front_size,
+                "palette": species_palette,
             }
             pokemon_data_list.append(mon_record)
         except Exception as e:
@@ -2135,10 +2431,12 @@ def main():
                     f.write(f", item = {json.dumps(evo['item'])}")
                 f.write(" },\n")
             f.write("    },\n")
-            rel_dir = args.outdir.replace("\\", "/")
+            rel_dir = game_rel_mod_dir(args.outdir)
             f.write(f"    spriteFront = \"{rel_dir}/assets/{mon['id'].lower()}_front.png\",\n")
             f.write(f"    spriteBack = \"{rel_dir}/assets/{mon['id'].lower()}_back.png\",\n")
             f.write(f"    frontSize = {mon.get('frontSize') or 5},\n")
+            if mon.get("palette"):
+                f.write(f"    palette = \"{mon['id']}\",\n")
             f.write("    dexEntry = {\n")
             f.write(f"      kind = {json.dumps(mon['dexEntry']['kind'])},\n")
             f.write(f"      heightFt = {mon['dexEntry']['heightFt']},\n")
@@ -2169,6 +2467,20 @@ def main():
         f.write("}\n\n")
         
         f.write("return P\n")
+
+    # Per-species SGB palettes (Advanced color mode); without these every
+    # Gen 2/3 mon falls through to MEWMON (peach/purple).
+    pals = {
+        mon["id"]: mon["palette"]
+        for mon in pokemon_data_list
+        if mon.get("palette")
+    }
+    if pals:
+        write_species_palettes_lua(
+            os.path.join(args.outdir, "species_palettes.lua"),
+            pals,
+        )
+        print(f"Wrote {len(pals)} species palettes")
 
     # Gen 2/3 learnset/TM additions for vanilla Kanto species (trainers/wild/gyms
     # build moves from Pokemon.movesAtLevel, so these patches are how Gen 1 mons
