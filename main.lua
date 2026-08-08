@@ -133,6 +133,9 @@ return function(mod)
   TrainerAi.register(mod)
   TrainerAi.install(mod)
 
+  local QuarantineRecover = require("mods.Kanto-Reforged.quarantine_recover")
+  QuarantineRecover.install(mod)
+
   -- Wrap Stats.calc to clamp Shedinja's maximum HP to 1 at runtime
   local Stats = require("src.pokemon.Stats")
   local original_calc = Stats.calc
