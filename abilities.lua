@@ -333,6 +333,27 @@ function Abilities.onDamage(next, ctx)
 end
 
 -- Post damage triggers (Color Change + contact abilities)
+--
+-- Gen 3 contact abilities use the physical/special split as a stand-in for
+-- the Gen 6+ contact flag. Chance is Random()%100 < 30 (pokeemerald).
+local function chance100(battle, percent)
+  local rng = battle and battle.rng
+  local roll
+  if type(rng) == "function" then
+    -- Prefer a full byte then reduce, so a float-or-lo-bound stub rng
+    -- cannot make every check succeed (rng()→0.x used to make roll<30
+    -- always true when the call was rng(0,99)).
+    roll = rng(0, 255)
+    if type(roll) ~= "number" then return false end
+    -- Non-integer (float [0,1) stub that ignored args): never auto-proc.
+    if roll ~= math.floor(roll) then return false end
+    roll = math.floor(roll) % 100
+  else
+    roll = math.random(0, 99)
+  end
+  return roll < percent
+end
+
 function Abilities.onPostDamage(battle, user, target, move, damage)
   if not target or not target.mon or (target.mon.hp and target.mon.hp <= 0) then return end
   local targetAbility = abilityOf(battle, target)
@@ -343,11 +364,13 @@ function Abilities.onPostDamage(battle, user, target, move, damage)
     battle:sayNext(Strings("%s's type\nchanged to %s!", displayName(target), move.type))
   end
 
-  -- Physical moves approximate "contact" for Gen 1 engine
+  -- Physical moves approximate "contact" for Gen 1 engine / Gen 3 abilities
   local TypeChart = require("src.battle.TypeChart")
   local category = move.category or TypeChart.category(move.type) or "physical"
   if category ~= "physical" or not damage or damage <= 0 then return end
   if target.substituteHP then return end
+  -- Confusion self-hit shares user/target; do not self-proc contact abilities.
+  if user == target then return end
 
   if targetAbility == "ROUGH_SKIN" and user and user.mon and user.mon.hp > 0 then
     local dmg = math.max(1, math.floor(user.mon.stats.hp / 8))
@@ -357,18 +380,16 @@ function Abilities.onPostDamage(battle, user, target, move, damage)
   end
 
   local StatusRegistry = require("src.battle.StatusRegistry")
-  local roll = (battle.rng or math.random)(0, 99)
 
   -- Stench: attacker's stink can flinch (Gen 1 secondary-flinch feel, ~10%)
-  if userAbility == "STENCH" and target.mon.hp > 0
-      and (battle.rng or math.random)(0, 99) < 10 then
+  if userAbility == "STENCH" and target.mon.hp > 0 and chance100(battle, 10) then
     target.flinched = true
   end
 
   -- Cursed Body: Disable the move that hit you (Gen 1 Disable)
   if targetAbility == "CURSED_BODY" and user and user.mon and user.mon.hp > 0
       and move and move.id and not user.disabledSlot
-      and (battle.rng or math.random)(0, 99) < 30 then
+      and chance100(battle, 30) then
     local slot
     for i, mv in ipairs(user.curMoves or {}) do
       if mv.id == move.id then
@@ -378,36 +399,42 @@ function Abilities.onPostDamage(battle, user, target, move, damage)
     end
     if slot then
       user.disabledSlot = slot
-      user.disabledTurns = (battle.rng or math.random)(2, 5)
+      local turnRoll = battle.rng and battle.rng(2, 5) or math.random(2, 5)
+      user.disabledTurns = turnRoll
       local moveName = (battle.data and battle.data.moves and battle.data.moves[move.id]
         and battle.data.moves[move.id].name) or move.id
       battle:sayNext(Strings("%s's\n%s was\ndisabled!", displayName(user), moveName))
     end
   end
 
-  if targetAbility == "STATIC" and roll < 30 and user and user.mon and not user.mon.status then
+  -- Static / Poison Point / Flame Body / Effect Spore: 30% on contact.
+  -- Do not pass moveType for Static — Gen 3 Static can paralyze Ground
+  -- (Thunder Wave cannot; that gate lives on PAR.canInflict).
+  if targetAbility == "STATIC" and chance100(battle, 30)
+      and user and user.mon and not user.mon.status then
     local msgs = StatusRegistry.inflict(battle, user, "PAR", {
-      secondary = true, moveType = "ELECTRIC", source = "STATIC",
+      secondary = true, source = "STATIC",
       expSourceBattler = target,
     })
     for _, m in ipairs(msgs or {}) do battle:sayNext(m) end
-  elseif targetAbility == "POISON_POINT" and roll < 30
+  elseif targetAbility == "POISON_POINT" and chance100(battle, 30)
       and user and user.mon and not user.mon.status then
     local msgs = StatusRegistry.inflict(battle, user, "PSN", {
       secondary = true, moveType = "POISON", source = "POISON_POINT",
       expSourceBattler = target,
     })
     for _, m in ipairs(msgs or {}) do battle:sayNext(m) end
-  elseif targetAbility == "FLAME_BODY" and roll < 30
+  elseif targetAbility == "FLAME_BODY" and chance100(battle, 30)
       and user and user.mon and not user.mon.status then
     local msgs = StatusRegistry.inflict(battle, user, "BRN", {
       secondary = true, moveType = "FIRE", source = "FLAME_BODY",
       expSourceBattler = target,
     })
     for _, m in ipairs(msgs or {}) do battle:sayNext(m) end
-  elseif targetAbility == "EFFECT_SPORE" and roll < 30
+  elseif targetAbility == "EFFECT_SPORE" and chance100(battle, 30)
       and user and user.mon and not user.mon.status then
-    local pick = ({ "SLP", "PSN", "PAR" })[(battle.rng or math.random)(1, 3)]
+    local pick = ({ "SLP", "PSN", "PAR" })[
+      (battle.rng and battle.rng(1, 3) or math.random(1, 3))]
     local msgs = StatusRegistry.inflict(battle, user, pick, {
       secondary = true, source = "EFFECT_SPORE",
       expSourceBattler = target,
@@ -415,8 +442,8 @@ function Abilities.onPostDamage(battle, user, target, move, damage)
     for _, m in ipairs(msgs or {}) do battle:sayNext(m) end
   elseif targetAbility == "CUTE_CHARM"
       and user and user.mon and not user.expInfatuated
-      and (battle.rng or math.random)(1, 3) == 1 then
-    -- Gen 3 Cute Charm is 1/3 (Gen 4+ lowered it to 30%).
+      and chance100(battle, 33) then
+    -- Gen 3 Cute Charm is ~1/3 (33/100 stand-in for Random()%3==0).
     local ua = abilityOf(battle, user)
     if ua ~= "OBLIVIOUS" then
       local Gender = require("mods.Kanto-Reforged.gender")

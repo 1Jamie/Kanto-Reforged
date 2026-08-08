@@ -6873,20 +6873,45 @@ def main():
                             species_id=p_name, dex=form_id,
                         )
                         
-            # Moves and level-up learnset (remap Gen 1 ids to engine names)
+            # Prefer Emerald (then RSE / FRLG) for ALL Gen 2–3 species so
+            # learnsets match Gen 3 timing — do not union later gens.
             learnset_list = []
             tmhm_set = set()
-            for move_entry in poke_data["moves"]:
-                m_name = remap_move(move_entry["move"]["name"].upper().replace("-", "_"))
-                for detail in move_entry["version_group_details"]:
-                    method = detail["move_learn_method"]["name"]
-                    if method == "level-up":
-                        learnset_list.append({
-                            "level": detail["level_learned_at"],
-                            "move": m_name
-                        })
-                    elif method == "machine":
-                        tmhm_set.add(m_name)
+            dex_num = poke_data.get("id") or 0
+            if 152 <= dex_num <= 386:
+                preferred_vgs = ("emerald", "ruby-sapphire", "firered-leafgreen")
+            else:
+                preferred_vgs = None
+
+            def collect_level_up(vg_allow):
+                out = []
+                for move_entry in poke_data["moves"]:
+                    m_name = remap_move(move_entry["move"]["name"].upper().replace("-", "_"))
+                    for detail in move_entry["version_group_details"]:
+                        method = detail["move_learn_method"]["name"]
+                        vg = detail["version_group"]["name"]
+                        if method == "level-up":
+                            if vg_allow is None or vg in vg_allow:
+                                out.append({
+                                    "level": detail["level_learned_at"],
+                                    "move": m_name
+                                })
+                        elif method == "machine":
+                            if preferred_vgs is None or vg in preferred_vgs \
+                                    or vg in ("emerald", "ruby-sapphire", "firered-leafgreen",
+                                              "crystal", "gold-silver", "xd", "colosseum"):
+                                tmhm_set.add(m_name)
+                return out
+
+            if preferred_vgs:
+                for vg in preferred_vgs:
+                    learnset_list = collect_level_up({vg})
+                    if learnset_list:
+                        break
+                if not learnset_list:
+                    learnset_list = collect_level_up(None)
+            else:
+                learnset_list = collect_level_up(None)
                         
             tmhm_list = sorted(list(tmhm_set))
                         

@@ -713,6 +713,63 @@ do
   }, stenchTarget, { type = "POISON", category = "physical", power = 40 }, 10)
   T.eq(stenchTarget.flinched, true, "Stench can flinch on physical contact")
 
+  -- Poison Point / Static: ~30% over many rolls (not 100%)
+  do
+    abilityMon("NIDORAN_F", "POISON_POINT")
+    local seed = 1
+    local function rng(a, b)
+      -- deterministic Park-Miller stand-in
+      seed = (seed * 16807) % 2147483647
+      if b == nil then a, b = 1, a end
+      return a + (seed % (b - a + 1))
+    end
+    local procs = 0
+    local N = 400
+    for _ = 1, N do
+      local user = {
+        mon = { species = "RATTATA", hp = 40, stats = { hp = 40 }, status = nil },
+        name = "Rattata", isPlayer = true, curTypes = { "NORMAL" },
+      }
+      local foe = {
+        mon = { species = "NIDORAN_F", hp = 40, stats = { hp = 40 } },
+        name = "Nido", isPlayer = false, curTypes = { "POISON" },
+      }
+      Abilities.onPostDamage({
+        data = Data, rng = rng, sayNext = function() end,
+        applyDamage = function() end, onFaint = function() end,
+      }, user, foe, { type = "NORMAL", category = "physical", power = 40 }, 10)
+      if user.mon.status == "PSN" then procs = procs + 1 end
+    end
+    local rate = procs / N
+    T.check(rate > 0.15 and rate < 0.45,
+      string.format("Poison Point rate ~30%% (got %.0f%% over %d)", rate * 100, N))
+  end
+
+  -- Stub rng that always returns the low bound must NOT force 100% procs
+  do
+    abilityMon("PIKACHU", "STATIC")
+    local user = {
+      mon = { species = "RATTATA", hp = 40, stats = { hp = 40 }, status = nil },
+      name = "Rattata", isPlayer = true, curTypes = { "NORMAL" },
+    }
+    local foe = {
+      mon = { species = "PIKACHU", hp = 40, stats = { hp = 40 } },
+      name = "Pika", isPlayer = false, curTypes = { "ELECTRIC" },
+    }
+    -- Float-style rng that ignores args used to make roll<30 always true.
+    local floatRng = function() return 0.1 end
+    local procs = 0
+    for _ = 1, 20 do
+      user.mon.status = nil
+      Abilities.onPostDamage({
+        data = Data, rng = floatRng, sayNext = function() end,
+        applyDamage = function() end, onFaint = function() end,
+      }, user, foe, { type = "NORMAL", category = "physical", power = 40 }, 10)
+      if user.mon.status == "PAR" then procs = procs + 1 end
+    end
+    T.eq(procs, 0, "float/ignore-args rng must not make Static always proc")
+  end
+
   -- Cursed Body: Disable the move that hit
   abilityMon("GENGAR", "CURSED_BODY")
   local cursedUser = {

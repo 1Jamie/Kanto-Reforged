@@ -151,6 +151,8 @@ return function(T, Data, run)
     local cuteBattle = {
       data = Data,
       rng = function(a, b)
+        -- chance100 uses rng(0,255)%100; return 0 to force a proc.
+        if a == 0 and b == 255 then return 0 end
         if a == 1 and b == 3 then return 1 end
         return a or 0
       end,
