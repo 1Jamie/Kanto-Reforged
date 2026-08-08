@@ -1188,6 +1188,11 @@ def key_out_flat_background(img):
     Otherwise flood-fill from every border pixel that matches the dominant
     corner color, so sprite-touching-corner black pixels do not become the
     key color, and enclosed white highlights (eyes, shine) stay opaque.
+
+    White-bodied mons (Forretress) leak: the shell is the same white as the
+    matte and touches the border, so a plain flood eats the body.  When that
+    happens, fall back to dilating non-matte ink/color into a silhouette mask
+    and only key white *outside* that mask.
     """
     from collections import Counter, deque
 
@@ -1223,31 +1228,96 @@ def key_out_flat_background(img):
     else:
         bg = Counter(corners).most_common(1)[0][0]
 
-    def matches(x, y):
-        r, g, b, a = pixels[x, y]
+    bg_n = 0
+    content_n = 0
+    for y in range(h):
+        for x in range(w):
+            if pixels[x, y][:3] == bg:
+                bg_n += 1
+            else:
+                content_n += 1
+
+    def matches(x, y, pix):
+        r, g, b, a = pix[x, y]
         return a >= 128 and (r, g, b) == bg
 
-    seen = [[False] * w for _ in range(h)]
-    q = deque()
-    for x in range(w):
-        for y in (0, h - 1):
-            if not seen[y][x] and matches(x, y):
-                seen[y][x] = True
-                q.append((x, y))
-    for y in range(1, h - 1):
-        for x in (0, w - 1):
-            if not seen[y][x] and matches(x, y):
-                seen[y][x] = True
-                q.append((x, y))
+    def flood_key(src_img):
+        out = src_img.copy()
+        pix = out.load()
+        seen = [[False] * w for _ in range(h)]
+        q = deque()
+        for x in range(w):
+            for y in (0, h - 1):
+                if not seen[y][x] and matches(x, y, pix):
+                    seen[y][x] = True
+                    q.append((x, y))
+        for y in range(1, h - 1):
+            for x in (0, w - 1):
+                if not seen[y][x] and matches(x, y, pix):
+                    seen[y][x] = True
+                    q.append((x, y))
+        while q:
+            x, y = q.popleft()
+            r, g, b, _ = pix[x, y]
+            pix[x, y] = (r, g, b, 0)
+            for nx, ny in ((x - 1, y), (x + 1, y), (x, y - 1), (x, y + 1)):
+                if 0 <= nx < w and 0 <= ny < h and not seen[ny][nx] and matches(nx, ny, pix):
+                    seen[ny][nx] = True
+                    q.append((nx, ny))
+        return out
 
-    while q:
-        x, y = q.popleft()
-        r, g, b, _ = pixels[x, y]
-        pixels[x, y] = (r, g, b, 0)
-        for nx, ny in ((x - 1, y), (x + 1, y), (x, y - 1), (x, y + 1)):
-            if 0 <= nx < w and 0 <= ny < h and not seen[ny][nx] and matches(nx, ny):
-                seen[ny][nx] = True
-                q.append((nx, ny))
+    def content_mask_key(src_img, dilate_n=6):
+        """Keep matte-colored body pixels that sit inside dilated non-matte ink."""
+        out = src_img.copy()
+        pix = out.load()
+        mask = [[False] * w for _ in range(h)]
+        for y in range(h):
+            for x in range(w):
+                if pix[x, y][:3] != bg:
+                    mask[y][x] = True
+        for _ in range(dilate_n):
+            nxt = [row[:] for row in mask]
+            for y in range(h):
+                for x in range(w):
+                    if not mask[y][x]:
+                        continue
+                    for nx, ny in ((x - 1, y), (x + 1, y), (x, y - 1), (x, y + 1)):
+                        if 0 <= nx < w and 0 <= ny < h:
+                            nxt[ny][nx] = True
+            mask = nxt
+        for y in range(h):
+            for x in range(w):
+                if pix[x, y][:3] == bg and not mask[y][x]:
+                    pix[x, y] = (bg[0], bg[1], bg[2], 0)
+        return out
+
+    flooded = flood_key(img)
+    fp = flooded.load()
+    white_left = 0
+    opaque_left = 0
+    for y in range(h):
+        for x in range(w):
+            r, g, b, a = fp[x, y]
+            if a < 128:
+                continue
+            opaque_left += 1
+            if (r, g, b) == bg:
+                white_left += 1
+
+    # Flood ate a white shell that was contiguous with the matte (Forretress).
+    bg_is_white = bg[0] >= 250 and bg[1] >= 250 and bg[2] >= 250
+    if (
+        bg_is_white
+        and bg_n > content_n
+        and white_left < max(24, int(bg_n * 0.08))
+        and opaque_left < max(80, int(content_n * 1.25))
+    ):
+        return content_mask_key(img)
+
+    # Copy flood result onto the working image.
+    for y in range(h):
+        for x in range(w):
+            pixels[x, y] = fp[x, y]
     return img
 
 
@@ -3864,6 +3934,24 @@ SPRITE_OVERRIDES = {
             (0, 0, 0),
         ],
     },
+    # White shell contiguous with Crystal matte — key_out must keep body white.
+    # Back uses v1 geometry; faithful majority-vote collapses the shell.
+    "FORRETRESS": {
+        "back_v1": True,
+        "dilate": True,
+        "stem": False,
+        "depth": False,
+        "seal": True,
+        "outline": "soft",
+        "close_gap": 1,
+        "shade": "nearest",
+        "palette": [
+            (255, 255, 255),
+            (197, 90, 214),   # purple band
+            (156, 16, 74),    # dark magenta
+            (0, 0, 0),
+        ],
+    },
     # Near-black body — dark_body profile + tiny-gem knobs.
     "SABLEYE": {
         "style": "dark_body",
@@ -3882,6 +3970,34 @@ SPRITE_OVERRIDES = {
             (0, 0, 0),
         ],
     },
+    # Dark robe + cream skull: body_mid treats luma≥90 as shade-1, so the
+    # olive body paints as cream/white in Advanced.  Hue-nearest keeps body
+    # on slot 2 and skull on slot 1.
+    "DUSKULL": {
+        "shade": "nearest",
+        "palette": [
+            (255, 255, 255),
+            (216, 208, 168),  # skull
+            (104, 104, 88),   # body
+            (0, 0, 0),
+        ],
+    },
+    # Same body_mid trap: gray gown luma~175 → pure white.
+    "DUSCLOPS": {
+        "shade": "nearest",
+        "palette": [
+            (255, 255, 255),
+            (176, 176, 160),  # body
+            (80, 56, 48),     # shadow / eye ring
+            (0, 0, 0),
+        ],
+    },
+    # Same washout class (auto-caught by Stage 0; pins keep palettes stable).
+    "SLAKING": {"shade": "nearest"},
+    "SHEDINJA": {"shade": "nearest"},
+    "SPOINK": {"shade": "nearest"},
+    "ANORITH": {"shade": "nearest"},
+    "SHIFTRY": {"shade": "nearest"},
 }
 
 
@@ -4583,8 +4699,23 @@ def analyze_sprite_decisions(img, colors):
     # stretching a saturated accent palette desaturates identity colors.
     needs_stretch = bool(low_chroma and mid_span < PALETTE_CONTRAST_MIN_MID_SPAN)
 
+    shade_mode = "body_mid" if low_chroma else "nearest"
+    # Light mid + darker fill (Duskull robe, Spoink body, Slaking fur):
+    # body_mid's luma≥90→shade1 paints the dark mass with the cream/pearl
+    # slot so Advanced looks whitewashed.  Prefer hue-nearest when the sheet
+    # is overall dark-ish and slot 2 is clearly the darker structural fill.
+    # Bright gowns / ice / birds (Gardevoir, Absol, Regice) keep body_mid.
+    if (
+        low_chroma
+        and colors
+        and len(colors) >= 3
+        and _rgb_luma(colors[2]) + 24 < _rgb_luma(colors[1])
+        and mean_opaque_luma(img) < 150
+    ):
+        shade_mode = "nearest"
+
     return {
-        "shade_mode": "body_mid" if low_chroma else "nearest",
+        "shade_mode": shade_mode,
         "needs_contrast_stretch": needs_stretch,
         "low_chroma": low_chroma,
         "clear_accent": clear_accent,
@@ -5220,6 +5351,18 @@ def process_sprite(input_path, output_path, target_size, species_id=None, dex=No
             input_path, output_path, target_size, opts, override=override
         )
     if is_gen2_dex(dex):
+        # White-shell backs (Forretress): v1 NEAREST keeps the body; the
+        # faithful majority-vote path shrinks it to a handful of pixels.
+        if is_back and override.get("back_v1"):
+            return process_sprite_v1(
+                input_path,
+                output_path,
+                target_size,
+                palette_override=override.get("palette"),
+                shade_mode=override.get("shade", "nearest"),
+                outline=override.get("outline", "soft"),
+                close_gap=int(override["close_gap"]) if override.get("close_gap") is not None else 1,
+            )
         opts = resolve_sprite_opts(species_id=species_id, dex=dex, input_path=input_path)
         return _process_sprite_faithful(
             input_path, output_path, target_size, opts, override=override

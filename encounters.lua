@@ -28,14 +28,20 @@ local MAPS = {
   ROUTE_8 = { habitats = { "urban" }, kinds = { "grass" } },
   ROUTE_9 = { habitats = { "mountain" }, kinds = { "grass" } },
   ROUTE_10 = { habitats = { "mountain" }, kinds = { "grass" } },
-  ROUTE_11 = { habitats = { "rough-terrain" }, kinds = { "grass" } },
+  -- Route 11 sits east of Vermilion (Ekans/Sandshrew, Spearow, Drowzee) and
+  -- feeds Diglett's Cave — not desert-only. Tag grassland/urban so curated
+  -- + coverage actually assign Gen 2/3 instead of leaving Spearow commons.
+  ROUTE_11 = {
+    habitats = { "rough-terrain", "grassland", "urban" },
+    kinds = { "grass" },
+  },
   ROUTE_12 = { habitats = { "rough-terrain", "grassland", "waters-edge" }, kinds = { "grass" } },
   ROUTE_13 = { habitats = { "rough-terrain", "grassland" }, kinds = { "grass" } },
   ROUTE_14 = { habitats = { "rough-terrain", "grassland" }, kinds = { "grass" } },
   ROUTE_15 = { habitats = { "rough-terrain", "grassland" }, kinds = { "grass" } },
   ROUTE_16 = { habitats = { "rough-terrain", "mountain" }, kinds = { "grass" } },
-  ROUTE_17 = { habitats = { "rough-terrain" }, kinds = { "grass" } },
-  ROUTE_18 = { habitats = { "rough-terrain" }, kinds = { "grass" } },
+  ROUTE_17 = { habitats = { "rough-terrain", "grassland" }, kinds = { "grass" } },
+  ROUTE_18 = { habitats = { "rough-terrain", "grassland" }, kinds = { "grass" } },
   ROUTE_19 = { habitats = { "sea", "waters-edge" }, kinds = { "water" } },
   ROUTE_20 = { habitats = { "sea", "waters-edge" }, kinds = { "water" } },
   ROUTE_21 = { habitats = { "sea", "waters-edge", "grassland" }, kinds = { "grass", "water" } },
@@ -49,6 +55,17 @@ local MAPS = {
   MT_MOON_1F = { habitats = { "cave" }, kinds = { "grass" } },
   MT_MOON_B1F = { habitats = { "cave" }, kinds = { "grass" } },
   MT_MOON_B2F = { habitats = { "cave" }, kinds = { "grass" } },
+  -- Iconic Diglett/Dugtrio tunnel: keep locals dominant. At most two rare
+  -- guest slots (low-frequency Diglett entries); never used as a coverage dump.
+  DIGLETTS_CAVE = {
+    habitats = { "cave" },
+    kinds = { "grass" },
+    iconicLocals = true,
+    -- Gen 1 layout: slots 1–8 Diglett, 9–10 Dugtrio. Touch only ~5% Digletts.
+    guestSlots = { 7, 8 },
+    -- Burrowing / magnetic cave dwellers that fit the tunnel thematically.
+    guestAllow = { "ARON", "NOSEPASS" },
+  },
   ROCK_TUNNEL_1F = { habitats = { "cave", "mountain" }, kinds = { "grass" } },
   ROCK_TUNNEL_B1F = { habitats = { "cave", "mountain" }, kinds = { "grass" } },
   VICTORY_ROAD_1F = { habitats = { "cave", "mountain" }, kinds = { "grass" } },
@@ -312,7 +329,11 @@ local function replacementPlan(mapDef, avgLevel, maxLevel, slots)
   end
   local mid = (avgLevel >= 14 or maxLevel >= 18) and 1 or 0
   local late = (avgLevel >= 32 or maxLevel >= 40) and 2 or mid
+  -- Slot 2 is a high-frequency common (~20%); without it, routes like
+  -- Route 11 keep a vanilla Spearow in a very common bucket and feel
+  -- unassigned even when slots 3/6/9 were mixed.
   return {
+    { index = 2, preferStage = 0, allowRare = false },
     { index = 3, preferStage = 0, allowRare = false },
     { index = 6, preferStage = mid, allowRare = false },
     { index = 9, preferStage = late, allowRare = false },
@@ -426,7 +447,8 @@ local function ensureBaseCoverage(mod, index)
     local meta = index.meta[speciesId]
     for _, mapId in ipairs(mapIds) do
       local mapDef = MAPS[mapId]
-      if habitatMatch(mapDef, meta.habitat) then
+      -- Never steal Diglett's Cave slots for general cave coverage.
+      if not mapDef.iconicLocals and habitatMatch(mapDef, meta.habitat) then
         for _, kind in ipairs(mapDef.kinds) do
           local enc = mod.content.encounters:get(mapId)
           local block = enc and enc[kind]
@@ -496,6 +518,25 @@ local function ensureBaseCoverage(mod, index)
   end
 end
 
+-- Iconic maps (Diglett's Cave): keep vanilla locals; swap only guestSlots
+-- from a short thematic allowlist. Habitat tags are ignored here — guests
+-- are hand-picked for the location (e.g. Aron is "mountain" but belongs).
+local function mixIconicGuests(index, mapDef, slots, _avg, _maxLv)
+  local allow = mapDef.guestAllow or {}
+  local guestIdx = mapDef.guestSlots or {}
+  for i, slotIndex in ipairs(guestIdx) do
+    local slot = slots[slotIndex]
+    if slot and not VANILLA_RARES[slot.species] then
+      -- One allowlist entry per guest slot (wrap if fewer guests than slots).
+      local chosen = allow[((i - 1) % #allow) + 1]
+      if chosen and index.meta[chosen] and not NEVER_WILD[chosen] then
+        slot.species = chosen
+        applyMinLevel(index, slot, chosen)
+      end
+    end
+  end
+end
+
 -- Curated: replace a few slots with Gen 2/3 (default), then cover gaps.
 local function mixCurated(mod, index)
   local mapIds = {}
@@ -508,21 +549,25 @@ local function mixCurated(mod, index)
       local slots = baselineSlots(mapId, kind)
       if slots and #slots > 0 then
         local avg, maxLv = slotStats(slots)
-        local plan = replacementPlan(mapDef, avg, maxLv, slots)
-        for planIdx, step in ipairs(plan) do
-          local slot = slots[step.index]
-          if slot and not VANILLA_RARES[slot.species] then
-            local pool = Encounters.eligible(
-              index, mapDef.habitats, slot.level, avg, maxLv, {
-                allowRare = step.allowRare,
-                rareOnly = step.rareOnly,
-                preferStage = step.preferStage,
-              })
-            local pickIndex = planIdx + (mapOrder - 1) * 3
-            local chosen = Encounters.pick(pool, pickIndex)
-            if chosen then
-              slot.species = chosen
-              applyMinLevel(index, slot, chosen)
+        if mapDef.iconicLocals then
+          mixIconicGuests(index, mapDef, slots, avg, maxLv)
+        else
+          local plan = replacementPlan(mapDef, avg, maxLv, slots)
+          for planIdx, step in ipairs(plan) do
+            local slot = slots[step.index]
+            if slot and not VANILLA_RARES[slot.species] then
+              local pool = Encounters.eligible(
+                index, mapDef.habitats, slot.level, avg, maxLv, {
+                  allowRare = step.allowRare,
+                  rareOnly = step.rareOnly,
+                  preferStage = step.preferStage,
+                })
+              local pickIndex = planIdx + (mapOrder - 1) * 3
+              local chosen = Encounters.pick(pool, pickIndex)
+              if chosen then
+                slot.species = chosen
+                applyMinLevel(index, slot, chosen)
+              end
             end
           end
         end
@@ -547,48 +592,52 @@ local function mixFullRandom(mod, index)
       local slots = baselineSlots(mapId, kind)
       if slots and #slots > 0 then
         local avg, maxLv = slotStats(slots)
-        -- Gen 1 locals from the vanilla table (unique, skip protected rares)
-        local locals, seen = {}, {}
-        for _, slot in ipairs(slots) do
-          if slot.species and not VANILLA_RARES[slot.species]
-              and not seen[slot.species] then
-            seen[slot.species] = true
-            locals[#locals + 1] = slot.species
+        if mapDef.iconicLocals then
+          mixIconicGuests(index, mapDef, slots, avg, maxLv)
+        else
+          -- Gen 1 locals from the vanilla table (unique, skip protected rares)
+          local locals, seen = {}, {}
+          for _, slot in ipairs(slots) do
+            if slot.species and not VANILLA_RARES[slot.species]
+                and not seen[slot.species] then
+              seen[slot.species] = true
+              locals[#locals + 1] = slot.species
+            end
           end
-        end
 
-        for slotIndex, slot in ipairs(slots) do
-          if not VANILLA_RARES[slot.species] then
-            local gen23 = Encounters.eligible(
-              index, mapDef.habitats, slot.level, avg, maxLv, {
-                allowRare = false,
-                rareOnly = false,
-                preferStage = Encounters.maxStageFor(avg, maxLv),
-              })
-            local pool, poolSeen = {}, {}
-            local function add(id)
-              if id and not poolSeen[id] then
-                poolSeen[id] = true
-                pool[#pool + 1] = id
-              end
-            end
-            for _, id in ipairs(locals) do add(id) end
-            for _, id in ipairs(gen23) do add(id) end
-            if mapDef.rare and slotIndex >= 7 then
-              local rares = Encounters.eligible(
+          for slotIndex, slot in ipairs(slots) do
+            if not VANILLA_RARES[slot.species] then
+              local gen23 = Encounters.eligible(
                 index, mapDef.habitats, slot.level, avg, maxLv, {
-                  allowRare = true, rareOnly = true, preferStage = 0,
+                  allowRare = false,
+                  rareOnly = false,
+                  preferStage = Encounters.maxStageFor(avg, maxLv),
                 })
-              if #rares > 0 then
-                pool, poolSeen = {}, {}
-                for _, id in ipairs(rares) do add(id) end
-                for _, id in ipairs(gen23) do add(id) end
+              local pool, poolSeen = {}, {}
+              local function add(id)
+                if id and not poolSeen[id] then
+                  poolSeen[id] = true
+                  pool[#pool + 1] = id
+                end
               end
-            end
-            if #pool > 0 then
-              local chosen = pool[hashIndex(mapId, slotIndex, #pool, 0xC0FFEE)]
-              slot.species = chosen
-              applyMinLevel(index, slot, chosen)
+              for _, id in ipairs(locals) do add(id) end
+              for _, id in ipairs(gen23) do add(id) end
+              if mapDef.rare and slotIndex >= 7 then
+                local rares = Encounters.eligible(
+                  index, mapDef.habitats, slot.level, avg, maxLv, {
+                    allowRare = true, rareOnly = true, preferStage = 0,
+                  })
+                if #rares > 0 then
+                  pool, poolSeen = {}, {}
+                  for _, id in ipairs(rares) do add(id) end
+                  for _, id in ipairs(gen23) do add(id) end
+                end
+              end
+              if #pool > 0 then
+                local chosen = pool[hashIndex(mapId, slotIndex, #pool, 0xC0FFEE)]
+                slot.species = chosen
+                applyMinLevel(index, slot, chosen)
+              end
             end
           end
         end

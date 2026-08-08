@@ -102,7 +102,9 @@ Wilds can hold berries (~**5%** chance). The berry is rolled only from types you
 
 ### Trainers
 
-Curated one-slot (or small) Gen 2–3 mixes into gyms, Elite Four, rival, and selected classes. Not full gym redesigns. See `trainers.lua` / `trainer_ai.lua`.
+Gym leaders and Elite Four get a curated **Gen 2 swap + Gen 3 add** (Blaine is Gen 3 lead-only so Growlithe→Arcanine and Ponyta→Rapidash stay intact). Ace mons hold a **berry ramp** (plain `BERRY` on Brock → status berries mid-game → Lum on Agatha/Lance). Rival mixes follow **continuity**: mid fights foreshadow a line; League fights are where finals debut (no champ-only surprises).
+
+**Tier 2** set pieces get heavier cherry-picks so Gen 2–3 show up on trainers, not only in grass: early gym trainers, Mt Moon Rockets, Fighting Dojo, Tower (including 7F), late gyms (Saffron/Fuchsia/Cinnabar/Viridian), SS Anne, Rock Tunnel, Cycling Road, Silph, and Victory Road. **Nugget Bridge** stays mostly Gen 1 (Bug Catcher + Mankey Jr Trainer fully vanilla) with one Gen 2–3 spice on the other fights. Other trash classes keep small one-slot mixes. See `trainers.lua` / `trainer_ai.lua`.
 
 ---
 
@@ -115,6 +117,7 @@ Every mon gets a gender from Gen 2 rules: Attack DV vs species `genderRate` (fem
 - Attract and Cute Charm use opposite-gender infatuation (Cute Charm at Gen 3’s 1/3 rate).
 - Captivate only hits the opposite gender.
 - Cute Charm lead biases wild genders (~2/3 opposite), Emerald-style.
+- Changing the values in save file will not swap the geneder, these are set on spawn time so we are not redoing the same math 3000x redundantly.
 
 ---
 
@@ -344,7 +347,7 @@ When the option is on, the Gen 1 XP pool is split so active fighters get most of
 
 ## Smarter AI
 
-Prefers damage that works, devalues setup/status when they would fail or are already applied, etc. Can be turned off in options.
+Four rungs: **natural** (common wilds — dump useless plays, otherwise messy), **soft** (route trash + threat wilds), **lite** (gyms / serious classes), **elite** (leaders / E4 / rivals). Soft/lite react to HP, speed, and existing status with small nudges—not a fixed opener script. Soft KO reads stay conservative (very low foe HP only) so trash fights do not dump status for a guessed KO. Threat wilds use soft via scary maps (non-fodder), rare maps, roamers, or a **tight** iconic species list (Snorlax/Gyarados/etc.—not every Golbat); legendaries fold into that threat set rather than being listed twice. Mt Moon Zubats stay natural. Decaying weights cool status/setup after use (full on soft, lighter on lite/elite); near-best mixing avoids locking one attack. Trainer bag items share a battle budget; held berries do not count against it. Toggleable in options.
 
 ---
 

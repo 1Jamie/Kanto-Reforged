@@ -145,24 +145,70 @@ return function(mod)
   end
 
   -- Wrap learnEvolutionMoves to teach evolutionMoves (learned at level 0 in PokeAPI)
+  -- and to flush any deferred Shedinja split announcement after the "evolved
+  -- into NINJASK" text (never push a TextBox during pokemon.evolved — that
+  -- lands under the congrats box and makes EvolutionState's stack:pop hit
+  -- the wrong state, which crashes / softlocks the evo screen).
   local Evolution = require("src.pokemon.Evolution")
+  local shedinjaAnnounceQueue = {}
+
+  local function queueShedinjaAnnounce(game, msg)
+    if not game or not msg then return end
+    shedinjaAnnounceQueue[#shedinjaAnnounceQueue + 1] = { game = game, msg = msg }
+  end
+
+  local function flushShedinjaAnnounce(game, thenFn)
+    local nextMsg
+    for i, entry in ipairs(shedinjaAnnounceQueue) do
+      if entry.game == game then
+        nextMsg = entry.msg
+        table.remove(shedinjaAnnounceQueue, i)
+        break
+      end
+    end
+    if not nextMsg then
+      if thenFn then thenFn() end
+      return
+    end
+    if game.stack then
+      local TextBox = require("src.render.TextBox")
+      game.stack:push(TextBox.new(game, Strings(nextMsg), function()
+        flushShedinjaAnnounce(game, thenFn)
+      end))
+    elseif thenFn then
+      thenFn()
+    end
+  end
+
+  local original_apply = Evolution.apply
+  Evolution.apply = function(game, mon, newSpecies, via)
+    mod._evoGame = game
+    local ok, err = pcall(original_apply, game, mon, newSpecies, via)
+    mod._evoGame = nil
+    if not ok then error(err) end
+  end
+
   local original_learnEvolutionMoves = Evolution.learnEvolutionMoves
   Evolution.learnEvolutionMoves = function(game, mon, onDone)
-    local Experience = require("src.battle.Experience")
-    local original_movesLearnedAt = Experience.movesLearnedAt
-    Experience.movesLearnedAt = function(speciesDef, level)
-      local out = original_movesLearnedAt(speciesDef, level)
-      if speciesDef and speciesDef.evolutionMoves then
-        for _, mv in ipairs(speciesDef.evolutionMoves) do
-          table.insert(out, 1, mv)
+    local function continueLearn()
+      local Experience = require("src.battle.Experience")
+      local original_movesLearnedAt = Experience.movesLearnedAt
+      Experience.movesLearnedAt = function(speciesDef, level)
+        local out = original_movesLearnedAt(speciesDef, level)
+        if speciesDef and speciesDef.evolutionMoves then
+          for _, mv in ipairs(speciesDef.evolutionMoves) do
+            table.insert(out, 1, mv)
+          end
         end
+        return out
       end
-      return out
+
+      local ok, err = pcall(original_learnEvolutionMoves, game, mon, onDone)
+      Experience.movesLearnedAt = original_movesLearnedAt
+      if not ok then error(err) end
     end
-    
-    local ok, err = pcall(original_learnEvolutionMoves, game, mon, onDone)
-    Experience.movesLearnedAt = original_movesLearnedAt
-    if not ok then error(err) end
+
+    flushShedinjaAnnounce(game, continueLearn)
   end
 
   -- Wrap openParty to implement Shadow Tag / Magnet Pull switch block.
@@ -928,12 +974,15 @@ return function(mod)
 
   -- Nincada → Ninjask leaves a Shedinja behind when a Poké Ball is
   -- consumed (Gen 3 split evolution). Inventory is id→count, not a list.
+  -- Announcements are queued and flushed from learnEvolutionMoves so we
+  -- never push a TextBox during EvolutionState's apply→congrats window.
   mod.events:on("pokemon.evolved", function(ev)
     if ev.fromSpecies ~= "NINCADA" or ev.toSpecies ~= "NINJASK" then
       return
     end
-    local game = ev.game or mod.activeGame
-    if not game or not game.save then return end
+    local game = ev.game or mod._evoGame or mod.activeGame
+    if not game or not game.save or not game.data then return end
+    if not ev.mon then return end
 
     local Bag = require("src.inventory.Bag")
     local ballId = nil
@@ -949,34 +998,39 @@ return function(mod)
     local Pokemon = require("src.pokemon.Pokemon")
     local Merge = require("src.mods.Merge")
     local Stats = require("src.pokemon.Stats")
-    local shedinja = Pokemon.new(game.data, "SHEDINJA", ev.mon.level)
-    shedinja.dvs = Merge.deepCopy(ev.mon.dvs)
-    shedinja.statExp = Merge.deepCopy(ev.mon.statExp or {})
+    local level = ev.mon.level or 20
+    local shedinja = Pokemon.new(game.data, "SHEDINJA", level)
+    -- Inherit DVs / effort / moves from the shell left behind (Gen 3).
+    shedinja.dvs = Merge.deepCopy(ev.mon.dvs) or shedinja.dvs
+    shedinja.statExp = Merge.deepCopy(ev.mon.statExp)
+      or { hp = 0, attack = 0, defense = 0, speed = 0, special = 0 }
+    if type(ev.mon.moves) == "table" then
+      shedinja.moves = Merge.deepCopy(ev.mon.moves)
+    end
+    shedinja.otName = ev.mon.otName
     shedinja.stats = Stats.calc(game.data.pokemon.SHEDINJA, shedinja.level,
                                 shedinja.dvs, shedinja.statExp)
     shedinja.hp = 1
-
-    local function announce(msg)
-      if mod.activeBattle and mod.activeBattle.sayNext then
-        mod.activeBattle:sayNext(Strings(msg))
-      elseif game.stack then
-        local TextBox = require("src.render.TextBox")
-        game.stack:push(TextBox.new(game, Strings(msg), function() end))
-      end
+    if game.save.pokedex then
+      game.save.pokedex.seen.SHEDINJA = true
+      game.save.pokedex.owned.SHEDINJA = true
     end
 
     if #game.save.party < 6 then
       table.insert(game.save.party, shedinja)
-      announce("A SHEDINJA appeared\nin the party!")
+      queueShedinjaAnnounce(game, "A SHEDINJA appeared\nin the party!")
     else
       local Boxes = require("src.pokemon.Boxes")
       local boxNum = Boxes.deposit(game.save, shedinja)
       if boxNum then
         local pc = (game.save.flags and game.save.flags.EVENT_MET_BILL)
                    and "BILL's PC" or "someone's PC"
-        announce(string.format("SHEDINJA was\ntransferred to\n%s!", pc))
+        queueShedinjaAnnounce(game,
+          string.format("SHEDINJA was\ntransferred to\n%s!", pc))
       else
-        announce("Every BOX is full!\nSHEDINJA escaped!")
+        -- Ball already spent; nowhere to put it (Gen 3 refuses the split
+        -- earlier — we can't refund cleanly mid-apply).
+        queueShedinjaAnnounce(game, "Every BOX is full!\nSHEDINJA escaped!")
       end
     end
   end)

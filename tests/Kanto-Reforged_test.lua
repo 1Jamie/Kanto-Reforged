@@ -321,6 +321,53 @@ end
 T.check(curatedMixed >= 1 and curatedMixed <= 10,
   "curated mode mixes a bounded set of Route 1 slots")
 
+-- Route 11: must receive Gen 2/3 grass assignments (not Spearow-only leftovers).
+do
+  local r11 = Data.encounters.ROUTE_11
+  T.check(r11 and r11.grass and r11.grass.slots, "Route 11 has grass encounters")
+  local gen23, spearow, unique = 0, 0, {}
+  for _, slot in ipairs(r11.grass.slots) do
+    unique[slot.species] = true
+    if slot.species == "SPEAROW" or slot.species == "FEAROW" then
+      spearow = spearow + 1
+    end
+    if encIndex.meta[slot.species] then
+      gen23 = gen23 + 1
+    end
+  end
+  local nUnique = 0
+  for _ in pairs(unique) do nUnique = nUnique + 1 end
+  T.check(gen23 >= 3, "Route 11 curated grass has Gen 2/3 assignments ("
+    .. tostring(gen23) .. ")")
+  T.check(nUnique >= 4, "Route 11 grass is not a single-species table")
+  T.check(spearow <= 3, "Route 11 is not Spearow-dominated ("
+    .. tostring(spearow) .. " Spearow/Fearow slots)")
+
+  local cave = Data.encounters.DIGLETTS_CAVE
+  T.check(cave and cave.grass and cave.grass.slots, "Diglett's Cave still has grass")
+  local diglett, dugtrio, guests, other = 0, 0, 0, 0
+  local guestOk = { ARON = true, NOSEPASS = true }
+  for _, slot in ipairs(cave.grass.slots) do
+    if slot.species == "DIGLETT" then
+      diglett = diglett + 1
+    elseif slot.species == "DUGTRIO" then
+      dugtrio = dugtrio + 1
+    elseif guestOk[slot.species] then
+      guests = guests + 1
+    else
+      other = other + 1
+    end
+  end
+  T.check(diglett >= 6, "Diglett's Cave stays Diglett-dominated ("
+    .. tostring(diglett) .. " Diglett slots)")
+  T.check(dugtrio >= 2, "Diglett's Cave keeps Dugtrio rare slots")
+  T.check(guests >= 1 and guests <= 2,
+    "Diglett's Cave has 1–2 thematic guests (Aron/Nosepass), got "
+      .. tostring(guests))
+  T.check(other == 0,
+    "Diglett's Cave has no off-theme guests (" .. tostring(other) .. ")")
+end
+
 -- Coverage pass: every non-legendary pack line is obtainable — catch a
 -- base (or gift/rod root), then evolve / breed. Mid/finals need not all
 -- appear in grass. Shedinja stays NEVER_WILD via Nincada.
@@ -531,6 +578,48 @@ do
   T.eq(limberTgt.mon.status, nil, "Limber blocks paralysis")
   T.eq(#(limberMsgs or {}), 0, "Limber returns no inflict messages")
 
+  -- Steel / Poison type immunity to poison status (Gen 2+)
+  local steelTgt = {
+    name = "Steelix", isPlayer = false,
+    curTypes = { "STEEL", "GROUND" },
+    mon = { species = "STEELIX", status = nil },
+  }
+  local steelMsgs = StatusRegistry.inflict(
+    { data = Data }, steelTgt, "PSN", { moveType = "POISON" })
+  T.eq(steelTgt.mon.status, nil, "Steel types cannot be poisoned")
+  T.eq(#(steelMsgs or {}), 0, "Steel poison returns no inflict messages")
+
+  local steelToxic = {
+    name = "Magneton", isPlayer = false,
+    curTypes = { "ELECTRIC", "STEEL" },
+    mon = { species = "MAGNETON", status = nil },
+  }
+  local toxicMsgs = StatusRegistry.inflict(
+    { data = Data }, steelToxic, "PSN", { toxic = true, moveType = "POISON" })
+  T.eq(steelToxic.mon.status, nil, "Steel types cannot be badly poisoned")
+  T.eq(steelToxic.toxicCounter, nil, "Steel toxic leaves no toxicCounter")
+  T.eq(#(toxicMsgs or {}), 0, "Steel toxic returns no inflict messages")
+
+  local poisonTgt = {
+    name = "Ekans", isPlayer = false,
+    curTypes = { "POISON" },
+    mon = { species = "EKANS", status = nil },
+  }
+  local poisonMsgs = StatusRegistry.inflict(
+    { data = Data }, poisonTgt, "PSN", {})
+  T.eq(poisonTgt.mon.status, nil, "Poison types still cannot be poisoned")
+  T.eq(#(poisonMsgs or {}), 0, "Poison-type poison returns no inflict messages")
+
+  local normalTgt = {
+    name = "Rattata", isPlayer = false,
+    curTypes = { "NORMAL" },
+    mon = { species = "RATTATA", status = nil },
+  }
+  local normalMsgs = StatusRegistry.inflict(
+    { data = Data }, normalTgt, "PSN", {})
+  T.eq(normalTgt.mon.status, "PSN", "Normal types can still be poisoned")
+  T.check(#(normalMsgs or {}) > 0, "Normal poison returns inflict messages")
+
   -- Flash Fire: Fire damage nullified
   abilityMon("VULPIX", "FLASH_FIRE")
   local ffDmg = select(1, Abilities.onDamage(
@@ -653,17 +742,28 @@ end
 -- 12. Verify Nincada Evolution Split
 Data.items.POKE_BALL = { id = "POKE_BALL", name = "Poké Ball", price = 200 }
 
-local mockMon = { species = "NINJASK", level = 20, dvs = {}, statExp = {} }
+local mockMon = {
+  species = "NINJASK", level = 20,
+  dvs = { attack = 8, defense = 8, speed = 8, special = 8, hp = 0 },
+  statExp = {},
+  moves = { { id = "SCRATCH", pp = 35 }, { id = "HARDEN", pp = 30 } },
+}
 local mockSave = {
   party = { mockMon },
   -- Real bag shape is id→count, not a list of {id,count} slots
   inventory = { POKE_BALL = 5 },
   flags = {},
+  pokedex = { seen = {}, owned = {} },
 }
+local pushedDuringSplit = 0
 local mockGame = {
   data = Data,
   save = mockSave,
-  stack = { push = function() end },
+  stack = {
+    push = function()
+      pushedDuringSplit = pushedDuringSplit + 1
+    end,
+  },
 }
 local ev = { game = mockGame, mon = mockMon, fromSpecies = "NINCADA", toSpecies = "NINJASK" }
 
@@ -672,7 +772,50 @@ Runtime.emit("pokemon.evolved", ev)
 
 T.eq(#mockSave.party, 2, "Evolution split added Shedinja to party")
 T.eq(mockSave.party[2].species, "SHEDINJA", "Party slot holds Shedinja species")
+T.eq(mockSave.party[2].hp, 1, "Shedinja HP is 1")
+T.eq(mockSave.party[2].moves[1].id, "SCRATCH", "Shedinja inherits moves")
 T.eq(mockSave.inventory.POKE_BALL, 4, "Poké Ball count decremented")
+T.eq(mockSave.pokedex.owned.SHEDINJA, true, "Shedinja marked owned")
+T.eq(pushedDuringSplit, 0,
+  "Shedinja announce is deferred (no TextBox during pokemon.evolved)")
+
+-- Real Evolution.apply path (no ev.game on the event) with spare slot + ball
+do
+  local Evolution = require("src.pokemon.Evolution")
+  local Pokemon = require("src.pokemon.Pokemon")
+  local Gender = require("mods.Kanto-Reforged.gender")
+  local mod = Gender._mod
+  local nincada = Pokemon.new(Data, "NINCADA", 20)
+  local pushed = {}
+  local save = {
+    party = { nincada },
+    inventory = { POKE_BALL = 1 },
+    bagOrder = { "POKE_BALL" },
+    pokedex = { seen = {}, owned = {} },
+    flags = {},
+    boxes = {},
+  }
+  local game = {
+    data = Data,
+    save = save,
+    stack = {
+      push = function(_, box)
+        pushed[#pushed + 1] = box
+      end,
+      pop = function() end,
+    },
+  }
+  mod.activeGame = game
+  Evolution.apply(game, nincada, "NINJASK", "LEVEL")
+  T.eq(nincada.species, "NINJASK", "Nincada became Ninjask")
+  T.eq(#save.party, 2, "apply path adds Shedinja with spare slot + ball")
+  T.eq(save.party[2].species, "SHEDINJA", "apply path Shedinja species")
+  T.eq(save.inventory.POKE_BALL, nil, "apply path consumes the Poké Ball")
+  T.eq(#pushed, 0, "apply path does not push TextBox under EvolutionState")
+  -- Flush deferred announce the way Congrats → learnEvolutionMoves does
+  Evolution.learnEvolutionMoves(game, nincada, function() end)
+  T.check(#pushed >= 1, "Shedinja announce flushes after evo text")
+end
 
 -- Full party sends Shedinja to the PC (and must not claim the lead was boxed)
 local fullMon = { species = "NINJASK", level = 20, dvs = {}, statExp = {} }

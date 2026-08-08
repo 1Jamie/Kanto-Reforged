@@ -192,15 +192,15 @@ function MoveEffects.applyHazards(battle, battler, side)
           end
         end
         msgs[#msgs + 1] = Strings("The poison spikes\ndisappeared!")
+      elseif hasType(battler, "STEEL") then
+        -- Steel is immune; spikes stay (unlike Poison absorb).
       elseif not battler.mon.status then
         local layers = h.layers or 1
         local opts = { toxic = layers >= 2, source = "TOXIC_SPIKES" }
         local StatusRegistry = require("src.battle.StatusRegistry")
-        local inflicted = StatusRegistry.inflict(battle, battler,
-          layers >= 2 and "PSN" or "PSN", opts)
-        if layers >= 2 then
-          battler.toxicCounter = 1
-        end
+        local inflicted = StatusRegistry.inflict(battle, battler, "PSN", opts)
+        -- toxicCounter is set inside PSN.onInflict when opts.toxic; do not
+        -- force it when inflict failed (Steel / Immunity / already statused).
         if type(inflicted) == "table" then
           for _, m in ipairs(inflicted) do msgs[#msgs + 1] = m end
         end
@@ -223,6 +223,18 @@ function MoveEffects.register(mod)
   -- merge writes it into Data.statuses (install-time edits of Data are wiped).
   mod.content.statuses:patch("SLP", {
     beforeMove = MoveEffects.sleepBeforeMove,
+  })
+
+  -- Gen 2+: Steel (and Poison) cannot be poisoned / badly poisoned.
+  local function canPoison(target)
+    if not target then return false end
+    for _, t in ipairs(target.curTypes or {}) do
+      if t == "POISON" or t == "STEEL" then return false end
+    end
+    return true
+  end
+  mod.content.statuses:patch("PSN", {
+    canInflict = canPoison,
   })
 
   -- ------- weather (Sunny Day / Rain Dance / Sandstorm / Hail)
@@ -1843,6 +1855,15 @@ function MoveEffects.install(mod)
       Status.RECORDS.SLP._expSleepModern = true
       Status.RECORDS.SLP._expSleepTalk = true
     end
+    if Status.RECORDS and Status.RECORDS.PSN then
+      Status.RECORDS.PSN.canInflict = function(target)
+        if not target then return false end
+        for _, t in ipairs(target.curTypes or {}) do
+          if t == "POISON" or t == "STEEL" then return false end
+        end
+        return true
+      end
+    end
   end
 
   -- After the loader merge, Data.statuses may still be the pre-patch table
@@ -1856,6 +1877,19 @@ function MoveEffects.install(mod)
       end
       if Status.RECORDS and Status.RECORDS.SLP then
         Status.RECORDS.SLP.beforeMove = MoveEffects.sleepBeforeMove
+      end
+      local function canPoison(target)
+        if not target then return false end
+        for _, t in ipairs(target.curTypes or {}) do
+          if t == "POISON" or t == "STEEL" then return false end
+        end
+        return true
+      end
+      if Data.statuses and Data.statuses.PSN then
+        Data.statuses.PSN.canInflict = canPoison
+      end
+      if Status.RECORDS and Status.RECORDS.PSN then
+        Status.RECORDS.PSN.canInflict = canPoison
       end
     end)
     MoveEffects._expSleepLoadedHook = true

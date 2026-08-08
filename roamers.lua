@@ -227,6 +227,17 @@ function Roamers.install(mod)
   end)
 
   -- Mark beaten / migrate on flee
+  mod.events:on("battle.started", function(ev)
+    if not ev or not ev.battle or ev.battle.kind ~= "wild" then return end
+    local enemy = ev.battle.enemy and ev.battle.enemy.mon
+    if not enemy or not enemy.species then return end
+    local s = state(mod)
+    if s.active and s.active[enemy.species] then
+      ev.battle.expRoamer = true
+      ev.battle.expWildSpecies = enemy.species
+    end
+  end)
+
   mod.events:on("battle.ended", function(ev)
     if not ev or not ev.battle or ev.battle.kind ~= "wild" then return end
     local enemy = ev.battle.enemy and ev.battle.enemy.mon

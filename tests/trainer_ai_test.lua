@@ -53,12 +53,27 @@ return function(T, Data, run)
   T.check(growFloor > tackleFloor + 2,
     "smart AI dumps Growl at -6 harder than it rates Tackle")
 
-  -- Fresh stages / healthy: Growl can compete with Tackle once; not forever.
+  -- Fresh stages / healthy: mild Growl prefer loses to STAB Tackle; ties non-STAB.
   local vFresh = view({ userMon = { hp = 80, stats = { hp = 100 } } })
   local growFresh = TrainerAi.score(vFresh, growDef, 10)
   local tackleFresh = TrainerAi.score(vFresh, tackleDef, 10)
-  T.check(growFresh <= tackleFresh,
-    "smart AI lets Growl compete with or beat Tackle when stages are fresh")
+  T.check(growFresh > tackleFresh,
+    "smart AI prefers STAB Tackle over fresh Growl on soft")
+  local vFreshWater = view({
+    user = {
+      curTypes = { "WATER" },
+      stages = {},
+      mon = { hp = 80, stats = { hp = 100 } },
+    },
+    target = {
+      curTypes = { "NORMAL" },
+      stages = {},
+      mon = { hp = 50, stats = { hp = 50 } },
+    },
+  })
+  T.eq(TrainerAi.score(vFreshWater, growDef, 10),
+      TrainerAi.score(vFreshWater, tackleDef, 10),
+    "smart AI lets Growl tie a non-STAB Tackle when stages are fresh")
 
   -- After one Attack drop, Growl backs off so Tackle wins.
   local vOnce = view({
@@ -68,13 +83,13 @@ return function(T, Data, run)
   T.check(TrainerAi.score(vOnce, growDef, 10) > TrainerAi.score(vOnce, tackleDef, 10),
     "smart AI stops preferring Growl after one Attack drop")
 
-  -- Sand Attack: ok once at 0 accuracy; locked spam after -1 is the bug we fixed.
+  -- Sand Attack: mild once at 0 accuracy; locked spam after -1 is the bug we fixed.
   local sandDef = Data.moves.SAND_ATTACK
   if sandDef then
     local vSandFresh = view({ userMon = { hp = 80, stats = { hp = 100 } } })
     T.check(TrainerAi.score(vSandFresh, sandDef, 10)
-        <= TrainerAi.score(vSandFresh, tackleDef, 10),
-      "smart AI lets Sand Attack compete once while accuracy is fresh")
+        > TrainerAi.score(vSandFresh, tackleDef, 10),
+      "smart AI prefers STAB Tackle over fresh Sand Attack on soft")
     local vSandHit = view({
       userMon = { hp = 80, stats = { hp = 100 } },
       targetStages = { accuracy = -1 },
@@ -91,22 +106,109 @@ return function(T, Data, run)
     T.check(TrainerAi.score(vStatus, sleepDef, 10) >= 16,
       "smart AI dumps sleep moves when the target is already statused")
 
-    -- Healthy opener: status can beat a neutral attack.
+    -- Healthy opener: sleep only gets a mild -1, so STAB Tackle still wins;
+    -- against a non-STAB attack they tie (random among minima).
     local vHealthy = view({
       userMon = { hp = 80, stats = { hp = 100 } },
       status = nil,
     })
     T.check(TrainerAi.score(vHealthy, sleepDef, 10)
-        < TrainerAi.score(vHealthy, tackleDef, 10),
-      "smart AI prefers sleep over Tackle vs a healthy unstatused target")
+        > TrainerAi.score(vHealthy, tackleDef, 10),
+      "smart AI prefers STAB Tackle over sleep on soft (no status lock)")
+    local vNoStab = view({
+      user = {
+        curTypes = { "WATER" },
+        stages = {},
+        mon = { hp = 80, stats = { hp = 100 } },
+      },
+      target = {
+        curTypes = { "NORMAL" },
+        stages = {},
+        mon = { hp = 50, stats = { hp = 50 }, status = nil },
+      },
+    })
+    T.check(TrainerAi.score(vNoStab, sleepDef, 10)
+        == TrainerAi.score(vNoStab, tackleDef, 10) + 1,
+      "smart AI applies low-acc sleep cost vs a non-STAB Tackle when healthy")
+    local confusionDef = Data.moves.CONFUSION
+    if confusionDef then
+      local vPsychic = view({
+        user = {
+          curTypes = { "PSYCHIC_TYPE" },
+          stages = {},
+          mon = { hp = 80, stats = { hp = 100 } },
+        },
+        target = {
+          curTypes = { "NORMAL" },
+          stages = {},
+          mon = { hp = 50, stats = { hp = 50 }, status = nil },
+        },
+      })
+      T.check(TrainerAi.score(vPsychic, sleepDef, 10)
+          > TrainerAi.score(vPsychic, confusionDef, 10),
+        "smart AI prefers STAB Confusion over Hypnosis/Sing on soft")
+    end
+
+    local sonic = Data.moves.SUPERSONIC
+    if sonic then
+      T.check(TrainerAi.score(vHealthy, sonic, 10)
+          > TrainerAi.score(vHealthy, tackleDef, 10),
+        "smart AI prefers STAB Tackle over Supersonic on soft")
+      T.check(TrainerAi.score(vNoStab, sonic, 10)
+          == TrainerAi.score(vNoStab, tackleDef, 10) + 1,
+        "smart AI applies low-acc Supersonic cost vs a non-STAB Tackle when healthy")
+    end
+
+    -- Decaying weight: after use the move is devalued, then returns to baseline.
+    local vWeighted = view({
+      user = {
+        curTypes = { "WATER" },
+        stages = {},
+        mon = { hp = 80, stats = { hp = 100 } },
+        expAiMoveWeight = { [sleepDef.id] = 4 },
+      },
+      target = {
+        curTypes = { "NORMAL" },
+        stages = {},
+        mon = { hp = 50, stats = { hp = 50 }, status = nil },
+      },
+    })
+    T.check(TrainerAi.score(vWeighted, sleepDef, 10)
+        > TrainerAi.score(vWeighted, tackleDef, 10) + 2,
+      "smart AI devalues sleep while its decay weight is high")
+    local vCooled = view({
+      user = {
+        curTypes = { "WATER" },
+        stages = {},
+        mon = { hp = 80, stats = { hp = 100 } },
+        expAiMoveWeight = { [sleepDef.id] = 1 },
+      },
+      target = {
+        curTypes = { "NORMAL" },
+        stages = {},
+        mon = { hp = 50, stats = { hp = 50 }, status = nil },
+      },
+    })
+    T.check(TrainerAi.score(vCooled, sleepDef, 10)
+        > TrainerAi.score(vNoStab, sleepDef, 10),
+      "partially cooled sleep is still above baseline")
+    T.check(TrainerAi.score(vNoStab, sleepDef, 10)
+        == TrainerAi.score(vNoStab, tackleDef, 10) + 1,
+      "at baseline weight low-acc sleep still costs vs non-STAB Tackle")
+
+    local decayUser = { expAiMoveWeight = { HYPNOSIS = 3, GROWL = 1 } }
+    TrainerAi.decayMoveWeights(decayUser)
+    T.eq(decayUser.expAiMoveWeight.HYPNOSIS, 2, "decay reduces opener weight by 1")
+    T.eq(decayUser.expAiMoveWeight.GROWL, nil, "decay clears weight at 1")
   end
 
   -- Will-O-Wisp (Will-O-Wisp burn) treated as status infliction.
   local willO = Data.moves.WILL_O_WISP
   if willO then
     local vBurn = view({ userMon = { hp = 80, stats = { hp = 100 } } })
-    T.check(TrainerAi.score(vBurn, willO, 10) < TrainerAi.score(vBurn, tackleDef, 10),
-      "smart AI prefers Will-O-Wisp over Tackle when healthy")
+    T.check(TrainerAi.score(vBurn, willO, 10)
+        > TrainerAi.score(vBurn, tackleDef, 10),
+      "smart AI prefers STAB Tackle over Will-O-Wisp on soft")
     T.check(TrainerAi.score(view({ status = "PAR" }), willO, 10) >= 16,
       "smart AI dumps Will-O-Wisp into an already-statused target")
   end
@@ -130,7 +232,69 @@ return function(T, Data, run)
       "two equal Normal attacks keep the same EXP_SMART score (random tiebreak)")
   end
 
-  -- Self setup while healthy: Swords Dance / Growth-style preferred early.
+  -- Anti-repeat: same attack is nudged so soft AI mixes moves.
+  do
+    local vRepeat = view({
+      user = {
+        curTypes = { "NORMAL" },
+        stages = {},
+        mon = { hp = 50, stats = { hp = 100 } },
+        expAiLastMoveId = "TACKLE",
+      },
+      target = {
+        curTypes = { "NORMAL" },
+        stages = {},
+        mon = { hp = 50, stats = { hp = 50 } },
+      },
+    })
+    T.check(TrainerAi.score(vRepeat, tackleDef, 10)
+        > TrainerAi.score(vRepeat, scratchDef, 10),
+      "smart AI devalues repeating the same attack on soft")
+  end
+
+  -- Near-best margin: best and next-best can share a pool (margin 1).
+  do
+    local attacker = {
+      curMoves = {
+        { id = "WATER_GUN", pp = 25 },
+        { id = "TACKLE", pp = 35 },
+      },
+      curTypes = { "WATER" },
+      stages = {},
+      mon = { hp = 40, stats = { hp = 40 } },
+      aiLayer2 = 0,
+    }
+    local b = {
+      data = Data,
+      enemyAIMods = { TrainerAi.LAYER_ID },
+      player = {
+        curTypes = { "NORMAL" },
+        stages = {},
+        mon = { hp = 40, stats = { hp = 40 } },
+      },
+      ruleset = { enemyUnlimitedPP = true },
+    }
+    if Data.moves.WATER_GUN then
+      local seen = {}
+      local n = 0
+      local function cycle(lo, hi)
+        n = n + 1
+        if hi <= lo then return lo end
+        return (n % 2 == 1) and lo or hi
+      end
+      for _ = 1, 16 do
+        attacker.aiLayer2 = 0
+        attacker.expAiLastMoveId = nil
+        local pick = TrainerAi.chooseWithMargin(attacker, cycle, b, 1)
+        seen[pick.id] = true
+      end
+      T.check(seen.WATER_GUN, "near-best pool still includes the STAB attack")
+      T.check(seen.TACKLE,
+        "near-best margin lets a near-best attack mix instead of locking STAB")
+    end
+  end
+
+  -- Self setup while healthy: mild prefer loses to STAB, ties non-STAB; dumps when stacked.
   local swords = Data.moves.SWORDS_DANCE or Data.moves.MEDITATE or Data.moves.SHARPNESS
   if not swords then
     -- Fall back to any ATTACK_UP2 / DEFENSE_UP2 style from Data.moves
@@ -146,14 +310,46 @@ return function(T, Data, run)
       userMon = { hp = 90, stats = { hp = 100 } },
       userStages = { attack = 0, special = 0 },
     })
-    T.check(TrainerAi.score(vSetup, swords, 10) < TrainerAi.score(vSetup, tackleDef, 10),
-      "smart AI prefers setup over Tackle while healthy with fresh stages")
+    T.check(TrainerAi.score(vSetup, swords, 10) > TrainerAi.score(vSetup, tackleDef, 10),
+      "smart AI prefers STAB Tackle over setup on soft (no scripted opener)")
+    local vSetupWater = view({
+      user = {
+        curTypes = { "WATER" },
+        stages = { attack = 0, special = 0 },
+        mon = { hp = 90, stats = { hp = 100 } },
+      },
+      target = {
+        curTypes = { "NORMAL" },
+        stages = {},
+        mon = { hp = 50, stats = { hp = 50 } },
+      },
+    })
+    T.eq(TrainerAi.score(vSetupWater, swords, 10),
+        TrainerAi.score(vSetupWater, tackleDef, 10),
+      "smart AI lets setup tie a non-STAB Tackle while healthy")
     local vStacked = view({
       userMon = { hp = 90, stats = { hp = 100 } },
       userStages = { attack = 2, special = 2 },
     })
     T.check(TrainerAi.score(vStacked, swords, 10) > TrainerAi.score(vStacked, tackleDef, 10),
       "smart AI stops preferring setup once stages are already boosted")
+
+    local vStageWeighted = view({
+      user = {
+        curTypes = { "WATER" },
+        stages = {},
+        mon = { hp = 90, stats = { hp = 100 } },
+        expAiMoveWeight = { [swords.id] = 3 },
+      },
+      target = {
+        curTypes = { "NORMAL" },
+        stages = {},
+        mon = { hp = 50, stats = { hp = 50 } },
+      },
+    })
+    T.check(TrainerAi.score(vStageWeighted, swords, 10)
+        > TrainerAi.score(vStageWeighted, tackleDef, 10) + 1,
+      "smart AI devalues setup while its decay weight is high")
   end
 
   -- Heal preferred at low HP over status.
@@ -302,15 +498,39 @@ return function(T, Data, run)
     T.eq(vsStatused.id, "TACKLE",
       "chooseMove dumps status into an already-statused active target")
 
-    -- Player switches: status move is eligible again and can win vs Tackle
-    -- when the user is healthy enough for the opener bonus.
+    -- Player switches: status dump lifts. Soft AI only mild-prefers status, so
+    -- use a non-STAB caster so poison ties Tackle and rng can open with it.
     b.player = freshPlayer
+    caster.curTypes = { "WATER" }
     caster.mon.hp = 40
     caster.mon.stats = { hp = 40 }
     caster.aiLayer2 = 0
     local vsFresh = TrainerAI.chooseMove(caster, function() return 1 end, b)
     T.eq(vsFresh.id, poisonId,
-      "chooseMove opens with status into a fresh healthy switch-in")
+      "chooseMove can open with status into a fresh switch-in when tied")
+
+    -- Same foe again: decay weight from the status try favors damage next.
+    caster.aiLayer2 = 0
+    local vsRetry = TrainerAI.chooseMove(caster, function() return 1 end, b)
+    T.eq(vsRetry.id, "TACKLE",
+      "chooseMove prefers damage while status decay weight is hot")
+    T.check(caster.expAiMoveWeight and (caster.expAiMoveWeight[poisonId] or 0) > 0,
+      "status pick applies a decay weight")
+
+    -- After the weight cools, status can compete again (long fights stay open).
+    -- Clear last-move anti-repeat so only decay weight is under test.
+    caster.expAiLastMoveId = nil
+    caster.expAiMoveWeight[poisonId] = 3
+    caster.aiLayer2 = 0
+    local vsCooling = TrainerAI.chooseMove(caster, function() return 1 end, b)
+    T.eq(vsCooling.id, "TACKLE",
+      "chooseMove still prefers damage while a decay weight remains")
+    caster.expAiMoveWeight = nil
+    caster.expAiLastMoveId = nil
+    caster.aiLayer2 = 0
+    local vsBaseline = TrainerAI.chooseMove(caster, function() return 1 end, b)
+    T.eq(vsBaseline.id, poisonId,
+      "chooseMove can reopen with status once decay weight returns to baseline")
   end
 
   -- Toggle off restores vanilla empty-mod random (rng returns 1 → GROWL).
@@ -322,20 +542,24 @@ return function(T, Data, run)
 
   run.loader.modOptions["Kanto-Reforged"][TrainerAi.OPTION_KEY] = true
 
-  -- ------- Three-tier gate -------------------------------------------------
+  -- ------- Four-tier gate -------------------------------------------------
   local tactLayer = Data.ai_classes[TrainerAi.LAYER_TACTICAL]
   local liteLayer = Data.ai_classes[TrainerAi.LAYER_TACTICAL_LITE]
+  local naturalLayer = Data.ai_classes[TrainerAi.LAYER_NATURAL]
   T.check(tactLayer and tactLayer.kind == "layer", "EXP_TACTICAL layer registered")
   T.check(liteLayer and liteLayer.kind == "layer", "EXP_TACTICAL_LITE layer registered")
+  T.check(naturalLayer and naturalLayer.kind == "layer", "EXP_NATURAL layer registered")
 
   local function fakeBattle(opts)
     opts = opts or {}
     return {
-      kind = "trainer",
+      kind = opts.kind or "trainer",
       oppClass = opts.class,
       trainer = { id = opts.class },
       expPartyIndex = opts.party or 1,
       expMapId = opts.map,
+      expWildSpecies = opts.species,
+      expRoamer = opts.roamer,
       data = Data,
       enemyAIMods = opts.aiMods or {},
       ruleset = { randMin = 217, randMax = 255, critIgnoresStages = true,
@@ -364,6 +588,169 @@ return function(T, Data, run)
     "elite", "Rocket#6 (Nugget Bridge) is elite")
   T.eq(TrainerAi.isElite("OPP_ROCKET", 3), true, "Rocket#3 is elite")
   T.eq(TrainerAi.isElite("OPP_ROCKET", 5), false, "Rocket#5 is not elite")
+
+  -- Wild natural vs soft threat rules.
+  T.eq(TrainerAi.tier(fakeBattle({
+    kind = "wild", map = "MT_MOON_1F", species = "ZUBAT",
+  })), "natural", "Mt Moon Zubat is natural")
+  T.eq(TrainerAi.tier(fakeBattle({
+    kind = "wild", map = "ROCK_TUNNEL_1F", species = "ZUBAT",
+  })), "natural", "Rock Tunnel Zubat stays fodder/natural")
+  T.eq(TrainerAi.tier(fakeBattle({
+    kind = "wild", map = "ROCK_TUNNEL_1F", species = "CUBONE",
+  })), "soft", "Rock Tunnel Cubone is soft")
+  T.eq(TrainerAi.tier(fakeBattle({
+    kind = "wild", map = "CERULEAN_CAVE_1F", species = "GOLBAT",
+  })), "soft", "Cerulean Cave wild is soft (rare map)")
+  T.eq(TrainerAi.tier(fakeBattle({
+    kind = "wild", map = "ROUTE_1", species = "RATTATA", roamer = true,
+  })), "soft", "roamer flag forces soft")
+  T.eq(TrainerAi.tier(fakeBattle({
+    kind = "wild", map = "ROUTE_1", species = "SNORLAX",
+  })), "soft", "threat species is soft even off threat maps")
+  T.eq(TrainerAi.tier(fakeBattle({
+    kind = "wild", map = "ROUTE_12", species = "GOLBAT",
+  })), "natural", "Golbat off threat maps stays natural (list tightened)")
+  T.eq(TrainerAi.tier(fakeBattle({
+    kind = "wild", map = "ROCK_TUNNEL_1F", species = "ONIX",
+  })), "soft", "Onix soft via threat map, not species list")
+  T.eq(TrainerAi.isThreatSpecies("ARTICUNO"), true,
+    "legendaries fold into THREAT_SPECIES (derived, not duplicated)")
+  T.eq(TrainerAi.isLegendarySpecies("ARTICUNO"), true, "ARTICUNO is legendary")
+  T.eq(TrainerAi.tier(fakeBattle({
+    kind = "wild", map = "ROUTE_1", species = "MEWTWO",
+  })), "soft", "legendary wild is soft via derived threat set")
+  -- No duplicate literal keys in the exported threat table.
+  local kangHits = 0
+  for id in pairs(TrainerAi.THREAT_SPECIES) do
+    if id == "KANGASKHAN" then kangHits = kangHits + 1 end
+  end
+  T.eq(kangHits, 1, "KANGASKHAN appears once in THREAT_SPECIES")
+
+  -- Natural scoring: dump useless status; no Hypnosis prefer over Tackle.
+  do
+    local hyp = Data.moves.HYPNOSIS or sleepDef
+    local vNat = view({
+      userMon = { hp = 80, stats = { hp = 100 } },
+      status = nil,
+    })
+    if hyp then
+      T.check(TrainerAi.scoreNatural(vNat, hyp, 10)
+          >= TrainerAi.scoreNatural(vNat, tackleDef, 10),
+        "natural AI does not prefer Hypnosis over Tackle")
+    end
+    T.check(TrainerAi.scoreNatural(view({ status = "PSN" }), sleepDef, 10) >= 16,
+      "natural AI dumps sleep into an already-statused target")
+    local vImmune = view({ targetTypes = { "GHOST" } })
+    T.check(TrainerAi.scoreNatural(vImmune, tackleDef, 10) >= 16,
+      "natural AI dumps immune Normal attacks")
+  end
+
+  -- Soft situational branches (conservative canKo).
+  do
+    local sing = Data.moves.SING or sleepDef
+    local vAsleep = view({
+      userMon = { hp = 80, stats = { hp = 100 } },
+      status = "SLP",
+    })
+    if sing then
+      T.check(TrainerAi.score(vAsleep, tackleDef, 10)
+          < TrainerAi.score(vAsleep, sing, 10),
+        "soft AI prefers Tackle over Sing into an already-sleeping foe")
+    end
+
+    local recover = Data.moves.RECOVER or Data.moves.SOFTBOILED
+    if recover and recover.effect == "HEAL_EFFECT" then
+      local vLow = view({
+        userMon = { hp = 20, stats = { hp = 100 } },
+        userStages = { attack = 0 },
+      })
+      T.check(TrainerAi.score(vLow, recover, 10)
+          < TrainerAi.score(vLow, growDef, 10),
+        "soft AI prefers heal over Growl at low HP")
+    end
+
+    if sleepDef then
+      local vHealthyWater = view({
+        user = {
+          curTypes = { "WATER" },
+          stages = {},
+          mon = { hp = 80, stats = { hp = 100 } },
+        },
+        target = {
+          curTypes = { "NORMAL" },
+          stages = {},
+          mon = { hp = 50, stats = { hp = 50 }, status = nil },
+        },
+      })
+      T.check(TrainerAi.score(vHealthyWater, sleepDef, 10)
+          > TrainerAi.score(vHealthyWater, tackleDef, 10) - 2,
+        "low-acc sleep is devalued vs baseline Tackle when not threatened")
+    end
+
+    local swords = Data.moves.SWORDS_DANCE or Data.moves.MEDITATE
+    local vFinish = view({
+      user = {
+        curTypes = { "WATER" },
+        stages = {},
+        mon = { hp = 80, stats = { hp = 100 } },
+      },
+      target = {
+        curTypes = { "NORMAL" },
+        stages = {},
+        mon = { hp = 8, stats = { hp = 50 }, status = nil },
+      },
+    })
+    if swords then
+      T.check(TrainerAi.score(vFinish, tackleDef, 10)
+          < TrainerAi.score(vFinish, swords, 10),
+        "soft AI prefers attack over setup when foe HP is very low")
+    end
+
+    -- Residual chip: dump self-setup while poisoned / seeded.
+    if swords then
+      local vPsn = view({
+        user = {
+          curTypes = { "WATER" },
+          stages = {},
+          mon = { hp = 80, stats = { hp = 100 }, status = "PSN" },
+        },
+        target = {
+          curTypes = { "NORMAL" },
+          stages = {},
+          mon = { hp = 50, stats = { hp = 50 } },
+        },
+      })
+      T.check(TrainerAi.score(vPsn, swords, 10)
+          > TrainerAi.score(vPsn, tackleDef, 10),
+        "soft AI dumps setup while poisoned")
+    end
+
+    -- Mid HP + SE STAB must NOT dump sleep for a guessed KO.
+    local ember = Data.moves.EMBER
+    if ember and sleepDef then
+      local vMidSe = view({
+        user = {
+          curTypes = { "FIRE" },
+          stages = {},
+          mon = { hp = 80, stats = { hp = 100 } },
+        },
+        target = {
+          curTypes = { "GRASS" },
+          stages = {},
+          mon = { hp = 40, stats = { hp = 50 }, status = nil },
+        },
+      })
+      local sleepScore = TrainerAi.score(vMidSe, sleepDef, 10)
+      local emberScore = TrainerAi.score(vMidSe, ember, 10)
+      -- Sleep remains competitive enough that a mid-HP SE read does not
+      -- hard-dump it the way a real KO dump would (>= +2 gap from openers).
+      T.check(sleepScore < 16,
+        "soft AI does not hard-dump sleep solely for mid-HP SE STAB guess")
+      T.check(emberScore <= sleepScore + 3,
+        "mid-HP SE prefer stays mild (no confident KO opener dump)")
+    end
+  end
 
   -- ------- Damage / KO policy (lite mid-only vs elite high-roll) ------------
   local function atkBattler(opts)
@@ -634,8 +1021,10 @@ return function(T, Data, run)
         seen.tactical = hasT
         seen.lite = hasL
         seen.smart = false
+        seen.natural = false
         for _, m in ipairs(mods) do
           if m == TrainerAi.LAYER_ID then seen.smart = true end
+          if m == TrainerAi.LAYER_NATURAL then seen.natural = true end
         end
         return savedScore(view, def, score)
       end
@@ -664,8 +1053,84 @@ return function(T, Data, run)
     bSoft.player = player
     seen = {}
     captureInject(bSoft)
-    T.check(seen.smart and not seen.tactical and not seen.lite,
+    T.check(seen.smart and not seen.tactical and not seen.lite and not seen.natural,
       "soft chooseMove injects EXP_SMART only")
+
+    -- Lite/elite get a lighter opener decay than soft (Hypnosis acc < 70 → soft 4, lite 2).
+    local hyp = Data.moves.HYPNOSIS
+    if hyp then
+      local openerUser = {
+        curMoves = { { id = "HYPNOSIS", pp = 20 }, { id = "TACKLE", pp = 35 } },
+        curTypes = { "PSYCHIC" },
+        stages = {},
+        curStats = { attack = 40, defense = 40, special = 60, speed = 50 },
+        mon = { hp = 40, stats = { hp = 40 }, level = 20, species = "DROWZEE" },
+        aiLayer2 = 0,
+      }
+      local fresh = {
+        curTypes = { "NORMAL" },
+        stages = {},
+        curStats = { attack = 40, defense = 40, special = 40, speed = 40 },
+        mon = { hp = 40, stats = { hp = 40 }, level = 20 },
+      }
+      -- Force Hypnosis as sole near-best by dumping Tackle type-wise isn't needed:
+      -- score soft prefers status mildly; pin RNG and ensure status isn't dumped.
+      local bSoftDecay = fakeBattle({ class = "OPP_YOUNGSTER", party = 1, map = "ROUTE_1" })
+      bSoftDecay.player = fresh
+      bSoftDecay.enemy = openerUser
+      openerUser.expAiMoveWeight = nil
+      openerUser.expAiLastMoveId = nil
+      openerUser.aiLayer2 = 0
+      -- Pre-bump Tackle so Hypnosis wins the soft pick.
+      TrainerAi.bumpMoveWeight(openerUser, "TACKLE", 8)
+      local softPick = TrainerAI.chooseMove(openerUser, function() return 1 end, bSoftDecay)
+      T.eq(softPick.id, "HYPNOSIS", "soft test forces Hypnosis opener")
+      local softW = openerUser.expAiMoveWeight and openerUser.expAiMoveWeight.HYPNOSIS or 0
+
+      local liteUser = {
+        curMoves = { { id = "HYPNOSIS", pp = 20 }, { id = "TACKLE", pp = 35 } },
+        curTypes = { "PSYCHIC" },
+        stages = {},
+        curStats = { attack = 40, defense = 40, special = 60, speed = 50 },
+        mon = { hp = 40, stats = { hp = 40 }, level = 20, species = "DROWZEE" },
+        aiLayer2 = 0,
+      }
+      local bLiteDecay = fakeBattle({
+        class = "OPP_JR_TRAINER_M", party = 1, map = "PEWTER_GYM",
+      })
+      bLiteDecay.player = fresh
+      bLiteDecay.enemy = liteUser
+      TrainerAi.bumpMoveWeight(liteUser, "TACKLE", 8)
+      local litePick = TrainerAI.chooseMove(liteUser, function() return 1 end, bLiteDecay)
+      T.eq(litePick.id, "HYPNOSIS", "lite test forces Hypnosis opener")
+      local liteW = liteUser.expAiMoveWeight and liteUser.expAiMoveWeight.HYPNOSIS or 0
+      T.check(softW > liteW and liteW > 0,
+        "lite opener decay is lighter than soft (soft=" .. softW .. " lite=" .. liteW .. ")")
+    end
+
+    local bWild = fakeBattle({
+      kind = "wild", map = "MT_MOON_1F", species = "ZUBAT",
+    })
+    bWild.player = player
+    bWild.enemy = attacker
+    seen = {}
+    local savedChoose = TrainerAi.chooseWithMargin
+    TrainerAi.chooseWithMargin = function(battler, rng, battle, margin)
+      local mods = battle.enemyAIMods or {}
+      seen.smart, seen.natural, seen.tactical, seen.lite = false, false, false, false
+      for _, m in ipairs(mods) do
+        if m == TrainerAi.LAYER_ID then seen.smart = true end
+        if m == TrainerAi.LAYER_NATURAL then seen.natural = true end
+        if m == TrainerAi.LAYER_TACTICAL then seen.tactical = true end
+        if m == TrainerAi.LAYER_TACTICAL_LITE then seen.lite = true end
+      end
+      return savedChoose(battler, rng, battle, margin)
+    end
+    attacker.aiLayer2 = 0
+    TrainerAI.chooseMove(attacker, function() return 1 end, bWild)
+    TrainerAi.chooseWithMargin = savedChoose
+    T.check(seen.natural and not seen.smart and not seen.tactical and not seen.lite,
+      "natural wild chooseMove injects EXP_NATURAL only")
   end
 
   -- Toggle off: elite and lite both stop injecting tactical layers.
@@ -712,36 +1177,168 @@ return function(T, Data, run)
   run.loader.modOptions["Kanto-Reforged"] = savedOpts
 
   -- Trainer mixes landed on the live Data table.
-  T.eq(Data.trainers.OPP_BROCK.parties[1][1].species, "ARON",
-    "Brock's Geodude swapped for Aron")
-  T.eq(Data.trainers.OPP_MISTY.parties[1][1].species, "MARILL",
-    "Misty's Staryu swapped for Marill")
-  T.eq(Data.trainers.OPP_LT_SURGE.parties[1][1].species, "ELECTRIKE",
-    "Surge's Voltorb swapped for Electrike")
-  T.eq(Data.trainers.OPP_ERIKA.parties[1][2].species, "ROSELIA",
-    "Erika's Tangela swapped for Roselia")
-  T.eq(Data.trainers.OPP_BLAINE.parties[1][1].species, "HOUNDOUR",
-    "Blaine's Growlithe swapped for Houndour")
-  T.eq(Data.trainers.OPP_GIOVANNI.parties[3][2].species, "DONPHAN",
-    "Giovanni gym Dugtrio swapped for Donphan")
-  T.eq(Data.trainers.OPP_LORELEI.parties[1][1].species, "PILOSWINE",
-    "Lorelei's Dewgong swapped for Piloswine")
+  local brock = Data.trainers.OPP_BROCK.parties[1]
+  T.eq(#brock, 3, "Brock party is Sudowoodo + Aron + Onix")
+  T.eq(brock[1].species, "SUDOWOODO", "Brock's Geodude swapped for Sudowoodo")
+  T.eq(brock[2].species, "ARON", "Brock Gen3 add is Aron before ace")
+  T.eq(brock[3].species, "ONIX", "Brock still ends on Onix")
+  T.eq(brock[3].heldItem, "BERRY", "Brock Onix holds BERRY")
+
+  local misty = Data.trainers.OPP_MISTY.parties[1]
+  T.eq(#misty, 3, "Misty party grew by Gen3 add")
+  T.eq(misty[1].species, "MARILL", "Misty's Staryu swapped for Marill")
+  T.eq(misty[2].species, "CORPHISH", "Misty Gen3 add is Corphish")
+  T.eq(misty[3].species, "STARMIE", "Misty still ends on Starmie")
+  T.eq(misty[3].heldItem, "PECHA_BERRY", "Misty Starmie holds Pecha")
+
+  local surge = Data.trainers.OPP_LT_SURGE.parties[1]
+  T.eq(surge[1].species, "FLAAFFY", "Surge's Voltorb swapped for Flaaffy")
+  T.eq(surge[#surge].species, "RAICHU", "Surge still ends on Raichu")
+  T.eq(surge[#surge].heldItem, "CHESTO_BERRY", "Surge Raichu holds Chesto")
+
+  local erika = Data.trainers.OPP_ERIKA.parties[1]
+  T.eq(erika[2].species, "BELLOSSOM", "Erika's Tangela swapped for Bellossom")
+  T.eq(erika[#erika].species, "VILEPLUME", "Erika still ends on Vileplume")
+  T.eq(erika[#erika].heldItem, "RAWST_BERRY", "Erika Vileplume holds Rawst")
+
+  local blaine = Data.trainers.OPP_BLAINE.parties[1]
+  T.eq(blaine[1].species, "TORKOAL", "Blaine Gen3 lead is Torkoal")
+  T.eq(blaine[2].species, "GROWLITHE", "Blaine keeps Growlithe")
+  T.eq(blaine[3].species, "PONYTA", "Blaine keeps Ponyta")
+  T.eq(blaine[4].species, "RAPIDASH", "Blaine keeps Rapidash")
+  T.eq(blaine[5].species, "ARCANINE", "Blaine still ends on Arcanine")
+  T.eq(blaine[5].heldItem, "PERSIM_BERRY", "Blaine Arcanine holds Persim (not Aspear)")
+
+  local giovanni = Data.trainers.OPP_GIOVANNI.parties[3]
+  T.eq(giovanni[2].species, "DONPHAN", "Giovanni gym Dugtrio swapped for Donphan")
+  T.eq(giovanni[#giovanni - 1].species, "FLYGON", "Giovanni Gen3 add is Flygon before ace")
+  T.eq(giovanni[#giovanni].species, "RHYDON", "Giovanni still ends on Rhydon")
+  T.eq(giovanni[#giovanni].heldItem, "CHERI_BERRY", "Giovanni Rhydon holds Cheri")
+
+  local lorelei = Data.trainers.OPP_LORELEI.parties[1]
+  T.eq(lorelei[1].species, "PILOSWINE", "Lorelei's Dewgong swapped for Piloswine")
+  T.eq(lorelei[#lorelei - 1].species, "WALREIN", "Lorelei Gen3 add is Walrein")
+  T.eq(lorelei[#lorelei].species, "LAPRAS", "Lorelei still ends on Lapras")
+  T.eq(lorelei[#lorelei].heldItem, "CHERI_BERRY", "Lorelei Lapras holds Cheri")
+
   T.eq(Data.trainers.OPP_BRUNO.parties[1][1].species, "STEELIX",
     "Bruno's Onix swapped for Steelix")
+  T.eq(Data.trainers.OPP_BRUNO.parties[1][#Data.trainers.OPP_BRUNO.parties[1]].species,
+    "MACHAMP", "Bruno still ends on Machamp")
   T.eq(Data.trainers.OPP_AGATHA.parties[1][2].species, "CROBAT",
     "Agatha's Golbat swapped for Crobat")
   T.eq(Data.trainers.OPP_LANCE.parties[1][1].species, "KINGDRA",
     "Lance's Gyarados swapped for Kingdra")
+  local lance = Data.trainers.OPP_LANCE.parties[1]
+  T.eq(lance[#lance - 1].species, "SALAMENCE", "Lance Gen3 add is Salamence")
+  T.eq(lance[#lance].species, "DRAGONITE", "Lance still ends on Dragonite")
+  T.eq(lance[#lance].heldItem, "LUM_BERRY", "Lance Dragonite holds Lum")
+
+  -- Rival continuity: League finals foreshadowed mid; finals debut at RIVAL3
+  T.eq(Data.trainers.OPP_RIVAL2.parties[10][2].species, "LAIRON",
+    "Rival late-mid foreshadows Aggron via Lairon")
+  T.eq(Data.trainers.OPP_RIVAL2.parties[10][3].species, "HOUNDOUR",
+    "Fire-path late mid keeps Houndour (no early Houndoom)")
+  T.eq(Data.trainers.OPP_RIVAL2.parties[11][3].species, "CARVANHA",
+    "Water-path late mid keeps Carvanha (no early Sharpedo)")
+  T.eq(Data.trainers.OPP_RIVAL2.parties[12][4].species, "SEADRA",
+    "Dragon-path late mid shows Seadra before Kingdra")
   T.eq(Data.trainers.OPP_RIVAL3.parties[1][3].species, "AGGRON",
     "Champion rival Rhydon swapped for Aggron")
+  T.eq(Data.trainers.OPP_RIVAL3.parties[1][4].species, "HOUNDOOM",
+    "Champion fire coverage reveals Houndoom")
+  T.eq(Data.trainers.OPP_RIVAL3.parties[2][4].species, "SHARPEDO",
+    "Champion water coverage reveals Sharpedo")
+  T.eq(Data.trainers.OPP_RIVAL3.parties[3][5].species, "KINGDRA",
+    "Champion dragon coverage reveals Kingdra")
+
   T.eq(Data.trainers.OPP_BUG_CATCHER.parties[1][1].species, "SPINARAK",
     "Bug Catcher party 1 leads with Spinarak")
   T.eq(Data.trainers.OPP_HIKER.parties[1][1].species, "ARON",
     "Hiker party 1 leads with Aron")
 
-  -- Onix ace still there for Brock (only first slot swapped)
-  T.eq(Data.trainers.OPP_BROCK.parties[1][2].species, "ONIX",
-    "Brock still ends on Onix")
+  -- Nugget Bridge: mostly Gen 1; one Gen 2–3 spice on a few fights.
+  -- Bug Catcher #9 and Jr Trainer #3 stay fully vanilla for nostalgia.
+  local nbBug = Data.trainers.OPP_BUG_CATCHER.parties[9]
+  T.eq(nbBug[1].species, "CATERPIE", "Nugget Bridge Bug Catcher stays Caterpie")
+  T.eq(nbBug[2].species, "WEEDLE", "Nugget Bridge Bug Catcher stays Weedle")
+  local nbLass8 = Data.trainers.OPP_LASS.parties[8]
+  T.eq(nbLass8[1].species, "PIDGEY", "Nugget Bridge Lass#8 keeps Pidgey")
+  T.eq(nbLass8[2].species, "MARILL", "Nugget Bridge Lass#8 spices Marill")
+  local nbYoung = Data.trainers.OPP_YOUNGSTER.parties[4]
+  T.eq(nbYoung[1].species, "ZIGZAGOON", "Nugget Bridge Youngster spices Zigzagoon")
+  T.eq(nbYoung[2].species, "EKANS", "Nugget Bridge Youngster keeps Ekans")
+  T.eq(nbYoung[3].species, "ZUBAT", "Nugget Bridge Youngster keeps Zubat")
+  local nbLass7 = Data.trainers.OPP_LASS.parties[7]
+  T.eq(nbLass7[1].species, "TAILLOW", "Nugget Bridge Lass#7 spices Taillow")
+  T.eq(nbLass7[2].species, "NIDORAN_F", "Nugget Bridge Lass#7 keeps Nidoran♀")
+  T.eq(Data.trainers.OPP_JR_TRAINER_M.parties[3][1].species, "MANKEY",
+    "Nugget Bridge Jr Trainer#3 stays Mankey (single-mon nostalgia)")
+  local nbJr2 = Data.trainers.OPP_JR_TRAINER_M.parties[2]
+  T.eq(nbJr2[1].species, "RATTATA", "Nugget Bridge Jr Trainer#2 keeps Rattata")
+  T.eq(nbJr2[2].species, "ARON", "Nugget Bridge Jr Trainer#2 spices Aron")
+  T.eq(Data.trainers.OPP_ROCKET.parties[6][1].species, "POOCHYENA",
+    "Nugget Bridge Rocket spices Poochyena")
+  T.eq(Data.trainers.OPP_ROCKET.parties[6][2].species, "ZUBAT",
+    "Nugget Bridge Rocket keeps Zubat")
+
+  local pewterJr = Data.trainers.OPP_JR_TRAINER_M.parties[1]
+  T.eq(pewterJr[1].species, "PHANPY", "Pewter gym Jr Trainer full Phanpy")
+  T.eq(pewterJr[2].species, "ARON", "Pewter gym Jr Trainer full Aron")
+
+  local cerSwimmer = Data.trainers.OPP_SWIMMER.parties[1]
+  T.eq(cerSwimmer[1].species, "CORPHISH", "Cerulean gym Swimmer Corphish")
+  T.eq(cerSwimmer[2].species, "CLAMPERL", "Cerulean gym Swimmer Clamperl")
+
+  local vermRocker = Data.trainers.OPP_ROCKER.parties[1]
+  T.eq(vermRocker[1].species, "ELECTRIKE", "Vermilion Rocker full Electrike")
+  T.eq(vermRocker[2].species, "MAREEP", "Vermilion Rocker Mareep")
+  T.eq(vermRocker[3].species, "PLUSLE", "Vermilion Rocker Plusle")
+
+  local celBeauty = Data.trainers.OPP_BEAUTY.parties[1]
+  T.eq(celBeauty[1].species, "SEEDOT", "Celadon Beauty full Seedot")
+  T.eq(celBeauty[4].species, "SHROOMISH", "Celadon Beauty full Shroomish")
+
+  T.eq(Data.trainers.OPP_ROCKET.parties[4][1].species, "MIGHTYENA",
+    "Mt Moon Rocket#4 is Mightyena")
+  T.eq(Data.trainers.OPP_BLACKBELT.parties[2][3].species, "HARIYAMA",
+    "Fighting Dojo Blackbelt ends on Hariyama")
+  T.eq(Data.trainers.OPP_CHANNELER.parties[5][1].species, "SHUPPET",
+    "Tower Channeler sample is Shuppet")
+
+  -- Tier-2 pass 2: late gyms, Tower 7F, travel
+  local saffron = Data.trainers.OPP_PSYCHIC_TR.parties[1]
+  T.eq(saffron[1].species, "KIRLIA", "Saffron Psychic full Kirlia")
+  T.eq(saffron[4].species, "XATU", "Saffron Psychic full Xatu")
+  T.eq(Data.trainers.OPP_JUGGLER.parties[3][2].species, "WOBBUFFET",
+    "Fuchsia Juggler has Wobbuffet")
+  T.eq(Data.trainers.OPP_TAMER.parties[2][1].species, "SEVIPER",
+    "Fuchsia Tamer lead Seviper")
+  T.eq(Data.trainers.OPP_SUPER_NERD.parties[10][4].species, "TORKOAL",
+    "Cinnabar Super Nerd ends on Torkoal")
+  T.eq(Data.trainers.OPP_BURGLAR.parties[4][3].species, "MAGCARGO",
+    "Cinnabar Burglar Magcargo")
+  T.eq(Data.trainers.OPP_BLACKBELT.parties[8][1].species, "HARIYAMA",
+    "Viridian gym Blackbelt Hariyama")
+  T.eq(Data.trainers.OPP_BLACKBELT.parties[1][2].species, "HITMONTOP",
+    "Dojo master Hitmonchan → Hitmontop")
+  T.eq(Data.trainers.OPP_ROCKET.parties[19][3].species, "CROBAT",
+    "Tower 7F Rocket#19 Crobat")
+  T.eq(Data.trainers.OPP_ROCKET.parties[21][3].species, "MIGHTYENA",
+    "Tower 7F Rocket#21 Mightyena")
+  T.eq(Data.trainers.OPP_CHANNELER.parties[19][2].species, "DUSKULL",
+    "Tower 6F Channeler Duskull")
+  T.eq(Data.trainers.OPP_SAILOR.parties[4][1].species, "CORPHISH",
+    "SS Anne Sailor Corphish")
+  T.eq(Data.trainers.OPP_HIKER.parties[13][2].species, "ARON",
+    "Rock Tunnel Hiker Aron")
+  T.eq(Data.trainers.OPP_BIKER.parties[12][4].species, "SWALOT",
+    "Cycling Road Biker Swalot")
+  T.eq(Data.trainers.OPP_ROCKET.parties[41][2].species, "SABLEYE",
+    "Silph Rocket#41 Sableye")
+  local vr = Data.trainers.OPP_COOLTRAINER_M.parties[5]
+  T.eq(vr[1].species, "BAYLEEF", "Victory Road Cooltrainer Bayleef")
+  T.eq(vr[4].species, "CHARIZARD", "Victory Road keeps Charizard ace")
 
   -- Mix table is non-empty and only references registered species
   T.check(#ExpTrainers.MIX >= 20, "curated trainer mix has a real set of swaps")
@@ -750,4 +1347,153 @@ return function(T, Data, run)
     T.check(Data.pokemon[species] ~= nil,
       "trainer mix species " .. tostring(species) .. " is registered")
   end
+  for _, row in ipairs(ExpTrainers.ACE_BERRIES) do
+    local item = row[3]
+    T.check(type(item) == "string" and #item > 0,
+      "ace berry id present for " .. tostring(row[1]))
+  end
+
+  -- ------- Overhauled Tier 3 AI Rules --------------------------------------
+  -- 1. Absolute KO Priority: If AI has a move that KOs player, eliteAction returns nil (attack forced).
+  do
+    local attacker = atkBattler({
+      level = 40,
+      hp = 10, -- low HP!
+      stats = { attack = 100, defense = 50, special = 50, speed = 100 },
+      moves = { { id = "WATER_GUN", pp = 25 } },
+    })
+    local defender = defBattler({
+      hp = 5, -- defender is low, easily KO'd by Water Gun!
+      maxHp = 50,
+      stats = { attack = 50, defense = 30, special = 30, speed = 40 },
+    })
+    local b = fakeBattle({ class = "OPP_BROCK", party = 1, map = "PEWTER_GYM" })
+    b.player = defender
+    b.enemy = attacker
+    b.aiUses = 2
+
+    local act = TrainerAi.eliteAction(b)
+    T.eq(act, nil, "eliteAction forces attack (returns nil) when KO is available, even at low HP")
+  end
+
+  -- 2. Anti-Heal Trap: Faster player that OHKOs AI prevents AI from wasting heal item.
+  do
+    local attacker = atkBattler({
+      level = 30,
+      hp = 10, -- 10 / 100 HP (10%)
+      stats = { attack = 50, defense = 30, special = 30, speed = 20 }, -- slow AI!
+      moves = { { id = "TACKLE", pp = 35 } },
+    })
+    attacker.mon.stats.hp = 100
+    attacker.mon.hp = 10
+    local defender = defBattler({
+      hp = 80, maxHp = 80,
+      stats = { attack = 150, defense = 50, special = 50, speed = 100 }, -- fast & deadly player!
+      moves = { { id = "EARTHQUAKE", pp = 10 } },
+    })
+    defender.curMoves = { { id = "EARTHQUAKE", pp = 10 } }
+    local b = fakeBattle({ class = "OPP_BROCK", party = 1, map = "PEWTER_GYM" })
+    b.player = defender
+    b.enemy = attacker
+    b.aiUses = 2
+
+    local act = TrainerAi.eliteAction(b)
+    T.eq(act, nil, "anti-heal trap: slow AI about to be OHKO'd skips healing item")
+  end
+
+  -- 3. Item Budget & Rival 3 Greedy Item Limit: Max 2 items for standard Elite, max 3 for Rival 3.
+  do
+    local attacker = atkBattler({
+      level = 30,
+      hp = 10,
+      stats = { attack = 50, defense = 50, special = 50, speed = 100 },
+      moves = { { id = "TACKLE", pp = 35 } },
+    })
+    attacker.mon.stats.hp = 100
+    attacker.mon.hp = 10
+    local defender = defBattler({
+      hp = 80, maxHp = 80,
+      stats = { attack = 10, defense = 50, special = 50, speed = 20 }, -- weak player
+      moves = { { id = "TACKLE", pp = 35 } },
+    })
+    defender.curMoves = { { id = "TACKLE", pp = 35 } }
+
+    -- Standard Elite (Erika has SUPER_POTION): Max 2 items total per battle.
+    -- (Brock's class item is FULL_HEAL only — status clear, not HP heal.)
+    local bElite = fakeBattle({ class = "OPP_ERIKA", party = 1, map = "CELADON_GYM" })
+    bElite.player = defender
+    bElite.enemy = attacker
+    bElite.aiUses = 2
+    bElite.enemyIndex = 1
+
+    local act1 = TrainerAi.eliteAction(bElite)
+    T.check(act1 ~= nil and act1.special == "aiItem", "Elite item 1 allowed")
+    bElite.enemyIndex = 2 -- Mon 2
+    local act2 = TrainerAi.eliteAction(bElite)
+    T.check(act2 ~= nil and act2.special == "aiItem", "Elite item 2 allowed")
+    bElite.enemyIndex = 3 -- Mon 3
+    local act3 = TrainerAi.eliteAction(bElite)
+    T.eq(act3, nil, "Elite item 3 blocked (battle item cap of 2 reached)")
+
+    -- Champion Rival 3: Max 3 items total per battle
+    local bRival = fakeBattle({ class = "OPP_RIVAL3", party = 1 })
+    bRival.player = defender
+    bRival.enemy = attacker
+    bRival.aiUses = 2
+    bRival.enemyIndex = 1
+
+    local r1 = TrainerAi.eliteAction(bRival)
+    T.check(r1 ~= nil and r1.special == "aiItem", "Rival3 item 1 allowed")
+    bRival.enemyIndex = 2
+    local r2 = TrainerAi.eliteAction(bRival)
+    T.check(r2 ~= nil and r2.special == "aiItem", "Rival3 item 2 allowed")
+    bRival.enemyIndex = 3
+    local r3 = TrainerAi.eliteAction(bRival)
+    T.check(r3 ~= nil and r3.special == "aiItem", "Rival3 item 3 allowed")
+    bRival.enemyIndex = 4
+    local r4 = TrainerAi.eliteAction(bRival)
+    T.eq(r4, nil, "Rival3 item 4 blocked (battle item cap of 3 reached)")
+
+    -- Held berries must not burn the AI bag-item budget (bag heals still count).
+    local bBerry = fakeBattle({ class = "OPP_ERIKA", party = 1, map = "CELADON_GYM" })
+    bBerry.player = defender
+    bBerry.enemy = attacker
+    bBerry.aiUses = 2
+    bBerry.enemyIndex = 1
+    bBerry.expBattleItemsUsed = 0
+    bBerry.expMonItemsUsed = {}
+    local a1 = TrainerAi.eliteAction(bBerry)
+    T.check(a1 and a1.special == "aiItem", "heal item still records")
+    T.check(bBerry.expBattleItemsUsed == 1, "bag heal increments budget")
+    -- Berries are held-item only; HEAL_ITEMS / X_ITEMS never include them, so
+    -- recordItemUsed ignores berry ids if somehow invoked.
+    local HeldItems = require("mods.Kanto-Reforged.held_items")
+    T.check(HeldItems.isBerry("BERRY"), "BERRY is a held berry")
+    T.check(HeldItems.isBerry("LUM_BERRY"), "LUM_BERRY is a held berry")
+    T.check(not HeldItems.isBerry("SUPER_POTION"), "SUPER_POTION is not a berry")
+  end
+
+  -- 4. Priority Move KO finish bonus in scoreTactical
+  do
+    local quickAttack = Data.moves.QUICK_ATTACK
+    local tackle = Data.moves.TACKLE
+    if quickAttack and tackle then
+      local attacker = atkBattler({
+        level = 20,
+        stats = { attack = 50, defense = 50, special = 50, speed = 40 },
+        moves = { { id = "QUICK_ATTACK", pp = 30 }, { id = "TACKLE", pp = 35 } },
+      })
+      local defender = defBattler({
+        hp = 8, maxHp = 50, -- low HP defender
+        stats = { attack = 50, defense = 40, special = 40, speed = 80 }, -- faster defender
+      })
+      local b = fakeBattle({ class = "OPP_LANCE", party = 1 })
+      b.player = defender
+      local v = { user = attacker, target = defender, battle = b, data = Data }
+      local qaScore = TrainerAi.scoreTactical(v, quickAttack, 10)
+      local tackleScore = TrainerAi.scoreTactical(v, tackle, 10)
+      T.check(qaScore < tackleScore, "scoreTactical gives Quick Attack extra finish bonus when target is in KO range")
+    end
+  end
 end
+
