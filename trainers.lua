@@ -226,6 +226,75 @@ local ACE_BERRIES = {
 Trainers.MIX = MIX
 Trainers.ACE_BERRIES = ACE_BERRIES
 
+-- Stock engine schemas only allow { level, species } on trainer party slots.
+-- Ace berries (and optional custom moves) need heldItem/moves accepted at
+-- patch time, and applied when BattleState.newTrainer builds the enemy party.
+-- These used to live as local engine forks; keep them in the mod instead.
+function Trainers.extendSchemas()
+  local Schemas = require("src.mods.Schemas")
+  local f = Schemas.f
+  local parties = Schemas.REGISTRIES.trainers
+    and Schemas.REGISTRIES.trainers.fields
+    and Schemas.REGISTRIES.trainers.fields.parties
+  local slotRec = parties and parties.inner and parties.inner.inner
+  if not (slotRec and slotRec.kind == "rec" and type(slotRec.fields) == "table") then
+    return false
+  end
+  slotRec.fields.heldItem = f.opt(f.str)
+  slotRec.fields.moves = f.opt(f.list(f.str))
+  return true
+end
+
+local function partyDefFor(game, oppClass, partyIndex)
+  local trainer = game and game.data and game.data.trainers and game.data.trainers[oppClass]
+  if not trainer then return nil end
+  local partyDef = trainer.parties and trainer.parties[partyIndex or 1]
+  if not partyDef then return nil end
+  local Runtime = require("src.mods.Runtime")
+  if Runtime.wantsHook("trainer.party") then
+    partyDef = Runtime.call("trainer.party", function(_, _, party)
+      return party
+    end, oppClass, partyIndex or 1, partyDef) or partyDef
+  end
+  return partyDef
+end
+
+--- Apply slot.heldItem / slot.moves onto a built trainer enemyParty.
+--- Safe if the engine already copied them (idempotent).
+function Trainers.applySlotExtras(game, battle, oppClass, partyIndex)
+  if not battle or type(battle.enemyParty) ~= "table" then return end
+  local partyDef = partyDefFor(game, oppClass, partyIndex)
+  if not partyDef then return end
+  for i, slot in ipairs(partyDef) do
+    local mon = battle.enemyParty[i]
+    if type(mon) == "table" and type(slot) == "table" then
+      if slot.heldItem then
+        mon.heldItem = slot.heldItem
+      end
+      if slot.moves then
+        mon.moves = {}
+        for _, moveId in ipairs(slot.moves) do
+          local mdef = game.data.moves and game.data.moves[moveId]
+          mon.moves[#mon.moves + 1] = { id = moveId, pp = mdef and mdef.pp or 0 }
+        end
+      end
+    end
+  end
+end
+
+function Trainers.install(mod)
+  if Trainers._installed then return end
+  Trainers._installed = true
+
+  local BattleState = require("src.battle.BattleState")
+  local originalNewTrainer = BattleState.newTrainer
+  BattleState.newTrainer = function(game, oppClass, partyIndex)
+    local battle = originalNewTrainer(game, oppClass, partyIndex)
+    Trainers.applySlotExtras(game, battle, oppClass, partyIndex)
+    return battle
+  end
+end
+
 local function copySlot(slot)
   local copy = {
     level = slot.level,

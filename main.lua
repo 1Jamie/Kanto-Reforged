@@ -33,6 +33,10 @@ local function applySpawnTables(mod, pokemon_data)
 end
 
 return function(mod)
+  -- Accept trainer party heldItem/moves before any trainers:patch (ace berries).
+  ExpTrainers.extendSchemas()
+  ExpTrainers.install(mod)
+
   -- Manager / card options
   mod.options:define({
     {

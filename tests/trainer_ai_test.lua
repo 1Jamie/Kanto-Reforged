@@ -1234,6 +1234,33 @@ return function(T, Data, run)
   T.eq(lance[#lance].species, "DRAGONITE", "Lance still ends on Dragonite")
   T.eq(lance[#lance].heldItem, "LUM_BERRY", "Lance Dragonite holds Lum")
 
+  -- Schema + BattleState heldItem must work without local engine forks.
+  do
+    local Schemas = require("src.mods.Schemas")
+    local slotRec = Schemas.REGISTRIES.trainers.fields.parties.inner.inner
+    T.check(slotRec.fields.heldItem ~= nil,
+      "mod extended trainer party schema with heldItem")
+    T.check(slotRec.fields.moves ~= nil,
+      "mod extended trainer party schema with moves")
+
+    local Pokemon = require("src.pokemon.Pokemon")
+    local BattleState = require("src.battle.BattleState")
+    local game = {
+      data = Data,
+      save = {
+        party = { Pokemon.new(Data, "PIKACHU", 50) },
+        player = {},
+        inventory = {},
+      },
+      stack = { push = function() end },
+    }
+    local battle = BattleState.newTrainer(game, "OPP_BROCK", 1)
+    local ace = battle.enemyParty[#battle.enemyParty]
+    T.eq(ace and ace.species, "ONIX", "Brock battle ace is Onix")
+    T.eq(ace and ace.heldItem, "BERRY",
+      "Brock battle applies ace berry without engine BattleState patch")
+  end
+
   -- Rival continuity: League finals foreshadowed mid; finals debut at RIVAL3
   T.eq(Data.trainers.OPP_RIVAL2.parties[10][2].species, "LAIRON",
     "Rival late-mid foreshadows Aggron via Lairon")
