@@ -152,6 +152,59 @@ local function takeNeed(save, need)
   end
 end
 
+local function itemName(data, id)
+  local def = data and data.items and data.items[id]
+  return (def and def.name) or id
+end
+
+--- Sorted "Nx NAME" lines for a recipe's berry cost.
+function BerryQuests.formatNeedLines(data, need)
+  local rows = {}
+  for id, n in pairs(need or {}) do
+    rows[#rows + 1] = { id = id, n = n, name = itemName(data, id) }
+  end
+  table.sort(rows, function(a, b) return a.name < b.name end)
+  local lines = {}
+  for _, row in ipairs(rows) do
+    lines[#lines + 1] = string.format("%dx %s", row.n, row.name)
+  end
+  return lines
+end
+
+function BerryQuests.formatRecipePrompt(data, rec)
+  local lines = BerryQuests.formatNeedLines(data, rec.need)
+  -- Paginate for the 2-line text box: title, then cost pages, then confirm.
+  local parts = { rec.label }
+  if #lines == 1 then
+    parts[#parts + 1] = "Needs:\n" .. lines[1]
+  else
+    parts[#parts + 1] = "Needs:"
+    for i = 1, #lines, 2 do
+      local a = lines[i]
+      local b = lines[i + 1]
+      parts[#parts + 1] = b and (a .. "\n" .. b) or a
+    end
+  end
+  parts[#parts + 1] = string.format("Make one %s?", rec.label)
+  return Strings(table.concat(parts, "\f"))
+end
+
+local function craftRecipe(mod, game, rec, done)
+  if not canAfford(game.save, rec.need) then
+    HouseNpcs.pushText(game, Strings("Not enough berries."), done)
+    return
+  end
+  takeNeed(game.save, rec.need)
+  if not HouseNpcs.giveItem(game, rec.give, 1) then
+    local Bag = require("src.inventory.Bag")
+    for id, n in pairs(rec.need) do Bag.add(game.save, id, n) end
+    HouseNpcs.pushText(game, Strings("The bag is full!"), done)
+    return
+  end
+  mod.save:set("blender_steps_anchor", mod.save:get("farmSteps", 0) or 0)
+  HouseNpcs.pushText(game, Strings("Blended a\n%s!", rec.label), done)
+end
+
 local function blenderTalk(mod)
   return function(game, ow, npc, done)
     if not blenderGateOk(mod, game) then
@@ -168,27 +221,28 @@ local function blenderTalk(mod)
     end
     local rows = {}
     for _, rec in ipairs(BerryQuests.RECIPES) do
-      rows[#rows + 1] = { label = rec.label, value = rec }
+      local mark = canAfford(game.save, rec.need) and "" or " ×"
+      rows[#rows + 1] = {
+        label = rec.label .. mark,
+        value = rec,
+      }
     end
     local ListMenu = require("src.ui.ListMenu")
     game.stack:push(ListMenu.new(game, Strings("Blend what?"), rows, {
+      onCancel = function()
+        if done then done() end
+      end,
       onChoose = function(row, menu)
         menu:close()
         local rec = row.value
-        if not canAfford(game.save, rec.need) then
-          HouseNpcs.pushText(game, Strings("Not enough berries."), done)
-          return
-        end
-        takeNeed(game.save, rec.need)
-        if not HouseNpcs.giveItem(game, rec.give, 1) then
-          -- refund on bag full
-          local Bag = require("src.inventory.Bag")
-          for id, n in pairs(rec.need) do Bag.add(game.save, id, n) end
-          HouseNpcs.pushText(game, Strings("The bag is full!"), done)
-          return
-        end
-        mod.save:set("blender_steps_anchor", mod.save:get("farmSteps", 0) or 0)
-        HouseNpcs.pushText(game, Strings("Blended a\n%s!", rec.label), done)
+        local prompt = BerryQuests.formatRecipePrompt(game.data, rec)
+        HouseNpcs.ask(game, prompt, function(yes)
+          if not yes then
+            HouseNpcs.pushText(game, Strings("Maybe later."), done)
+            return
+          end
+          craftRecipe(mod, game, rec, done)
+        end)
       end,
     }))
   end

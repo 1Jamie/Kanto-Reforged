@@ -98,7 +98,7 @@ Go into the Underground Path from the Route 5 entrance (the one by the Day Care 
 ### Rock Tunnel
 
 1. On **B1F**, keep an eye out for a Poké Ball with a **Focus Band** while youre exploring. Not sold in marts.
-2. Later (after Regi notes): theres a Regirock seal on B1F too. Needs notes + **3 Rock-types** in the party. Dont interact until ready (flee despawns it).
+2. Later (after Regi notes): look for a **hidden ladder** off the main B1F path (north wall spur). It drops into a sealed chamber with Regirock. Needs notes + **3 Rock-types** in the party. Dont interact until ready (flee despawns it).
 
 ### Celadon (this city does a lot)
 
@@ -241,7 +241,7 @@ Use Radar until catch or KO. Optional.
 ### Regis
 
 1. Pewter Speech House scholar → Regi notes (fossil mon or Boulder Badge).
-2. Rock Tunnel B1F: Regirock, **3 Rock-types** in party.
+2. Rock Tunnel B1F hidden ladder → Regirock chamber (**3 Rock-types** in party).
 3. Seafoam B2F: Regice, **1 Ice-type**.
 4. Power Plant: Registeel, **1 Steel-type**.
 

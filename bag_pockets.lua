@@ -134,6 +134,7 @@ function BagPockets.register(mod)
       list.title = BagPockets.current().label
       -- SELECT reorder is ambiguous across filtered views; leave unused.
       list.onSelectKey = nil
+      HeldItems.decorateBagMenu(mod, game, list, opts)
 
       -- Public projection for Gen1 Modern UI (ignored when that mod is absent).
       list.__pocketIndex = pocketIndex

@@ -220,7 +220,8 @@ function BattleClubs.register(mod)
     name = "CELADONMANSION2F_BATTLE_CLUB",
     sprite = "SPRITE_HIKER",
     text = "TEXT_CELADONMANSION2F_BATTLE_CLUB",
-    x = 3, y = 8,
+    -- Meeting-room floor (left), not the east hall (x=6/7).
+    x = 2, y = 5,
   }, BattleClubs.OWNER)
 
   HouseNpcs.appendNpc(mod, "VERMILION_PIDGEY_HOUSE", {

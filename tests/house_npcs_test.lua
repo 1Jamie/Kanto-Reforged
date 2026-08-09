@@ -48,6 +48,28 @@ return function(T, Data, run)
     "Beast Tracker NPC present")
   T.check(findObj("CELADON_MANSION_ROOF", "CELADONMANSIONROOF_HO_OH") ~= nil,
     "Ho-Oh on roof")
+  do
+    local LegendShrines = require("mods.Kanto-Reforged.legend_shrines")
+    local hoOh = findObj("CELADON_MANSION_ROOF", "CELADONMANSIONROOF_HO_OH")
+    T.eq(hoOh.x, LegendShrines.HO_OH_X, "Ho-Oh perched on cabin roof x")
+    T.eq(hoOh.y, LegendShrines.HO_OH_Y, "Ho-Oh perched on cabin roof y")
+    T.check(hoOh.x ~= 4 or hoOh.y ~= 5,
+      "Ho-Oh no longer blocks corridor to Eevee door")
+
+    local Map = require("src.world.Map")
+    local def = Data.maps.CELADON_MANSION_ROOF
+    local ts = Data.tilesets.MANSION
+    T.check(Map.defIsWalkableCell(def, ts, 2, 4),
+      "cabin roof under Ho-Oh is walkable")
+    T.check(Map.defIsWalkableCell(def, ts, 3, 4),
+      "stair lip onto cabin roof is walkable")
+    T.check(Map.defIsWalkableCell(def, ts, 3, 5),
+      "stair lip lower cell is walkable")
+    T.check(Map.defIsWalkableCell(def, ts, 4, 5),
+      "east corridor stays walkable (Eevee path)")
+    T.check(Map.defIsWalkableCell(def, ts, 2, 7),
+      "Eevee house door still walkable")
+  end
   T.check(findObj("ROUTE_2_TRADE_HOUSE", "ROUTE2TRADEHOUSE_TAILLOW") ~= nil,
     "Taillow trade NPC")
   T.check(findObj("FUCHSIA_BILLS_GRANDPAS_HOUSE", "FUCHSIABILLSGRANDPASHOUSE_SEEDOT") ~= nil,
@@ -118,6 +140,12 @@ return function(T, Data, run)
     if rec.give == "HP_UP" then
       vitamin = true
       T.eq(rec.need.CHERI_BERRY, 10, "HP UP costs 10 Cheri")
+      local prompt = BerryQuests.formatRecipePrompt(Data, rec)
+      T.check(type(prompt) == "string" and #prompt > 0, "blender prompt is text")
+      T.check(prompt:find("CHERI", 1, true) or prompt:find("10", 1, true),
+        "blender prompt lists Cheri cost")
+      T.check(prompt:find("Make one", 1, true) or prompt:find("HP UP", 1, true),
+        "blender prompt asks to confirm")
     end
     if rec.give ~= "LUM_BERRY" then
       for id in pairs(rec.need) do
@@ -127,12 +155,58 @@ return function(T, Data, run)
     end
   end
   T.check(vitamin, "HP UP recipe present")
+  do
+    local lines = BerryQuests.formatNeedLines(Data, {
+      CHERI_BERRY = 10, PECHA_BERRY = 1,
+    })
+    T.eq(#lines, 2, "need lines covers both berries")
+    T.check(lines[1]:find("1x", 1, true) ~= nil
+        or lines[2]:find("1x", 1, true) ~= nil, "counts appear in need lines")
+  end
+
+  -- Mansion 2F club NPCs stay out of the east stair hall (x=6/7).
+  do
+    local club = findObj("CELADON_MANSION_2F", "CELADONMANSION2F_BATTLE_CLUB")
+    local tracker = findObj("CELADON_MANSION_2F", "CELADONMANSION2F_BEAST_TRACKER")
+    T.check(club and club.x ~= 6 and club.x ~= 7,
+      "Battle Club not in east hall")
+    T.check(tracker and tracker.x ~= 6 and tracker.x ~= 7,
+      "Beast Tracker not in east hall")
+    T.eq(club.x, 2, "Battle Club in meeting room")
+    T.eq(club.y, 5, "Battle Club north of plants")
+    T.eq(tracker.x, 1, "Beast Tracker SW of meeting room")
+    T.eq(tracker.y, 8, "Beast Tracker on south row")
+  end
 
   -- Fossils + Regis keys exist
   T.check(Data.items.ROOT_FOSSIL ~= nil or Data.items.CLAW_FOSSIL ~= nil
       or Data.maps.CINNABAR_LAB_FOSSIL_ROOM ~= nil,
     "Gen3 fossil content wired")
-  T.check(findObj("ROCK_TUNNEL_B1F", "ROCKTUNNELB1F_REGIROCK") ~= nil, "Regirock present")
+  T.check(Data.maps.REGIROCK_CHAMBER ~= nil, "REGIROCK_CHAMBER registered")
+  T.eq(Data.maps.REGIROCK_CHAMBER.index, 1104, "Regirock chamber index 1104")
+  T.check(findObj("REGIROCK_CHAMBER", "REGIROCKCHAMBER_REGIROCK") ~= nil,
+    "Regirock in chamber")
+  T.check(findObj("ROCK_TUNNEL_B1F", "ROCKTUNNELB1F_REGIROCK") == nil,
+    "Regirock no longer on B1F main path")
+  do
+    local LegendRegis = require("mods.Kanto-Reforged.legend_regis")
+    local Map = require("src.world.Map")
+    local def = Data.maps.ROCK_TUNNEL_B1F
+    local ts = Data.tilesets.CAVERN
+    local lx, ly = LegendRegis.LADDER_X, LegendRegis.LADDER_Y
+    T.check(Map.defIsWalkableCell(def, ts, lx, ly),
+      "Rock Tunnel Regirock ladder cell walkable")
+    T.check(Map.defIsWalkableCell(def, ts, lx, ly - 1),
+      "approach spur north of ladder stays walkable")
+    local warps = def.warps or {}
+    T.eq(#warps, 5, "B1F gained Regirock chamber warp")
+    local w = warps[5]
+    T.eq(w.x, lx, "ladder warp x")
+    T.eq(w.y, ly, "ladder warp y")
+    T.eq(w.destMap, "REGIROCK_CHAMBER", "ladder leads to chamber")
+    T.check(talkOk("REGIROCK_CHAMBER", "TEXT_REGIROCKCHAMBER_REGIROCK"),
+      "Regirock chamber talk")
+  end
   T.check(findObj("POWER_PLANT", "POWERPLANT_REGISTEEL") ~= nil, "Registeel present")
   T.check(Data.items.RAINBOW_WING ~= nil, "Rainbow Wing key")
   T.check(Data.items.SILVER_WING ~= nil, "Silver Wing key")

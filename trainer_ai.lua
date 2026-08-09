@@ -28,8 +28,33 @@ TrainerAi.OPTION = {
   default = true,
 }
 
+-- Voluntary-switch free-hit timing (player Switch → enemy attack).
+-- gen3 (default): lock AI move against the outgoing mon, then land it
+--   on the switch-in (matches RS/FRLG/Emerald turn lock-in).
+-- gen1: pick after send-out (engine default; feels like AI saw the swap).
+TrainerAi.SWITCH_LOCK_KEY = "switch_hit_ai"
+TrainerAi.SWITCH_LOCK_GEN3 = "gen3"
+TrainerAi.SWITCH_LOCK_GEN1 = "gen1"
+TrainerAi.SWITCH_LOCK_OPTION = {
+  key = TrainerAi.SWITCH_LOCK_KEY,
+  label = "SWITCH HIT AI",
+  type = "choice",
+  default = TrainerAi.SWITCH_LOCK_GEN3,
+  choices = {
+    { "GEN 3", TrainerAi.SWITCH_LOCK_GEN3 },
+    { "GEN 1", TrainerAi.SWITCH_LOCK_GEN1 },
+  },
+}
+
 function TrainerAi.enabled(mod)
   return mod and mod.options and mod.options:get(TrainerAi.OPTION_KEY) and true or false
+end
+
+function TrainerAi.switchLockGen3(mod)
+  if not mod or not mod.options then return true end
+  local value = mod.options:get(TrainerAi.SWITCH_LOCK_KEY)
+  if value == TrainerAi.SWITCH_LOCK_GEN1 then return false end
+  return true
 end
 
 -- ------- Tier rosters -------------------------------------------------------
@@ -1422,6 +1447,45 @@ function TrainerAi.install(mod)
       battle.expWildSpecies = species
     end
     return battle
+  end
+
+  -- Retarget queued actions to the live side battlers. Older engines
+  -- captured battler refs in resolveTurn; an AI switch then left the
+  -- player's move hitting the withdrawn mon (SE text, no visible HP loss).
+  -- Current engines already refresh in resolveTurn; this wrap is idempotent.
+  if not BattleState._krLiveBattlerRetarget then
+    BattleState._krLiveBattlerRetarget = true
+    local originalExecute = BattleState.executeAction
+    BattleState.executeAction = function(self, user, target, action)
+      if user then
+        user = user.isPlayer and self.player or self.enemy
+      end
+      if target then
+        target = target.isPlayer and self.player or self.enemy
+      end
+      return originalExecute(self, user, target, action)
+    end
+  end
+
+  -- Voluntary-switch free-hit timing (see SWITCH_LOCK_OPTION).
+  -- When set to Gen 3, lock the AI action against the outgoing mon;
+  -- Gen 1 leaves the engine's post-send-out pick alone.
+  if not BattleState._krGen3SwitchLock then
+    BattleState._krGen3SwitchLock = true
+    local originalResolveSwitch = BattleState.resolveSwitch
+    BattleState.resolveSwitch = function(self, newMon)
+      local skipFree = (self.player and self.player.expBatonPass)
+          or (self.player and self.player.expWantsSwitch)
+          or self.expSkipNextEnemyAction
+      if not skipFree and TrainerAi.switchLockGen3(mod) then
+        local locked = self:enemyAction()
+        self.enemyAction = function()
+          self.enemyAction = nil
+          return locked
+        end
+      end
+      return originalResolveSwitch(self, newMon)
+    end
   end
 
   -- Inject tier layers into chooseMove.

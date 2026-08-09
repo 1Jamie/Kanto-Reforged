@@ -1,11 +1,26 @@
 -- Gen 2–3 held items for Kanto Reforged (engine stays Gen1-faithful).
--- Storage: mon.heldItem (string id). Give/Take via ui.party.submenu.
+-- Storage: mon.heldItem (string id). Give/Take via ui.party.submenu;
+-- optional Give from the bag (BAG GIVE option).
 
 local Strings = require("src.core.Strings")
 
 local HeldItems = {}
 
 HeldItems.WILD_BERRY_CHANCE = 0.05
+
+HeldItems.BAG_GIVE_KEY = "bag_give"
+HeldItems.BAG_GIVE_OPTION = {
+  key = HeldItems.BAG_GIVE_KEY,
+  label = "BAG GIVE",
+  type = "toggle",
+  default = true,
+}
+
+function HeldItems.bagGiveEnabled(mod)
+  mod = mod or HeldItems._mod
+  if not mod or not mod.options then return true end
+  return mod.options:get(HeldItems.BAG_GIVE_KEY) and true or false
+end
 
 -- holdEffect:
 --   leftovers | focus_band | berry | berry_status | type_boost
@@ -261,6 +276,128 @@ local function bagHoldables(save)
   return rows
 end
 
+local function monDisplayName(data, mon)
+  return mon.nickname or (data.pokemon[mon.species] and data.pokemon[mon.species].name)
+    or mon.species or "?????"
+end
+
+-- Move one holdable from the bag onto a party mon. Swaps the previous
+-- hold back into the bag when present. Returns ok, err ("full"|"empty"|"bad").
+function HeldItems.giveToMon(game, mon, itemId)
+  local Bag = require("src.inventory.Bag")
+  if not game or not mon or not itemId then return false, "bad" end
+  if not HeldItems.isHoldable(itemId) then return false, "bad" end
+  if (game.save.inventory[itemId] or 0) <= 0 then return false, "empty" end
+  if mon.heldItem then
+    if not Bag.add(game.save, mon.heldItem, 1) then
+      return false, "full"
+    end
+  end
+  Bag.remove(game.save, itemId, 1)
+  mon.heldItem = itemId
+  return true
+end
+
+local function refreshBagRow(game, list, itemId)
+  if not list or not list.items then return end
+  for i = #list.items, 1, -1 do
+    local it = list.items[i]
+    if it.value == itemId then
+      local left = game.save.inventory[itemId]
+      if not left or left <= 0 then
+        table.remove(list.items, i)
+      else
+        it.right = "x" .. tostring(left)
+      end
+      break
+    end
+  end
+  list.index = math.min(list.index or 1, math.max(1, #list.items))
+end
+
+function HeldItems.pickMonAndGive(game, itemId, bagList)
+  local TextBox = require("src.render.TextBox")
+  local Breeding = require("mods.Kanto-Reforged.breeding")
+  require("src.ui.Screens").push(game, "PartyMenu", {
+    pickOnly = true,
+    onSwitch = function(mon)
+      if Breeding.isEgg(mon) then
+        game.stack:push(TextBox.new(game, Strings("An EGG can't hold\nan item!")))
+        return
+      end
+      local ok, err = HeldItems.giveToMon(game, mon, itemId)
+      if err == "full" then
+        game.stack:push(TextBox.new(game, Strings("The bag is full!")))
+        return
+      end
+      if not ok then return end
+      refreshBagRow(game, bagList, itemId)
+      local def = HeldItems.def(itemId)
+      game.stack:push(TextBox.new(game, Strings("%s was given\nthe %s.",
+        monDisplayName(game.data, mon),
+        def and def.name or itemId)))
+    end,
+  })
+end
+
+-- Inject GIVE into the bag's USE/TOSS submenu for holdable items when the
+-- BAG GIVE option is on (field only — no give mid-battle).
+function HeldItems.decorateBagMenu(mod, game, list, opts)
+  if not list or type(list.onChoose) ~= "function" then return end
+  local battle = opts and opts.battle
+  local origOnChoose = list.onChoose
+  list.onChoose = function(item)
+    local id = item and item.value
+    local wantGive = not battle
+        and not list.swapIndex
+        and id
+        and HeldItems.isHoldable(id)
+        and HeldItems.bagGiveEnabled(mod)
+    if not wantGive then
+      return origOnChoose(item)
+    end
+
+    local Menu = require("src.ui.Menu")
+    local origMenuNew = Menu.new
+    Menu.new = function(g, items, menuOpts)
+      Menu.new = origMenuNew
+      local giveEntry = {
+        label = Strings("GIVE"),
+        onSelect = function()
+          HeldItems.pickMonAndGive(g, id, list)
+        end,
+      }
+      local merged = {}
+      if type(items) == "table" and #items >= 2 then
+        merged[1] = items[1]
+        merged[2] = giveEntry
+        for i = 2, #items do
+          merged[#merged + 1] = items[i]
+        end
+      else
+        merged[1] = giveEntry
+        for _, it in ipairs(items or {}) do
+          merged[#merged + 1] = it
+        end
+      end
+      local mo = {}
+      if type(menuOpts) == "table" then
+        for k, v in pairs(menuOpts) do mo[k] = v end
+      end
+      -- Grow for the extra row; nudge up so the box stays on-screen.
+      mo.th = #merged * (mo.rowStep or 2) + 1
+      if mo.ty and mo.ty + mo.th > 18 then
+        mo.ty = math.max(0, 18 - mo.th)
+      end
+      return origMenuNew(g, merged, mo)
+    end
+
+    local ok, err = pcall(origOnChoose, item)
+    Menu.new = origMenuNew
+    if not ok then error(err) end
+  end
+end
+
 local MAJOR_STATUS = { PAR = true, PSN = true, BRN = true, FRZ = true, SLP = true }
 
 local function berryMatchesCure(def, kind)
@@ -269,11 +406,6 @@ local function berryMatchesCure(def, kind)
     return kind == "confusion" or MAJOR_STATUS[kind]
   end
   return def.cure == kind
-end
-
-local function monDisplayName(data, mon)
-  return mon.nickname or (data.pokemon[mon.species] and data.pokemon[mon.species].name)
-    or mon.species or "?????"
 end
 
 local function cureActiveToxic(battle, mon)
@@ -511,20 +643,15 @@ function HeldItems.install(mod)
           onChoose = function(row, list)
             list:close()
             local id = row.value
-            if not HeldItems.isHoldable(id) then return end
-            if (g.save.inventory[id] or 0) <= 0 then return end
-            if m.heldItem then
-              if not Bag.add(g.save, m.heldItem, 1) then
-                g.stack:push(TextBox.new(g, Strings("The bag is full!")))
-                return
-              end
+            local ok, err = HeldItems.giveToMon(g, m, id)
+            if err == "full" then
+              g.stack:push(TextBox.new(g, Strings("The bag is full!")))
+              return
             end
-            Bag.remove(g.save, id, 1)
-            m.heldItem = id
+            if not ok then return end
             local def = HeldItems.def(id)
             g.stack:push(TextBox.new(g, Strings("%s was given\nthe %s.",
-              m.nickname or (g.data.pokemon[m.species] and g.data.pokemon[m.species].name)
-                or m.species,
+              monDisplayName(g.data, m),
               def and def.name or id)))
           end,
         }))

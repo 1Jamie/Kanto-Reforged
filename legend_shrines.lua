@@ -6,6 +6,52 @@ local Strings = require("src.core.Strings")
 local LegendShrines = {}
 LegendShrines.OWNER = "legend_shrines"
 
+-- Ho-Oh perch on the brown roof-house (cells on block row 2).
+-- Was (4,5) in the east corridor, which blocked the Eevee door path.
+LegendShrines.HO_OH_X = 2
+LegendShrines.HO_OH_Y = 4
+
+-- Custom MANSION blocks: brown roof look, walkable feet (tile 1 / 26).
+-- Collision uses each cell's bottom-left 8x8 (indices 5,7,13,15 in the 4x4).
+-- West cabin block keeps the left wall (74/75); east block adds a stair
+-- lip on the corridor edge so you can walk up from (4,4)/(4,5).
+local ROOF_WEST = {
+  74, 75, 54, 55,
+  74, 75,  1, 55,
+  74, 75, 54, 55,
+  74, 75,  1, 55,
+}
+local ROOF_EAST = {
+  54, 55, 10, 11,
+   1, 55, 26, 27,
+  54, 55, 10, 11,
+   1, 55, 26, 27,
+}
+
+function LegendShrines.patchHoOhRoof(mod)
+  local Data = require("src.core.Data")
+  local mansion = Data.tilesets and Data.tilesets.MANSION
+  local baseCount = mansion and mansion.blocks and #mansion.blocks or 72
+  local idWest, idEast = baseCount, baseCount + 1
+
+  mod.content.tilesets:patch("MANSION", {
+    blocks = { __append = { ROOF_WEST, ROOF_EAST } },
+  })
+
+  -- Vanilla CELADON_MANSION_ROOF is 4x6; swap cabin top blocks 33/34.
+  mod.content.maps:patch("CELADON_MANSION_ROOF", {
+    blocks = {
+      69, 59, 28, 27,
+      61,  7, 29, 29,
+      idWest, idEast, 29, 29,
+      37, 38, 29, 29,
+      51, 31, 30, 29,
+      32, 31, 31, 30,
+    },
+  })
+  return idWest, idEast
+end
+
 local function hasItem(save, id)
   return save.inventory and (save.inventory[id] or 0) > 0
 end
@@ -78,11 +124,16 @@ function LegendShrines.register(mod)
     x = 5, y = 4,
   }, LegendShrines.OWNER)
 
-  -- Ho-Oh on mansion roof
+  -- Ho-Oh used to stand in the 1-tile corridor east of the brown roof
+  -- house (x=4,y=5), which blocked the only path to the Eevee door.
+  -- Open the cabin roof + a stair lip from that corridor, and perch
+  -- Ho-Oh on top instead.
+  LegendShrines.patchHoOhRoof(mod)
   HouseNpcs.appendNpc(mod, "CELADON_MANSION_ROOF", {
     index = 1, name = "CELADONMANSIONROOF_HO_OH",
     sprite = "SPRITE_BIRD", text = "TEXT_CELADONMANSIONROOF_HO_OH",
-    x = 4, y = 5, pokemon = "HO_OH", level = 50,
+    x = LegendShrines.HO_OH_X, y = LegendShrines.HO_OH_Y,
+    pokemon = "HO_OH", level = 50,
   }, LegendShrines.OWNER)
 
   HouseNpcs.appendNpc(mod, "SEAFOAM_ISLANDS_B1F", {

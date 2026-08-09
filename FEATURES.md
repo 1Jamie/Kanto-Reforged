@@ -278,6 +278,8 @@ Growing on plots is cheaper than buying when you need bulk (blender vitamins, et
 
 Gate: Rainbow Badge **or** Soil Rank ≥ 1.
 
+Pick a recipe → see the berry cost → confirm YES/NO before anything is taken. Unaffordable recipes are marked with `×` in the list.
+
 ![Juice Club blender on Celadon Mansion 3F](screen-shots/juice-blender.png)
 
 | Recipe | Cost | Output |
@@ -457,7 +459,7 @@ One-shot statics. **Win, catch, or flee** all set the beat flag and hide the obj
 | Lugia | Seafoam B1F | Silver Wing (Route 12 Gate upstairs: Water ≥Lv30) | 50 (rain) |
 | Kyogre | Seafoam B3F | Blue Orb (Cinnabar Lab scientist, post-Champion, first talk) | 60 (rain) |
 | Groudon | Pokémon Mansion B1F | Red Orb (same scientist, second talk) | 60 (sun) |
-| Regirock | Rock Tunnel B1F | Pewter scholar notes + **3 Rock-types** in party | 50 |
+| Regirock | Rock Tunnel B1F hidden ladder → `REGIROCK_CHAMBER` | Pewter scholar notes + **3 Rock-types** in party | 50 |
 | Regice | Seafoam B2F | Notes + **1 Ice-type** | 50 |
 | Registeel | Power Plant | Notes + **1 Steel-type** | 50 |
 | Rayquaza | Sky Pillar (custom) | Beat Kyogre **and** Groudon; hiker gate on Route 23 | 70 |
@@ -481,6 +483,7 @@ One-shot statics. **Win, catch, or flee** all set the beat flag and hide the obj
 | `SKY_PILLAR_KANT` | 1101 | Rayquaza |
 | `ILEX_SHRINE_KANT` | 1102 | Celebi |
 | `BIRTH_ISLAND_KANT` | 1103 | Deoxys |
+| `REGIROCK_CHAMBER` | 1104 | Regirock (ladder from Rock Tunnel B1F) |
 
 Legendary custom maps save return coordinates on enter and exit via warp hooks so you cannot soft-lock. They are not remembered as `lastOutdoor` (same class of fix as the Berry Farm PC door).
 

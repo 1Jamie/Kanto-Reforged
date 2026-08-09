@@ -95,7 +95,8 @@ function Roamers.register(mod)
     name = "CELADONMANSION2F_BEAST_TRACKER",
     sprite = "SPRITE_SUPER_NERD",
     text = "TEXT_CELADONMANSION2F_BEAST_TRACKER",
-    x = 6, y = 8,
+    -- SW of the meeting room so the east stair hall stays clear.
+    x = 1, y = 8,
   }, Roamers.OWNER)
 
   mod.content.items:register("ROAMING_RADAR", {

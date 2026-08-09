@@ -47,6 +47,8 @@ return function(mod)
     },
     ModernXpShare.OPTION,
     TrainerAi.OPTION,
+    TrainerAi.SWITCH_LOCK_OPTION,
+    HeldItems.BAG_GIVE_OPTION,
     SplitSpecial.OPTION,
     require("mods.Kanto-Reforged.dexnav").OPTION,
   })

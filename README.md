@@ -69,7 +69,7 @@ Competitive held items (Choice Band, Life Orb, Focus Sash) work in battle: band 
 ## Legendary hunting
 
 - **Roamers**: after Silph, Beast Tracker (Mansion 2F) gives Roaming Radar and starts Raikou/Entei/Suicune. Latias/Latios after Champion (Indigo lobby). Foot travel migrates to adjacent routes; Fly/Teleport/blackout reshuffles. Cry on map enter when one is here. High level so Repel does not block them. Radar (bag / start menu) shows route + HERE/NEXT DOOR/FAR. DexNav adds a ROAM row only if the beast is on the current map. Pokédex AREA line after first `seen`.
-- **Statics**: Ho-Oh (Celadon roof + Rainbow Wing), Lugia (Seafoam + Silver Wing), Kyogre/Groudon (orbs), Regis (scholar + seals), Rayquaza/Celebi/Deoxys on custom maps (indices 1101–1103) with return warps, Jirachi (Mt Moon, Heart Scales).
+- **Statics**: Ho-Oh (Celadon roof + Rainbow Wing), Lugia (Seafoam + Silver Wing), Kyogre/Groudon (orbs), Regis (scholar + seals; Regirock in a Rock Tunnel ladder chamber), Rayquaza/Celebi/Deoxys on custom maps (indices 1101–1103) with return warps, Jirachi (Mt Moon, Heart Scales).
 
 Legendary overworld sprites reuse Gen 1 sheets (`SPRITE_BIRD` / `SPRITE_MONSTER` / `SPRITE_FAIRY`). Intentional so they fit gen1.
 
