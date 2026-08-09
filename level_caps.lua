@@ -145,10 +145,9 @@ local function pushText(game, msg, done)
 end
 
 local function ask(game, msg, cb)
-  local ChoiceBox = require("src.ui.ChoiceBox")
-  pushText(game, msg, function()
-    game.stack:push(ChoiceBox.new(game, cb))
-  end)
+  -- Same pattern as HouseNpcs.ask: YES/NO on the still-open text box.
+  local TextBox = require("src.render.TextBox")
+  game.stack:push(TextBox.new(game, msg, nil, { choice = cb }))
 end
 
 local function pinExpAtLevel(data, mon, level)

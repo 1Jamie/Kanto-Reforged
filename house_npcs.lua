@@ -81,13 +81,12 @@ function HouseNpcs.pushText(game, msg, done)
 end
 
 function HouseNpcs.ask(game, msg, onChoice)
-  local ChoiceBox = require("src.ui.ChoiceBox")
+  -- Gen 1 YesNoChoice sits on the still-open text box (InitYesNoTextBox-
+  -- Parameters). TextBox opts.choice pushes ChoiceBox correctly; the old
+  -- ChoiceBox.new(game, {"YES","NO"}, fn) call used the wrong arity and
+  -- crashed when confirming (onChoose was a table).
   local TextBox = require("src.render.TextBox")
-  game.stack:push(TextBox.new(game, msg, function()
-    game.stack:push(ChoiceBox.new(game, { "YES", "NO" }, function(i)
-      onChoice(i == 1)
-    end))
-  end))
+  game.stack:push(TextBox.new(game, msg, nil, { choice = onChoice }))
 end
 
 -- Soft bracket even when hardcore caps are off (same milestone table).

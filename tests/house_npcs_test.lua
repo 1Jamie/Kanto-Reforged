@@ -51,24 +51,31 @@ return function(T, Data, run)
   do
     local LegendShrines = require("mods.Kanto-Reforged.legend_shrines")
     local hoOh = findObj("CELADON_MANSION_ROOF", "CELADONMANSIONROOF_HO_OH")
-    T.eq(hoOh.x, LegendShrines.HO_OH_X, "Ho-Oh perched on cabin roof x")
-    T.eq(hoOh.y, LegendShrines.HO_OH_Y, "Ho-Oh perched on cabin roof y")
-    T.check(hoOh.x ~= 4 or hoOh.y ~= 5,
-      "Ho-Oh no longer blocks corridor to Eevee door")
+    T.eq(hoOh.x, LegendShrines.HO_OH_X, "Ho-Oh on patio x")
+    T.eq(hoOh.y, LegendShrines.HO_OH_Y, "Ho-Oh on patio y")
+    T.check(hoOh.x ~= 4,
+      "Ho-Oh not in east corridor (Eevee path)")
 
     local Map = require("src.world.Map")
     local def = Data.maps.CELADON_MANSION_ROOF
     local ts = Data.tilesets.MANSION
-    T.check(Map.defIsWalkableCell(def, ts, 2, 4),
-      "cabin roof under Ho-Oh is walkable")
-    T.check(Map.defIsWalkableCell(def, ts, 3, 4),
-      "stair lip onto cabin roof is walkable")
-    T.check(Map.defIsWalkableCell(def, ts, 3, 5),
-      "stair lip lower cell is walkable")
+    -- Vanilla cabin top stays solid — no custom walk-on-roof blocks.
+    T.check(not Map.defIsWalkableCell(def, ts, 2, 4),
+      "cabin roof stays solid (no broken walkable patch)")
+    T.check(not Map.defIsWalkableCell(def, ts, 3, 4),
+      "cabin roof east cell stays solid")
+    T.check(Map.defIsWalkableCell(def, ts, LegendShrines.HO_OH_X, LegendShrines.HO_OH_Y),
+      "Ho-Oh patio cell is walkable")
     T.check(Map.defIsWalkableCell(def, ts, 4, 5),
       "east corridor stays walkable (Eevee path)")
     T.check(Map.defIsWalkableCell(def, ts, 2, 7),
       "Eevee house door still walkable")
+    -- Vanilla uses two stair warps; both remain.
+    local stairs = 0
+    for _, w in ipairs(def.warps or {}) do
+      if w.destMap == "CELADON_MANSION_3F" then stairs = stairs + 1 end
+    end
+    T.eq(stairs, 2, "both roof stair warps to 3F remain")
   end
   T.check(findObj("ROUTE_2_TRADE_HOUSE", "ROUTE2TRADEHOUSE_TAILLOW") ~= nil,
     "Taillow trade NPC")
@@ -96,6 +103,52 @@ return function(T, Data, run)
   T.check(Data.items.ROAMING_RADAR ~= nil, "Roaming Radar registered")
   T.check(Data.trainers.OPP_EXP_BATTLE_CLUB ~= nil, "Battle Club trainer class")
   T.check(Competitive.ITEMS.CHOICE_BAND ~= nil, "Competitive catalog has Choice Band")
+
+  -- HouseNpcs.ask must wire TextBox.choice (not the broken ChoiceBox arity).
+  do
+    local pushed = {}
+    local game = {
+      data = Data,
+      save = { party = {}, inventory = {}, money = 0 },
+      stack = {
+        push = function(_, screen) pushed[#pushed + 1] = screen end,
+        pop = function() end,
+        top = function() return pushed[#pushed] end,
+      },
+      input = { wasPressed = function() return false end },
+    }
+    local answered
+    HouseNpcs.ask(game, "Battle?", function(yes) answered = yes end)
+    T.eq(#pushed, 1, "ask pushes one TextBox")
+    local box = pushed[1]
+    T.check(type(box.choice) == "function", "ask uses TextBox choice callback")
+    box.choice(true)
+    T.eq(answered, true, "YES reaches ask callback")
+  end
+
+  -- Circuit host party builds without error.
+  do
+    local BattleState = require("src.battle.BattleState")
+    local Pokemon = require("src.pokemon.Pokemon")
+    local game = {
+      data = Data,
+      save = {
+        party = { Pokemon.new(Data, "PIKACHU", 30) },
+        player = { name = "RED" },
+        inventory = {},
+        options = { battleStyle = "set" },
+        pokedex = { seen = {}, owned = {} },
+        flags = {},
+        money = 0,
+      },
+      stack = { push = function() end, pop = function() end, top = function() end },
+    }
+    local ok, battle = pcall(BattleState.newTrainer, game, "OPP_EXP_BATTLE_CLUB", 1)
+    T.check(ok and battle ~= nil, "Circuit Host battle constructs")
+    if ok and battle then
+      T.check(#battle.enemyParty >= 1, "Circuit Host has a party")
+    end
+  end
 
   -- Extra trades appended (vanilla 10 + 2)
   T.eq(#Data.field.trades, 12, "two extra in-game trades")
