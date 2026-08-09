@@ -29,9 +29,8 @@ TrainerAi.OPTION = {
 }
 
 -- Voluntary-switch free-hit timing (player Switch → enemy attack).
--- gen3 (default): lock AI move against the outgoing mon, then land it
---   on the switch-in (matches RS/FRLG/Emerald turn lock-in).
--- gen1: pick after send-out (engine default; feels like AI saw the swap).
+-- gen1 (default): pick after send-out (engine / classic Gen 1 timing).
+-- gen3: lock AI move against the outgoing mon, then land it on the switch-in.
 TrainerAi.SWITCH_LOCK_KEY = "switch_hit_ai"
 TrainerAi.SWITCH_LOCK_GEN3 = "gen3"
 TrainerAi.SWITCH_LOCK_GEN1 = "gen1"
@@ -39,10 +38,10 @@ TrainerAi.SWITCH_LOCK_OPTION = {
   key = TrainerAi.SWITCH_LOCK_KEY,
   label = "SWITCH HIT AI",
   type = "choice",
-  default = TrainerAi.SWITCH_LOCK_GEN3,
+  default = TrainerAi.SWITCH_LOCK_GEN1,
   choices = {
-    { "GEN 3", TrainerAi.SWITCH_LOCK_GEN3 },
     { "GEN 1", TrainerAi.SWITCH_LOCK_GEN1 },
+    { "GEN 3", TrainerAi.SWITCH_LOCK_GEN3 },
   },
 }
 
@@ -51,10 +50,8 @@ function TrainerAi.enabled(mod)
 end
 
 function TrainerAi.switchLockGen3(mod)
-  if not mod or not mod.options then return true end
-  local value = mod.options:get(TrainerAi.SWITCH_LOCK_KEY)
-  if value == TrainerAi.SWITCH_LOCK_GEN1 then return false end
-  return true
+  if not mod or not mod.options then return false end
+  return mod.options:get(TrainerAi.SWITCH_LOCK_KEY) == TrainerAi.SWITCH_LOCK_GEN3
 end
 
 -- ------- Tier rosters -------------------------------------------------------
