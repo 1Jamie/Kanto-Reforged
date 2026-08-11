@@ -75,13 +75,12 @@ local function redrawSplitSpecialStats(self)
   love.graphics.setColor(1, 1, 1, 1)
   love.graphics.rectangle("fill", 8, 72, 64, 64)
   love.graphics.setColor(0, 0, 0, 1)
-  -- Short labels so five rows + values fit the classic box without crowding.
   local rows = {
-    { "ATK.", stats.attack },
-    { "DEF.", stats.defense },
-    { "SPD.", stats.speed },
-    { "SP.A", sp and sp.sp_attack or stats.special },
-    { "SP.D", sp and sp.sp_defense or stats.special },
+    { "ATTACK", stats.attack },
+    { "DEFENSE", stats.defense },
+    { "SPEED", stats.speed },
+    { "SP.ATK", sp and sp.sp_attack or stats.special },
+    { "SP.DEF", sp and sp.sp_defense or stats.special },
   }
   for i, s in ipairs(rows) do
     local y = 72 + (i - 1) * 12
@@ -153,44 +152,73 @@ local function drawAbilityPage(self)
 end
 
 function SummaryUi.register(mod)
-  local Builtin = require("src.ui.SummaryMenu")
-  mod.content.screens:register("SummaryMenu", {
-    new = function(game, mon)
-      local self = Builtin.new(game, mon)
-      self._expMaxPage = 3
-
-      -- Same A/B page flow, callable from Gen1 Modern UI semantic actions.
-      function self:advance()
-        if self.page < self._expMaxPage then
-          self.page = self.page + 1
-        else
-          self.game.stack:pop()
-        end
-      end
-
-      function self:update(_dt)
-        local input = self.game.input
-        if input:wasPressed("a") or input:wasPressed("b") then
-          self:advance()
-        end
-      end
-
-      local baseDraw = Builtin.draw
-      function self:draw()
-        if self.page <= 2 then
+  local Host = require("mods.Kanto-Reforged.host")
+  if Host.isGen2() then
+    local ok, Builtin = pcall(require, "src.ui.gen2.SummaryMenu")
+    if not ok or not Builtin or not Builtin.new then
+      mod.log:warn("Gen2 SummaryMenu unavailable; ability overlay skipped")
+      return
+    end
+    mod.content.screens:register("Gen2SummaryMenu", {
+      new = function(game, opts)
+        local self = Builtin.new(game, opts)
+        local baseDraw = self.draw
+        function self:draw()
           baseDraw(self)
-          redrawNameWithGender(self)
-          if self.page == 1 and SplitSpecial.enabled(mod) then
-            redrawSplitSpecialStats(self)
+          -- Pink page: ability name under the status/type block.
+          if (self.page or 1) == 1 and self.mon then
+            local page = SummaryUi.abilityPage(self.mon, self.game and self.game.data)
+            love.graphics.setColor(0, 0, 0, 1)
+            Font.draw(Strings("ABILITY/") .. page.ability, 1 * 8, 7 * 8)
+            love.graphics.setColor(1, 1, 1, 1)
           end
-        else
-          drawAbilityPage(self)
         end
-      end
+        return self
+      end,
+    })
+    return
+  end
 
-      return self
-    end,
-  })
+  local Gen1Patch = require("mods.Kanto-Reforged.gen1_patch")
+  Gen1Patch.apply(require("src.ui.SummaryMenu"), function(Builtin)
+    mod.content.screens:register("SummaryMenu", {
+      new = function(game, mon)
+        local self = Builtin.new(game, mon)
+        self._expMaxPage = 3
+
+        -- Same A/B page flow, callable from Gen1 Modern UI semantic actions.
+        function self:advance()
+          if self.page < self._expMaxPage then
+            self.page = self.page + 1
+          else
+            self.game.stack:pop()
+          end
+        end
+
+        function self:update(_dt)
+          local input = self.game.input
+          if input:wasPressed("a") or input:wasPressed("b") then
+            self:advance()
+          end
+        end
+
+        local baseDraw = Builtin.draw
+        function self:draw()
+          if self.page <= 2 then
+            baseDraw(self)
+            redrawNameWithGender(self)
+            if self.page == 1 and SplitSpecial.enabled(mod) then
+              redrawSplitSpecialStats(self)
+            end
+          else
+            drawAbilityPage(self)
+          end
+        end
+
+        return self
+      end,
+    })
+  end)
 end
 
 return SummaryUi

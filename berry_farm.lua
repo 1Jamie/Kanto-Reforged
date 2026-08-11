@@ -70,6 +70,71 @@ BerryFarm.ALL_POKECENTERS = {
   "SAFFRON_POKECENTER", "CINNABAR_POKECENTER",
 }
 
+-- Gold Johto 1Fs: east-corner stairs mirroring the shared 2F stairs at (0,7).
+-- Warp tiles only fire on warp-collision cells — block 18's LEFT cell — so
+-- the farm door is (8,7), not (9,7). South row keeps outdoor mats (17/39).
+BerryFarm.ALL_POKECENTERS_GEN2_JOHTO = {
+  "CHERRYGROVE_POKECENTER_1F", "VIOLET_POKECENTER_1F", "AZALEA_POKECENTER_1F",
+  "GOLDENROD_POKECENTER_1F", "ECRUTEAK_POKECENTER_1F", "OLIVINE_POKECENTER_1F",
+  "CIANWOOD_POKECENTER_1F", "MAHOGANY_POKECENTER_1F", "BLACKTHORN_POKECENTER_1F",
+  "ROUTE_32_POKECENTER_1F", "SILVER_CAVE_POKECENTER_1F",
+}
+BerryFarm.PC_DOOR_GEN2_STAIRS = { x = 8, y = 7 }
+BerryFarm.PC_BLOCKS_GEN2_JOHTO = {
+  1, 2, 3, 19, 8,
+  5, 6, 7, 4, 12,
+  4, 4, 4, 46, 47,
+  18, 17, 39, 4, 18,
+}
+
+-- Gold Kanto 1Fs share the Gen2 5×4 pokecenter shell (not Gen1's 7×4), but
+-- get a second exit-mat pair on the south row — same "step on the red pad"
+-- feel as Gen1 farm mats / the outdoor door. Mat pair 17/39 warps on the
+-- RIGHT of 17 and LEFT of 39 → cells (7,7)/(8,7).
+BerryFarm.ALL_POKECENTERS_GEN2_KANTO = {
+  "VIRIDIAN_POKECENTER_1F", "PEWTER_POKECENTER_1F", "CERULEAN_POKECENTER_1F",
+  "ROUTE_10_POKECENTER_1F",
+  "VERMILION_POKECENTER_1F", "LAVENDER_POKECENTER_1F", "CELADON_POKECENTER_1F",
+  "FUCHSIA_POKECENTER_1F", "SAFFRON_POKECENTER_1F", "CINNABAR_POKECENTER_1F",
+}
+BerryFarm.PC_DOOR_GEN2_PAD = { x = 7, y = 7 }
+BerryFarm.PC_DOOR_GEN2_PAD_B = { x = 8, y = 7 }
+-- Vanilla Gold 5×4 PC blocks with south row ending in a second 17/39 mat pair.
+BerryFarm.PC_BLOCKS_GEN2_KANTO = {
+  1, 2, 3, 19, 8,
+  5, 6, 7, 4, 12,
+  4, 4, 4, 46, 47,
+  18, 17, 39, 17, 39,
+}
+
+-- Odd-shaped centres (Indigo): stairs-only, no mat rewrite.
+BerryFarm.ALL_POKECENTERS_GEN2_STAIRS_ONLY = {
+  "INDIGO_PLATEAU_POKECENTER_1F",
+}
+BerryFarm.PC_DOOR_GEN2_INDIGO = { x = 17, y = 13 }
+
+function BerryFarm.isGen2KantoCenter(mapId)
+  for _, id in ipairs(BerryFarm.ALL_POKECENTERS_GEN2_KANTO) do
+    if id == mapId then return true end
+  end
+  return false
+end
+
+function BerryFarm.gen2DoorFor(mapId)
+  if mapId == "INDIGO_PLATEAU_POKECENTER_1F" then
+    return BerryFarm.PC_DOOR_GEN2_INDIGO, nil
+  end
+  if BerryFarm.isGen2KantoCenter(mapId) then
+    return BerryFarm.PC_DOOR_GEN2_PAD, BerryFarm.PC_DOOR_GEN2_PAD_B
+  end
+  return BerryFarm.PC_DOOR_GEN2_STAIRS, nil
+end
+
+function BerryFarm.returnCellFor(mapId)
+  local a = select(1, BerryFarm.gen2DoorFor(mapId))
+  return a or BerryFarm.PC_DOOR_GEN2_STAIRS
+end
+
 -- Farm geometry (blocks): 19×12 → 38×24 cells
 -- Cobble yard, plain tree-walled border (same as every other OVERWORLD map),
 -- plus a lake on the east side you can surf across — no encounters, no
@@ -79,6 +144,14 @@ BerryFarm.EXIT = { x = 8, y = 5 }    -- house door warp tile
 -- Return onto the farm mat (same pad you left from); warp stays inert until
 -- you step off, same as any other door arrival.
 BerryFarm.RETURN_CELL = { x = 9, y = 7 }
+
+function BerryFarm.returnCell()
+  local Host = require("mods.Kanto-Reforged.host")
+  if Host.isGen2() then
+    return BerryFarm.PC_DOOR_GEN2_STAIRS
+  end
+  return BerryFarm.RETURN_CELL
+end
 
 -- OVERWORLD block ids (plain tree-wall border, same as the original layout)
 local WALL = 15          -- solid tree wall border
@@ -473,6 +546,8 @@ local function makePlotTalk(mod, plotIndex)
 end
 
 function BerryFarm.register(mod)
+  local Host = require("mods.Kanto-Reforged.host")
+  local HouseNpcs = require("mods.Kanto-Reforged.house_npcs")
   registerPlotSprites(mod)
   -- Width 19: farm yard cols 0–8, grass buffer col 9, shore col 10,
   -- lake cols 11–17, tree wall closes the east edge at col 18.
@@ -544,11 +619,24 @@ function BerryFarm.register(mod)
     talk[plotTextId(i)] = makePlotTalk(mod, i)
   end
 
+  local Host = require("mods.Kanto-Reforged.host")
+  local tileset = "OVERWORLD"
+  local destCenter = "VIRIDIAN_POKECENTER"
+  if Host.isGen2() then
+    local Gen2Compat = require("mods.Kanto-Reforged.gen2_compat")
+    tileset = Gen2Compat.ensureTileset(mod, "TILESET_JOHTO")
+    -- Default return is a Kanto centre (not Cherrygrove).
+    destCenter = "VIRIDIAN_POKECENTER_1F"
+    if not (mod.content.maps:get(destCenter)) then
+      destCenter = BerryFarm.MAP_ID
+    end
+  end
+
   mod.content.maps:register(BerryFarm.MAP_ID, {
     id = BerryFarm.MAP_ID,
     label = "BerryFarm",
     index = 1100,
-    tileset = "OVERWORLD",
+    tileset = tileset,
     width = width,
     height = height,
     blocks = blocks,
@@ -557,13 +645,13 @@ function BerryFarm.register(mod)
       {
         x = BerryFarm.LANDING.x,
         y = BerryFarm.LANDING.y,
-        destMap = "VIRIDIAN_POKECENTER",
+        destMap = destCenter,
         destWarp = 1,
       },
       {
         x = BerryFarm.EXIT.x,
         y = BerryFarm.EXIT.y,
-        destMap = "VIRIDIAN_POKECENTER",
+        destMap = destCenter,
         destWarp = 1,
       },
     },
@@ -571,7 +659,7 @@ function BerryFarm.register(mod)
       {
         index = 1,
         name = "BERRY_FARM_GIRL",
-        sprite = "SPRITE_BRUNETTE_GIRL",
+        sprite = HouseNpcs.spriteFor("SPRITE_BRUNETTE_GIRL"),
         movement = "STAY",
         range = "DOWN",
         text = "TEXT_BERRY_FARM_GIRL",
@@ -603,66 +691,145 @@ function BerryFarm.register(mod)
     signs = {},
   })
 
-  mod.content.map_scripts:register(BerryFarm.MAP_ID, {
-    talk = talk,
-    onEnter = function(game, ow)
-      syncPlotMarkers(mod)
-    end,
-    -- Any facing into any cell of a flower bed opens that plot.
-    onInteract = function(game, ow, fx, fy)
-      local idx = plotIndexAt(fx, fy)
-      if not idx then return false end
-      makePlotTalk(mod, idx)(game, ow, nil, function() end)
-      return true
-    end,
-  })
+  local Host = require("mods.Kanto-Reforged.host")
+  if Host.isGen1() then
+    mod.content.map_scripts:register(BerryFarm.MAP_ID, {
+      talk = talk,
+      onEnter = function(game, ow)
+        syncPlotMarkers(mod)
+      end,
+      onInteract = function(game, ow, fx, fy)
+        local idx = plotIndexAt(fx, fy)
+        if not idx then return false end
+        makePlotTalk(mod, idx)(game, ow, nil, function() end)
+        return true
+      end,
+    })
 
-  -- Farm mat on every Pokémon Center (warps #3/#4 + red carpet blocks)
-  for _, mapId in ipairs(BerryFarm.ALL_POKECENTERS) do
-    mod.content.maps:patch(mapId, {
-      blocks = BerryFarm.PC_BLOCKS,
-      warps = {
-        __append = {
-          {
-            x = BerryFarm.PC_DOOR.x,
-            y = BerryFarm.PC_DOOR.y,
-            destMap = BerryFarm.MAP_ID,
-            destWarp = 1,
-          },
-          {
-            x = BerryFarm.PC_DOOR_B.x,
-            y = BerryFarm.PC_DOOR_B.y,
-            destMap = BerryFarm.MAP_ID,
-            destWarp = 1,
+    for _, mapId in ipairs(BerryFarm.ALL_POKECENTERS) do
+      mod.content.maps:patch(mapId, {
+        blocks = BerryFarm.PC_BLOCKS,
+        warps = {
+          __append = {
+            {
+              x = BerryFarm.PC_DOOR.x,
+              y = BerryFarm.PC_DOOR.y,
+              destMap = BerryFarm.MAP_ID,
+              destWarp = 1,
+            },
+            {
+              x = BerryFarm.PC_DOOR_B.x,
+              y = BerryFarm.PC_DOOR_B.y,
+              destMap = BerryFarm.MAP_ID,
+              destWarp = 1,
+            },
           },
         },
-      },
-    })
+      })
+    end
+  else
+    HouseNpcs.bindTalk(mod, BerryFarm.MAP_ID, talk)
+
+    local function appendFarmWarps(mapId, a, b)
+      local rows = {
+        {
+          x = a.x, y = a.y,
+          destMap = BerryFarm.MAP_ID,
+          destWarp = 1,
+        },
+      }
+      if b then
+        rows[#rows + 1] = {
+          x = b.x, y = b.y,
+          destMap = BerryFarm.MAP_ID,
+          destWarp = 1,
+        }
+      end
+      mod.content.maps:patch(mapId, {
+        warps = { __append = rows },
+      })
+    end
+
+    -- Johto: east stairs block (same metatile as 2F stairs) + warp on its
+    -- warp-collision cell (8,7). Plain warp on floor tiles never fires.
+    for _, mapId in ipairs(BerryFarm.ALL_POKECENTERS_GEN2_JOHTO) do
+      pcall(function()
+        mod.content.maps:patch(mapId, {
+          blocks = BerryFarm.PC_BLOCKS_GEN2_JOHTO,
+          warps = {
+            __append = {
+              {
+                x = BerryFarm.PC_DOOR_GEN2_STAIRS.x,
+                y = BerryFarm.PC_DOOR_GEN2_STAIRS.y,
+                destMap = BerryFarm.MAP_ID,
+                destWarp = 1,
+              },
+            },
+          },
+        })
+      end)
+    end
+    for _, mapId in ipairs(BerryFarm.ALL_POKECENTERS_GEN2_STAIRS_ONLY) do
+      pcall(function()
+        local door = BerryFarm.gen2DoorFor(mapId)
+        appendFarmWarps(mapId, door, nil)
+      end)
+    end
+    -- Kanto: exit-mat pair + south-row block rewrite (pad look).
+    for _, mapId in ipairs(BerryFarm.ALL_POKECENTERS_GEN2_KANTO) do
+      pcall(function()
+        mod.content.maps:patch(mapId, {
+          blocks = BerryFarm.PC_BLOCKS_GEN2_KANTO,
+          warps = {
+            __append = {
+              {
+                x = BerryFarm.PC_DOOR_GEN2_PAD.x,
+                y = BerryFarm.PC_DOOR_GEN2_PAD.y,
+                destMap = BerryFarm.MAP_ID,
+                destWarp = 1,
+              },
+              {
+                x = BerryFarm.PC_DOOR_GEN2_PAD_B.x,
+                y = BerryFarm.PC_DOOR_GEN2_PAD_B.y,
+                destMap = BerryFarm.MAP_ID,
+                destWarp = 1,
+              },
+            },
+          },
+        })
+      end)
+    end
   end
 end
 
 function BerryFarm.install(mod)
+  local Host = require("mods.Kanto-Reforged.host")
+  local Gen1Patch = require("mods.Kanto-Reforged.gen1_patch")
   BerryFarm._mod = mod
   ensureState(mod)
 
-  -- The farm reuses OVERWORLD tiles, so the engine treats it as "outside" and
-  -- would stamp BERRY_FARM into lastOutdoor on exit — then the PC's LAST_MAP
-  -- door returns you to the farm. Never remember the farm as the outdoor side.
-  local OverworldState = require("src.world.OverworldController")
-  if not OverworldState._berryFarmRememberOutdoor then
-    local origRemember = OverworldState.rememberOutdoor
-    OverworldState.rememberOutdoor = function(self, id, x, y)
-      if id == BerryFarm.MAP_ID then
-        return
-      end
-      return origRemember(self, id, x, y)
-    end
-    OverworldState._berryFarmRememberOutdoor = true
+  local function grantStarterBerry(game)
+    if not game or not game.save then return end
+    BerryFarm.ensureUnlocked(mod)
+    if mod.save:get("starterGranted", false) then return end
+    local Bag = require("src.inventory.Bag")
+    Bag.add(game.save, "BERRY", 3)
+    mod.save:set("starterGranted", true)
   end
 
-  -- Lake is surfable (no wild encounters or fishing spots are registered
-  -- for BERRY_FARM, so surfing it is just scenery) and is fully enclosed
-  -- by the tree wall border, same as any other OVERWORLD map.
+  if Host.isGen1() then
+    -- Never remember the farm as the outdoor side (PC LAST_MAP poison).
+    Gen1Patch.apply(require("src.world.OverworldController"), function(OverworldState)
+      if OverworldState._berryFarmRememberOutdoor then return end
+      local origRemember = OverworldState.rememberOutdoor
+      if type(origRemember) ~= "function" then return end
+      OverworldState.rememberOutdoor = function(self, id, x, y)
+        if id == BerryFarm.MAP_ID then return end
+        return origRemember(self, id, x, y)
+      end
+      OverworldState._berryFarmRememberOutdoor = true
+    end)
+  end
 
   local function currentOutdoor()
     local Game = package.loaded["src.core.Game"]
@@ -673,25 +840,15 @@ function BerryFarm.install(mod)
     return nil
   end
 
-  local function grantStarterBerry(game)
-    if not game or not game.save then return end
-    BerryFarm.ensureUnlocked(mod)
-    if mod.save:get("starterGranted", false) then return end
-    local Bag = require("src.inventory.Bag")
-    -- Enough that eating one by mistake still leaves berries to plant.
-    Bag.add(game.save, "BERRY", 3)
-    mod.save:set("starterGranted", true)
-  end
-
-  -- Remember which center we came from, snapshot outdoor, grant starter berries.
   mod.events:on("player.warped", function(ev)
     if not ev or ev.toMap ~= BerryFarm.MAP_ID then return end
     local from = ev.fromMap
     if type(from) == "string" and from:find("POKECENTER", 1, true) then
+      local cell = BerryFarm.returnCellFor(from)
       mod.save:set("returnCenter", {
         map = from,
-        x = BerryFarm.RETURN_CELL.x,
-        y = BerryFarm.RETURN_CELL.y,
+        x = cell.x,
+        y = cell.y,
       })
     end
     local outdoor = currentOutdoor()
@@ -700,21 +857,24 @@ function BerryFarm.install(mod)
     end
     local Game = package.loaded["src.core.Game"]
     grantStarterBerry(Game)
+    if Host.isGen2() then
+      syncPlotMarkers(mod)
+    end
   end)
 
-  -- Farm exit → saved center. Also repair PC LAST_MAP if it resolved to the farm.
   mod.hooks:wrap("warp.destination", function(next, mapId, x, y, ctx)
     local warp = ctx and ctx.warp
 
-    if warp and warp.x == BerryFarm.EXIT.x and warp.y == BerryFarm.EXIT.y then
+    if warp and warp.x == BerryFarm.EXIT.x and warp.y == BerryFarm.EXIT.y
+        and type(warp.destMap) == "string"
+        and warp.destMap:find("POKECENTER", 1, true) then
       local ret = mod.save:get("returnCenter", nil)
       if ret and ret.map then
-        -- Always land on the farm mat (ignore older saves that stored nurse coords)
-        return ret.map, BerryFarm.RETURN_CELL.x, BerryFarm.RETURN_CELL.y
+        local cell = BerryFarm.returnCellFor(ret.map)
+        return ret.map, ret.x or cell.x, ret.y or cell.y
       end
     end
 
-    -- PC outdoor exit with lastOutdoor poisoned to BERRY_FARM
     if mapId == BerryFarm.MAP_ID and warp and warp.destMap == "LAST_MAP" then
       local saved = mod.save:get("savedOutdoor", nil) or currentOutdoor()
       if saved and saved.id and saved.id ~= BerryFarm.MAP_ID then
@@ -730,18 +890,39 @@ function BerryFarm.install(mod)
     return next(mapId, x, y, ctx)
   end)
 
-  -- Step counter: completed tile steps only (Player.update returns true on land)
-  local Player = require("src.world.Player")
-  if not Player._berryFarmStepHook then
-    local origUpdate = Player.update
-    Player.update = function(self, ...)
-      local landed = origUpdate(self, ...)
-      if landed then
-        BerryFarm.bumpStep(BerryFarm._mod)
+  if Host.isGen1() then
+    Gen1Patch.apply(require("src.world.Player"), function(Player)
+      if Player._berryFarmStepHook then return end
+      local origUpdate = Player.update
+      if type(origUpdate) ~= "function" then return end
+      Player.update = function(self, ...)
+        local landed = origUpdate(self, ...)
+        if landed then
+          BerryFarm.bumpStep(BerryFarm._mod)
+        end
+        return landed
       end
-      return landed
-    end
-    Player._berryFarmStepHook = true
+      Player._berryFarmStepHook = true
+    end)
+  else
+    -- Gold: step growth + plot interact via world events (no map_scripts).
+    mod.events:on("world.stepped", function(ev)
+      BerryFarm.bumpStep(mod)
+    end)
+    mod.events:on("map.entered", function(ev)
+      if ev and ev.mapId == BerryFarm.MAP_ID then
+        syncPlotMarkers(mod)
+      end
+    end)
+    mod.events:on("world.interacted", function(ev)
+      if not ev or ev.mapId ~= BerryFarm.MAP_ID then return end
+      local idx = plotIndexAt(ev.x, ev.y)
+      if not idx then return end
+      local Game = package.loaded["src.core.Game"]
+      if Game then
+        makePlotTalk(mod, idx)(Game, nil, nil, function() end)
+      end
+    end)
   end
 end
 

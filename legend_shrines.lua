@@ -41,8 +41,15 @@ local function staticTalk(species, level, flag, needItem, weather)
       HouseNpcs.pushText(game, Strings("A mysterious\npresence..."), done)
       return
     end
-    local BattleState = require("src.battle.BattleState")
-    local battle = BattleState.newWild(game, species, level)
+    local Gen1Patch = require("mods.Kanto-Reforged.gen1_patch")
+    local battle
+    Gen1Patch.apply(require("src.battle.BattleState"), function(bs)
+      battle = bs.newWild(game, species, level)
+    end)
+    if not battle then
+      if done then done() end
+      return
+    end
     if weather then
       battle.weather = weather
       battle.weatherTurns = 255
@@ -65,6 +72,11 @@ local function staticTalk(species, level, flag, needItem, weather)
 end
 
 function LegendShrines.register(mod)
+  local Host = require("mods.Kanto-Reforged.host")
+  if Host.isGen2() then
+    -- Gold Johto owns Ho-Oh/Lugia; Hoenn weather duo deferred (map_scripts).
+    return
+  end
   registerKeys(mod)
 
   -- Wing hunters

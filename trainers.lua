@@ -286,13 +286,16 @@ function Trainers.install(mod)
   if Trainers._installed then return end
   Trainers._installed = true
 
-  local BattleState = require("src.battle.BattleState")
-  local originalNewTrainer = BattleState.newTrainer
-  BattleState.newTrainer = function(game, oppClass, partyIndex)
-    local battle = originalNewTrainer(game, oppClass, partyIndex)
-    Trainers.applySlotExtras(game, battle, oppClass, partyIndex)
-    return battle
-  end
+  local Gen1Patch = require("mods.Kanto-Reforged.gen1_patch")
+  Gen1Patch.apply(require("src.battle.BattleState"), function(BattleState)
+    local originalNewTrainer = BattleState.newTrainer
+    if type(originalNewTrainer) ~= "function" then return end
+    BattleState.newTrainer = function(game, oppClass, partyIndex)
+      local battle = originalNewTrainer(game, oppClass, partyIndex)
+      Trainers.applySlotExtras(game, battle, oppClass, partyIndex)
+      return battle
+    end
+  end)
 end
 
 local function copySlot(slot)

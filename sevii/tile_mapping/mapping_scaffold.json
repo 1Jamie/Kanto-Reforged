@@ -1,0 +1,228 @@
+{
+  "version": 1,
+  "gen1_tileset": "OVERWORLD",
+  "gen1_block_px": 32,
+  "gen1_note": "Each block is 4\u00d74 of 8\u00d78 tiles (32\u00d732). Buildings are multi-block stamps.",
+  "frlg_note": "FRLG metatiles are 16\u00d716 (2\u00d72 of 8\u00d78) with two layers. One Island uses general + sevii_islands_123.",
+  "building_stamps": {
+    "PC": {
+      "size": [
+        2,
+        2
+      ],
+      "blocks": [
+        32,
+        33,
+        124,
+        114
+      ]
+    },
+    "MART": {
+      "size": [
+        2,
+        2
+      ],
+      "blocks": [
+        32,
+        33,
+        124,
+        115
+      ]
+    },
+    "HOUSE": {
+      "size": [
+        3,
+        2
+      ],
+      "blocks": [
+        12,
+        13,
+        14,
+        16,
+        58,
+        0
+      ]
+    }
+  },
+  "roles": [
+    {
+      "role": "OCEAN",
+      "frlg": "MB_OCEAN_WATER 0x15 (e.g. mid 0x12b)",
+      "gen1_candidates": [
+        67,
+        107,
+        24
+      ],
+      "notes": "Cinnabar water; pair 100|24 for west cliff",
+      "pick": 67,
+      "pick_reason": "Cinnabar ocean \u2014 CV ignores behavior and falsely picks flat 5"
+    },
+    {
+      "role": "CLIFF_MASS",
+      "frlg": "brown cliff mids 0x071/0x07c\u2026",
+      "gen1_candidates": [
+        44,
+        40
+      ],
+      "notes": "Pewter/Route 4 mountain fill",
+      "pick": 44,
+      "pick_reason": "Pewter mountain mass"
+    },
+    {
+      "role": "CLIFF_FACE",
+      "frlg": "cliff abutting walkable deck",
+      "gen1_candidates": [
+        41
+      ],
+      "notes": "Vertical face beside plaza",
+      "pick": 41,
+      "pick_reason": "Route 4 / Pewter face"
+    },
+    {
+      "role": "RIDGE",
+      "frlg": "top of cliff / platform rim",
+      "gen1_candidates": [
+        63,
+        59,
+        62
+      ],
+      "notes": "South-facing platform lip",
+      "pick": 63,
+      "pick_reason": "Pewter ridge top"
+    },
+    {
+      "role": "STAIR",
+      "frlg": "MB_ROCK_STAIRS 0x2A",
+      "gen1_candidates": [
+        47
+      ],
+      "notes": "Outdoor stairs (Pewter/Route 4)",
+      "pick": 47,
+      "pick_reason": "MB_ROCK_STAIRS \u2192 Gen1 outdoor stair"
+    },
+    {
+      "role": "LEDGE",
+      "frlg": "jump / tier drop rim",
+      "gen1_candidates": [
+        26
+      ],
+      "notes": "One-way down; use with STAIR breaks",
+      "pick": 26,
+      "pick_reason": "Pewter ledge jump"
+    },
+    {
+      "role": "DECK",
+      "frlg": "walkable plateau (PC tier)",
+      "gen1_candidates": [
+        123,
+        87,
+        1
+      ],
+      "notes": "123=Cinnabar rock; 87=inland top; 1=grass plaza",
+      "pick": 123,
+      "pick_reason": "Cinnabar rock deck for PC terrace"
+    },
+    {
+      "role": "SAND",
+      "frlg": "MB_SAND 0x21",
+      "gen1_candidates": [
+        10
+      ],
+      "notes": "Dirt/sand stand-in",
+      "pick": 10,
+      "pick_reason": "dirt/sand"
+    },
+    {
+      "role": "TREE_BORDER",
+      "frlg": "conifer rows on west/north",
+      "gen1_candidates": [
+        15
+      ],
+      "notes": "Sparse border only \u2014 not a forest wall",
+      "pick": 15,
+      "pick_reason": "sparse pine"
+    },
+    {
+      "role": "PIER",
+      "frlg": "wooden dock tongue",
+      "gen1_candidates": [
+        7,
+        85,
+        10
+      ],
+      "notes": "Path stand-in; wood pier = standins/ when custom tileset exists",
+      "pick": 85,
+      "pick_reason": "cobble 85 fully walkable (path 7 is not)",
+      "standin_gap": "see gap_report for pier/building secondary mids"
+    },
+    {
+      "role": "HOUSE",
+      "frlg": "One Island purple-roof house (~multi metatile)",
+      "gen1_candidates": [
+        12,
+        13,
+        14,
+        16,
+        58,
+        0
+      ],
+      "gen1_stamp": "3x2 HOUSE (12,13,14 / 16,58,0)",
+      "notes": "FRLG house is larger; Gen1 stamp is fixed 3\u00d72 blocks",
+      "pick": "HOUSE",
+      "pick_reason": "fixed Gen1 3\u00d72 stamp \u2014 no OVERWORLD wood/purple roof"
+    },
+    {
+      "role": "POKECENTER",
+      "frlg": "Network Center (large orange roof)",
+      "gen1_candidates": [
+        32,
+        33,
+        124,
+        114
+      ],
+      "gen1_stamp": "2x2 PC (32,33 / 124,114)",
+      "notes": "Gen1 PC is smaller than FRLG Network Center",
+      "pick": "PC",
+      "pick_reason": "Gen1 PC stamp as Network Center stand-in"
+    },
+    {
+      "role": "MART",
+      "frlg": "none on FRLG One Island (Gen1 QoL)",
+      "gen1_candidates": [
+        32,
+        33,
+        124,
+        115
+      ],
+      "gen1_stamp": "2x2 MART (32,33 / 124,115)",
+      "notes": "Optional adjacent to PC",
+      "pick": "MART",
+      "pick_reason": "Gen1 QoL mart stamp"
+    }
+  ],
+  "frlg_oneisland_behavior_histogram": {
+    "0": 113,
+    "21": 21,
+    "23": 1,
+    "33": 2,
+    "42": 2,
+    "101": 1,
+    "105": 2,
+    "132": 1
+  },
+  "howto": [
+    "1. Open gen1_overworld_atlas.png and gen1_buildings.png",
+    "2. Open frlg_oneisland_metatiles.png (what One Island actually uses)",
+    "3. Run with --cv: FRLG art is GB-2bpp filtered, then matched to Gen1",
+    "4. Prefer gen1_top when needs_standin=false; else eye-check standins/",
+    "5. For each role in mapping_scaffold.json, set pick to Gen1 block ID or stand-in path",
+    "6. Feed picks into sevii_layout_gen.py ROLE_VOCAB (invent only for remaining gaps)"
+  ],
+  "gb_rules": {
+    "tile_px": 8,
+    "colors": 4,
+    "block_px": 32,
+    "metatile_px": 16,
+    "source": "pret/pokefirered + pret/pokered (public), then filtered"
+  }
+}

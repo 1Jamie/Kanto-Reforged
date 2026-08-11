@@ -169,19 +169,23 @@ function HeldItems.def(itemId)
 end
 
 function HeldItems.get(mon)
-  return mon and mon.heldItem or nil
+  if not mon then return nil end
+  return mon.heldItem or mon.item
 end
 
 function HeldItems.set(mon, itemId)
   if not mon then return end
   mon.heldItem = itemId
+  mon.item = itemId
 end
 
 -- Remove the hold and remember it for Recycle (on the battler when given).
 function HeldItems.consume(mon, battler)
-  if not mon or not mon.heldItem then return nil end
-  local id = mon.heldItem
+  if not mon then return nil end
+  local id = mon.heldItem or mon.item
+  if not id then return nil end
   mon.heldItem = nil
+  mon.item = nil
   if battler then
     battler.expLastConsumedItem = id
   end
@@ -189,7 +193,11 @@ function HeldItems.consume(mon, battler)
 end
 
 function HeldItems.ofBattler(battler)
-  return battler and battler.mon and battler.mon.heldItem or nil
+  if not battler then return nil end
+  if (battler.expEmbargoTurns or 0) > 0 then return nil end
+  local mon = battler.mon or battler
+  if mon and (mon.expEmbargoTurns or 0) > 0 then return nil end
+  return HeldItems.get(mon)
 end
 
 function HeldItems.typeBoostIds()
@@ -204,20 +212,26 @@ function HeldItems.typeBoostIds()
 end
 
 function HeldItems.register(mod)
+  -- Gold already ships type boosters / leftovers / etc.; only fill gaps.
   for id, rec in pairs(HeldItems.CATALOG) do
-    mod.content.items:register(id, {
-      id = rec.id,
-      name = rec.name,
-      price = rec.price,
-      tossable = true,
-    })
+    if not mod.content.items:get(id) then
+      mod.content.items:register(id, {
+        id = rec.id,
+        name = rec.name,
+        price = rec.price,
+        tossable = true,
+      })
+    end
   end
 
-  mod.content.link_fields:register("held_item", {
-    rev = 1,
-    pack = function(mon) return mon.heldItem end,
-    unpack = function(mon, v) mon.heldItem = v end,
-  })
+  local Host = require("mods.Kanto-Reforged.host")
+  if Host.isGen1() then
+    mod.content.link_fields:register("held_item", {
+      rev = 1,
+      pack = function(mon) return mon.heldItem end,
+      unpack = function(mon, v) mon.heldItem = v end,
+    })
+  end
 end
 
 function HeldItems.registerMarts(mod)
@@ -282,62 +296,97 @@ local function monDisplayName(data, mon)
 end
 
 -- Move one holdable from the bag onto a party mon. Swaps the previous
--- hold back into the bag when present. Returns ok, err ("full"|"empty"|"bad").
+-- hold back into the bag when present. Returns ok, err, previousId.
+-- Removes the bag item first so a full bag can still swap when that
+-- remove frees a slot for the returned hold.
 function HeldItems.giveToMon(game, mon, itemId)
   local Bag = require("src.inventory.Bag")
   if not game or not mon or not itemId then return false, "bad" end
   if not HeldItems.isHoldable(itemId) then return false, "bad" end
   if (game.save.inventory[itemId] or 0) <= 0 then return false, "empty" end
-  if mon.heldItem then
-    if not Bag.add(game.save, mon.heldItem, 1) then
-      return false, "full"
+
+  local previous = HeldItems.get(mon)
+  if previous == itemId then
+    return true, nil, previous
+  end
+
+  Bag.remove(game.save, itemId, 1)
+  if previous then
+    if not Bag.add(game.save, previous, 1) then
+      Bag.add(game.save, itemId, 1) -- rollback
+      return false, "full", previous
     end
   end
-  Bag.remove(game.save, itemId, 1)
-  mon.heldItem = itemId
-  return true
+  HeldItems.set(mon, itemId)
+  return true, nil, previous
 end
 
-local function refreshBagRow(game, list, itemId)
-  if not list or not list.items then return end
-  for i = #list.items, 1, -1 do
-    local it = list.items[i]
-    if it.value == itemId then
-      local left = game.save.inventory[itemId]
-      if not left or left <= 0 then
-        table.remove(list.items, i)
-      else
-        it.right = "x" .. tostring(left)
-      end
-      break
-    end
+local function rebuildBagListItems(game, list)
+  if not list then return end
+  local Bag = require("src.inventory.Bag")
+  local items = {}
+  for _, id in ipairs(Bag.order(game.save)) do
+    local def = game.data.items[id]
+    items[#items + 1] = {
+      value = id,
+      label = def and def.name or id,
+      right = "x" .. tostring(game.save.inventory[id]),
+    }
   end
-  list.index = math.min(list.index or 1, math.max(1, #list.items))
+  list.items = items
+  list.index = math.min(list.index or 1, math.max(1, #items))
+  if list.scroll and list.rows and list.index - list.scroll > list.rows then
+    list.scroll = list.index - list.rows
+  end
+  if list.scroll and list.index - list.scroll < 1 then
+    list.scroll = math.max(0, list.index - 1)
+  end
+end
+
+local function giveMessage(data, mon, itemId, previous)
+  local name = monDisplayName(data, mon)
+  local def = HeldItems.def(itemId)
+  local given = def and def.name or itemId
+  if previous and previous ~= itemId then
+    local prevDef = HeldItems.def(previous)
+    local prevName = prevDef and prevDef.name or previous
+    return Strings("%s was given\nthe %s.\fThe %s was\nput in the BAG.",
+      name, given, prevName)
+  end
+  return Strings("%s was given\nthe %s.", name, given)
 end
 
 function HeldItems.pickMonAndGive(game, itemId, bagList)
   local TextBox = require("src.render.TextBox")
   local Breeding = require("mods.Kanto-Reforged.breeding")
-  require("src.ui.Screens").push(game, "PartyMenu", {
-    pickOnly = true,
-    onSwitch = function(mon)
-      if Breeding.isEgg(mon) then
-        game.stack:push(TextBox.new(game, Strings("An EGG can't hold\nan item!")))
-        return
-      end
-      local ok, err = HeldItems.giveToMon(game, mon, itemId)
-      if err == "full" then
-        game.stack:push(TextBox.new(game, Strings("The bag is full!")))
-        return
-      end
-      if not ok then return end
-      refreshBagRow(game, bagList, itemId)
-      local def = HeldItems.def(itemId)
-      game.stack:push(TextBox.new(game, Strings("%s was given\nthe %s.",
-        monDisplayName(game.data, mon),
-        def and def.name or itemId)))
-    end,
-  })
+  local Host = require("mods.Kanto-Reforged.host")
+  local Screens = require("src.ui.Screens")
+
+  local function onPick(mon)
+    if Breeding.isEgg(mon) then
+      game.stack:push(TextBox.new(game, Strings("An EGG can't hold\nan item!")))
+      return
+    end
+    local ok, err, previous = HeldItems.giveToMon(game, mon, itemId)
+    if err == "full" then
+      game.stack:push(TextBox.new(game, Strings("The bag is full!")))
+      return
+    end
+    if not ok then return end
+    rebuildBagListItems(game, bagList)
+    game.stack:push(TextBox.new(game, giveMessage(game.data, mon, itemId, previous)))
+  end
+
+  Screens.push(game, Host.isGen2() and "Gen2PartyMenu" or "PartyMenu", Host.isGen2() and {
+      prompt = "useItem",
+      onChoose = function(_index, mon)
+        game.stack:pop()
+        onPick(mon)
+      end,
+    } or {
+      pickOnly = true,
+      onSwitch = onPick,
+    })
 end
 
 -- Inject GIVE into the bag's USE/TOSS submenu for holdable items when the
@@ -444,8 +493,14 @@ function HeldItems.tryBagUse(data, save, itemId, target, battle)
     if target.hp <= 0 or target.hp >= target.stats.hp then
       return noEffect()
     end
-    require("src.world.PikachuFollower")
-      .modifyHappiness(save, "USEDITEM", target)
+    do
+      local Gen1Patch = require("mods.Kanto-Reforged.gen1_patch")
+      Gen1Patch.apply(require("src.world.PikachuFollower"), function(follower)
+        if type(follower.modifyHappiness) == "function" then
+          follower.modifyHappiness(save, "USEDITEM", target)
+        end
+      end)
+    end
     local before = target.hp
     target.hp = math.min(target.stats.hp, target.hp + heal)
     require("src.core.Sound").play(data, "Heal_HP")
@@ -481,8 +536,14 @@ function HeldItems.tryBagUse(data, save, itemId, target, battle)
     curedStatus = true
   end
 
-  require("src.world.PikachuFollower")
-    .modifyHappiness(save, "USEDITEM", target)
+    do
+      local Gen1Patch = require("mods.Kanto-Reforged.gen1_patch")
+      Gen1Patch.apply(require("src.world.PikachuFollower"), function(follower)
+        if type(follower.modifyHappiness) == "function" then
+          follower.modifyHappiness(save, "USEDITEM", target)
+        end
+      end)
+    end
   require("src.core.Sound").play(data, "Heal_Ailment")
   if curedConfusion and not curedStatus then
     return "consumed", {
@@ -643,16 +704,13 @@ function HeldItems.install(mod)
           onChoose = function(row, list)
             list:close()
             local id = row.value
-            local ok, err = HeldItems.giveToMon(g, m, id)
+            local ok, err, previous = HeldItems.giveToMon(g, m, id)
             if err == "full" then
               g.stack:push(TextBox.new(g, Strings("The bag is full!")))
               return
             end
             if not ok then return end
-            local def = HeldItems.def(id)
-            g.stack:push(TextBox.new(g, Strings("%s was given\nthe %s.",
-              monDisplayName(g.data, m),
-              def and def.name or id)))
+            g.stack:push(TextBox.new(g, giveMessage(g.data, m, id, previous)))
           end,
         }))
       end,
@@ -783,17 +841,21 @@ function HeldItems.install(mod)
   end
 
   -- Wild berry holds
-  local original_newWild = BattleState.newWild
-  BattleState.newWild = function(game, species, level, opts)
-    local battle = original_newWild(game, species, level, opts)
-    if battle and battle.enemy and battle.enemy.mon then
-      local rng = (battle.rng and function(...)
-        return battle.rng(...)
-      end) or love.math.random
-      HeldItems.maybeGiveWildHold(battle.enemy.mon, rng)
+  local Gen1Patch = require("mods.Kanto-Reforged.gen1_patch")
+  Gen1Patch.apply(BattleState, function(bs)
+    local original_newWild = bs.newWild
+    if type(original_newWild) ~= "function" then return end
+    bs.newWild = function(game, species, level, opts)
+      local battle = original_newWild(game, species, level, opts)
+      if battle and battle.enemy and battle.enemy.mon then
+        local rng = (battle.rng and function(...)
+          return battle.rng(...)
+        end) or love.math.random
+        HeldItems.maybeGiveWildHold(battle.enemy.mon, rng)
+      end
+      return battle
     end
-    return battle
-  end
+  end)
 
   -- Bag / pause-menu USE: berries act like later-gen medicine (party target).
   local ItemEffects = require("src.inventory.ItemEffects")

@@ -79,8 +79,12 @@ local function sealTalk(species, level, flag, needType, needCount)
         "The seal wants\n%s-type POKéMON.", needType), done)
       return
     end
-    local BattleState = require("src.battle.BattleState")
-    local battle = BattleState.newWild(game, species, level)
+    local Gen1Patch = require("mods.Kanto-Reforged.gen1_patch")
+    local battle
+    Gen1Patch.apply(require("src.battle.BattleState"), function(bs)
+      battle = bs.newWild(game, species, level)
+    end)
+    if not battle then if done then done() end return end
     battle.onFinish = function(result)
       if result == "win" or result == "caught" or result == "run" then
         game.save.flags = game.save.flags or {}
@@ -168,6 +172,8 @@ function LegendRegis.registerChamber(mod)
 end
 
 function LegendRegis.register(mod)
+  local Host = require("mods.Kanto-Reforged.host")
+  if Host.isGen2() then return end
   HouseNpcs.appendNpc(mod, "PEWTER_SPEECH_HOUSE", {
     index = 3, name = "PEWTERSPEECHHOUSE_REGI_SCHOLAR",
     sprite = "SPRITE_SCIENTIST", text = "TEXT_PEWTERSPEECHHOUSE_REGI_SCHOLAR",

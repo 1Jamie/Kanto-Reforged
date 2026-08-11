@@ -33,12 +33,16 @@ end
 
 -- Gen 3 formulas; spa/spd both read the Gen1 special DV.
 function MoveEffects.hiddenPower(battler)
-  local mon = battler.mon
+  local BattleCompat = require("mods.Kanto-Reforged.battle_compat")
+  local mon = BattleCompat.mon(battler) or battler
   local hp = dv(mon, "hp")
   local atk = dv(mon, "attack")
   local def = dv(mon, "defense")
   local spe = dv(mon, "speed")
   local spc = dv(mon, "special")
+  if spc == 0 and mon.dvs and mon.dvs.specialAttack then
+    spc = mon.dvs.specialAttack
+  end
   local a = (hp % 2) + 2 * (atk % 2) + 4 * (def % 2)
       + 8 * (spe % 2) + 16 * (spc % 2) + 32 * (spc % 2)
   local typeIndex = math.floor(a * 15 / 63)
@@ -49,7 +53,8 @@ function MoveEffects.hiddenPower(battler)
 end
 
 function MoveEffects.weatherBall(battle)
-  local weather = battle and battle.field and battle.field.weather
+  local BattleCompat = require("mods.Kanto-Reforged.battle_compat")
+  local weather = BattleCompat.getWeather(battle)
   if weather == "SUNNY" then return "FIRE", 100 end
   if weather == "RAINY" then return "WATER", 100 end
   if weather == "SANDSTORM" then return "ROCK", 100 end
@@ -59,8 +64,10 @@ end
 
 -- Gen 3 Flail / Reversal power from remaining HP fraction
 function MoveEffects.flailPower(battler)
-  local mon = battler.mon
-  local n = math.floor(mon.hp * 48 / mon.stats.hp)
+  local BattleCompat = require("mods.Kanto-Reforged.battle_compat")
+  local hp = BattleCompat.hp(battler)
+  local maxHp = BattleCompat.maxHp(battler)
+  local n = math.floor(hp * 48 / math.max(1, maxHp))
   if n < 1 then return 200 end
   if n < 5 then return 150 end
   if n < 10 then return 100 end
@@ -71,10 +78,11 @@ end
 
 -- Gen 1 has no friendship; approximate from DVs (max Return ≈ 102)
 function MoveEffects.returnPower(battler)
-  local mon = battler.mon
+  local BattleCompat = require("mods.Kanto-Reforged.battle_compat")
+  local mon = BattleCompat.mon(battler) or {}
   local dvs = mon.dvs or {}
   local sum = (dvs.hp or 0) + (dvs.attack or 0) + (dvs.defense or 0)
-      + (dvs.speed or 0) + (dvs.special or 0)
+      + (dvs.speed or 0) + (dvs.special or dvs.specialAttack or 0)
   return math.max(1, math.floor(sum * 102 / 75))
 end
 
@@ -219,6 +227,40 @@ function MoveEffects.applyHazards(battle, battler, side)
 end
 
 function MoveEffects.register(mod)
+  local Host = require("mods.Kanto-Reforged.host")
+  if Host.isGen2() then
+    -- Gold-safe weather setters (Drought/Drizzle moves + Hail overlay).
+    local BattleCompat = require("mods.Kanto-Reforged.battle_compat")
+    local function weatherRun(weather, text)
+      return function(battle, attacker)
+        local name = BattleCompat.displayName(battle, attacker)
+        BattleCompat.setWeather(battle, weather,
+          Strings(text, name), 5)
+        local Abilities = require("mods.Kanto-Reforged.abilities")
+        Abilities.updateForecast(battle, battle.player)
+        Abilities.updateForecast(battle, battle.enemy)
+      end
+    end
+    local weathers = {
+      EXP_WEATHER_SUNNY = { "SUNNY", "%s's move\nintensified the sun!" },
+      EXP_WEATHER_RAINY = { "RAINY", "%s's move\nmade it rain!" },
+      EXP_WEATHER_SANDSTORM = { "SANDSTORM", "A sandstorm\nkicked up!" },
+      EXP_WEATHER_HAIL = { "HAIL", "It started\nto hail!" },
+    }
+    for id, row in pairs(weathers) do
+      pcall(function()
+        local rec = { kind = "primary", run = weatherRun(row[1], row[2]) }
+        if mod.content.move_effects:get(id) then
+          mod.content.move_effects:override(id, rec)
+        else
+          mod.content.move_effects:register(id, rec)
+        end
+      end)
+    end
+    require("mods.Kanto-Reforged.move_effects_gen2").register(mod)
+    return
+  end
+
   -- Sleep: Gen 2+ wake-and-attack. Must be a content patch so the post-entry
   -- merge writes it into Data.statuses (install-time edits of Data are wiped).
   mod.content.statuses:patch("SLP", {
@@ -1063,6 +1105,10 @@ function MoveEffects.register(mod)
       local frac = ({ 4, 2, 1 })[n] or 1
       local heal = math.max(1, math.floor(ctx.user.mon.stats.hp / frac))
       ctx.user.expStockpile = nil
+      if (ctx.user.expHealBlockTurns or 0) > 0 then
+        return { Strings("%s can't restore HP\nbecause of HEAL BLOCK!",
+          displayName(ctx.user)) }
+      end
       if ctx.user.mon.hp >= ctx.user.mon.stats.hp then
         return { Strings("But, it failed!") }
       end
@@ -1240,6 +1286,32 @@ function MoveEffects.register(mod)
       end
       ctx.target.expTormented = true
       return { Strings("%s was\nsubjected to TORMENT!", displayName(ctx.target)) }
+    end,
+  })
+
+  -- ------- Embargo / Heal Block
+
+  mod.content.move_effects:register("EXP_EMBARGO_EFFECT", {
+    kind = "primary",
+    accuracyChecked = true,
+    run = function(ctx)
+      if (ctx.target.expEmbargoTurns or 0) > 0 then
+        return { Strings("But, it failed!") }
+      end
+      ctx.target.expEmbargoTurns = 5
+      return { Strings("%s can't use\nitems anymore!", displayName(ctx.target)) }
+    end,
+  })
+
+  mod.content.move_effects:register("EXP_HEAL_BLOCK_EFFECT", {
+    kind = "primary",
+    accuracyChecked = true,
+    run = function(ctx)
+      if (ctx.target.expHealBlockTurns or 0) > 0 then
+        return { Strings("But, it failed!") }
+      end
+      ctx.target.expHealBlockTurns = 5
+      return { Strings("%s was prevented\nfrom healing!", displayName(ctx.target)) }
     end,
   })
 
@@ -1587,14 +1659,17 @@ function MoveEffects.register(mod)
     end,
   })
 
-  -- ------- Tailwind (singles stand-in: +2 Speed)
+  -- ------- Tailwind (field Speed ×2 via Abilities.speedMult; no stage bump)
 
   mod.content.move_effects:register("EXP_TAILWIND_EFFECT", {
     kind = "primary",
     run = function(ctx)
       local side = ctx.side(ctx.user)
+      if (side.expTailwindTurns or 0) > 0 then
+        return { Strings("But, it failed!") }
+      end
       side.expTailwindTurns = 4
-      return applyStages(ctx, ctx.user, { { stat = "speed", change = 2 } }, false)
+      return { Strings("The Tailwind blew from\nbehind %s!", displayName(ctx.user)) }
     end,
   })
 
@@ -1791,6 +1866,12 @@ end
 -- Battle wiring: Encore, Taunt, Attract, Fake Out, hazards, Safeguard,
 -- Sturdy, Destiny Bond, Perish Song, residuals.
 function MoveEffects.install(mod)
+  local Host = require("mods.Kanto-Reforged.host")
+  if Host.isGen2() then
+    require("mods.Kanto-Reforged.move_effects_gen2").install(mod)
+    return
+  end
+
   local BattleState = require("src.battle.BattleState")
   local StatusRegistry = require("src.battle.StatusRegistry")
   local Strings = require("src.core.Strings")
@@ -2453,14 +2534,24 @@ function MoveEffects.install(mod)
         end
       end
       if b.mon.hp > 0 and (b.expIngrain or b.expAquaRing) then
-        local heal = math.max(1, math.floor(b.mon.stats.hp / 16))
-        if b.mon.hp < b.mon.stats.hp then
-          b.mon.hp = math.min(b.mon.stats.hp, b.mon.hp + heal)
-          if battle.sayNext then
-            battle:sayNext(Strings("%s restored a little\nHP!",
-              b.isPlayer and b.name or ("Enemy " .. b.name)))
+        if (b.expHealBlockTurns or 0) <= 0 then
+          local heal = math.max(1, math.floor(b.mon.stats.hp / 16))
+          if b.mon.hp < b.mon.stats.hp then
+            b.mon.hp = math.min(b.mon.stats.hp, b.mon.hp + heal)
+            if battle.sayNext then
+              battle:sayNext(Strings("%s restored a little\nHP!",
+                b.isPlayer and b.name or ("Enemy " .. b.name)))
+            end
           end
         end
+      end
+      if b.expEmbargoTurns and b.expEmbargoTurns > 0 then
+        b.expEmbargoTurns = b.expEmbargoTurns - 1
+        if b.expEmbargoTurns <= 0 then b.expEmbargoTurns = nil end
+      end
+      if b.expHealBlockTurns and b.expHealBlockTurns > 0 then
+        b.expHealBlockTurns = b.expHealBlockTurns - 1
+        if b.expHealBlockTurns <= 0 then b.expHealBlockTurns = nil end
       end
       if b.expPerishTurns and b.mon.hp > 0 then
         b.expPerishTurns = b.expPerishTurns - 1

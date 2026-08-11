@@ -90,6 +90,8 @@ local function roamerOnMap(mod, mapId)
 end
 
 function Roamers.register(mod)
+  local Host = require("mods.Kanto-Reforged.host")
+  if Host.isGen2() then return end
   HouseNpcs.appendNpc(mod, "CELADON_MANSION_2F", {
     index = 2,
     name = "CELADONMANSION2F_BEAST_TRACKER",
@@ -169,6 +171,8 @@ function Roamers.register(mod)
 end
 
 function Roamers.install(mod)
+  local Host = require("mods.Kanto-Reforged.host")
+  if Host.isGen2() then return end
   Roamers._mod = mod
   mod.events:on("game.ready", function(ev)
     if ev and ev.game and ev.game.data then

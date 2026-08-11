@@ -160,28 +160,34 @@ function Gender.install(mod)
   end
 
   -- Trainer battles replace DVs after Pokemon.new; re-derive gender.
-  local BattleState = require("src.battle.BattleState")
-  local original_newTrainer = BattleState.newTrainer
-  BattleState.newTrainer = function(game, oppClass, partyIndex)
-    local battle = original_newTrainer(game, oppClass, partyIndex)
-    local data = game and game.data
-    if battle and data then
-      for _, mon in ipairs(battle.enemyParty or {}) do
-        Gender.resync(data, mon)
+  local Gen1Patch = require("mods.Kanto-Reforged.gen1_patch")
+  Gen1Patch.apply(require("src.battle.BattleState"), function(BattleState)
+    local original_newTrainer = BattleState.newTrainer
+    if type(original_newTrainer) == "function" then
+      BattleState.newTrainer = function(game, oppClass, partyIndex)
+        local battle = original_newTrainer(game, oppClass, partyIndex)
+        local data = game and game.data
+        if battle and data then
+          for _, mon in ipairs(battle.enemyParty or {}) do
+            Gender.resync(data, mon)
+          end
+        end
+        return battle
       end
     end
-    return battle
-  end
 
-  local original_newWild = BattleState.newWild
-  BattleState.newWild = function(game, species, level, opts)
-    local battle = original_newWild(game, species, level, opts)
-    if battle and battle.enemy and battle.enemy.mon then
-      local rng = battle.rng or math.random
-      Gender.applyCuteCharmWild(game, battle.enemy.mon, rng)
+    local original_newWild = BattleState.newWild
+    if type(original_newWild) == "function" then
+      BattleState.newWild = function(game, species, level, opts)
+        local battle = original_newWild(game, species, level, opts)
+        if battle and battle.enemy and battle.enemy.mon then
+          local rng = battle.rng or math.random
+          Gender.applyCuteCharmWild(game, battle.enemy.mon, rng)
+        end
+        return battle
+      end
     end
-    return battle
-  end
+  end)
 
   local original_before = Status.beforeMove
   Status.beforeMove = function(battler, rng, battle)

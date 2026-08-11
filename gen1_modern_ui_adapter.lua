@@ -201,6 +201,10 @@ local function summaryAdvance(_, state)
 end
 
 return function(mod)
+  local Host = require("mods.Kanto-Reforged.host")
+  if Host.isGen2() then
+    return false, "Gen1 Modern UI adapter is Gen1-only"
+  end
   local ui = mod.find and mod.find("gen1_modern_ui") or nil
   if not (ui and ui.exports and ui.exports.registerAdapter) then
     return false, "Gen1 Modern UI is not installed"

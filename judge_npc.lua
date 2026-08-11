@@ -1,6 +1,8 @@
--- DV / Hidden Power / statExp judge on Underground Path Route 5.
+-- DV / Hidden Power / statExp judge.
+-- Gen1: Underground Path (Route 5 entrance). Gold: UNDERGROUND_PATH tunnel.
 
 local HouseNpcs = require("mods.Kanto-Reforged.house_npcs")
+local Host = require("mods.Kanto-Reforged.host")
 local MoveEffects = require("mods.Kanto-Reforged.move_effects")
 local Strings = require("src.core.Strings")
 
@@ -99,18 +101,21 @@ local function talkHandler(mod)
 end
 
 function JudgeNpc.register(mod)
-  HouseNpcs.appendNpc(mod, "UNDERGROUND_PATH_ROUTE_5", {
-    index = 2,
+  local mapId = Host.isGen2() and "UNDERGROUND_PATH" or "UNDERGROUND_PATH_ROUTE_5"
+  local index = Host.isGen2() and 1 or 2
+  local x = Host.isGen2() and 2 or 5
+  local y = Host.isGen2() and 10 or 3
+
+  HouseNpcs.appendNpc(mod, mapId, {
+    index = index,
     name = "UNDERGROUNDPATHROUTE5_JUDGE",
     sprite = "SPRITE_SCIENTIST",
     text = "TEXT_UNDERGROUNDPATHROUTE5_JUDGE",
-    x = 5, y = 3,
+    x = x, y = y,
   }, JudgeNpc.OWNER)
 
-  mod.content.map_scripts:register("UNDERGROUND_PATH_ROUTE_5", {
-    talk = {
-      TEXT_UNDERGROUNDPATHROUTE5_JUDGE = talkHandler(mod),
-    },
+  HouseNpcs.bindTalk(mod, mapId, {
+    TEXT_UNDERGROUNDPATHROUTE5_JUDGE = talkHandler(mod),
   })
 end
 

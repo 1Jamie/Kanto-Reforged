@@ -14,8 +14,9 @@ return function(T, Data, run)
     "QUADRUPED", "Cyndaquil → QUADRUPED")
   T.eq(SpeciesIcons.pickClass({ id = "STEELIX", types = { "STEEL", "GROUND" } }),
     "SNAKE", "Steelix → SNAKE")
-  T.eq(SpeciesIcons.pickClass({ id = "RALTS", types = { "PSYCHIC_TYPE", "FAIRY" } }),
-    "FAIRY", "Ralts → FAIRY")
+  -- Gen1 menu-icon class (not the Fairy typing); Ralts uses the fairy sheet
+  T.eq(SpeciesIcons.pickClass({ id = "RALTS", types = { "PSYCHIC_TYPE" } }),
+    "FAIRY", "Ralts → FAIRY icon class")
   T.eq(SpeciesIcons.pickClass({ id = "GENERIC_PSY", types = { "PSYCHIC_TYPE" } }),
     "MON", "generic Psychic → MON")
 

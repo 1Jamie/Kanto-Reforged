@@ -15,10 +15,13 @@ return {
     { 168, 56, 72 },
     { 0, 0, 0 },
   },
+  -- Front grayscale: white=face/belly/hands, light=body, dark=AA, black=ink.
+  -- Cream must live in the white slot (face is white pixels). Tan-in-dark
+  -- only paints the thin AA rim and looks wrong. Dark slot = deeper purple.
   AIPOM = {
-    { 255, 255, 255 },
-    { 239, 189, 99 },
-    { 99, 33, 115 },
+    { 255, 236, 200 },
+    { 104, 48, 136 },
+    { 56, 28, 80 },
     { 0, 0, 0 },
   },
   ALTARIA = {
@@ -742,9 +745,9 @@ return {
     { 0, 0, 0 },
   },
   MINUN = {
-    { 255, 255, 255 },
-    { 248, 232, 192 },
-    { 88, 120, 224 },
+    { 255, 255, 255 },  -- white body (Gen2 forces slot 1 to white)
+    { 48, 72, 168 },    -- darker blue shadows (light-gray pixels)
+    { 88, 120, 224 },   -- brighter blue accents (ears / cheeks / paws)
     { 0, 0, 0 },
   },
   MISDREAVUS = {

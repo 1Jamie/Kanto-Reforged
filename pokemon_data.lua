@@ -649,7 +649,7 @@ P.moves = {
   EMBARGO = {
     id = "EMBARGO", name = "EMBARGO", type = "DARK",
     power = 0, accuracy = 100, pp = 15,
-    category = "status", effect = "NO_ADDITIONAL_EFFECT"
+    category = "status", effect = "EXP_EMBARGO_EFFECT"
   },
   ENCORE = {
     id = "ENCORE", name = "ENCORE", type = "NORMAL",
@@ -993,7 +993,7 @@ P.moves = {
   HEAL_BLOCK = {
     id = "HEAL_BLOCK", name = "HEAL BLOCK", type = "PSYCHIC_TYPE",
     power = 0, accuracy = 100, pp = 15,
-    category = "status", effect = "NO_ADDITIONAL_EFFECT"
+    category = "status", effect = "EXP_HEAL_BLOCK_EFFECT"
   },
   HEAL_PULSE = {
     id = "HEAL_PULSE", name = "HEAL PULSE", type = "PSYCHIC_TYPE",
@@ -5090,9 +5090,7 @@ P.species = {
   },
   CLEFFA = {
     id = "CLEFFA", name = "CLEFFA", dex = 173,
-    types = {
-      "FAIRY",
-    },
+    types = { "NORMAL" },
     baseStats = {
       hp = 50, attack = 25,
       defense = 28, speed = 15,
@@ -5219,10 +5217,7 @@ P.species = {
   },
   IGGLYBUFF = {
     id = "IGGLYBUFF", name = "IGGLYBUFF", dex = 174,
-    types = {
-      "NORMAL",
-      "FAIRY",
-    },
+    types = { "NORMAL" },
     baseStats = {
       hp = 90, attack = 30,
       defense = 15, speed = 15,
@@ -5343,9 +5338,7 @@ P.species = {
   },
   TOGEPI = {
     id = "TOGEPI", name = "TOGEPI", dex = 175,
-    types = {
-      "FAIRY",
-    },
+    types = { "NORMAL" },
     baseStats = {
       hp = 35, attack = 20,
       defense = 65, speed = 20,
@@ -5465,10 +5458,7 @@ P.species = {
   },
   TOGETIC = {
     id = "TOGETIC", name = "TOGETIC", dex = 176,
-    types = {
-      "FAIRY",
-      "FLYING",
-    },
+    types = { "NORMAL", "FLYING" },
     baseStats = {
       hp = 55, attack = 40,
       defense = 85, speed = 40,
@@ -5704,6 +5694,11 @@ P.species = {
     spriteFront = "mods/Kanto-Reforged/assets/natu_front.png",
     spriteBack = "mods/Kanto-Reforged/assets/natu_back.png",
     frontSize = 6,
+    -- Gen1 absolute scales (fraction 0.65 of normal). Gold conversion is
+    -- handled by battle_sprite_scale.lua in toGen2Record — do not hand-tune
+    -- Gold numbers here.
+    battleScaleFront = 0.65,
+    battleScaleBack = 1.3,  -- 0.65 × Gen1 back default 2
     palette = "NATU",
     dexEntry = {
       kind = "TINY BIRD POKMON",
@@ -6293,10 +6288,7 @@ P.species = {
   },
   MARILL = {
     id = "MARILL", name = "MARILL", dex = 183,
-    types = {
-      "WATER",
-      "FAIRY",
-    },
+    types = { "WATER" },
     baseStats = {
       hp = 70, attack = 20,
       defense = 50, speed = 40,
@@ -6426,10 +6418,7 @@ P.species = {
   },
   AZUMARILL = {
     id = "AZUMARILL", name = "AZUMARILL", dex = 184,
-    types = {
-      "WATER",
-      "FAIRY",
-    },
+    types = { "WATER" },
     baseStats = {
       hp = 100, attack = 50,
       defense = 80, speed = 50,
@@ -9440,9 +9429,7 @@ P.species = {
   },
   SNUBBULL = {
     id = "SNUBBULL", name = "SNUBBULL", dex = 209,
-    types = {
-      "FAIRY",
-    },
+    types = { "NORMAL" },
     baseStats = {
       hp = 60, attack = 80,
       defense = 50, speed = 30,
@@ -9583,9 +9570,7 @@ P.species = {
   },
   GRANBULL = {
     id = "GRANBULL", name = "GRANBULL", dex = 210,
-    types = {
-      "FAIRY",
-    },
+    types = { "NORMAL" },
     baseStats = {
       hp = 90, attack = 120,
       defense = 75, speed = 45,
@@ -17826,10 +17811,7 @@ P.species = {
   },
   RALTS = {
     id = "RALTS", name = "RALTS", dex = 280,
-    types = {
-      "PSYCHIC_TYPE",
-      "FAIRY",
-    },
+    types = { "PSYCHIC_TYPE" },
     baseStats = {
       hp = 28, attack = 25,
       defense = 25, speed = 40,
@@ -17958,10 +17940,7 @@ P.species = {
   },
   KIRLIA = {
     id = "KIRLIA", name = "KIRLIA", dex = 281,
-    types = {
-      "PSYCHIC_TYPE",
-      "FAIRY",
-    },
+    types = { "PSYCHIC_TYPE" },
     baseStats = {
       hp = 38, attack = 35,
       defense = 35, speed = 50,
@@ -18095,10 +18074,7 @@ P.species = {
   },
   GARDEVOIR = {
     id = "GARDEVOIR", name = "GARDEVOIR", dex = 282,
-    types = {
-      "PSYCHIC_TYPE",
-      "FAIRY",
-    },
+    types = { "PSYCHIC_TYPE" },
     baseStats = {
       hp = 68, attack = 65,
       defense = 65, speed = 80,
@@ -19997,10 +19973,7 @@ P.species = {
   },
   AZURILL = {
     id = "AZURILL", name = "AZURILL", dex = 298,
-    types = {
-      "NORMAL",
-      "FAIRY",
-    },
+    types = { "NORMAL" },
     baseStats = {
       hp = 50, attack = 20,
       defense = 40, speed = 20,
@@ -20553,10 +20526,7 @@ P.species = {
   },
   MAWILE = {
     id = "MAWILE", name = "MAWILE", dex = 303,
-    types = {
-      "STEEL",
-      "FAIRY",
-    },
+    types = { "STEEL" },
     baseStats = {
       hp = 50, attack = 85,
       defense = 85, speed = 50,

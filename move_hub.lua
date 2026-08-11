@@ -63,9 +63,19 @@ local function learnsetMoves(game, mon)
       end
     end
   end
+  -- Gold: levelMoves is { { level, move }, ... } or similar.
+  if def and def.levelMoves then
+    for _, row in ipairs(def.levelMoves) do
+      if type(row) == "table" then
+        add(row.move or row[2] or row.id)
+      elseif type(row) == "string" then
+        add(row)
+      end
+    end
+  end
   -- egg moves from breeding data if present
-  local Breeding = require("mods.Kanto-Reforged.breeding")
-  if Breeding and Breeding.eggMovesFor then
+  local ok, Breeding = pcall(require, "mods.Kanto-Reforged.breeding")
+  if ok and Breeding and Breeding.eggMovesFor then
     for _, id in ipairs(Breeding.eggMovesFor(mon.species) or {}) do
       add(id)
     end
@@ -245,23 +255,29 @@ local function hubTalk(mod)
 end
 
 function MoveHub.register(mod)
-  HouseNpcs.appendNpc(mod, "SAFFRON_PIDGEY_HOUSE", {
-    index = 5,
+  local Host = require("mods.Kanto-Reforged.host")
+  local mapId = Host.isGen2() and "MR_PSYCHICS_HOUSE" or "SAFFRON_PIDGEY_HOUSE"
+  local index = Host.isGen2() and 2 or 5
+
+  HouseNpcs.appendNpc(mod, mapId, {
+    index = index,
     name = "SAFFRONPIDGEYHOUSE_MOVE_HUB",
     sprite = "SPRITE_HIKER",
     text = "TEXT_SAFFRONPIDGEYHOUSE_MOVE_HUB",
     x = 6, y = 5,
   }, MoveHub.OWNER)
 
-  -- Heart Scale hidden items
-  mod.content.field:patch("hiddenItems", {
-    ROUTE_12 = { { x = 20, y = 55, item = "HEART_SCALE" } },
-    ROUTE_19 = { { x = 8, y = 10, item = "HEART_SCALE" } },
-    SEAFOAM_ISLANDS_B1F = { { x = 10, y = 8, item = "HEART_SCALE" } },
-  })
+  -- Heart Scale hidden items (Gen1 field registry only).
+  if Host.isGen1() then
+    mod.content.field:patch("hiddenItems", {
+      ROUTE_12 = { { x = 20, y = 55, item = "HEART_SCALE" } },
+      ROUTE_19 = { { x = 8, y = 10, item = "HEART_SCALE" } },
+      SEAFOAM_ISLANDS_B1F = { { x = 10, y = 8, item = "HEART_SCALE" } },
+    })
+  end
 
-  mod.content.map_scripts:register("SAFFRON_PIDGEY_HOUSE", {
-    talk = { TEXT_SAFFRONPIDGEYHOUSE_MOVE_HUB = hubTalk(mod) },
+  HouseNpcs.bindTalk(mod, mapId, {
+    TEXT_SAFFRONPIDGEYHOUSE_MOVE_HUB = hubTalk(mod),
   })
 end
 

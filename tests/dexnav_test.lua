@@ -65,6 +65,22 @@ return function(T, Data, run)
   T.eq(owned.label, Data.pokemon.PIDGEY.name or "PIDGEY", "owned shows species name")
   T.check(owned.right:find("GRASS", 1, true) ~= nil, "owned includes method tag")
 
+  -- Gold pokedex uses `caught` instead of `owned`
+  local caught = DexNav.formatRow(entry, {
+    seen = { PIDGEY = true }, caught = { PIDGEY = true },
+  }, Data.pokemon)
+  T.eq(caught.label, Data.pokemon.PIDGEY.name or "PIDGEY",
+    "Gold caught counts as owned")
+  T.check(caught.right:find("GRASS", 1, true) ~= nil,
+    "Gold caught shows method levels")
+
+  -- Nil owned/caught tables must not crash (real Gold save shape)
+  local goldBare = DexNav.formatRow(entry, { seen = {} }, Data.pokemon)
+  T.eq(goldBare.label, "????", "Gold dex without owned/caught is unseen")
+  local goldFlags = DexNav.dexFlags({ seen = { A = true }, caught = { B = true } })
+  T.check(goldFlags.owned.B == true, "dexFlags maps caught -> owned")
+  T.check(goldFlags.seen.A == true, "dexFlags keeps seen")
+
   -- Fishing note: grass-only false; water or superRod true
   T.eq(DexNav.showFishingNote({
     grass = { slots = { { species = "PIDGEY", level = 3 } } },

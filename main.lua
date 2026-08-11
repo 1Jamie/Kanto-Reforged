@@ -9,7 +9,8 @@ local ExpTrainers = require("mods.Kanto-Reforged.trainers")
 local Strings = require("src.core.Strings")
 
 local function battlerHasType(battler, typeId)
-  for _, t in ipairs((battler and battler.curTypes) or {}) do
+  local BattleCompat = require("mods.Kanto-Reforged.battle_compat")
+  for _, t in ipairs(BattleCompat.types(battler)) do
     if t == typeId then return true end
   end
   return false
@@ -33,9 +34,14 @@ local function applySpawnTables(mod, pokemon_data)
 end
 
 return function(mod)
+  local Host = require("mods.Kanto-Reforged.host")
+  local PokemonGen2 = require("mods.Kanto-Reforged.pokemon_gen2")
+
   -- Accept trainer party heldItem/moves before any trainers:patch (ace berries).
   ExpTrainers.extendSchemas()
-  ExpTrainers.install(mod)
+  if Host.isGen1() then
+    ExpTrainers.install(mod)
+  end
 
   -- Manager / card options
   mod.options:define({
@@ -53,94 +59,102 @@ return function(mod)
     require("mods.Kanto-Reforged.dexnav").OPTION,
   })
 
-  -- Register Gen 2/3 move effects before content that references them
   ExpMoveEffects.register(mod)
   ExpMoveEffects.install(mod)
 
-  -- Held items (items + link_fields + Give/Take + residuals)
-  HeldItems.register(mod)
-  HeldItems.registerMarts(mod)
-  HeldItems.install(mod)
-
-  -- Gender (DV-deterministic + Attract/Cute Charm infatuation)
-  Gender.register(mod)
-  Gender.install(mod)
-
-  local Breeding = require("mods.Kanto-Reforged.breeding")
-  Breeding.register(mod)
-  Breeding.install(mod)
-
-  local Daycare = require("mods.Kanto-Reforged.daycare")
-  Daycare.register(mod)
-  Daycare.install(mod)
+  if Host.isGen1() then
+    HeldItems.register(mod)
+    HeldItems.registerMarts(mod)
+    HeldItems.install(mod)
+    Gender.register(mod)
+    Gender.install(mod)
+    local Breeding = require("mods.Kanto-Reforged.breeding")
+    Breeding.register(mod)
+    Breeding.install(mod)
+    local Daycare = require("mods.Kanto-Reforged.daycare")
+    Daycare.register(mod)
+    Daycare.install(mod)
+  else
+    -- Gold: item defs for berries / holds (no Gen1 mart text_pointers / UI).
+    HeldItems.register(mod)
+  end
 
   local BerryFarm = require("mods.Kanto-Reforged.berry_farm")
   BerryFarm.register(mod)
   BerryFarm.install(mod)
 
-  local LevelCaps = require("mods.Kanto-Reforged.level_caps")
-  LevelCaps.register(mod)
-  LevelCaps.install(mod)
-
-  local OverworldLoot = require("mods.Kanto-Reforged.overworld_loot")
-  OverworldLoot.register(mod)
-
   local HouseNpcs = require("mods.Kanto-Reforged.house_npcs")
   HouseNpcs.resetClaims()
+  if Host.isGen2() then
+    HouseNpcs.installTalkDispatch(mod)
+  end
 
-  local Competitive = require("mods.Kanto-Reforged.competitive_items")
-  Competitive.register(mod)
-  Competitive.install(mod)
+  if Host.isGen1() then
+    local LevelCaps = require("mods.Kanto-Reforged.level_caps")
+    LevelCaps.register(mod)
+    LevelCaps.install(mod)
+    local OverworldLoot = require("mods.Kanto-Reforged.overworld_loot")
+    OverworldLoot.register(mod)
+    local Competitive = require("mods.Kanto-Reforged.competitive_items")
+    Competitive.register(mod)
+    Competitive.install(mod)
+    local BattleClubs = require("mods.Kanto-Reforged.battle_clubs")
+    BattleClubs.register(mod)
+    local JudgeNpc = require("mods.Kanto-Reforged.judge_npc")
+    JudgeNpc.register(mod)
+    local TradesExtra = require("mods.Kanto-Reforged.trades_extra")
+    TradesExtra.register(mod)
+    local BerryQuests = require("mods.Kanto-Reforged.berry_quests")
+    BerryQuests.register(mod)
+    local MoveHub = require("mods.Kanto-Reforged.move_hub")
+    MoveHub.register(mod)
+    local ItemSmith = require("mods.Kanto-Reforged.item_smith")
+    ItemSmith.register(mod)
+    local Roamers = require("mods.Kanto-Reforged.roamers")
+    Roamers.register(mod)
+    Roamers.install(mod)
+    local RoamingRadar = require("mods.Kanto-Reforged.roaming_radar")
+    RoamingRadar.register(mod)
+    local RoamerDex = require("mods.Kanto-Reforged.roamer_dex")
+    RoamerDex.install(mod)
+    local LegendShrines = require("mods.Kanto-Reforged.legend_shrines")
+    LegendShrines.register(mod)
+    local LegendRegis = require("mods.Kanto-Reforged.legend_regis")
+    LegendRegis.register(mod)
+    local LegendMythicals = require("mods.Kanto-Reforged.legend_mythicals")
+    LegendMythicals.register(mod)
+    LegendMythicals.install(mod)
+    local FossilsGen3 = require("mods.Kanto-Reforged.fossils_gen3")
+    FossilsGen3.register(mod)
+    ModernXpShare.install(mod)
+    local QuarantineRecover = require("mods.Kanto-Reforged.quarantine_recover")
+    QuarantineRecover.install(mod)
+  else
+    -- Gold Kanto parity: farm quests + Celadon/Vermilion clubs (Kanto maps).
+    -- Utility NPCs stay on Kanto maps (not Johto remaps).
+    local Competitive = require("mods.Kanto-Reforged.competitive_items")
+    Competitive.register(mod)
+    Competitive.install(mod)
+    local BattleClubs = require("mods.Kanto-Reforged.battle_clubs")
+    BattleClubs.register(mod)
+    local BerryQuests = require("mods.Kanto-Reforged.berry_quests")
+    BerryQuests.register(mod)
+    local JudgeNpc = require("mods.Kanto-Reforged.judge_npc")
+    JudgeNpc.register(mod)
+    local MoveHub = require("mods.Kanto-Reforged.move_hub")
+    MoveHub.register(mod)
+    local ItemSmith = require("mods.Kanto-Reforged.item_smith")
+    ItemSmith.register(mod)
+  end
 
-  local BattleClubs = require("mods.Kanto-Reforged.battle_clubs")
-  BattleClubs.register(mod)
+  local SEVII_ENABLED = false
+  if SEVII_ENABLED and Host.isGen1() then
+    local Sevii = require("mods.Kanto-Reforged.sevii.main_register")
+    Sevii.register(mod)
+  end
 
-  local JudgeNpc = require("mods.Kanto-Reforged.judge_npc")
-  JudgeNpc.register(mod)
-
-  local TradesExtra = require("mods.Kanto-Reforged.trades_extra")
-  TradesExtra.register(mod)
-
-  local BerryQuests = require("mods.Kanto-Reforged.berry_quests")
-  BerryQuests.register(mod)
-
-  local MoveHub = require("mods.Kanto-Reforged.move_hub")
-  MoveHub.register(mod)
-
-  local ItemSmith = require("mods.Kanto-Reforged.item_smith")
-  ItemSmith.register(mod)
-
-  local Roamers = require("mods.Kanto-Reforged.roamers")
-  Roamers.register(mod)
-  Roamers.install(mod)
-
-  local RoamingRadar = require("mods.Kanto-Reforged.roaming_radar")
-  RoamingRadar.register(mod)
-
-  local RoamerDex = require("mods.Kanto-Reforged.roamer_dex")
-  RoamerDex.install(mod)
-
-  local LegendShrines = require("mods.Kanto-Reforged.legend_shrines")
-  LegendShrines.register(mod)
-
-  local LegendRegis = require("mods.Kanto-Reforged.legend_regis")
-  LegendRegis.register(mod)
-
-  local LegendMythicals = require("mods.Kanto-Reforged.legend_mythicals")
-  LegendMythicals.register(mod)
-  LegendMythicals.install(mod)
-
-  local FossilsGen3 = require("mods.Kanto-Reforged.fossils_gen3")
-  FossilsGen3.register(mod)
-
-  ModernXpShare.install(mod)
-
-  -- Smarter wild/trainer move scoring (prefer damage, skip no-ops)
   TrainerAi.register(mod)
   TrainerAi.install(mod)
-
-  local QuarantineRecover = require("mods.Kanto-Reforged.quarantine_recover")
-  QuarantineRecover.install(mod)
 
   -- Wrap Stats.calc to clamp Shedinja's maximum HP to 1 at runtime
   local Stats = require("src.pokemon.Stats")
@@ -220,30 +234,33 @@ return function(mod)
     flushShedinjaAnnounce(game, continueLearn)
   end
 
-  -- Wrap openParty to implement Shadow Tag / Magnet Pull switch block.
-  -- openParty is always the player's party UI, so the blocker is the enemy.
-  local BattleState = require("src.battle.BattleState")
-  local original_openParty = BattleState.openParty
-  BattleState.openParty = function(self)
-    local opponent = self.enemy
-    if opponent and opponent.mon and opponent.mon.hp and opponent.mon.hp > 0 then
-      local oppDef = self.data.pokemon[opponent.mon.species]
-      local ability = oppDef and oppDef.ability
-      if ability == "SHADOW_TAG" and not battlerHasType(self.player, "GHOST") then
-        self:say(Strings("Cannot switch due to Shadow Tag!"))
-        self.phase = "messages"
-        self.afterQueue = "menu"
-        return
+  -- Wrap openParty to implement Shadow Tag / Magnet Pull switch block (Gen1).
+  if Host.isGen1() then
+    local Gen1Patch = require("mods.Kanto-Reforged.gen1_patch")
+    Gen1Patch.apply(require("src.battle.BattleState"), function(BattleState)
+      local original_openParty = BattleState.openParty
+      if type(original_openParty) ~= "function" then return end
+      BattleState.openParty = function(self)
+        local opponent = self.enemy
+        if opponent and opponent.mon and opponent.mon.hp and opponent.mon.hp > 0 then
+          local oppDef = self.data.pokemon[opponent.mon.species]
+          local ability = oppDef and oppDef.ability
+          if ability == "SHADOW_TAG" and not battlerHasType(self.player, "GHOST") then
+            self:say(Strings("Cannot switch due to Shadow Tag!"))
+            self.phase = "messages"
+            self.afterQueue = "menu"
+            return
+          end
+          if ability == "MAGNET_PULL" and battlerHasType(self.player, "STEEL") then
+            self:say(Strings("Cannot switch due to Magnet Pull!"))
+            self.phase = "messages"
+            self.afterQueue = "menu"
+            return
+          end
+        end
+        return original_openParty(self)
       end
-      -- Magnet Pull: Gen 1 Mean Look-style trap, but only vs Steel
-      if ability == "MAGNET_PULL" and battlerHasType(self.player, "STEEL") then
-        self:say(Strings("Cannot switch due to Magnet Pull!"))
-        self.phase = "messages"
-        self.afterQueue = "menu"
-        return
-      end
-    end
-    return original_openParty(self)
+    end)
   end
 
   -- 1. Load generated databases
@@ -251,91 +268,166 @@ return function(mod)
   local has_pokemon, pokemon_data = pcall(require, "mods.Kanto-Reforged.pokemon_data")
   
   -- 2. Register Custom Types and Type Matchups
+  -- Same Dark/Steel/Fairy table on Red and Gold (upsert on Gold so ROM + KR agree).
   if has_types then
+    local TypeChartPatches = require("mods.Kanto-Reforged.type_chart_patches")
+
     for id, record in pairs(types_data.types) do
-      mod.content.type_chart:register(id, record)
-      mod.log:info("Registered custom type: %s", id)
+      if not mod.content.type_chart:get(id) then
+        pcall(function()
+          mod.content.type_chart:register(id, record)
+        end)
+        mod.log:info("Registered custom type: %s", id)
+      end
     end
-    for _, row in ipairs(types_data.matchups) do
-      local key = row.attacker .. ">" .. row.defender
-      mod.content.type_chart:register(key, { multiplier = row.multiplier })
+
+    if Host.isGen2() then
+      -- Gold already has Dark/Steel from ROM; force KR Fairy + all modern
+      -- matchup rows so effectiveness matches Red.
+      TypeChartPatches.applyModernTypes(mod, types_data)
+      mod.log:info("Synced Dark/Steel/Fairy matchups (Gold)")
+    else
+      for _, row in ipairs(types_data.matchups) do
+        local key = row.attacker .. ">" .. row.defender
+        pcall(function()
+          mod.content.type_chart:register(key, { multiplier = row.multiplier })
+        end)
+      end
+      mod.log:info("Registered custom type effectiveness matchups")
     end
-    mod.log:info("Registered custom type effectiveness matchups")
+
+    -- Classic Gen1 quirks → Gen3 on every host (idempotent on Gold).
+    TypeChartPatches.apply(mod)
   else
     mod.log:warn("types_data.lua not found (run generate_pokemon_mod.py first)")
   end
   
   -- 3. Register Custom Moves and Pokémon Species
   if has_pokemon then
-    local moves_registered = 0
-    for id, record in pairs(pokemon_data.moves) do
-      mod.content.moves:register(id, record)
-      moves_registered = moves_registered + 1
+    local Gen2Compat = require("mods.Kanto-Reforged.gen2_compat")
+    local goldDataReady = false
+    if Host.isGen2() then
+      -- Seed growth rates, EVOLVE_* aliases, and move-effect stubs so Gen3
+      -- content can resolve without requiring a full Gold ROM cache first.
+      Gen2Compat.seedInfra(mod, pokemon_data)
+      goldDataReady = Gen2Compat.goldDataReady(mod)
+      if not goldDataReady then
+        mod.log:warn(
+          "Gold ROM cache incomplete; Hoenn moves use effect stubs / "
+            .. "Gen1-known learnsets. Import Gold for full move tables."
+        )
+      end
     end
-    mod.log:info("Registered %d custom moves", moves_registered)
 
-    local MoveAnims = require("mods.Kanto-Reforged.move_anims")
-    MoveAnims.register(mod, pokemon_data.moves)
-    MoveAnims.install(mod)
+    local moves_registered = 0
+    if not Host.isGen2() or goldDataReady then
+      for id, record in pairs(pokemon_data.moves) do
+        local ok = pcall(function()
+          if Host.isGen2() then
+            local copy = {}
+            for k, v in pairs(record) do copy[k] = v end
+            copy.effect = Gen2Compat.effectForMove(id, record.effect)
+            mod.content.moves:register(id, copy)
+          else
+            mod.content.moves:register(id, record)
+          end
+        end)
+        if ok then moves_registered = moves_registered + 1 end
+      end
+      mod.log:info("Registered %d custom moves", moves_registered)
+
+      local MoveAnims = require("mods.Kanto-Reforged.move_anims")
+      MoveAnims.register(mod, pokemon_data.moves)
+      MoveAnims.install(mod)
+    else
+      -- Incomplete Gold: still register moves whose type + effect already resolve.
+      for id, record in pairs(pokemon_data.moves) do
+        local ok = pcall(function()
+          local copy = {}
+          for k, v in pairs(record) do copy[k] = v end
+          copy.effect = Gen2Compat.effectForMove(id, record.effect)
+          if not mod.content.type_chart:get(copy.type) then return end
+          if not mod.content.move_effects:get(copy.effect) then
+            Gen2Compat.seedMoveEffectStubs(mod, { moves = { [id] = copy } })
+          end
+          mod.content.moves:register(id, copy)
+        end)
+        if ok and mod.content.moves:get(id) then
+          moves_registered = moves_registered + 1
+        end
+      end
+      mod.log:info("Registered %d custom moves (compat / partial Gold)", moves_registered)
+    end
+
+    -- Gen3 move types on Red and Gold (Bite→Dark, Charm→Normal, …).
+    -- Does not touch sprites or generate_pokemon_mod.py.
+    local okMoves, MoveTypePatches = pcall(require, "mods.Kanto-Reforged.move_type_patches")
+    if okMoves then
+      MoveTypePatches.apply(mod)
+    end
     
-    local species_registered = 0
-    local highestDex = 151
     local DexEntries = require("mods.Kanto-Reforged.dex_entries")
     local dexTexts = DexEntries.bindAll(mod, pokemon_data.species)
 
-    -- Register per-species SGB palettes BEFORE the pokemon records that
-    -- reference them.  Without this, Advanced color falls through to MEWMON
-    -- (peach + purple) for every Gen 2/3 mon.
     local okPals, species_palettes = pcall(require, "mods.Kanto-Reforged.species_palettes")
+    local PaletteGen2 = require("mods.Kanto-Reforged.palette_gen2")
     if okPals and type(species_palettes) == "table" then
-      local n = 0
-      for id, colors in pairs(species_palettes) do
-        mod.content.palettes:register(id, colors)
-        n = n + 1
+      if Host.isGen2() then
+        -- Gold: middle-two-color rows under gen2Palettes.pokemon[species].
+        -- Do NOT Gen1-register named packs here — that pollutes top-level
+        -- gen2Palettes keys and leaves Hoenn monColors nil (grayscale).
+        PaletteGen2.apply(mod, species_palettes, pokemon_data)
+      else
+        PaletteGen2.applyGen1(mod, species_palettes)
       end
-      mod.log:info("Registered %d species palettes", n)
     else
-      mod.log:warn("species_palettes.lua missing — Gen 2/3 mons will use MEWMON")
+      mod.log:warn("species_palettes.lua missing — Gen 2/3 mons will use MEWMON / grayscale")
     end
 
-    for id, record in pairs(pokemon_data.species) do
-      mod.content.pokemon:register(id, record)
-      species_registered = species_registered + 1
-      if record.dex and record.dex > highestDex then
-        highestDex = record.dex
+    if Host.isGen2() then
+      PokemonGen2.registerForGold(mod, pokemon_data, {
+        goldDataReady = goldDataReady,
+      })
+      local EncountersGen2 = require("mods.Kanto-Reforged.encounters_gen2")
+      EncountersGen2.apply(mod, pokemon_data)
+      local TrainersGen2 = require("mods.Kanto-Reforged.trainers_gen2")
+      TrainersGen2.install(mod)
+    else
+      PokemonGen2.applyGen1DerivedSprites(mod, pokemon_data)
+      local species_registered = 0
+      local highestDex = 151
+      for id, record in pairs(pokemon_data.species) do
+        mod.content.pokemon:register(id, record)
+        species_registered = species_registered + 1
+        if record.dex and record.dex > highestDex then
+          highestDex = record.dex
+        end
       end
+      mod.log:info("Registered %d custom Pokémon species", species_registered)
+      mod.content.constants:patch("dexSize", highestDex)
+      mod.content.constants:patch("dexDigits", math.max(3, #tostring(highestDex)))
+      mod.log:info("Pokédex extended to %d", highestDex)
+
+      local SpeciesIcons = require("mods.Kanto-Reforged.species_icons")
+      SpeciesIcons.register(mod, pokemon_data.species)
+
+      applySpawnTables(mod, pokemon_data)
+      local nTrainers = ExpTrainers.apply(mod)
+      mod.log:info("Trainer parties mixed (%d classes)", nTrainers)
+      mod.events:on("mod.options_changed", function(ev)
+        if ev and ev.mod == mod.id and ev.key == "full_spawn_random" then
+          applySpawnTables(mod, pokemon_data)
+        end
+      end)
     end
-    mod.log:info("Registered %d custom Pokémon species", species_registered)
+
     if dexTexts > 0 then
       mod.log:info("Registered %d Pokédex flavor texts", dexTexts)
     end
 
-    local SpeciesIcons = require("mods.Kanto-Reforged.species_icons")
-    SpeciesIcons.register(mod, pokemon_data.species)
-
-    -- Pokédex list is 1..constants.dexSize; vanilla import stamps 151, so
-    -- Gen 2/3 numbers never appear until we extend the bound.
-    mod.content.constants:patch("dexSize", highestDex)
-    mod.content.constants:patch("dexDigits", math.max(3, #tostring(highestDex)))
-    mod.log:info("Pokédex extended to %d", highestDex)
-    
-    -- Mix wild spawn distributions (curated slots, or full Gen1–3 random)
-    applySpawnTables(mod, pokemon_data)
-
-    -- Curated Gen 2/3 swaps into gyms, Elite Four, rival, and some trash
-    local nTrainers = ExpTrainers.apply(mod)
-    mod.log:info("Trainer parties mixed (%d classes)", nTrainers)
-
-    -- Re-apply when the card toggle changes (restores vanilla baselines first)
-    mod.events:on("mod.options_changed", function(ev)
-      if ev and ev.mod == mod.id and ev.key == "full_spawn_random" then
-        applySpawnTables(mod, pokemon_data)
-      end
-    end)
-
     -- Register Tyrogue custom evolution check logic
     local function checkTyrogue(mon, level, cond)
-      if not mon or mon.level < level then return false end
+      if not mon or (mon.level or 0) < level then return false end
       local att = mon.stats and mon.stats.attack or 0
       local def = mon.stats and mon.stats.defense or 0
       if cond == "atk" then return att > def
@@ -343,65 +435,115 @@ return function(mod)
       else return att == def end
     end
 
-    mod.content.evolution_methods:register("TYROGUE_ATK", {
-      check = function(game, mon, evo, trigger)
+    local function registerEvoMethod(id, gen1Check, gen2Check)
+      if Host.isGen2() then
+        mod.content.evolution_methods:register(id, { check = gen2Check })
+      else
+        mod.content.evolution_methods:register(id, { check = gen1Check })
+      end
+    end
+
+    registerEvoMethod("TYROGUE_ATK",
+      function(game, mon, evo, trigger)
         return trigger.kind == "levelup" and checkTyrogue(mon, evo.level or 20, "atk")
-      end
-    })
-    mod.content.evolution_methods:register("TYROGUE_DEF", {
-      check = function(game, mon, evo, trigger)
+      end,
+      function(entry, mon, ctx)
+        return checkTyrogue(mon, (entry and entry.level) or 20, "atk")
+      end)
+    registerEvoMethod("TYROGUE_DEF",
+      function(game, mon, evo, trigger)
         return trigger.kind == "levelup" and checkTyrogue(mon, evo.level or 20, "def")
-      end
-    })
-    mod.content.evolution_methods:register("TYROGUE_BAL", {
-      check = function(game, mon, evo, trigger)
+      end,
+      function(entry, mon, ctx)
+        return checkTyrogue(mon, (entry and entry.level) or 20, "def")
+      end)
+    registerEvoMethod("TYROGUE_BAL",
+      function(game, mon, evo, trigger)
         return trigger.kind == "levelup" and checkTyrogue(mon, evo.level or 20, "bal")
-      end
-    })
+      end,
+      function(entry, mon, ctx)
+        return checkTyrogue(mon, (entry and entry.level) or 20, "bal")
+      end)
 
     -- Register Wurmple custom random split checking based on DVs modulo 2
     local function checkWurmple(mon, level, remainder)
-      if not mon or mon.level < level then return false end
+      if not mon or (mon.level or 0) < level then return false end
       local dvs = mon.dvs or {}
-      local val = (dvs.attack or 0) + (dvs.defense or 0) + (dvs.speed or 0) + (dvs.special or 0)
+      local val = (dvs.attack or 0) + (dvs.defense or 0) + (dvs.speed or 0)
+        + (dvs.special or dvs.specialAttack or 0)
       return val % 2 == remainder
     end
 
-    mod.content.evolution_methods:register("WURMPLE_A", {
-      check = function(game, mon, evo, trigger)
+    registerEvoMethod("WURMPLE_A",
+      function(game, mon, evo, trigger)
         return trigger.kind == "levelup" and checkWurmple(mon, evo.level or 7, 0)
-      end
-    })
-    mod.content.evolution_methods:register("WURMPLE_B", {
-      check = function(game, mon, evo, trigger)
+      end,
+      function(entry, mon, ctx)
+        return checkWurmple(mon, (entry and entry.level) or 7, 0)
+      end)
+    registerEvoMethod("WURMPLE_B",
+      function(game, mon, evo, trigger)
         return trigger.kind == "levelup" and checkWurmple(mon, evo.level or 7, 1)
-      end
-    })
+      end,
+      function(entry, mon, ctx)
+        return checkWurmple(mon, (entry and entry.level) or 7, 1)
+      end)
 
     -- Patch vanilla Kanto species evolutions
     if pokemon_data.evolutions then
       local evos_patched = 0
+      local useInto = Host.isGen2()
       for speciesId, new_evos in pairs(pokemon_data.evolutions) do
         local existing = mod.content.pokemon:get(speciesId)
         if existing then
           local evos = {}
+          local function evoTarget(evo)
+            return evo.into or evo.species
+          end
+          local function copyEvo(evo)
+            local target = evoTarget(evo)
+            local method = evo.method
+            if useInto then
+              local Gen2Compat = require("mods.Kanto-Reforged.gen2_compat")
+              method = Gen2Compat.remapEvoMethod(method)
+              return {
+                method = method,
+                level = evo.level,
+                item = evo.item,
+                into = target,
+                time = evo.time,
+                comparison = evo.comparison,
+              }
+            end
+            return {
+              method = method,
+              level = evo.level,
+              item = evo.item,
+              species = target,
+            }
+          end
           if existing.evolutions then
             for _, evo in ipairs(existing.evolutions) do
-              table.insert(evos, { method = evo.method, level = evo.level, item = evo.item, species = evo.species })
+              table.insert(evos, copyEvo(evo))
             end
           end
           local seen = {}
           for _, evo in ipairs(evos) do
-            seen[evo.species] = true
+            seen[evoTarget(evo)] = true
           end
           for _, evo in ipairs(new_evos) do
-            if not seen[evo.species] then
-              table.insert(evos, evo)
-              seen[evo.species] = true
+            local target = evoTarget(evo)
+            -- Skip into-targets that are not in this boot's pokemon table
+            -- (headless Gold without a Gold cache has no Espeon/etc.).
+            if target and not seen[target] and mod.content.pokemon:get(target) then
+              table.insert(evos, copyEvo(evo))
+              seen[target] = true
             end
           end
-          mod.content.pokemon:patch(speciesId, { evolutions = evos })
-          evos_patched = evos_patched + 1
+          local ok = pcall(function()
+            mod.content.pokemon:patch(speciesId, { evolutions = evos })
+          end)
+          if ok then evos_patched = evos_patched + 1 end
         end
       end
       mod.log:info("Patched evolutions for %d vanilla Pokémon species", evos_patched)
@@ -460,15 +602,35 @@ return function(mod)
 
       local nLearn, nTm = 0, 0
       local speciesSeen = {}
+      local learnField = Host.isGen2() and "levelMoves" or "learnset"
+      local function knownMove(id)
+        return mod.content.moves:get(id) ~= nil
+      end
+      local function filterMoves(list)
+        local out = {}
+        for _, entry in ipairs(list or {}) do
+          if type(entry) == "string" then
+            if knownMove(entry) then out[#out + 1] = entry end
+          elseif entry.move and knownMove(entry.move) then
+            out[#out + 1] = entry
+          end
+        end
+        return out
+      end
       if learnset_patches.learnset then
         for speciesId, additions in pairs(learnset_patches.learnset) do
           local existing = mod.content.pokemon:get(speciesId)
           if existing then
-            mod.content.pokemon:patch(speciesId, {
-              learnset = mergeLearnset(existing.learnset, additions),
-            })
-            nLearn = nLearn + 1
-            speciesSeen[speciesId] = true
+            local base = existing[learnField] or existing.learnset or existing.levelMoves
+            local ok = pcall(function()
+              mod.content.pokemon:patch(speciesId, {
+                [learnField] = mergeLearnset(base, filterMoves(additions)),
+              })
+            end)
+            if ok then
+              nLearn = nLearn + 1
+              speciesSeen[speciesId] = true
+            end
           end
         end
       end
@@ -476,13 +638,16 @@ return function(mod)
         for speciesId, additions in pairs(learnset_patches.tmhm) do
           local existing = mod.content.pokemon:get(speciesId)
           if existing then
-            -- Re-read after possible learnset patch above
             existing = mod.content.pokemon:get(speciesId)
-            mod.content.pokemon:patch(speciesId, {
-              tmhm = mergeTmhm(existing.tmhm, additions),
-            })
-            nTm = nTm + 1
-            speciesSeen[speciesId] = true
+            local ok = pcall(function()
+              mod.content.pokemon:patch(speciesId, {
+                tmhm = mergeTmhm(existing.tmhm, filterMoves(additions)),
+              })
+            end)
+            if ok then
+              nTm = nTm + 1
+              speciesSeen[speciesId] = true
+            end
           end
         end
       end
@@ -502,8 +667,10 @@ return function(mod)
       local nAbil = 0
       for speciesId, ability in pairs(ability_patches.abilities) do
         if ability and ability ~= "NONE" then
-          mod.content.pokemon:patch(speciesId, { ability = ability })
-          nAbil = nAbil + 1
+          local ok = pcall(function()
+            mod.content.pokemon:patch(speciesId, { ability = ability })
+          end)
+          if ok then nAbil = nAbil + 1 end
         end
       end
       mod.log:info("Patched Gen 3 abilities onto %d Kanto species", nAbil)
@@ -517,11 +684,22 @@ return function(mod)
       local nSp = 0
       for speciesId, row in pairs(special_stat_patches.stats) do
         if type(row) == "table" and row.sp_attack and row.sp_defense then
-          mod.content.pokemon:patch(speciesId, {
-            sp_attack = row.sp_attack,
-            sp_defense = row.sp_defense,
-          })
-          nSp = nSp + 1
+          local ok = pcall(function()
+            if Host.isGen2() then
+              mod.content.pokemon:patch(speciesId, {
+                baseStats = {
+                  specialAttack = row.sp_attack,
+                  specialDefense = row.sp_defense,
+                },
+              })
+            else
+              mod.content.pokemon:patch(speciesId, {
+                sp_attack = row.sp_attack,
+                sp_defense = row.sp_defense,
+              })
+            end
+          end)
+          if ok then nSp = nSp + 1 end
         end
       end
       mod.log:info("Patched SpA/SpD onto %d Kanto species", nSp)
@@ -533,19 +711,32 @@ return function(mod)
     local okGender, gender_patches = pcall(require, "mods.Kanto-Reforged.gender_patches")
     if okGender and gender_patches and gender_patches.rates then
       local nGender = 0
+      local field = Host.isGen2() and "genderRatio" or "genderRate"
       for speciesId, rate in pairs(gender_patches.rates) do
         if type(rate) == "number" then
-          mod.content.pokemon:patch(speciesId, { genderRate = rate })
-          nGender = nGender + 1
+          -- Gen2 genderRatio is 0–255; KR genderRate is female eighths (-1 genderless).
+          local value = rate
+          if Host.isGen2() then
+            if rate < 0 then
+              value = 255
+            else
+              value = math.max(0, math.min(254, math.floor(rate * 32)))
+            end
+          end
+          local ok = pcall(function()
+            mod.content.pokemon:patch(speciesId, { [field] = value })
+          end)
+          if ok then nGender = nGender + 1 end
         end
       end
-      -- Form ids that do not match PokéAPI species names
       if type(gender_patches.rates.DEOXYS) == "number" then
-        mod.content.pokemon:patch("DEOXYS_NORMAL", {
-          genderRate = gender_patches.rates.DEOXYS,
-        })
+        pcall(function()
+          mod.content.pokemon:patch("DEOXYS_NORMAL", {
+            [field] = Host.isGen2() and 255 or gender_patches.rates.DEOXYS,
+          })
+        end)
       end
-      mod.log:info("Patched genderRate onto %d species", nGender)
+      mod.log:info("Patched %s onto %d species", field, nGender)
     else
       mod.log:warn("gender_patches.lua missing; gender rates skipped")
     end
@@ -553,7 +744,31 @@ return function(mod)
     -- Breeding: egg groups, hatch counters, baby species, egg moves
     local okBreed, breeding_patches = pcall(require, "mods.Kanto-Reforged.breeding_patches")
     if okBreed and breeding_patches then
-      local nBreed = Breeding.applyPatches(mod, breeding_patches)
+      local Breeding = require("mods.Kanto-Reforged.breeding")
+      local nBreed = 0
+      if Host.isGen2() then
+        -- Gen2 schema uses eggSteps (not hatchCounter) and rejects KR-only fields.
+        for speciesId, row in pairs(breeding_patches.species or {}) do
+          local patch = {}
+          if row.eggGroups then patch.eggGroups = row.eggGroups end
+          if row.hatchCounter then patch.eggSteps = row.hatchCounter end
+          if row.eggMoves then
+            local moves = {}
+            for _, mv in ipairs(row.eggMoves) do
+              if mod.content.moves:get(mv) then moves[#moves + 1] = mv end
+            end
+            patch.eggMoves = moves
+          end
+          if next(patch) then
+            local ok = pcall(function()
+              mod.content.pokemon:patch(speciesId, patch)
+            end)
+            if ok then nBreed = nBreed + 1 end
+          end
+        end
+      else
+        nBreed = Breeding.applyPatches(mod, breeding_patches)
+      end
       mod.log:info("Patched breeding data onto %d species", nBreed)
     else
       mod.log:warn("breeding_patches.lua missing; daycare breeding skipped")
@@ -581,11 +796,14 @@ return function(mod)
 
   -- 4. Hook into battle damage pipeline (SpA/SpD + abilities +
   --    variable-power Gen 2/3 moves)
+  local BattleCompat = require("mods.Kanto-Reforged.battle_compat")
   mod.hooks:wrap("battle.damage", function(next, ctx)
     local move = ctx.move
     local user = ctx.user
     local target = ctx.target
     local TypeChart = require("src.battle.TypeChart")
+    local userMon = BattleCompat.mon(user)
+    local targetMon = BattleCompat.mon(target)
 
     local oldType, oldPower, oldCategory
     local function bumpPower(p)
@@ -603,21 +821,27 @@ return function(mod)
       local t, p = ExpMoveEffects.weatherBall(ctx.battle)
       move.type, move.power = t, p
       move.category = TypeChart.category(t) or "special"
-    elseif move and move.id == "FACADE" and user.mon.status then
+    elseif move and move.id == "FACADE" and BattleCompat.status(user) then
       bumpPower((move.power or 70) * 2)
-    elseif move and (move.id == "ERUPTION" or move.id == "WATER_SPOUT") then
-      bumpPower(math.max(1, math.floor((move.power or 150) * user.mon.hp / user.mon.stats.hp)))
+    elseif move and (move.id == "ERUPTION" or move.id == "WATER_SPOUT") and userMon then
+      bumpPower(math.max(1, math.floor((move.power or 150)
+        * BattleCompat.hp(user) / BattleCompat.maxHp(user))))
     elseif move and (move.id == "FLAIL" or move.id == "REVERSAL") then
       bumpPower(ExpMoveEffects.flailPower(user))
     elseif move and move.id == "RETURN" then
       bumpPower(ExpMoveEffects.returnPower(user))
     elseif move and move.id == "FRUSTRATION" then
       bumpPower(ExpMoveEffects.frustrationPower(user))
-    elseif move and move.id == "HEX" and target.mon.status then
+    elseif move and move.id == "HEX" and BattleCompat.status(target) then
       bumpPower((move.power or 65) * 2)
-    elseif move and move.id == "VENOSHOCK" and target.mon.status == "PSN" then
+    elseif move and move.id == "VENOSHOCK"
+        and (BattleCompat.status(target) == "PSN"
+          or BattleCompat.status(target) == "poison"
+          or BattleCompat.status(target) == "TOX"
+          or BattleCompat.status(target) == "toxic") then
       bumpPower((move.power or 65) * 2)
-    elseif move and move.id == "BRINE" and target.mon.hp * 2 <= target.mon.stats.hp then
+    elseif move and move.id == "BRINE" and targetMon
+        and BattleCompat.hp(target) * 2 <= BattleCompat.maxHp(target) then
       bumpPower((move.power or 65) * 2)
     elseif move and (move.id == "REVENGE" or move.id == "AVALANCHE")
         and user.expTookDamageThisTurn then
@@ -626,17 +850,25 @@ return function(mod)
       bumpPower((move.power or 50) * 2)
     elseif move and move.id == "PURSUIT" and target.expActedThisTurn then
       bumpPower((move.power or 40) * 2)
-    elseif move and move.id == "KNOCK_OFF" and HeldItems.ofBattler(target) then
+    elseif move and move.id == "KNOCK_OFF" and HeldItems.ofBattler
+        and HeldItems.ofBattler(target) then
       bumpPower(math.floor((move.power or 65) * 1.5))
-    elseif move and move.id == "FURY_CUTTER" then
+    elseif move and move.id == "FURY_CUTTER" and not BattleCompat.isGen2(ctx.battle) then
       local n = user.expFuryCutter or 0
       bumpPower((move.power or 40) * (2 ^ math.min(n, 4)))
     elseif move and move.id == "MAGNITUDE" then
       local p = ExpMoveEffects.magnitudePower(ctx.battle.rng or love.math.random)
       bumpPower(p)
-    elseif move and move.id == "SMELLING_SALTS" and target.mon.status == "PAR" then
+    elseif move and move.id == "SMELLING_SALTS"
+        and (BattleCompat.status(target) == "PAR"
+          or BattleCompat.status(target) == "paralyze"
+          or BattleCompat.status(target) == "paralysis") then
       bumpPower((move.power or 70) * 2)
-    elseif move and (move.id == "ROLLOUT" or move.id == "ICE_BALL") then
+    elseif move and move.id == "WAKE_UP_SLAP"
+        and (BattleCompat.hasStatus(target, "SLP", "sleep")) then
+      bumpPower((move.power or 70) * 2)
+    elseif move and (move.id == "ROLLOUT" or move.id == "ICE_BALL")
+        and not BattleCompat.isGen2(ctx.battle) then
       local n = user.expRollout or 0
       local base = move.power or 30
       if user.defenseCurled then base = base * 2 end
@@ -667,29 +899,33 @@ return function(mod)
     local oldTypes
     if target and target.expIdentified and move
         and (move.type == "NORMAL" or move.type == "FIGHTING") then
+      local types = BattleCompat.types(target)
       local hasGhost = false
-      for _, t in ipairs(target.curTypes or {}) do
+      for _, t in ipairs(types) do
         if t == "GHOST" then hasGhost = true break end
       end
       if hasGhost then
-        oldTypes = target.curTypes
+        oldTypes = types
         local nt = {}
         for _, t in ipairs(oldTypes) do
           if t ~= "GHOST" then nt[#nt + 1] = t end
         end
         if #nt == 0 then nt = { "NORMAL" } end
-        target.curTypes = nt
+        BattleCompat.setTypes(target, nt)
       end
     end
 
     local function finish(damage, info)
       -- Type boosters must see the effective move type (Hidden Power /
       -- Weather Ball mutate move.type before damage, then restore it).
-      damage = HeldItems.modifyDamage(damage, ctx)
+      if HeldItems.modifyDamage then
+        local ok, out = pcall(HeldItems.modifyDamage, damage, ctx)
+        if ok then damage = out end
+      end
       if oldPower ~= nil then
         move.type, move.power, move.category = oldType, oldPower, oldCategory
       end
-      if oldTypes then target.curTypes = oldTypes end
+      if oldTypes then BattleCompat.setTypes(target, oldTypes) end
       -- Mirror Coat tracks special damage taken this hit
       local category = move.category or TypeChart.category(move.type) or "physical"
       if category == "special" and damage and damage > 0 then
@@ -701,7 +937,8 @@ return function(mod)
     local category = move.category or TypeChart.category(move.type) or "physical"
     local isSpecial = category == "special"
 
-    if isSpecial and SplitSpecial.enabled(mod) then
+    if isSpecial and SplitSpecial.enabled(mod)
+        and user.curStats and target.curStats then
       local oldUserSpecial = user.curStats.special
       local oldTargetSpecial = target.curStats.special
 
@@ -739,25 +976,37 @@ return function(mod)
 
     local userAbility = Abilities.abilityOf(ctx.battle, ctx.user)
     local oldAcc
-    if userAbility == "COMPOUND_EYES" and ctx.move and ctx.move.accuracy then
-      oldAcc = ctx.move.accuracy
-      ctx.move.accuracy = math.min(100, math.floor(oldAcc * 13 / 10))
+    if userAbility == "COMPOUND_EYES" then
+      if type(ctx.accuracy) == "number" then
+        oldAcc = ctx.accuracy
+        ctx.accuracy = math.min(100, math.floor(oldAcc * 13 / 10))
+      elseif ctx.move and ctx.move.accuracy then
+        oldAcc = ctx.move.accuracy
+        ctx.move.accuracy = math.min(100, math.floor(oldAcc * 13 / 10))
+      end
     end
 
     -- Foresight: ignore positive evasion stages
     local oldEvasion
-    if ctx.target and ctx.target.expIdentified and ctx.target.stages then
-      oldEvasion = ctx.target.stages.evasion
+    local stages = ctx.target and BattleCompat.stages(ctx.battle, ctx.target)
+    if ctx.target and ctx.target.expIdentified and stages then
+      oldEvasion = stages.evasion
       if (oldEvasion or 0) > 0 then
-        ctx.target.stages.evasion = 0
+        stages.evasion = 0
       else
         oldEvasion = nil
       end
     end
 
     local hit = next(ctx)
-    if oldAcc then ctx.move.accuracy = oldAcc end
-    if oldEvasion ~= nil then ctx.target.stages.evasion = oldEvasion end
+    if oldAcc then
+      if type(ctx.accuracy) == "number" then
+        ctx.accuracy = oldAcc
+      elseif ctx.move then
+        ctx.move.accuracy = oldAcc
+      end
+    end
+    if oldEvasion ~= nil and stages then stages.evasion = oldEvasion end
     if hit == false then return false end
 
     local targetAbility = Abilities.abilityOf(ctx.battle, ctx.target)
@@ -769,8 +1018,8 @@ return function(mod)
         return false
       end
     end
-    if targetAbility == "SAND_VEIL" and ctx.battle.field
-        and ctx.battle.field.weather == "SANDSTORM" then
+    if targetAbility == "SAND_VEIL"
+        and BattleCompat.getWeather(ctx.battle) == "SANDSTORM" then
       if (ctx.battle.rng or love.math.random)(0, 99) < 20 then
         return false
       end
@@ -783,11 +1032,19 @@ return function(mod)
     local battle = mod.activeBattle or ctx.battle
     if battle and ctx.attacker then
       local target = (ctx.attacker == battle.player) and battle.enemy or battle.player
+      -- Gen2 crit ctx may name the defender explicitly.
+      target = ctx.target or ctx.defender or target
       local ability = Abilities.abilityOf(battle, target)
       if ability == "BATTLE_ARMOR" or ability == "SHELL_ARMOR" then
         return false
       end
-      local side = battle.sideOf and battle:sideOf(target)
+      local sideKey = battle.sideOf and battle:sideOf(target)
+      local side = sideKey
+      if type(sideKey) == "string" and battle.sides then
+        side = battle.sides[sideKey]
+      elseif type(sideKey) == "number" and battle.sides then
+        side = battle.sides[sideKey]
+      end
       if side and side.expLuckyChantTurns and side.expLuckyChantTurns > 0 then
         return false
       end
@@ -817,23 +1074,56 @@ return function(mod)
   mod.hooks:wrap("battle.turn_order", function(next, a, aMove, b, bMove, ctx)
     local battle = mod.activeBattle
     if not battle then return next(a, aMove, b, bMove, ctx) end
-    local TurnOrder = require("src.battle.TurnOrder")
     local ma, mb = Abilities.speedMult(battle, a), Abilities.speedMult(battle, b)
     local trick = battle.expTrickRoomTurns and battle.expTrickRoomTurns > 0
     if ma == 1 and mb == 1 and not trick then
       return next(a, aMove, b, bMove, ctx)
     end
-    local oldA, oldB = a.curStats.speed, b.curStats.speed
-    a.curStats.speed = math.floor(oldA * ma)
-    b.curStats.speed = math.floor(oldB * mb)
-    local first = TurnOrder.firstMover(a, aMove, b, bMove,
-      (ctx and ctx.rng) or love.math.random, ctx and ctx.invertTie)
-    a.curStats.speed, b.curStats.speed = oldA, oldB
+    -- Gen1: mutate curStats.speed temporarily.
+    if a.curStats and b.curStats then
+      local TurnOrder = require("src.battle.TurnOrder")
+      local oldA, oldB = a.curStats.speed, b.curStats.speed
+      a.curStats.speed = math.floor(oldA * ma)
+      b.curStats.speed = math.floor(oldB * mb)
+      local first = TurnOrder.firstMover(a, aMove, b, bMove,
+        (ctx and ctx.rng) or love.math.random, ctx and ctx.invertTie)
+      a.curStats.speed, b.curStats.speed = oldA, oldB
+      if trick then return not first end
+      return first
+    end
+    -- Gen2: compare battleStat × stages × speedMult (and priority).
+    if BattleCompat.isGen2(battle) and type(battle.battleStat) == "function" then
+      local G2Damage = require("src.battle.gen2.Damage")
+      local function effSpeed(mon)
+        if not mon then return 0 end
+        local spd = battle:battleStat(mon, "speed") or 1
+        local key = type(battle.sideOf) == "function" and battle:sideOf(mon)
+        local stages = key and battle.stages and battle.stages[key]
+        spd = G2Damage.applyStage(spd, stages and stages.speed or 0)
+        if BattleCompat.hasStatus(mon, "PAR", "paralyze") then
+          spd = math.floor(spd * 0.25)
+        end
+        return math.floor(spd * Abilities.speedMult(battle, mon))
+      end
+      local pa = (aMove and aMove.priority) or 0
+      local pb = (bMove and bMove.priority) or 0
+      if pa ~= pb then return pa > pb end
+      local sa, sb = effSpeed(a), effSpeed(b)
+      if trick then sa, sb = sb, sa end
+      if sa ~= sb then return sa > sb end
+      local rng = (ctx and ctx.rng) or love.math.random
+      return rng(2) == 1
+    end
     if trick then
-      -- Invert: the slower one moves first
+      local first = next(a, aMove, b, bMove, ctx)
       return not first
     end
-    return first
+    if ma ~= mb then
+      local pa = (aMove and aMove.priority) or 0
+      local pb = (bMove and bMove.priority) or 0
+      if pa == pb then return ma > mb end
+    end
+    return next(a, aMove, b, bMove, ctx)
   end)
 
   -- Shadow Tag / Magnet Pull / Mean Look escape blocker; Run Away always escapes wilds
@@ -849,15 +1139,15 @@ return function(mod)
       return false
     end
     local opponent = battle.enemy
-    if opponent and opponent.mon and opponent.mon.hp and opponent.mon.hp > 0 then
-      local oppDef = battle.data.pokemon[opponent.mon.species]
-      local ability = oppDef and oppDef.ability
+    local oppMon = opponent and BattleCompat.mon(opponent)
+    if oppMon and oppMon.hp and oppMon.hp > 0 then
+      local ability = Abilities.abilityOf(battle, opponent)
       if ability == "SHADOW_TAG" and not battlerHasType(battle.player, "GHOST") then
-        battle:sayNext(Strings("Cannot escape due to Shadow Tag!"))
+        BattleCompat.say(battle, Strings("Cannot escape due to Shadow Tag!"))
         return false
       end
       if ability == "MAGNET_PULL" and battlerHasType(battle.player, "STEEL") then
-        battle:sayNext(Strings("Cannot escape due to Magnet Pull!"))
+        BattleCompat.say(battle, Strings("Cannot escape due to Magnet Pull!"))
         return false
       end
     end
@@ -890,9 +1180,9 @@ return function(mod)
   -- Castform Weather Forms Sprite Resolver Hook
   mod.hooks:wrap("pokemon.sprite", function(next, path, ctx)
     if ctx.species == "CASTFORM" and mod.activeBattle then
-      local weather = mod.activeBattle.field.weather
-      if weather == "SUNNY" or weather == "RAINY" or weather == "HAIL" or weather == "SNOWY" then
-        local suffix = weather == "SUNNY" and "sunny" or (weather == "RAINY" and "rainy" or "snowy")
+      local weather = BattleCompat.getWeather(mod.activeBattle)
+      local suffix = BattleCompat.castformSuffix(weather)
+      if suffix then
         return mod.path .. "/assets/castform_" .. suffix .. "_" .. ctx.side .. ".png"
       end
     end
@@ -900,15 +1190,28 @@ return function(mod)
   end)
 
   -- 5. Hook battle entry, turns, and moves
+  -- Gold never calls TypeChart.load (Gen1 BattleState does). KR AI / abilities
+  -- use TypeChart.effectiveness — load the merged chart on ready + battle.
+  local function ensureTypeChart(data)
+    if not data or not data.type_chart then return end
+    local ok, TypeChart = pcall(require, "src.battle.TypeChart")
+    if ok and TypeChart and TypeChart.load then
+      TypeChart.load(data)
+    end
+  end
+
   mod.events:on("game.ready", function(ev)
     if ev.game then
       mod.activeGame = ev.game
+      ensureTypeChart(ev.game.data)
     end
   end)
 
   mod.events:on("battle.started", function(ev)
     if ev.battle then
       mod.activeBattle = ev.battle
+      ensureTypeChart(ev.battle.data or (ev.game and ev.game.data)
+        or (mod.activeGame and mod.activeGame.data))
       Abilities.onEntry(ev.battle, ev.battle.player)
       Abilities.onEntry(ev.battle, ev.battle.enemy)
     end
@@ -924,7 +1227,19 @@ return function(mod)
         -- battle may already be tearing down; best-effort bag add already done
       end
     end
+    -- Gold battlers are party tables; wipe AI facade fields before SAVE.
+    local BattleCompat = require("mods.Kanto-Reforged.battle_compat")
+    BattleCompat.scrubBattle(ev.battle)
     mod.activeBattle = nil
+  end)
+
+  -- Belt-and-suspenders: scrub again at write time in case a battle left
+  -- party[i].mon == party[i] (serialize cycle / former stack overflow).
+  mod.events:on("save.writing", function(ev)
+    local BattleCompat = require("mods.Kanto-Reforged.battle_compat")
+    if ev and ev.save then
+      BattleCompat.scrubPartyMons(ev.save.party)
+    end
   end)
   
   mod.events:on("battle.battler_switched", function(ev)
@@ -1021,8 +1336,13 @@ return function(mod)
                                 shedinja.dvs, shedinja.statExp)
     shedinja.hp = 1
     if game.save.pokedex then
-      game.save.pokedex.seen.SHEDINJA = true
-      game.save.pokedex.owned.SHEDINJA = true
+      local dex = game.save.pokedex
+      dex.seen = dex.seen or {}
+      dex.seen.SHEDINJA = true
+      -- Gen1: owned; Gold: caught (same DexNav mismatch class).
+      if dex.owned then dex.owned.SHEDINJA = true end
+      dex.caught = dex.caught or {}
+      dex.caught.SHEDINJA = true
     end
 
     if #game.save.party < 6 then

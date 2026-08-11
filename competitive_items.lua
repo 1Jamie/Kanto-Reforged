@@ -49,24 +49,38 @@ end
 function Competitive.register(mod)
   for id, def in pairs(Competitive.ITEMS) do
     HeldItems.CATALOG[id] = def
-    mod.content.items:register(id, {
-      id = def.id,
-      name = def.name,
-      price = def.price or 0,
-      tossable = def.tossable ~= false,
-    })
+    -- Gold may already define HEART_SCALE / similar; skip collisions.
+    if not mod.content.items:get(id) then
+      mod.content.items:register(id, {
+        id = def.id,
+        name = def.name,
+        price = def.price or 0,
+        tossable = def.tossable ~= false,
+      })
+    end
   end
 end
 
 function Competitive.install(mod)
+  local BattleCompat = require("mods.Kanto-Reforged.battle_compat")
+
+  local function holdId(battler)
+    local mon = BattleCompat.mon(battler) or battler
+    return HeldItems.ofBattler(battler) or HeldItems.get(mon)
+  end
+
+  local function monOf(battler)
+    return BattleCompat.mon(battler) or (battler and battler.mon) or battler
+  end
+
   -- Atk / damage modifiers
   mod.hooks:wrap("battle.damage", function(next, ctx)
     local dmg, info = next(ctx)
     if not dmg or dmg <= 0 or not ctx then return dmg, info end
     local user = ctx.user
     local move = ctx.move
-    if not user or not user.mon or not move then return dmg, info end
-    local id = user.mon.heldItem
+    if not user or not move then return dmg, info end
+    local id = holdId(user)
     local def = id and HeldItems.def(id)
     if not def then return dmg, info end
 
@@ -82,8 +96,7 @@ function Competitive.install(mod)
   -- Choice lock: record first damaging/status move used
   mod.events:on("battle.move_used", function(ev)
     if not ev or not ev.user or not ev.move then return end
-    local mon = ev.user.mon
-    if not mon or mon.heldItem ~= "CHOICE_BAND" then return end
+    if holdId(ev.user) ~= "CHOICE_BAND" then return end
     if not ev.user.expChoiceLock then
       ev.user.expChoiceLock = ev.move.id
     end
@@ -101,19 +114,29 @@ function Competitive.install(mod)
   mod.events:on("battle.turn_ended", function(ev)
     if not ev or not ev.battle then return end
     local function tick(b)
-      if not b or not b.mon or not b.expLifeOrbPending then return end
+      if not b or not b.expLifeOrbPending then return end
       b.expLifeOrbPending = nil
-      if b.mon.heldItem ~= "LIFE_ORB" or b.mon.hp <= 0 then return end
-      local recoil = math.max(1, math.floor(b.mon.stats.hp / 10))
-      b.mon.hp = math.max(0, b.mon.hp - recoil)
+      local mon = monOf(b)
+      if not mon or holdId(b) ~= "LIFE_ORB" or (mon.hp or 0) <= 0 then return end
+      local maxHp = (mon.stats and mon.stats.hp) or mon.maxHp or mon.hp or 1
+      local recoil = math.max(1, math.floor(maxHp / 10))
+      mon.hp = math.max(0, mon.hp - recoil)
       if ev.battle.sayNext then
         ev.battle:sayNext(Strings("%s is hurt\nby its LIFE ORB!", displayName(b)))
+      elseif BattleCompat.say then
+        BattleCompat.say(ev.battle, Strings("%s is hurt\nby its LIFE ORB!",
+          BattleCompat.displayName(ev.battle, b)))
       end
       if ev.battle.drainNext then ev.battle:drainNext() end
     end
     tick(ev.battle.player)
     tick(ev.battle.enemy)
   end)
+
+  -- Focus Sash / Choice Band BattleState patches are Gen1-only (Gold battle
+  -- lives in src/battle/gen2). Damage/event hooks above still apply on both.
+  local Host = require("mods.Kanto-Reforged.host")
+  if not Host.isGen1() then return end
 
   -- Focus Sash: first lethal hit from full HP → 1 HP, consume (per-hit).
   -- Later hits in a multi-hit can still faint.

@@ -72,9 +72,13 @@ Custom types registered with matchups:
 - **Steel**
 - **Fairy**
 
+Gen1 type-chart quirks are patched to Gen2/Gen3 values on **both** Red and Gold (`type_chart_patches.lua`): Ghost hits Psychic, Bug/Poison are no longer mutual SE, Ice is weak into Fire. Dark/Steel/Fairy matchups are upserted on Gold so they match Red’s table.
+
 ### Moves
 
 Hundreds of Gen 2–3 moves with custom effects (Rollout, weather, hazards, status berries as bag/held medicine, Hidden Power from DVs, etc.). New moves reuse Gen 1 battle animations (composed or aliased).
+
+Vanilla Gen1 move types are patched to Gen3 on **both** hosts (`move_type_patches.lua`): Bite→Dark, Gust→Flying, Karate Chop→Fighting, Sand-Attack→Ground. Gen6 Fairy retcons on Gen2 moves (Charm, Sweet Kiss, Moonlight) stay **Normal** to match Gen3 (same policy as species typings).
 
 Shedinja’s max HP is clamped to **1** at runtime.
 
@@ -299,7 +303,7 @@ Step cool-down between crafts: **640** farm steps (480 at soil rank 3). No berry
 
 - **Pockets:** Items, Balls, Key Items, TMs & HMs, Berries.
 - Bag capacity **60**.
-- **DexNav** on the start menu after you have the Pokédex: current map species (more detail once seen/caught). Footer notes Super Rod on fishable maps. If a roamer is on this map, an optional **ROAM** row appears. Mod setting **DEXNAV**: `DEXNAV` (default), `DEXNAV-KR` (rename to tell it apart from another DexNav mod), or `OFF` (hide KR’s entry).
+- **DexNav** on the start menu (Red) / Pokegear (Gold, via optional `pokegear_cards` lib) after you have the Pokédex: current map species (more detail once seen/caught). Footer notes Super Rod on fishable maps. If a roamer is on this map, an optional **ROAM** row appears. Mod setting **DEXNAV**: `DEXNAV` (default), `DEXNAV-KR` (rename to tell it apart from another DexNav mod), or `OFF` (hide KR’s entry).
 - **Summary** page shows ability, held item, and gender glyph.
 - **Optional [Gen1 Modern UI](https://github.com/ArmstrongThomas/gen1-modern-ui):** when that mod is installed, bag pockets and the summary ability page use its presenters; DexNav and party Give/Take keep working through the existing start-menu / party submenu hooks. With Modern UI absent, all of this still draws and plays as stock Gen 1 UI.
 
@@ -337,7 +341,7 @@ Step cool-down between crafts: **640** farm steps (480 at soil rank 3). No berry
 
 Never taking candy = vanilla leveling.
 
-House battle clubs scale opponent levels from the same milestone table even when hard caps are off (soft bracket).
+House battle clubs: with **level caps on**, opponents use the story soft-cap only (on-bracket competitive). With caps **off**, scale is **max(soft-cap, highest non-egg party level)** so overleveled teams still get a hard Circuit.
 
 ---
 
@@ -355,7 +359,7 @@ Four rungs: **natural** (common wilds — dump useless plays, otherwise messy), 
 
 ## House NPCs and utility
 
-All short Gen 1-style dialogues. No Natures/IV judge, only DVs / Hidden Power / statExp. Club levels scale from the soft-cap bracket even if you never took the Viridian candies.
+All short Gen 1-style dialogues. No Natures/IV judge, only DVs / Hidden Power / statExp. Club levels: soft-cap when Viridian caps are on; otherwise **max(soft-cap, highest party level)**.
 
 ### Celadon Circuit (Celadon Mansion 2F)
 
@@ -484,8 +488,23 @@ One-shot statics. **Win, catch, or flee** all set the beat flag and hide the obj
 | `ILEX_SHRINE_KANT` | 1102 | Celebi |
 | `BIRTH_ISLAND_KANT` | 1103 | Deoxys |
 | `REGIROCK_CHAMBER` | 1104 | Regirock (ladder from Rock Tunnel B1F) |
+| `SEVII_ONE_ISLAND` | 1200 | Sevii One Island town |
+| `SEVII_ONE_ISLAND_HARBOR` | 1201 | Ferry landing |
+| `SEVII_ONE_ISLAND_POKECENTER` | 1202 | Island PC |
+| `SEVII_ONE_ISLAND_MART` | 1203 | Island Mart |
+| `SEVII_ONE_ISLAND_KINDLE_ROAD` | 1204 | East route (imported wilds) |
+| `SEVII_ONE_ISLAND_TREASURE_BEACH` | 1205 | South beach (imported wilds) |
 
 Legendary custom maps save return coordinates on enter and exit via warp hooks so you cannot soft-lock. They are not remembered as `lastOutdoor` (same class of fix as the Berry Farm PC door).
+
+Sevii map ids 1200+ are reserved but **not loaded** while Sevii is parked.
+
+### Sevii Islands (parked)
+
+**Disabled.** Sevii maps/ferry/tooling live under `sevii/` but `SEVII_ENABLED` is false in `main.lua`. Indices **1200–1399** stay reserved. Tooling (run from that folder):
+
+- `python3 sevii/sevii_import.py --pokefirered /path/to/pokefirered`
+- `python3 sevii/sevii_semantic_remap.py` (writes `sevii/layout_data.lua`)
 
 ---
 
@@ -509,6 +528,9 @@ Legendary custom maps save return coordinates on enter and exit via warp hooks s
 | `main.lua` | Boot order, types/moves/species registration, options |
 | `pokemon_data.lua` / patches | Generated species, abilities, learnsets, gender, breeding |
 | `types_data.lua` | Dark / Steel / Fairy |
+| `type_chart_patches.lua` | Gen1→Gen3 matchup fixes (Ghost/Psychic, Bug/Poison, Ice/Fire) |
+| `move_type_patches.lua` | Gen1/Gen2 move types → Gen3 |
+| `palette_gen2.lua` | KR species palettes → Gold `gen2Palettes.pokemon` rows |
 | `move_effects.lua` / `move_anims.lua` | Effects + anim aliases |
 | `encounters.lua` / `trainers.lua` / `trainer_ai.lua` | Wilds + trainer mixes + AI |
 | `held_items.lua` / `competitive_items.lua` / `overworld_loot.lua` | Items + finds |
@@ -522,6 +544,7 @@ Legendary custom maps save return coordinates on enter and exit via warp hooks s
 | `move_hub.lua` / `item_smith.lua` / `fossils_gen3.lua` | Tutor hub, smith, fossils |
 | `roamers.lua` / `roaming_radar.lua` / `roamer_dex.lua` / `kanto_graph.lua` | Roamers |
 | `legend_shrines.lua` / `legend_regis.lua` / `legend_mythicals.lua` | Statics + custom maps |
+| `sevii/` (parked) | Sevii ferry/maps/tooling — disabled until `SEVII_ENABLED` |
 
 Tests live under `tests/` and are pulled in by `tests/Kanto-Reforged_test.lua`.
 

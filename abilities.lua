@@ -1,4 +1,5 @@
 local Strings = require("src.core.Strings")
+local BattleCompat = require("mods.Kanto-Reforged.battle_compat")
 
 local Abilities = {}
 
@@ -37,61 +38,113 @@ function Abilities.isSoundMove(moveId)
   return SOUND_MOVES[moveId] == true
 end
 
-local function displayName(b)
-  return b.isPlayer and b.name or ("Enemy " .. b.name)
+local function displayName(battle, b)
+  return BattleCompat.displayName(battle, b)
+end
+
+local function speciesOf(battler)
+  return BattleCompat.species(battler)
 end
 
 local function abilityOf(battle, battler)
-  if not battler or not battler.mon then return nil end
+  if not battler then return nil end
   if battler.expAbilitySuppressed then return nil end
   if battler.expTracedAbility then return battler.expTracedAbility end
   if not battle or not battle.data or not battle.data.pokemon then return nil end
-  local def = battle.data.pokemon[battler.mon.species]
+  local species = speciesOf(battler)
+  if not species then return nil end
+  local def = battle.data.pokemon[species]
   return def and def.ability
 end
 Abilities.abilityOf = abilityOf
+Abilities.speciesOf = speciesOf
+
+--- True when the battler's ability blocks this major status (or confuse).
+--- Accepts Gen1 codes (SLP/BRN/…) or Gold ids (sleep/burn/…).
+function Abilities.blocksStatus(battle, battler, status, opts)
+  if not status or not battler then return false end
+  opts = opts or {}
+  local ability = abilityOf(battle, battler)
+  if not ability then return false end
+  local g2 = BattleCompat.toGen2Status(status) or status
+  local g1 = BattleCompat.toGen1Status(status) or status
+
+  if (ability == "INSOMNIA" or ability == "VITAL_SPIRIT")
+      and (g2 == "sleep" or g1 == "SLP") then
+    return true
+  end
+  if battle and battle.expUproarActive and (g2 == "sleep" or g1 == "SLP") then
+    return true
+  end
+  if ability == "LIMBER" and (g2 == "paralyze" or g1 == "PAR") then
+    return true
+  end
+  if ability == "WATER_VEIL" and (g2 == "burn" or g1 == "BRN") then
+    return true
+  end
+  if ability == "MAGMA_ARMOR" and (g2 == "freeze" or g1 == "FRZ") then
+    return true
+  end
+  if ability == "IMMUNITY"
+      and (g2 == "poison" or g2 == "toxic" or g1 == "PSN" or g1 == "TOX") then
+    return true
+  end
+  if ability == "OWN_TEMPO" and (g2 == "confuse" or status == "CONFUSION"
+      or status == "confuse") then
+    return true
+  end
+  if ability == "LEAF_GUARD" and (g2 == "sleep" or g1 == "SLP"
+      or g2 == "poison" or g2 == "toxic" or g1 == "PSN" or g1 == "TOX"
+      or g2 == "burn" or g1 == "BRN" or g2 == "paralyze" or g1 == "PAR"
+      or g2 == "freeze" or g1 == "FRZ") then
+    local weather = BattleCompat.getWeather(battle)
+    if weather == "SUNNY" then return true end
+  end
+  if opts.secondary and not opts.fromAbility and ability == "SHIELD_DUST" then
+    return true
+  end
+  if ability == "FLASH_FIRE" and (g2 == "burn" or g1 == "BRN")
+      and opts.moveType == "FIRE" and not opts.secondary then
+    return true
+  end
+  if ability == "LIGHTNING_ROD" and (g2 == "paralyze" or g1 == "PAR")
+      and opts.moveType == "ELECTRIC" and not opts.secondary then
+    return true
+  end
+  return false
+end
 
 local function setWeather(battle, weather, message)
-  if not battle.field then
-    battle.field = { weather = nil, tokens = {}, sides = battle.sides }
-  end
-  if battle.field.weather == weather then return end
-  battle.field.weather = weather
-  if message then
-    battle:sayNext(Strings(message))
-  end
+  BattleCompat.setWeather(battle, weather, message and Strings(message) or nil)
   Abilities.updateForecast(battle, battle.player)
   Abilities.updateForecast(battle, battle.enemy)
 end
 
 -- Intimidate effect handler
 local function triggerIntimidate(battle, source, target)
-  if not target or not target.mon or (target.mon.hp and target.mon.hp <= 0) then return end
-
-  -- Intimidate is blocked by Substitute
+  local mon = BattleCompat.mon(target)
+  if not mon or (mon.hp and mon.hp <= 0) then return end
   if target.substituteHP then return end
 
-  local cur = target.stages.attack or 0
+  local stages = BattleCompat.stages(battle, target)
+  if not stages then return end
+  local cur = stages.attack or 0
   if cur <= -6 then return end
-
-  target.stages.attack = math.max(-6, cur - 1)
+  stages.attack = math.max(-6, cur - 1)
   target.hazeStatReset = nil
 
-  local srcName = displayName(source)
-  local tgtName = displayName(target)
-
-  battle:sayNext(Strings("%s's\nINTIMIDATE cuts\n%s's ATTACK!", srcName, tgtName))
+  BattleCompat.say(battle, Strings("%s's\nINTIMIDATE cuts\n%s's ATTACK!",
+    displayName(battle, source), displayName(battle, target)))
 end
 
--- Update Forecast form and types
+-- Update Forecast form and types (Castform)
 function Abilities.updateForecast(battle, battler)
-  if not battler or not battler.mon then return end
-  local def = battle.data.pokemon[battler.mon.species]
-  local ability = def and def.ability
-  if ability ~= "FORECAST" then return end
+  if not BattleCompat.mon(battler) then return end
+  if abilityOf(battle, battler) ~= "FORECAST" then return end
 
-  local weather = battle.field and battle.field.weather
-  local oldType = battler.curTypes[1]
+  local weather = BattleCompat.getWeather(battle)
+  local types = BattleCompat.types(battler)
+  local oldType = types[1]
   local newType = "NORMAL"
   if weather == "SUNNY" then
     newType = "FIRE"
@@ -102,20 +155,32 @@ function Abilities.updateForecast(battle, battler)
   end
 
   if oldType ~= newType then
-    battler.curTypes = { newType }
-    battle:sayNext(Strings("%s transformed\ninto its weather form!", displayName(battler)))
+    BattleCompat.setTypes(battler, { newType })
+    BattleCompat.say(battle, Strings("%s transformed\ninto its weather form!",
+      displayName(battle, battler)))
   end
 end
 
 -- Chlorophyll / Swift Swim / Tailwind effective-speed multiplier
 function Abilities.speedMult(battle, battler)
   local ability = abilityOf(battle, battler)
-  local weather = battle.field and battle.field.weather
+  local weather = BattleCompat.getWeather(battle)
   local mult = 1
   if ability == "CHLOROPHYLL" and weather == "SUNNY" then mult = mult * 2 end
   if ability == "SWIFT_SWIM" and weather == "RAINY" then mult = mult * 2 end
   local side = battle.sideOf and battle:sideOf(battler)
-  if side and side.expTailwindTurns and side.expTailwindTurns > 0 then
+  if type(side) == "table" and side.expTailwindTurns and side.expTailwindTurns > 0 then
+    mult = mult * 2
+  elseif battle.sides then
+    for _, s in ipairs(battle.sides) do
+      if s and s.expTailwindTurns and s.expTailwindTurns > 0 then
+        -- Gen1 sideOf returns side table; Gen2 returns "player"/"enemy" keys.
+      end
+    end
+  end
+  if type(side) == "string" and battle.sides and battle.sides[side]
+      and battle.sides[side].expTailwindTurns
+      and battle.sides[side].expTailwindTurns > 0 then
     mult = mult * 2
   end
   return mult
@@ -123,32 +188,43 @@ end
 
 -- Entry triggers
 function Abilities.onEntry(battle, battler)
-  if not battler or not battler.mon then return end
+  if not BattleCompat.mon(battler) then return end
   local ability = abilityOf(battle, battler)
+  local name = displayName(battle, battler)
 
   if ability == "INTIMIDATE" then
     local target = battler.isPlayer and battle.enemy or battle.player
+    -- Gen2: isPlayer may be absent; compare identity to battle.player.
+    if target == nil and battle.player and battle.enemy then
+      target = (battler == battle.player) and battle.enemy or battle.player
+    end
     triggerIntimidate(battle, battler, target)
   elseif ability == "FORECAST" then
     Abilities.updateForecast(battle, battler)
   elseif ability == "DROUGHT" then
-    setWeather(battle, "SUNNY", displayName(battler) .. "'s\nDROUGHT intensified\nthe sun!")
+    setWeather(battle, "SUNNY", name .. "'s\nDROUGHT intensified\nthe sun!")
   elseif ability == "DRIZZLE" then
-    setWeather(battle, "RAINY", displayName(battler) .. "'s\nDRIZZLE made it\nrain!")
+    setWeather(battle, "RAINY", name .. "'s\nDRIZZLE made it\nrain!")
   elseif ability == "SAND_STREAM" then
-    setWeather(battle, "SANDSTORM", displayName(battler) .. "'s\nSAND STREAM whipped\nup a sandstorm!")
+    setWeather(battle, "SANDSTORM", name .. "'s\nSAND STREAM whipped\nup a sandstorm!")
   elseif ability == "AIR_LOCK" then
-    setWeather(battle, nil, displayName(battler) .. "'s\nAIR LOCK cleared\nthe weather!")
+    setWeather(battle, nil, name .. "'s\nAIR LOCK cleared\nthe weather!")
   elseif ability == "TRACE" then
-    local foe = battler.isPlayer and battle.enemy or battle.player
+    local foe = (battler == battle.player or battler.isPlayer) and battle.enemy or battle.player
     local foeAbility = abilityOf(battle, foe)
     if foeAbility and foeAbility ~= "TRACE" then
       battler.expTracedAbility = foeAbility
-      battle:sayNext(Strings("%s traced\n%s!", displayName(battler), foeAbility:gsub("_", " ")))
-      -- Re-trigger entry effects of the copied ability once
+      BattleCompat.say(battle, Strings("%s traced\n%s!", name, foeAbility:gsub("_", " ")))
       if foeAbility == "INTIMIDATE" then
-        local target = battler.isPlayer and battle.enemy or battle.player
-        triggerIntimidate(battle, battler, target)
+        triggerIntimidate(battle, battler, foe)
+      elseif foeAbility == "FORECAST" then
+        Abilities.updateForecast(battle, battler)
+      elseif foeAbility == "DROUGHT" then
+        setWeather(battle, "SUNNY", name .. "'s\nDROUGHT intensified\nthe sun!")
+      elseif foeAbility == "DRIZZLE" then
+        setWeather(battle, "RAINY", name .. "'s\nDRIZZLE made it\nrain!")
+      elseif foeAbility == "SAND_STREAM" then
+        setWeather(battle, "SANDSTORM", name .. "'s\nSAND STREAM whipped\nup a sandstorm!")
       end
     end
   end
@@ -161,19 +237,20 @@ function Abilities.onMoveUsed(battle, user, move)
   if weather then
     setWeather(battle, weather)
   end
+  -- Also sync when Gold native weather moves already wrote battle.weather.
   Abilities.updateForecast(battle, battle.player)
   Abilities.updateForecast(battle, battle.enemy)
 end
 
 -- Turn start triggers (Truant)
 function Abilities.onTurnStart(battle, battler)
-  if not battler or not battler.mon then return end
+  if not BattleCompat.mon(battler) then return end
   local ability = abilityOf(battle, battler)
   if ability == "TRUANT" then
     if battler.loafing then
       battler.loafing = false
       battler.skipMove = true
-      battle:sayNext(Strings("%s is\nloafing around!", displayName(battler)))
+      BattleCompat.say(battle, Strings("%s is\nloafing around!", displayName(battle, battler)))
     else
       battler.loafing = true
     end
@@ -182,118 +259,106 @@ end
 
 -- End of turn (Speed Boost)
 function Abilities.onTurnEnded(battle, battler)
-  if not battler or not battler.mon or battler.mon.hp <= 0 then return end
+  local mon = BattleCompat.mon(battler)
+  if not mon or (mon.hp or 0) <= 0 then return end
   if abilityOf(battle, battler) ~= "SPEED_BOOST" then return end
-  local cur = battler.stages.speed or 0
+  local stages = BattleCompat.stages(battle, battler)
+  if not stages then return end
+  local cur = stages.speed or 0
   if cur >= 6 then return end
-  battler.stages.speed = cur + 1
+  stages.speed = cur + 1
   battler.hazeStatReset = nil
-  battle:sayNext(Strings("%s's SPEED\nrose!", displayName(battler)))
+  BattleCompat.say(battle, Strings("%s's SPEED\nrose!", displayName(battle, battler)))
 end
 
--- Damage pipeline triggers
+-- Damage pipeline triggers (Gen1 curStats + Gen2 ctx.opts)
 function Abilities.onDamage(next, ctx)
   local move = ctx.move
   local user = ctx.user
   local target = ctx.target
+  local battle = ctx.battle
 
-  local targetAbility = abilityOf(ctx.battle, target)
-  local userAbility = abilityOf(ctx.battle, user)
+  local targetAbility = abilityOf(battle, target)
+  local userAbility = abilityOf(battle, user)
+  local userMon = BattleCompat.mon(user)
+  local targetMon = BattleCompat.mon(target)
 
-  -- 1. Levitate: Ground moves have no effect
   if targetAbility == "LEVITATE" and move.type == "GROUND" then
-    return 0, { crit = false, typeMult = 0 }
+    return 0, { crit = false, typeMult = 0, effectiveness = 0 }
   end
 
-  -- Flash Fire: Fire moves have no effect (Gen 1-style type immunity)
   if targetAbility == "FLASH_FIRE" and move.type == "FIRE"
       and move.power and move.power > 0 then
-    ctx.battle:sayNext(Strings("%s's FLASH FIRE\nmade it immune!", displayName(target)))
-    return 0, { crit = false, typeMult = 0 }
+    BattleCompat.say(battle, Strings("%s's FLASH FIRE\nmade it immune!",
+      displayName(battle, target)))
+    return 0, { crit = false, typeMult = 0, effectiveness = 0 }
   end
 
-  -- Lightning Rod: Electric moves have no effect (singles Gen 1 stand-in)
   if targetAbility == "LIGHTNING_ROD" and move.type == "ELECTRIC"
       and move.power and move.power > 0 then
-    ctx.battle:sayNext(Strings("%s's LIGHTNING ROD\ntook the attack!", displayName(target)))
-    return 0, { crit = false, typeMult = 0 }
+    BattleCompat.say(battle, Strings("%s's LIGHTNING ROD\ntook the attack!",
+      displayName(battle, target)))
+    return 0, { crit = false, typeMult = 0, effectiveness = 0 }
   end
 
-  -- 1b. Soundproof: immune to sound moves
   if targetAbility == "SOUNDPROOF" and SOUND_MOVES[move.id] then
-    return 0, { crit = false, typeMult = 0 }
+    return 0, { crit = false, typeMult = 0, effectiveness = 0 }
   end
 
-  -- 2. Wonder Guard: only super-effective damaging moves land
   if targetAbility == "WONDER_GUARD" and move.power and move.power > 0 then
     local TypeChart = require("src.battle.TypeChart")
-    local mult = TypeChart.effectiveness(move.type, target.curTypes)
+    local mult = TypeChart.effectiveness(move.type, BattleCompat.types(target))
     if mult <= 10 then
-      return 0, { crit = false, typeMult = 0 }
+      return 0, { crit = false, typeMult = 0, effectiveness = 0 }
     end
   end
 
-  -- 3. Volt Absorb / Water Absorb
   local absorbType = ABSORB[targetAbility]
-  if absorbType and move.type == absorbType and move.power and move.power > 0 then
-    local heal = math.max(1, math.floor(target.mon.stats.hp / 4))
-    target.mon.hp = math.min(target.mon.stats.hp, target.mon.hp + heal)
-    ctx.battle:sayNext(Strings("%s restored HP\nusing its %s!",
-      displayName(target), targetAbility:gsub("_", " ")))
-    return 0, { crit = false, typeMult = 0 }
+  if absorbType and move.type == absorbType and move.power and move.power > 0
+      and targetMon then
+    local heal = math.max(1, math.floor(BattleCompat.maxHp(target) / 4))
+    BattleCompat.heal(target, heal)
+    BattleCompat.say(battle, Strings("%s restored HP\nusing its %s!",
+      displayName(battle, target), targetAbility:gsub("_", " ")))
+    return 0, { crit = false, typeMult = 0, effectiveness = 0 }
   end
 
   local TypeChart = require("src.battle.TypeChart")
   local category = move.category or TypeChart.category(move.type) or "physical"
   local isPhysical = category == "physical"
+  local restores = {}
 
-  -- 4. Overgrow / Blaze / Torrent / Swarm: 1.5x when HP ≤ 1/3
+  local function pushRestore(fn)
+    if fn then restores[#restores + 1] = fn end
+  end
+
   local boostType = STARTER_BOOST[userAbility]
-  local boostedStat, oldStat
-  if boostType and move.type == boostType and user.mon.hp * 3 <= user.mon.stats.hp then
-    local key = isPhysical and "attack" or "special"
-    boostedStat = key
-    oldStat = user.curStats[key]
-    user.curStats[key] = math.floor(oldStat * 1.5)
+  if boostType and move.type == boostType and userMon
+      and BattleCompat.hp(user) * 3 <= BattleCompat.maxHp(user) then
+    pushRestore(BattleCompat.scaleOffense(ctx, user, isPhysical, 1.5))
   end
 
-  -- Pure Power / Huge Power: double Attack for physical moves
-  local pureBoost, pureOld
   if (userAbility == "PURE_POWER" or userAbility == "HUGE_POWER") and isPhysical then
-    pureBoost = true
-    pureOld = user.curStats.attack
-    user.curStats.attack = pureOld * 2
+    pushRestore(BattleCompat.scaleOffense(ctx, user, true, 2))
   end
 
-  -- Hustle: 1.5x physical Attack
-  local hustleBoost, hustleOld
   if userAbility == "HUSTLE" and isPhysical then
-    hustleBoost = true
-    hustleOld = user.curStats.attack
-    user.curStats.attack = math.floor(hustleOld * 1.5)
+    pushRestore(BattleCompat.scaleOffense(ctx, user, true, 1.5))
   end
 
-  -- Plus / Minus: singles stand-in for the doubles SpA link — 1.5x Special
-  local plusBoost, plusOld
   if (userAbility == "PLUS" or userAbility == "MINUS") and not isPhysical then
-    plusBoost = true
-    plusOld = user.curStats.special
-    user.curStats.special = math.floor(plusOld * 1.5)
+    pushRestore(BattleCompat.scaleOffense(ctx, user, false, 1.5))
   end
 
-  -- Marvel Scale: 1.5x Defense when statused
-  local marvelOld
-  if targetAbility == "MARVEL_SCALE" and target.mon.status and isPhysical then
-    marvelOld = target.curStats.defense
-    target.curStats.defense = math.floor(marvelOld * 1.5)
+  if targetAbility == "MARVEL_SCALE" and BattleCompat.hasStatus(target,
+        "BRN", "PSN", "PAR", "SLP", "FRZ", "TOX",
+        "burn", "poison", "paralyze", "sleep", "freeze", "toxic")
+      and isPhysical then
+    pushRestore(BattleCompat.scaleDefense(ctx, target, true, 1.5))
   end
 
   local function restoreBoosts()
-    if boostedStat then user.curStats[boostedStat] = oldStat end
-    if pureBoost then user.curStats.attack = pureOld end
-    if hustleBoost then user.curStats.attack = hustleOld end
-    if plusBoost then user.curStats.special = plusOld end
-    if marvelOld then target.curStats.defense = marvelOld end
+    for i = #restores, 1, -1 do restores[i]() end
   end
 
   local function applyFieldMods(damage)
@@ -302,27 +367,22 @@ function Abilities.onDamage(next, ctx)
         and (move.type == "FIRE" or move.type == "ICE") then
       damage = math.max(1, math.floor(damage / 2))
     end
-    if ctx.battle.expMudSport and move.type == "ELECTRIC" then
+    if battle and battle.expMudSport and move.type == "ELECTRIC" then
       damage = math.max(1, math.floor(damage / 3))
     end
-    if ctx.battle.expWaterSport and move.type == "FIRE" then
+    if battle and battle.expWaterSport and move.type == "FIRE" then
       damage = math.max(1, math.floor(damage / 3))
     end
     return damage
   end
 
-  -- 5. Guts: +50% physical Attack when statused (cancels burn cut)
-  if userAbility == "GUTS" and isPhysical and user.mon.status then
-    local oldAttack = user.curStats.attack
+  if userAbility == "GUTS" and isPhysical and BattleCompat.status(user) then
     local factor = 1.5
-    if user.mon.status == "BRN" then
+    if BattleCompat.hasStatus(user, "BRN", "burn") then
       factor = 3.0
     end
-    user.curStats.attack = math.floor(oldAttack * factor)
-
+    pushRestore(BattleCompat.scaleOffense(ctx, user, true, factor))
     local damage, info = next(ctx)
-
-    user.curStats.attack = oldAttack
     restoreBoosts()
     return applyFieldMods(damage), info
   end
@@ -332,22 +392,17 @@ function Abilities.onDamage(next, ctx)
   return applyFieldMods(damage), info
 end
 
--- Post damage triggers (Color Change + contact abilities)
---
--- Gen 3 contact abilities use the physical/special split as a stand-in for
--- the Gen 6+ contact flag. Chance is Random()%100 < 30 (pokeemerald).
 local function chance100(battle, percent)
   local rng = battle and battle.rng
   local roll
   if type(rng) == "function" then
-    -- Prefer a full byte then reduce, so a float-or-lo-bound stub rng
-    -- cannot make every check succeed (rng()→0.x used to make roll<30
-    -- always true when the call was rng(0,99)).
     roll = rng(0, 255)
     if type(roll) ~= "number" then return false end
-    -- Non-integer (float [0,1) stub that ignored args): never auto-proc.
     if roll ~= math.floor(roll) then return false end
     roll = math.floor(roll) % 100
+  elseif battle and type(battle.random) == "function" then
+    roll = battle.random(100)
+    if type(roll) ~= "number" then return false end
   else
     roll = math.random(0, 99)
   end
@@ -355,44 +410,54 @@ local function chance100(battle, percent)
 end
 
 function Abilities.onPostDamage(battle, user, target, move, damage)
-  if not target or not target.mon or (target.mon.hp and target.mon.hp <= 0) then return end
+  local targetMon = BattleCompat.mon(target)
+  if not targetMon or (targetMon.hp and targetMon.hp <= 0) then return end
   local targetAbility = abilityOf(battle, target)
   local userAbility = abilityOf(battle, user)
+  local userMon = BattleCompat.mon(user)
 
-  if targetAbility == "COLOR_CHANGE" and damage > 0 and move.type ~= target.curTypes[1] then
-    target.curTypes = { move.type }
-    battle:sayNext(Strings("%s's type\nchanged to %s!", displayName(target), move.type))
+  local types = BattleCompat.types(target)
+  if targetAbility == "COLOR_CHANGE" and damage > 0 and move.type ~= types[1] then
+    BattleCompat.setTypes(target, { move.type })
+    BattleCompat.say(battle, Strings("%s's type\nchanged to %s!",
+      displayName(battle, target), move.type))
   end
 
-  -- Physical moves approximate "contact" for Gen 1 engine / Gen 3 abilities
   local TypeChart = require("src.battle.TypeChart")
   local category = move.category or TypeChart.category(move.type) or "physical"
   if category ~= "physical" or not damage or damage <= 0 then return end
   if target.substituteHP then return end
-  -- Confusion self-hit shares user/target; do not self-proc contact abilities.
   if user == target then return end
 
-  if targetAbility == "ROUGH_SKIN" and user and user.mon and user.mon.hp > 0 then
-    local dmg = math.max(1, math.floor(user.mon.stats.hp / 8))
-    battle:applyDamage(user, dmg)
-    battle:sayNext(Strings("%s was hurt by\nROUGH SKIN!", displayName(user)))
-    if user.mon.hp <= 0 then battle:onFaint(user) end
+  if targetAbility == "ROUGH_SKIN" and userMon and (userMon.hp or 0) > 0 then
+    local dmg = math.max(1, math.floor(BattleCompat.maxHp(user) / 8))
+    BattleCompat.applyHpLoss(battle, user, dmg)
+    BattleCompat.say(battle, Strings("%s was hurt by\nROUGH SKIN!",
+      displayName(battle, user)))
+    if BattleCompat.hp(user) <= 0 and battle.onFaint and user.mon then
+      battle:onFaint(user)
+    end
   end
 
-  local StatusRegistry = require("src.battle.StatusRegistry")
+  -- Contact status abilities.
+  if not userMon or (userMon.hp or 0) <= 0 then return end
 
-  -- Stench: attacker's stink can flinch (Gen 1 secondary-flinch feel, ~10%)
-  if userAbility == "STENCH" and target.mon.hp > 0 and chance100(battle, 10) then
-    target.flinched = true
+  if userAbility == "STENCH" and BattleCompat.hp(target) > 0 and chance100(battle, 10) then
+    if battle.volatile then
+      local vol = battle:volatile(target)
+      if vol then vol.flinched = true end
+    else
+      target.flinched = true
+    end
   end
 
-  -- Cursed Body: Disable the move that hit you (Gen 1 Disable)
-  if targetAbility == "CURSED_BODY" and user and user.mon and user.mon.hp > 0
+  if targetAbility == "CURSED_BODY" and BattleCompat.hp(user) > 0
       and move and move.id and not user.disabledSlot
       and chance100(battle, 30) then
+    local moves = user.curMoves or user.moves or {}
     local slot
-    for i, mv in ipairs(user.curMoves or {}) do
-      if mv.id == move.id then
+    for i, mv in ipairs(moves) do
+      if (mv.id or mv) == move.id then
         slot = i
         break
       end
@@ -401,66 +466,52 @@ function Abilities.onPostDamage(battle, user, target, move, damage)
       user.disabledSlot = slot
       local turnRoll = battle.rng and battle.rng(2, 5) or math.random(2, 5)
       user.disabledTurns = turnRoll
+      if battle.volatile then
+        local vol = battle:volatile(user)
+        if vol then
+          vol.disabled = move.id
+          vol.disabledTurns = turnRoll
+        end
+      end
       local moveName = (battle.data and battle.data.moves and battle.data.moves[move.id]
         and battle.data.moves[move.id].name) or move.id
-      battle:sayNext(Strings("%s's\n%s was\ndisabled!", displayName(user), moveName))
+      BattleCompat.say(battle, Strings("%s's\n%s was\ndisabled!",
+        displayName(battle, user), moveName))
     end
   end
 
-  -- Static / Poison Point / Flame Body / Effect Spore: 30% on contact.
-  -- Do not pass moveType for Static — Gen 3 Static can paralyze Ground
-  -- (Thunder Wave cannot; that gate lives on PAR.canInflict).
   if targetAbility == "STATIC" and chance100(battle, 30)
-      and user and user.mon and not user.mon.status then
-    local msgs = StatusRegistry.inflict(battle, user, "PAR", {
-      secondary = true, source = "STATIC",
-      expSourceBattler = target,
-    })
-    for _, m in ipairs(msgs or {}) do battle:sayNext(m) end
+      and not BattleCompat.status(user) then
+    BattleCompat.applyStatus(battle, user, "paralyze", target, { fromAbility = true })
   elseif targetAbility == "POISON_POINT" and chance100(battle, 30)
-      and user and user.mon and not user.mon.status then
-    local msgs = StatusRegistry.inflict(battle, user, "PSN", {
-      secondary = true, moveType = "POISON", source = "POISON_POINT",
-      expSourceBattler = target,
-    })
-    for _, m in ipairs(msgs or {}) do battle:sayNext(m) end
+      and not BattleCompat.status(user) then
+    BattleCompat.applyStatus(battle, user, "poison", target, { fromAbility = true })
   elseif targetAbility == "FLAME_BODY" and chance100(battle, 30)
-      and user and user.mon and not user.mon.status then
-    local msgs = StatusRegistry.inflict(battle, user, "BRN", {
-      secondary = true, moveType = "FIRE", source = "FLAME_BODY",
-      expSourceBattler = target,
-    })
-    for _, m in ipairs(msgs or {}) do battle:sayNext(m) end
+      and not BattleCompat.status(user) then
+    BattleCompat.applyStatus(battle, user, "burn", target, { fromAbility = true })
   elseif targetAbility == "EFFECT_SPORE" and chance100(battle, 30)
-      and user and user.mon and not user.mon.status then
-    local pick = ({ "SLP", "PSN", "PAR" })[
+      and not BattleCompat.status(user) then
+    local pick = ({ "sleep", "poison", "paralyze" })[
       (battle.rng and battle.rng(1, 3) or math.random(1, 3))]
-    local msgs = StatusRegistry.inflict(battle, user, pick, {
-      secondary = true, source = "EFFECT_SPORE",
-      expSourceBattler = target,
-    })
-    for _, m in ipairs(msgs or {}) do battle:sayNext(m) end
+    BattleCompat.applyStatus(battle, user, pick, target, { fromAbility = true })
   elseif targetAbility == "CUTE_CHARM"
-      and user and user.mon and not user.expInfatuated
+      and not user.expInfatuated
       and chance100(battle, 33) then
-    -- Gen 3 Cute Charm is ~1/3 (33/100 stand-in for Random()%3==0).
     local ua = abilityOf(battle, user)
     if ua ~= "OBLIVIOUS" then
-      local Gender = require("mods.Kanto-Reforged.gender")
-      if Gender.canInfatuate(target.mon, user.mon) then
+      local okG, Gender = pcall(require, "mods.Kanto-Reforged.gender")
+      if okG and Gender.canInfatuate and Gender.canInfatuate(targetMon, userMon) then
         Gender.applyInfatuation(battle, user)
       end
     end
   end
 end
 
--- Rock Head: zero recoil amounts
 function Abilities.modifyRecoil(battle, user, amount)
   if abilityOf(battle, user) == "ROCK_HEAD" then return 0 end
   return amount
 end
 
--- Pickup: ~10% chance to find a common item after winning a battle
 local PICKUP_TABLE = {
   "POTION", "ANTIDOTE", "SUPER_POTION", "AWAKENING", "BURN_HEAL",
   "ICE_HEAL", "PARLYZ_HEAL", "REPEL", "SUPER_REPEL", "GREAT_BALL",
@@ -470,13 +521,14 @@ local PICKUP_TABLE = {
 function Abilities.tryPickup(game, party, rng)
   if not game or not game.save or not party then return end
   rng = rng or math.random
-  local Bag = require("src.inventory.Bag")
+  local okBag, Bag = pcall(require, "src.inventory.Bag")
+  if not okBag then return end
   for _, mon in ipairs(party) do
     if mon and mon.hp and mon.hp > 0 then
       local def = game.data and game.data.pokemon and game.data.pokemon[mon.species]
       if def and def.ability == "PICKUP" and rng(0, 99) < 10 then
         local item = PICKUP_TABLE[rng(1, #PICKUP_TABLE)]
-        if item and Bag.add(game.save, item, 1) then
+        if item and Bag.add and Bag.add(game.save, item, 1) then
           return item, mon
         end
       end
@@ -484,7 +536,6 @@ function Abilities.tryPickup(game, party, rng)
   end
 end
 
--- Illuminate: wild encounter rate multiplier (1.5x when lead has it)
 function Abilities.illuminateRateMult(game)
   local lead = game and game.save and game.save.party and game.save.party[1]
   if not lead then return 1 end

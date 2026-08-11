@@ -184,6 +184,38 @@ T.eq(getMatchupMultiplier("STEEL", "FIRE"), 5, "Steel vs Fire is half damage")
 T.eq(getMatchupMultiplier("PSYCHIC_TYPE", "STEEL"), 5, "Psychic vs Steel is half damage")
 T.eq(getMatchupMultiplier("STEEL", "NORMAL"), 10, "Steel vs Normal defaults to neutral 1.0x")
 
+-- Gen3 move types (Gen1 ROM remaps + Gen3-strict Fairy→Normal)
+T.eq(Data.moves.BITE.type, "DARK", "Bite is Dark (Gen2/3)")
+T.eq(Data.moves.GUST.type, "FLYING", "Gust is Flying (Gen2/3)")
+T.eq(Data.moves.KARATE_CHOP.type, "FIGHTING", "Karate Chop is Fighting (Gen2/3)")
+T.eq(Data.moves.SAND_ATTACK.type, "GROUND", "Sand-Attack is Ground (Gen2/3)")
+if Data.moves.CHARM then
+  T.eq(Data.moves.CHARM.type, "NORMAL", "Charm is Normal in Gen3 (not Fairy)")
+end
+
+-- Gen1 chart quirks patched to Gen2/3
+T.eq(getMatchupMultiplier("GHOST", "PSYCHIC_TYPE"), 20, "Ghost vs Psychic is SE (Gen2/3)")
+T.eq(getMatchupMultiplier("BUG", "POISON"), 5, "Bug vs Poison is NVE (Gen2/3)")
+T.eq(getMatchupMultiplier("POISON", "BUG"), 10, "Poison vs Bug is neutral (Gen2/3)")
+T.eq(getMatchupMultiplier("ICE", "FIRE"), 5, "Ice vs Fire is NVE (Gen2/3)")
+
+-- Gen3 species typings (no Fairy retcon): Dark hits Ralts for 2×
+local TypeChart = require("src.battle.TypeChart")
+T.eq(TypeChart.effectiveness("GHOST", { "PSYCHIC_TYPE" }), 20,
+  "TypeChart Ghost vs Psychic is 2×")
+T.eq(TypeChart.effectiveness("BUG", { "POISON" }), 5,
+  "TypeChart Bug vs Poison is ½×")
+T.eq(TypeChart.effectiveness("ICE", { "FIRE" }), 5,
+  "TypeChart Ice vs Fire is ½×")
+T.eq(table.concat(Data.pokemon.RALTS.types, ","), "PSYCHIC_TYPE",
+  "Ralts is Psychic-only (Gen3)")
+T.eq(TypeChart.effectiveness("DARK", Data.pokemon.RALTS.types), 20,
+  "Dark vs Ralts is super-effective")
+T.eq(table.concat(Data.pokemon.MAWILE.types, ","), "STEEL",
+  "Mawile is Steel-only (Gen3)")
+T.eq(table.concat(Data.pokemon.MARILL.types, ","), "WATER",
+  "Marill is Water-only (Gen3)")
+
 -- 5. Verify Shedinja maximum HP clamping
 local Stats = require("src.pokemon.Stats")
 local shedStats = Stats.calc(Data.pokemon.SHEDINJA, 50, {}, {})
@@ -944,7 +976,7 @@ T.check(not sawSentToBox, "starter gift does not show SentToBoxText")
 local Evolution = require("src.pokemon.Evolution")
 local monToEvolve = { species = "CROBAT", level = 23, moves = {} }
 Data.pokemon.CROBAT.evolutionMoves = { "BITE" }
-Data.moves.BITE = { id = "BITE", name = "Bite", type = "NORMAL", power = 60, pp = 25 }
+Data.moves.BITE = { id = "BITE", name = "Bite", type = "DARK", power = 60, pp = 25 }
 
 local mockEvolveGame = {
   data = Data,
@@ -2052,8 +2084,9 @@ require("mods.Kanto-Reforged.tests.quarantine_recover_test")(T, Data, run)
 require("mods.Kanto-Reforged.tests.ai_switch_retarget_test")(T, Data, run)
 require("mods.Kanto-Reforged.tests.ai_switch_lock_pre_test")(T, Data, run)
 require("mods.Kanto-Reforged.tests.bag_pockets_test")(T, Data, run)
-require("mods.Kanto-Reforged.tests.bag_give_test")(T, Data, run)
-require("mods.Kanto-Reforged.tests.gen1_modern_ui_adapter_test")(T, Data, run)
+  require("mods.Kanto-Reforged.tests.bag_give_test")(T, Data, run)
+  require("mods.Kanto-Reforged.tests.gen1_modern_ui_adapter_test")(T, Data, run)
+  -- Sevii parked (WIP); suite lives at sevii/sevii_phase0_test.lua
 require("mods.Kanto-Reforged.tests.rollout_test")(T, Data, run)
 require("mods.Kanto-Reforged.tests.move_anims_test")(T, Data, run)
 require("mods.Kanto-Reforged.tests.species_icons_test")(T, Data, run)

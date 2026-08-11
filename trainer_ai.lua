@@ -61,6 +61,9 @@ local ELITE_ALL_PARTIES = {
   OPP_RIVAL1 = true,
   OPP_RIVAL2 = true,
   OPP_RIVAL3 = true,
+  RIVAL1 = true,
+  RIVAL2 = true,
+  RIVAL3 = true,
 }
 
 -- Exact party indexes for elite story/boss fights.
@@ -79,6 +82,29 @@ local ELITE_PARTIES = {
   OPP_AGATHA = { [1] = true },
   OPP_LANCE = { [1] = true },
   OPP_ROCKET = { [1] = true, [2] = true, [3] = true, [4] = true, [6] = true },
+  -- Johto / Gold class ids (no OPP_ prefix)
+  BROCK = { [1] = true },
+  MISTY = { [1] = true },
+  FALKNER = { [1] = true },
+  BUGSY = { [1] = true },
+  WHITNEY = { [1] = true },
+  MORTY = { [1] = true },
+  CHUCK = { [1] = true },
+  JASMINE = { [1] = true },
+  PRYCE = { [1] = true },
+  CLAIR = { [1] = true },
+  LT_SURGE = { [1] = true },
+  ERIKA = { [1] = true },
+  JANINE = { [1] = true },
+  SABRINA = { [1] = true },
+  BLAINE = { [1] = true },
+  BLUE = { [1] = true },
+  WILL = { [1] = true },
+  KOGA = { [1] = true },
+  BRUNO = { [1] = true },
+  KAREN = { [1] = true },
+  LANCE = { [1] = true },
+  RED = { [1] = true },
 }
 
 local GYM_MAPS = {
@@ -91,6 +117,15 @@ local GYM_MAPS = {
   CINNABAR_GYM = true,
   VIRIDIAN_GYM = true,
   FIGHTING_DOJO = true,
+  -- Johto gyms
+  VIOLET_GYM = true,
+  AZALEA_GYM = true,
+  GOLDENROD_GYM = true,
+  ECRUTEAK_GYM = true,
+  CIANWOOD_GYM = true,
+  OLIVINE_GYM = true,
+  MAHOGANY_GYM = true,
+  BLACKTHORN_GYM = true,
 }
 
 local LITE_CLASSES = {
@@ -103,6 +138,18 @@ local LITE_CLASSES = {
   OPP_TAMER = true,
   OPP_ROCKET = true,
   OPP_CHANNELER = true,
+  COOLTRAINERM = true,
+  COOLTRAINERF = true,
+  BLACKBELT_T = true,
+  PSYCHIC_T = true,
+  JUGGLER = true,
+  SCIENTIST = true,
+  BOARDER = true,
+  SKIER = true,
+  EXECUTIVE_M = true,
+  EXECUTIVE_F = true,
+  GRUNTM = true,
+  GRUNTF = true,
 }
 
 -- Wild soft upgrades: scary maps (fodder species stay natural here).
@@ -313,6 +360,12 @@ local SCREEN_EFFECTS = {
   MIST_EFFECT = "mist",
   FOCUS_ENERGY_EFFECT = "focusEnergy",
   EXP_SAFEGUARD_EFFECT = "expSafeguard",
+  -- Gold native effect ids after Gen2Compat remap.
+  EFFECT_LIGHT_SCREEN = "lightScreen",
+  EFFECT_REFLECT = "reflect",
+  EFFECT_MIST = "mist",
+  EFFECT_FOCUS_ENERGY = "focusEnergy",
+  EFFECT_SAFEGUARD = "expSafeguard",
 }
 
 local function softOpenerEffect(effect)
@@ -395,23 +448,25 @@ local function stageOf(battler, stat)
 end
 
 local function hpRatio(battler)
-  local mon = battler and battler.mon
-  if not mon or not mon.stats or not mon.stats.hp or mon.stats.hp <= 0 then
-    return 1
-  end
-  return mon.hp / mon.stats.hp
+  local BattleCompat = require("mods.Kanto-Reforged.battle_compat")
+  local mon = BattleCompat.mon(battler)
+  if not mon then return 1 end
+  local maxHp = (mon.stats and mon.stats.hp) or mon.maxHp or 0
+  if maxHp <= 0 then return 1 end
+  return (mon.hp or 0) / maxHp
 end
 
 -- Residual chip that makes self-setup suicidal next turns.
 local function hasResidual(battler)
   if not battler then return false end
   if battler.leechSeeded then return true end
-  local st = battler.mon and battler.mon.status
-  return st == "PSN" or st == "BRN" or st == "TOX"
+  local BattleCompat = require("mods.Kanto-Reforged.battle_compat")
+  return BattleCompat.hasStatus(battler, "PSN", "BRN", "TOX", "poison", "burn", "toxic")
 end
 
 local function themeFor(battle)
-  local class = battle and (battle.oppClass or (battle.trainer and battle.trainer.id))
+  local class = battle and (battle.oppClass or (battle.trainer and (
+    battle.trainer.classId or battle.trainer.class or battle.trainer.id)))
   return (class and THEMES[class]) or {}
 end
 
@@ -429,14 +484,75 @@ local function fixedRng(value)
   end
 end
 
+local function aiRng(battle)
+  if battle and type(battle.rng) == "function" then return battle.rng end
+  if battle and type(battle.random) == "function" then
+    -- Gen2 BattleRandom is 0..n-1; adapt to love-style 1..n / lo..hi.
+    return function(lo, hi)
+      if hi == nil then
+        local n = lo or 1
+        return (battle.random(n) or 0) + 1
+      end
+      local span = hi - lo + 1
+      return lo + (battle.random(span) or 0)
+    end
+  end
+  return love and love.math and love.math.random or math.random
+end
+
 -- Mid-roll and high-roll damage estimates (no crit). Returns mid, high, typeMult.
 -- Returns nil mid when the move is non-damaging or battlers lack stats.
 function TrainerAi.estimateDamage(battle, attacker, defender, moveDef, opts)
   opts = opts or {}
   if not moveDef or (moveDef.power or 0) <= 0 then return nil, nil, 10 end
   if not attacker or not defender then return nil, nil, 10 end
+  local BattleCompat = require("mods.Kanto-Reforged.battle_compat")
+  BattleCompat.prepareAiBattler(battle, attacker)
+  BattleCompat.prepareAiBattler(battle, defender)
   if not attacker.curStats or not defender.curStats then return nil, nil, 10 end
-  if not attacker.mon or not attacker.mon.level then return nil, nil, 10 end
+  local aMon = BattleCompat.mon(attacker)
+  if not aMon or not aMon.level then return nil, nil, 10 end
+
+  local defTypes = defender.curTypes or BattleCompat.types(defender)
+  local mult = TypeChart.effectiveness(moveDef.type, defTypes)
+
+  if BattleCompat.isGen2(battle) then
+    local ok, G2Damage = pcall(require, "src.battle.gen2.Damage")
+    if not ok or not G2Damage or not G2Damage.calc then
+      return nil, nil, mult
+    end
+    local chart = battle.data and battle.data.type_chart
+    local function roll(variation)
+      local dmg = G2Damage.calc({
+        level = aMon.level,
+        power = moveDef.power,
+        moveType = moveDef.type,
+        attacker = {
+          attack = attacker.curStats.attack,
+          specialAttack = attacker.curStats.specialAttack
+            or attacker.curStats.special,
+          types = attacker.curTypes or BattleCompat.types(attacker),
+          stages = attacker.stages or {},
+        },
+        defender = {
+          defense = defender.curStats.defense,
+          specialDefense = defender.curStats.specialDefense
+            or defender.curStats.special,
+          types = defTypes,
+          stages = defender.stages or {},
+        },
+        types = chart and chart.types,
+        matchups = chart and chart.matchups,
+        critical = false,
+        variation = variation,
+      })
+      return dmg or 0
+    end
+    local midDmg = roll(92)
+    local highDmg = opts.highRoll and roll(100) or midDmg
+    return midDmg, highDmg, mult
+  end
+
   local ruleset = rulesetOf(battle)
   local lo = ruleset.randMin or 217
   local hi = ruleset.randMax or 255
@@ -457,7 +573,6 @@ function TrainerAi.estimateDamage(battle, attacker, defender, moveDef, opts)
       rng = fixedRng(hi),
     })
   end
-  local mult = TypeChart.effectiveness(move.type, defender.curTypes)
   return midDmg, highDmg, mult
 end
 
@@ -508,7 +623,8 @@ function TrainerAi.effectiveSpeed(battler)
   local spd = battler.curStats.speed
   local stage = stageOf(battler, "speed")
   spd = Stats.applyStage(spd, stage)
-  if battler.mon and battler.mon.status == "PAR" then
+  local BattleCompat = require("mods.Kanto-Reforged.battle_compat")
+  if BattleCompat.hasStatus(battler, "PAR", "paralyze") then
     spd = math.floor(spd * 0.25)
   end
   return spd
@@ -934,7 +1050,10 @@ local function scoreTactical(view, def, score, mode)
   end
 
   -- Dual-type effectiveness (replaces first-row soft SE for damaging).
-  local typeMult = TypeChart.effectiveness(def.type, target.curTypes)
+  local typeMult = 10
+  if power > 0 then
+    typeMult = TypeChart.effectiveness(def.type, target.curTypes)
+  end
 
   if power > 0 then
     if typeMult == 0 then
@@ -1221,8 +1340,11 @@ end
 function TrainerAi.eliteAction(battle)
   if not battle or battle.kind ~= "trainer" then return nil end
   if (battle.aiUses or 0) <= 0 then return nil end
+  local BattleCompat = require("mods.Kanto-Reforged.battle_compat")
+  BattleCompat.prepareAiBattle(battle)
   local enemy = battle.enemy
-  if not enemy or not enemy.mon then return nil end
+  local enemyMon = BattleCompat.mon(enemy)
+  if not enemy or not enemyMon then return nil end
 
   -- Fresh switch budget each time a new enemy mon is active.
   if battle.expAiSwitchMon ~= battle.enemyIndex then
@@ -1238,10 +1360,8 @@ function TrainerAi.eliteAction(battle)
   }, "elite")
   local canKo = pressure.midKo or pressure.highKo
 
-  -- =========================================================================
-  -- RULE 1: ABSOLUTE KO PRIORITY OVER ITEMS & SWITCHES
-  -- If AI has ANY move that can KO player this turn, force attack immediately!
-  -- =========================================================================
+  -- Absolute KO priority: fall through to move scoring. Gen2 specials are
+  -- applied earlier via enemyTrySwitchOrItem wrap (not enemy_action).
   if canKo then
     return nil
   end
@@ -1250,11 +1370,14 @@ function TrainerAi.eliteAction(battle)
   local aiFaster = TrainerAi.isAiFaster(battle)
 
   -- Full Heal / status clear when it actually matters and is safe.
-  local status = enemy.mon.status
-  if status and (theme.fullHealUrgency or status == "SLP" or status == "FRZ"
-      or status == "PAR" or status == "BRN") then
+  local status = enemyMon.status
+  if status and (theme.fullHealUrgency
+      or status == "SLP" or status == "sleep"
+      or status == "FRZ" or status == "freeze"
+      or status == "PAR" or status == "paralyze"
+      or status == "BRN" or status == "burn") then
     -- Don't use status item if player will KO AI on this turn anyway.
-    if playerDmg < enemy.mon.hp and canUseItem(battle, theme) then
+    if playerDmg < enemyMon.hp and canUseItem(battle, theme) then
       local item, class = classItem(battle)
       if class and class.onStatus and class.item then
         recordItemUsed(battle, class.item)
@@ -1300,11 +1423,11 @@ function TrainerAi.eliteAction(battle)
     -- do NOT waste the item!
     local isTrapped = false
     if not aiFaster then
-      if playerDmg >= enemy.mon.hp then
+      if playerDmg >= enemyMon.hp then
         isTrapped = true -- OHKO'd before heal can land
       else
-        local maxHp = (enemy.mon.stats and enemy.mon.stats.hp) or 100
-        local postHealHp = math.min(maxHp, enemy.mon.hp + math.floor(maxHp * 0.75))
+        local maxHp = (enemyMon.stats and enemyMon.stats.hp) or 100
+        local postHealHp = math.min(maxHp, enemyMon.hp + math.floor(maxHp * 0.75))
         if playerDmg >= postHealHp * 0.75 then
           isTrapped = true -- Player damage invalidates heal
         end
@@ -1334,8 +1457,11 @@ function TrainerAi.eliteAction(battle)
   -- Only use X-items when AI is healthy (>70% HP), turn 1 of mon, and foe threat is low (<25% HP).
   -- =========================================================================
   if userHp > 0.70 and canUseItem(battle, theme) then
-    local maxHp = (enemy.mon.stats and enemy.mon.stats.hp) or 100
-    local foeLowThreat = playerDmg < maxHp * 0.25 or (battle.player and battle.player.mon and (battle.player.mon.status == "SLP" or battle.player.mon.status == "FRZ"))
+    local maxHp = (enemyMon.stats and enemyMon.stats.hp) or 100
+    local foeLowThreat = playerDmg < maxHp * 0.25
+      or (battle.player and battle.player.mon and (
+        battle.player.mon.status == "SLP" or battle.player.mon.status == "sleep"
+        or battle.player.mon.status == "FRZ" or battle.player.mon.status == "freeze"))
     if foeLowThreat then
       local item = classItem(battle)
       local xStat = item and X_ITEMS[item]
@@ -1356,8 +1482,11 @@ end
 function TrainerAi.liteAction(battle)
   if not battle or battle.kind ~= "trainer" then return nil end
   if (battle.aiUses or 0) <= 0 then return nil end
+  local BattleCompat = require("mods.Kanto-Reforged.battle_compat")
+  BattleCompat.prepareAiBattle(battle)
   local enemy = battle.enemy
-  if not enemy or not enemy.mon then return nil end
+  local enemyMon = BattleCompat.mon(enemy)
+  if not enemy or not enemyMon then return nil end
 
   local theme = themeFor(battle)
   local pressure = boardPressure({
@@ -1370,7 +1499,7 @@ function TrainerAi.liteAction(battle)
   -- Emergency heal only; max 1 item total per battle for Lite class.
   if hpRatio(enemy) <= 0.25 and canUseItem(battle, theme) then
     local playerDmg = TrainerAi.playerMaxDamage(battle)
-    if playerDmg < enemy.mon.hp then
+    if playerDmg < enemyMon.hp then
       local item, class = classItem(battle)
       if item and HEAL_ITEMS[item] then
         recordItemUsed(battle, item)
@@ -1383,6 +1512,250 @@ function TrainerAi.liteAction(battle)
     end
   end
   return nil
+end
+
+local function appendLayer(mods, id)
+  for _, m in ipairs(mods) do
+    if m == id then return end
+  end
+  mods[#mods + 1] = id
+end
+
+--- Apply KR elite/lite specials on Gen2 Battle (items / switches).
+function TrainerAi.applyGen2AiAction(battle, act)
+  if not battle or not act or not act.special then return false end
+  local enemy = battle.enemy
+  if not enemy then return false end
+  local trainerName = (battle.trainer and battle.trainer.name) or "TRAINER"
+
+  if act.special == "aiSwitch" then
+    local target = act.index
+    if not target or not battle.enemyParty or not battle.enemyParty[target] then
+      return false
+    end
+    if type(battle.clearVolatile) == "function" then
+      pcall(function() battle:clearVolatile(enemy) end)
+    end
+    local outgoing = enemy
+    if type(battle.emit) == "function" then
+      battle:emit({ kind = "message",
+        text = trainerName .. " withdrew " .. (battle:monName(outgoing) or "POKéMON") .. "!" })
+    end
+    battle.enemyIndex = target
+    battle.enemy = battle.enemyParty[target]
+    if type(battle.clearVolatile) == "function" then
+      pcall(function() battle:clearVolatile(battle.enemy) end)
+    end
+    if battle.stages then
+      local Battle = require("src.battle.gen2.Battle")
+      battle.stages.enemy = Battle.newStages()
+    end
+    if type(battle.emit) == "function" then
+      battle:emit({ kind = "send", side = "enemy", mon = battle.enemy,
+        text = trainerName .. " sent out " .. (battle:monName(battle.enemy) or "POKéMON") .. "!" })
+    end
+    local Runtime = require("src.mods.Runtime")
+    Runtime.emit("battle.battler_switched", {
+      battle = battle,
+      side = type(battle.sideRecord) == "function" and battle:sideRecord(battle.enemy) or nil,
+      battler = battle.enemy,
+      previous = outgoing,
+    })
+    if type(battle.breakTrapsOnSend) == "function" then
+      pcall(function() battle:breakTrapsOnSend(battle.enemy) end)
+    end
+    if type(battle.spikesDamage) == "function" then
+      pcall(function() battle:spikesDamage(battle.enemy) end)
+    end
+    battle.enemy.expJustEntered = true
+    return true
+  end
+
+  if act.special == "aiItem" then
+    local item = act.item
+    if not item then return false end
+    local maxHp = (enemy.stats and enemy.stats.hp) or enemy.maxHp or 1
+    local HEAL = {
+      FULL_RESTORE = math.huge, MAX_POTION = math.huge,
+      HYPER_POTION = 200, SUPER_POTION = 50, POTION = 20,
+    }
+    local X_STAT = {
+      X_ATTACK = "attack", X_DEFEND = "defense", X_SPEED = "speed",
+      X_SPECIAL = "specialAttack", X_SP_ATK = "specialAttack",
+    }
+    if type(battle.heal) == "function" and HEAL[item] then
+      local amount = HEAL[item]
+      battle:heal(enemy, amount == math.huge and maxHp or amount)
+      if item == "FULL_RESTORE" then
+        enemy.status = nil
+        if type(battle.volatile) == "function" then
+          local vol = battle:volatile(enemy)
+          if vol then vol.confuseCount = nil end
+        end
+      end
+    elseif item == "FULL_HEAL" then
+      enemy.status = nil
+      if type(battle.volatile) == "function" then
+        local vol = battle:volatile(enemy)
+        if vol then vol.confuseCount = nil end
+      end
+    elseif X_STAT[item] and battle.stages and battle.stages.enemy then
+      local key = X_STAT[item]
+      local s = battle.stages.enemy
+      s[key] = math.min(6, (s[key] or 0) + 1)
+    elseif item == "GUARD_SPEC" then
+      enemy.mist = true
+    else
+      return false
+    end
+    if type(battle.emit) == "function" then
+      local itemName = (battle.data and battle.data.items and battle.data.items[item]
+        and battle.data.items[item].name) or item
+      battle:emit({ kind = "message",
+        text = trainerName .. " used " .. itemName .. "!" })
+    end
+    if battle.aiUses and battle.aiUses > 0 then
+      battle.aiUses = battle.aiUses - 1
+    end
+    return true
+  end
+
+  return false
+end
+
+--- Shared move picker: attach EXP_* layers and chooseWithMargin.
+function TrainerAi.pickScoredMove(mod, battle, rng, battler)
+  local BattleCompat = require("mods.Kanto-Reforged.battle_compat")
+  BattleCompat.prepareAiBattle(battle)
+  local enemy = battler or (battle and battle.enemy)
+  if not enemy then return nil end
+  if battle and not battle.enemy then battle.enemy = enemy end
+  local tier = TrainerAi.tier(battle)
+  local saved = battle.enemyAIMods
+  local mods = {}
+  if type(saved) == "table" then
+    for i, m in ipairs(saved) do mods[i] = m end
+  end
+  if tier == "natural" then
+    appendLayer(mods, TrainerAi.LAYER_NATURAL)
+  else
+    appendLayer(mods, TrainerAi.LAYER_ID)
+    if tier == "elite" then
+      appendLayer(mods, TrainerAi.LAYER_TACTICAL)
+    elseif tier == "lite" then
+      appendLayer(mods, TrainerAi.LAYER_TACTICAL_LITE)
+    end
+  end
+  battle.enemyAIMods = mods
+  local margin = 1
+  if tier == "elite" then
+    margin = 0
+  elseif tier == "natural" then
+    margin = 2
+  end
+  rng = rng or aiRng(battle)
+  local ok, result = pcall(TrainerAi.chooseWithMargin, enemy, rng, battle, margin)
+  battle.enemyAIMods = saved
+  if not ok then error(result) end
+  if result and enemy then
+    enemy.expAiLastMoveId = result.id
+    local def = battle.data and battle.data.moves and battle.data.moves[result.id]
+    if tier ~= "natural" and def then
+      TrainerAi.bumpMoveWeight(enemy, result.id, softDecayBump(def, tier))
+    end
+  end
+  return result
+end
+
+-- Shared soft preferences (Fake Out / hazards / Taunt) for both gens.
+local HAZARD_MOVES = {
+  SPIKES = true, STEALTH_ROCK = true, TOXIC_SPIKES = true,
+}
+local FLUFF_MOVES = {
+  GROWL = true, TAIL_WHIP = true, LEER = true, STRING_SHOT = true,
+  SAND_ATTACK = true, SMOKESCREEN = true, FLASH = true,
+}
+
+local function movePp(mv)
+  return type(mv) == "table" and (mv.pp or 1) or 1
+end
+
+local function moveIdOf(mv)
+  return type(mv) == "table" and mv.id or mv
+end
+
+local function foeSideHazards(battle)
+  local sides = battle.sides
+  if not sides then return nil end
+  return sides.player or sides[1]
+end
+
+local function hasHazard(side, id)
+  if not side or not side.hazards then return false end
+  for _, h in ipairs(side.hazards) do
+    if h.id == id then return true end
+  end
+  return false
+end
+
+local function preferSharedSetup(battle, chosenId)
+  local enemy = battle.enemy
+  if not enemy then return chosenId end
+  local moves = enemy.curMoves or enemy.moves
+  if not moves then return chosenId end
+
+  if enemy.expJustEntered then
+    for _, mv in ipairs(moves) do
+      local id = moveIdOf(mv)
+      if id == "FAKE_OUT" and movePp(mv) > 0 then return id end
+    end
+  end
+
+  -- Without a concrete choice, only Fake Out is forced above.
+  if chosenId == nil then return nil end
+
+  if battle.kind == "trainer" then
+    local side = foeSideHazards(battle)
+    local want = {
+      STEALTH_ROCK = not hasHazard(side, "STEALTH_ROCK"),
+      SPIKES = true,
+      TOXIC_SPIKES = true,
+    }
+    if side and side.hazards then
+      for _, h in ipairs(side.hazards) do
+        if h.id == "SPIKES" then
+          want.SPIKES = (h.layers or 1) < 3
+        elseif h.id == "TOXIC_SPIKES" then
+          want.TOXIC_SPIKES = (h.layers or 1) < 2
+        end
+      end
+    end
+    local isFluff = type(chosenId) ~= "string" or FLUFF_MOVES[chosenId]
+    if not isFluff and type(chosenId) == "string" then
+      local def = battle.data and battle.data.moves and battle.data.moves[chosenId]
+      isFluff = def and (not def.power or def.power == 0)
+        and not HAZARD_MOVES[chosenId] and chosenId ~= "TAUNT"
+    end
+    if isFluff then
+      for _, mv in ipairs(moves) do
+        local id = moveIdOf(mv)
+        if HAZARD_MOVES[id] and movePp(mv) > 0 and want[id] then
+          return id
+        end
+      end
+      local BattleCompat = require("mods.Kanto-Reforged.battle_compat")
+      local foe = battle.player
+      if foe and not BattleCompat.status(foe) then
+        for _, mv in ipairs(moves) do
+          local id = moveIdOf(mv)
+          if id == "TAUNT" and movePp(mv) > 0 and not foe.expTauntedTurns then
+            return "TAUNT"
+          end
+        end
+      end
+    end
+  end
+  return chosenId
 end
 
 -- ------- Register / install -------------------------------------------------
@@ -1406,13 +1779,6 @@ function TrainerAi.register(mod)
   })
 end
 
-local function appendLayer(mods, id)
-  for _, m in ipairs(mods) do
-    if m == id then return end
-  end
-  mods[#mods + 1] = id
-end
-
 local function currentMapId(game)
   local ow = game and game.overworld
   return ow and ow.map and ow.map.id or nil
@@ -1420,134 +1786,164 @@ end
 
 function TrainerAi.install(mod)
   if TrainerAI._expansionSmartAi then return end
+  local Host = require("mods.Kanto-Reforged.host")
+  local Gen1Patch = require("mods.Kanto-Reforged.gen1_patch")
+  local BattleCompat = require("mods.Kanto-Reforged.battle_compat")
 
-  -- Stash party index + map id on every trainer battle.
-  local BattleState = require("src.battle.BattleState")
-  local originalNewTrainer = BattleState.newTrainer
-  BattleState.newTrainer = function(game, oppClass, partyIndex)
-    local battle = originalNewTrainer(game, oppClass, partyIndex)
-    if battle then
-      battle.expPartyIndex = partyIndex or 1
-      battle.expMapId = currentMapId(game)
-      battle.expAiSwitches = 0
-      battle.expBattleItemsUsed = 0
-      battle.expMonItemsUsed = {}
-    end
-    return battle
-  end
-
-  local originalNewWild = BattleState.newWild
-  BattleState.newWild = function(game, species, level, opts)
-    local battle = originalNewWild(game, species, level, opts)
-    if battle then
-      battle.expMapId = currentMapId(game)
-      battle.expWildSpecies = species
-    end
-    return battle
-  end
-
-  -- Retarget queued actions to the live side battlers. Older engines
-  -- captured battler refs in resolveTurn; an AI switch then left the
-  -- player's move hitting the withdrawn mon (SE text, no visible HP loss).
-  -- Current engines already refresh in resolveTurn; this wrap is idempotent.
-  if not BattleState._krLiveBattlerRetarget then
-    BattleState._krLiveBattlerRetarget = true
-    local originalExecute = BattleState.executeAction
-    BattleState.executeAction = function(self, user, target, action)
-      if user then
-        user = user.isPlayer and self.player or self.enemy
-      end
-      if target then
-        target = target.isPlayer and self.player or self.enemy
-      end
-      return originalExecute(self, user, target, action)
-    end
-  end
-
-  -- Voluntary-switch free-hit timing (see SWITCH_LOCK_OPTION).
-  -- When set to Gen 3, lock the AI action against the outgoing mon;
-  -- Gen 1 leaves the engine's post-send-out pick alone.
-  if not BattleState._krGen3SwitchLock then
-    BattleState._krGen3SwitchLock = true
-    local originalResolveSwitch = BattleState.resolveSwitch
-    BattleState.resolveSwitch = function(self, newMon)
-      local skipFree = (self.player and self.player.expBatonPass)
-          or (self.player and self.player.expWantsSwitch)
-          or self.expSkipNextEnemyAction
-      if not skipFree and TrainerAi.switchLockGen3(mod) then
-        local locked = self:enemyAction()
-        self.enemyAction = function()
-          self.enemyAction = nil
-          return locked
+  -- Gen1 engine wiring (metadata, switch-lock, live retarget).
+  if Host.isGen1() then
+    Gen1Patch.apply(require("src.battle.BattleState"), function(BattleState)
+      local originalNewTrainer = BattleState.newTrainer
+      if type(originalNewTrainer) == "function" then
+        BattleState.newTrainer = function(game, oppClass, partyIndex)
+          local battle = originalNewTrainer(game, oppClass, partyIndex)
+          if battle then
+            battle.expPartyIndex = partyIndex or 1
+            battle.expMapId = currentMapId(game)
+            battle.expAiSwitches = 0
+            battle.expBattleItemsUsed = 0
+            battle.expMonItemsUsed = {}
+          end
+          return battle
         end
       end
-      return originalResolveSwitch(self, newMon)
-    end
-  end
 
-  -- Inject tier layers into chooseMove.
-  local originalChoose = TrainerAI.chooseMove
-  TrainerAI.chooseMove = function(battler, rng, battle)
-    if not battle or not TrainerAi.enabled(mod) then
-      return originalChoose(battler, rng, battle)
-    end
-    local saved = battle.enemyAIMods
-    local mods = {}
-    if type(saved) == "table" then
-      for i, m in ipairs(saved) do mods[i] = m end
-    end
-    local tier = TrainerAi.tier(battle)
-    if tier == "natural" then
-      appendLayer(mods, TrainerAi.LAYER_NATURAL)
-    else
-      appendLayer(mods, TrainerAi.LAYER_ID)
-      if tier == "elite" then
-        appendLayer(mods, TrainerAi.LAYER_TACTICAL)
-      elseif tier == "lite" then
-        appendLayer(mods, TrainerAi.LAYER_TACTICAL_LITE)
+      local originalNewWild = BattleState.newWild
+      if type(originalNewWild) == "function" then
+        BattleState.newWild = function(game, species, level, opts)
+          local battle = originalNewWild(game, species, level, opts)
+          if battle then
+            battle.expMapId = currentMapId(game)
+            battle.expWildSpecies = species
+          end
+          return battle
+        end
+      end
+
+      if not BattleState._krLiveBattlerRetarget and type(BattleState.executeAction) == "function" then
+        BattleState._krLiveBattlerRetarget = true
+        local originalExecute = BattleState.executeAction
+        BattleState.executeAction = function(self, user, target, action)
+          if user then
+            user = user.isPlayer and self.player or self.enemy
+          end
+          if target then
+            target = target.isPlayer and self.player or self.enemy
+          end
+          return originalExecute(self, user, target, action)
+        end
+      end
+
+      if not BattleState._krGen3SwitchLock and type(BattleState.resolveSwitch) == "function" then
+        BattleState._krGen3SwitchLock = true
+        local originalResolveSwitch = BattleState.resolveSwitch
+        BattleState.resolveSwitch = function(self, newMon)
+          local skipFree = (self.player and self.player.expBatonPass)
+              or (self.player and self.player.expWantsSwitch)
+              or self.expSkipNextEnemyAction
+          if not skipFree and TrainerAi.switchLockGen3(mod) then
+            local locked = self:enemyAction()
+            self.enemyAction = function()
+              self.enemyAction = nil
+              return locked
+            end
+          end
+          return originalResolveSwitch(self, newMon)
+        end
+      end
+    end)
+
+    local originalChoose = TrainerAI.chooseMove
+    if type(originalChoose) == "function" then
+      TrainerAI.chooseMove = function(battler, rng, battle)
+        if not battle or not TrainerAi.enabled(mod) then
+          return originalChoose(battler, rng, battle)
+        end
+        return TrainerAi.pickScoredMove(mod, battle, rng, battler)
+          or originalChoose(battler, rng, battle)
       end
     end
-    battle.enemyAIMods = mods
-    -- Natural: wide margin (messy). Soft/lite: near-best. Elite: exact.
-    local margin = 1
-    if tier == "elite" then
-      margin = 0
-    elseif tier == "natural" then
-      margin = 2
-    end
-    local ok, result = pcall(TrainerAi.chooseWithMargin, battler, rng, battle, margin)
-    battle.enemyAIMods = saved
-    if not ok then error(result) end
-    if result and battler then
-      battler.expAiLastMoveId = result.id
-      local def = battle.data and battle.data.moves and battle.data.moves[result.id]
-      -- Natural stays messy (no decay). Soft/lite/elite cool openers after use.
-      if tier ~= "natural" and def then
-        TrainerAi.bumpMoveWeight(battler, result.id, softDecayBump(def, tier))
+  else
+    -- Gen2: stamp KR AI metadata when a battle starts.
+    mod.events:on("battle.started", function(ev)
+      local b = ev and ev.battle
+      if not b then return end
+      b.kind = ev.kind or (b.wild and "wild" or "trainer")
+      b.oppClass = ev.trainerId or b.oppClass
+      if b.trainer then
+        b.expPartyIndex = b.trainer.index or 1
       end
-    end
-    return result
+      b.expAiSwitches = 0
+      b.expBattleItemsUsed = 0
+      b.expMonItemsUsed = {}
+      if b.aiUses == nil then b.aiUses = 99 end
+      if b.wild and b.enemy then
+        b.expWildSpecies = b.enemy.species
+      end
+    end)
+
+    -- Elite/lite items & switches before vanilla Ai.chooseItem / switch.
+    Gen1Patch.apply(require("src.battle.gen2.Battle"), function(Battle)
+      if Battle._krAiSpecialWrap then return end
+      Battle._krAiSpecialWrap = true
+      local original = Battle.enemyTrySwitchOrItem
+      Battle.enemyTrySwitchOrItem = function(self)
+        if TrainerAi.enabled(mod) and self.trainer and not self.wild then
+          BattleCompat.prepareAiBattle(self)
+          local tier = TrainerAi.tier(self)
+          if tier == "elite" or tier == "lite" then
+            local act = (tier == "elite") and TrainerAi.eliteAction(self)
+              or TrainerAi.liteAction(self)
+            if act and act.special
+                and TrainerAi.applyGen2AiAction(self, act) then
+              return true
+            end
+          end
+        end
+        return original(self)
+      end
+    end)
   end
 
-  -- Elite / lite actions replace vanilla classAction for those tiers.
+  -- Shared overhaul: both gens use the same enemy_action brain.
   mod.hooks:wrap("battle.enemy_action", function(next, battle)
     if not TrainerAi.enabled(mod) then return next(battle) end
+    BattleCompat.prepareAiBattle(battle)
+
+    local forced = preferSharedSetup(battle, nil)
+    if forced then return forced end
+
     local tier = TrainerAi.tier(battle)
-    if tier == "soft" or tier == "natural" then return next(battle) end
+    local gen2 = BattleCompat.isGen2(battle)
+
+    if not gen2 and (tier == "soft" or tier == "natural") then
+      local chosen = next(battle)
+      local id = type(chosen) == "table" and (chosen.id or chosen.move) or chosen
+      local prefer = preferSharedSetup(battle, id)
+      if prefer and prefer ~= id then
+        return { id = prefer, pp = 1 }
+      end
+      return chosen
+    end
 
     local locked = battle.lockedAction and battle:lockedAction(battle.enemy)
     if locked then return locked end
 
-    local act
-    if tier == "elite" then
-      act = TrainerAi.eliteAction(battle)
-    else
-      act = TrainerAi.liteAction(battle)
+    if tier == "elite" or tier == "lite" then
+      local act = (tier == "elite") and TrainerAi.eliteAction(battle)
+        or TrainerAi.liteAction(battle)
+      -- Gen2 specials are consumed in enemyTrySwitchOrItem; ignore here.
+      if act and not (gen2 and act.special) then return act end
     end
-    if act then return act end
 
-    -- Skip vanilla blind classAction; still use chooseMove (with layer inject).
-    return TrainerAI.chooseMove(battle.enemy, battle.rng, battle)
+    local picked = TrainerAi.pickScoredMove(mod, battle)
+    if not picked then return next(battle) end
+    local id = preferSharedSetup(battle, picked.id) or picked.id
+    if gen2 then return id end
+    if id ~= picked.id then
+      return { id = id, pp = picked.pp or 1 }
+    end
+    return picked
   end)
 
   TrainerAI._expansionSmartAi = true

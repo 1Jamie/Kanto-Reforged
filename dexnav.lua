@@ -1,12 +1,14 @@
--- Route DexNav: START-menu list of wild species on the current map.
+-- Route DexNav: wild species on the current map.
+-- Gen1: START-menu list after the Pokédex.
+-- Gen2: POKéGEAR card via optional dep pokegear_cards — Gold's map-tool home.
 -- Progressive reveal: ???? (unseen) → name (seen) → per-method levels (owned).
 -- Fish-only; Super Rod only for fishing; Old/Good Rod omitted with a
 -- conditional footer on fishable maps.
 --
 -- Mod option `dexnav_mode`:
---   dexnav    — start-menu label DEXNAV (default)
+--   dexnav    — label DEXNAV (default)
 --   dexnav_kr — label DEXNAV-KR (disambiguate vs another DexNav mod)
---   off       — do not add the start-menu entry
+--   off       — hide the entry / card
 
 local DexNav = {}
 
@@ -26,7 +28,7 @@ DexNav.OPTION = {
   },
 }
 
--- Labels the Roaming Radar (and similar) can anchor after.
+-- Labels the Roaming Radar (and similar) can anchor after on the start menu.
 DexNav.MENU_LABELS = { "DEXNAV", "DEXNAV-KR" }
 
 local SCREEN = "ExpDexNav"
@@ -38,6 +40,16 @@ local NO_WILD = "No wild Pokemon here."
 -- Keep the note to a single glyph-row and shrink visible rows when it shows.
 local ROWS_WITH_FOOTER = 6
 local ROWS_DEFAULT = 7
+
+-- Pokegear strip: reuse MAP chrome tiles; iconX is auto-assigned by
+-- pokegear_cards past the vanilla CLOCK/MAP/PHONE/RADIO columns.
+local POKEGEAR_CARD = {
+  id = "dexnav",
+  label = "DEXNAV",
+  icon = 0x40,
+}
+local POKEGEAR_VISIBLE = 6
+local ENGINE_POKEDEX = 11
 
 function DexNav.mode(mod)
   if not mod or not mod.options then return DexNav.MODE_DEFAULT end
@@ -52,6 +64,15 @@ end
 function DexNav.menuLabel(mod)
   if DexNav.mode(mod) == DexNav.MODE_KR then return "DEXNAV-KR" end
   return "DEXNAV"
+end
+
+function DexNav.hasPokedex(game)
+  local save = game and game.save
+  if not save then return false end
+  if save.pokedexReceived then return true end
+  if save.flags and save.flags.EVENT_GOT_POKEDEX then return true end
+  if save.engineFlags and save.engineFlags[ENGINE_POKEDEX] then return true end
+  return false
 end
 
 local function absorb(byId, method, slots)
@@ -74,6 +95,48 @@ local function absorb(byId, method, slots)
       end
     end
   end
+end
+
+local function mergeTodSlots(todMap)
+  if not todMap then return nil end
+  local slots = todMap.slots
+  if not slots then return nil end
+  -- Gen1 / Gen2 water: flat slot list.
+  if slots[1] then return slots end
+  -- Gen2 grass: MORN/DAY/NITE tables.
+  local out = {}
+  for _, tod in ipairs({ "MORN", "DAY", "NITE" }) do
+    for _, slot in ipairs(slots[tod] or {}) do
+      out[#out + 1] = slot
+    end
+  end
+  return out
+end
+
+-- Resolve Gen1-shaped enc + optional fish slots from either host's data.
+function DexNav.sourcesForMap(data, mapId)
+  if not data or not mapId then return nil, nil end
+  local Host = require("mods.Kanto-Reforged.host")
+  if Host.isGen2() then
+    local g2 = data.gen2Encounters
+    local grassRow = g2 and g2.grass and g2.grass[mapId]
+    local waterRow = g2 and g2.water and g2.water[mapId]
+    local enc = {
+      grass = { slots = mergeTodSlots(grassRow) or {} },
+      water = { slots = (waterRow and waterRow.slots) or {} },
+    }
+    if #enc.grass.slots == 0 then enc.grass = nil end
+    if #(enc.water.slots or {}) == 0 then enc.water = nil end
+    if not enc.grass and not enc.water then enc = nil end
+    -- Fallback: some boots keep Gen1-shaped data.encounters[mapId].
+    if not enc and data.encounters and data.encounters[mapId] then
+      enc = data.encounters[mapId]
+    end
+    return enc, nil
+  end
+  local enc = data.encounters and data.encounters[mapId]
+  local fish = data.field and data.field.superRod and data.field.superRod[mapId]
+  return enc, fish
 end
 
 -- enc: encounters[mapId] or nil; fishSlots: field.superRod[mapId] or nil
@@ -125,8 +188,17 @@ function DexNav.formatOwnedMethods(methods)
   return table.concat(parts, " / ")
 end
 
+-- Gen1 uses pokedex.owned; Gold uses pokedex.caught. Accept either.
+function DexNav.dexFlags(pokedex)
+  pokedex = pokedex or {}
+  return {
+    seen = pokedex.seen or {},
+    owned = pokedex.owned or pokedex.caught or {},
+  }
+end
+
 function DexNav.formatRow(entry, dex, pokemon)
-  dex = dex or { seen = {}, owned = {} }
+  dex = DexNav.dexFlags(dex)
   local id = entry.id
   local def = pokemon and pokemon[id]
   local name = (def and def.name) or id
@@ -145,6 +217,9 @@ function DexNav.formatRow(entry, dex, pokemon)
 end
 
 function DexNav.currentMapId(game)
+  if game and game.world and game.world.map and game.world.map.id then
+    return game.world.map.id
+  end
   if game and game.overworld and game.overworld.map and game.overworld.map.id then
     return game.overworld.map.id
   end
@@ -160,9 +235,23 @@ function DexNav.mapTitle(mapId, mod)
   return prefix .. " " .. mapId:gsub("_", " ")
 end
 
-function DexNav.buildItems(data, mapId, pokedex, roamers)
-  local enc = data and data.encounters and data.encounters[mapId]
-  local fish = data and data.field and data.field.superRod and data.field.superRod[mapId]
+function DexNav.roamersHere(mod, mapId)
+  if not mapId then return nil end
+  local ok, Roamers = pcall(require, "mods.Kanto-Reforged.roamers")
+  if not ok or not Roamers then return nil end
+  local list = {}
+  for _, id in ipairs(Roamers.BEASTS or {}) do
+    if Roamers.getLocation(mod, id) == mapId then list[#list + 1] = id end
+  end
+  for _, id in ipairs(Roamers.EONS or {}) do
+    if Roamers.getLocation(mod, id) == mapId then list[#list + 1] = id end
+  end
+  if #list == 0 then return nil end
+  return list
+end
+
+function DexNav.buildItems(data, mapId, pokedex, roamers, mod)
+  local enc, fish = DexNav.sourcesForMap(data, mapId)
   local rows = DexNav.aggregate(enc, fish, data and data.pokemon)
   local items = {}
   if roamers then
@@ -182,44 +271,200 @@ function DexNav.buildItems(data, mapId, pokedex, roamers)
   return items, note and FISHING_NOTE or nil
 end
 
-function DexNav.register(mod)
-  mod.content.screens:register(SCREEN, {
-    new = function(game)
-      local mapId = DexNav.currentMapId(game)
-      local dex = (game.save and game.save.pokedex) or { seen = {}, owned = {} }
-      local roamers = nil
-      local ok, Roamers = pcall(require, "mods.Kanto-Reforged.roamers")
-      if ok and Roamers and mapId then
-        local list = {}
-        for _, id in ipairs(Roamers.BEASTS or {}) do
-          if Roamers.getLocation(mod, id) == mapId then list[#list + 1] = id end
-        end
-        for _, id in ipairs(Roamers.EONS or {}) do
-          if Roamers.getLocation(mod, id) == mapId then list[#list + 1] = id end
-        end
-        if #list > 0 then roamers = list end
+local function buildScreen(mod, game)
+  local mapId = DexNav.currentMapId(game)
+  local dex = DexNav.dexFlags(game.save and game.save.pokedex)
+  local roamers = DexNav.roamersHere(mod, mapId)
+  local items, footer = DexNav.buildItems(game.data, mapId, dex, roamers, mod)
+  if #items == 0 then
+    items = { { label = NO_WILD, right = "", value = nil } }
+  end
+  return mod.ui.ListMenu.new(game, DexNav.mapTitle(mapId, mod), items, {
+    pageJump = true,
+    footer = footer,
+    rows = footer and ROWS_WITH_FOOTER or ROWS_DEFAULT,
+    onChoose = function(_, menu) menu:close() end,
+  })
+end
+
+local function refreshPokegearDex(self, mod)
+  local game = self.game
+  local mapId = DexNav.currentMapId(game)
+  local dex = DexNav.dexFlags(game and game.save and game.save.pokedex)
+  local items, footer = DexNav.buildItems(
+    game and game.data, mapId, dex, DexNav.roamersHere(mod, mapId), mod)
+  if #items == 0 then
+    items = { { label = NO_WILD, right = "", value = nil } }
+  end
+  self._krDexNavItems = items
+  self._krDexNavFooter = footer
+  self._krDexNavCursor = 0
+  self._krDexNavScroll = 0
+  self._krDexNavMap = mapId
+end
+
+local function drawDexNavCard(gear, mod, helpers)
+  local Font = require("src.render.Font")
+  local Chrome = require("src.ui.gen2.Chrome")
+  local H = helpers or {}
+  local text = H.text or function(g, str, tx, ty)
+    if g.text then g:text(str, tx, ty) else Chrome.print(str, tx, ty) end
+  end
+  local textbox = H.textbox or function(g, tx, ty, w, h)
+    if g.textbox then g:textbox(tx, ty, w, h)
+    elseif g.drawPlate then g:drawPlate(tx, ty, w + 2, h + 2) end
+  end
+
+  if not gear._krDexNavItems then
+    refreshPokegearDex(gear, mod)
+  end
+  local items = gear._krDexNavItems or {}
+  local footer = gear._krDexNavFooter
+  local cursor = gear._krDexNavCursor or 0
+  local scroll = gear._krDexNavScroll or 0
+  local n = #items
+  -- Leave a bottom hint row; fishing note steals one more.
+  local listRows = footer and (POKEGEAR_VISIBLE - 1) or POKEGEAR_VISIBLE
+  local listY = 6
+
+  if H.drawStrip then H.drawStrip(gear)
+  elseif gear.drawStrip then gear:drawStrip() end
+
+  local title = DexNav.menuLabel(mod)
+  local mapId = gear._krDexNavMap
+  local mapShort = mapId and mapId:gsub("_", " ") or ""
+  if #mapShort > 16 then mapShort = mapShort:sub(1, 16) end
+  text(gear, title, 1, 3)
+  if mapShort ~= "" then text(gear, mapShort, 1, 4) end
+
+  -- Cream list plate so ▶ is visible (black cursor on black ground was
+  -- invisible — rows just appeared to flash when scrolling).
+  textbox(gear, 0, 5, 18, listRows + 1)
+
+  local moreBelow = scroll + listRows < n
+  for i = 1, listRows do
+    local idx = scroll + i
+    local row = items[idx]
+    local ty = listY + (i - 1)
+    if row then
+      local label = row.label or ""
+      if #label > 10 then label = label:sub(1, 10) end
+      local right = row.right or ""
+      if #right > 7 then right = right:sub(1, 7) end
+      text(gear, label, 2, ty)
+      if right ~= "" then text(gear, right, 12, ty) end
+      if (idx - 1) == cursor then
+        -- On cream plate: flat black ▶ matches phone / Chrome.List.
+        Chrome.cursor(1, ty)
       end
-      local items, footer = DexNav.buildItems(game.data, mapId, dex, roamers)
-      if #items == 0 then
-        items = { { label = NO_WILD, right = "", value = nil } }
+    end
+  end
+
+  -- Gold-style ▼ when more below (Chrome.List).
+  if moreBelow then
+    love.graphics.setColor(0, 0, 0, 1)
+    Font.drawCode(Chrome.DOWN_ARROW, 1 * 8, (listY + listRows) * 8)
+    love.graphics.setColor(1, 1, 1, 1)
+  end
+
+  -- Position + mode hint. Strip previews like MAP/PHONE/RADIO; card mode
+  -- is for scrolling.
+  local pos = n == 0 and "0/0" or ("%d/%d"):format(cursor + 1, n)
+  local modeHint = (gear.mode == "card") and "B:BACK" or "A:OPEN"
+  local hint = footer and (pos .. " " .. footer) or (pos .. "  " .. modeHint)
+  if #hint > 18 then hint = hint:sub(1, 18) end
+  text(gear, hint, 1, 16)
+end
+
+local function installPokegear(mod)
+  local Host = require("mods.Kanto-Reforged.host")
+  if not Host.isGen2() then return end
+
+  local handle = mod.find and mod.find("pokegear_cards")
+  local api = handle and handle.exports
+  if not api or api.apiVersion ~= 1 or type(api.register) ~= "function" then
+    if mod.log then
+      mod.log:warn("DexNav needs pokegear_cards (enable that mod for the "
+        .. "Gold Pokegear card)")
+    end
+    return
+  end
+
+  local unreg, err = api.register({
+    id = POKEGEAR_CARD.id,
+    label = function() return DexNav.menuLabel(mod) end,
+    icon = POKEGEAR_CARD.icon,
+    -- Prefer auto-layout so other custom cards can share the strip; fall
+    -- back to the historical column past RADIO when nothing else is present.
+    iconX = nil,
+    priority = 40,
+    owner = mod.id or "Kanto-Reforged",
+    visible = function(gear)
+      if DexNav.mode(mod) == DexNav.MODE_OFF then return false end
+      return DexNav.hasPokedex(gear.game or { save = gear.save })
+    end,
+    onHighlight = function(gear)
+      if not gear._krDexNavItems then
+        refreshPokegearDex(gear, mod)
       end
-      return mod.ui.ListMenu.new(game, DexNav.mapTitle(mapId, mod), items, {
-        pageJump = true,
-        footer = footer,
-        rows = footer and ROWS_WITH_FOOTER or ROWS_DEFAULT,
-        onChoose = function(_, menu) menu:close() end,
-      })
+    end,
+    draw = function(gear)
+      drawDexNavCard(gear, mod, api.helpers)
+    end,
+    update = function(gear, input)
+      if not gear._krDexNavItems then
+        refreshPokegearDex(gear, mod)
+      end
+      local items = gear._krDexNavItems or {}
+      local n = #items
+      if n == 0 then return end
+      local footer = gear._krDexNavFooter
+      local visible = footer and POKEGEAR_VISIBLE - 1 or POKEGEAR_VISIBLE
+      local cursor = gear._krDexNavCursor or 0
+      local scroll = gear._krDexNavScroll or 0
+      if input:wasPressed("up") then
+        cursor = (cursor - 1) % n
+      elseif input:wasPressed("down") then
+        cursor = (cursor + 1) % n
+      elseif input:wasPressed("a") then
+        -- Read-only browse: A does not close (B backs out via the lib).
+        return
+      end
+      if cursor < scroll then scroll = cursor end
+      if cursor >= scroll + visible then scroll = cursor - visible + 1 end
+      gear._krDexNavCursor = cursor
+      gear._krDexNavScroll = math.max(0, scroll)
     end,
   })
+
+  if not unreg then
+    if mod.log then
+      mod.log:warn("DexNav Pokegear register failed: %s", tostring(err))
+    end
+    return
+  end
+  DexNav._pokegearUnregister = unreg
+  if mod.log then
+    mod.log:info("DexNav registered as Pokegear card via pokegear_cards")
+  end
+end
+
+function DexNav.register(mod)
+  mod.content.screens:register(SCREEN, {
+    new = function(game) return buildScreen(mod, game) end,
+  })
+
+  local Host = require("mods.Kanto-Reforged.host")
+  if Host.isGen2() then
+    installPokegear(mod)
+    return
+  end
 
   mod.hooks:wrap("ui.start_menu.items", function(next, game, items)
     local out = next(game, items)
     if type(out) ~= "table" then return out end
     if DexNav.mode(mod) == DexNav.MODE_OFF then return out end
-    local flags = game and game.save and game.save.flags
-    if not (flags and flags.EVENT_GOT_POKEDEX) then
-      return out
-    end
+    if not DexNav.hasPokedex(game) then return out end
     return mod.ui.insertAfter(out, "POKéDEX", {
       label = DexNav.menuLabel(mod),
       onSelect = function() mod.ui.push(game, SCREEN) end,

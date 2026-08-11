@@ -1244,18 +1244,18 @@ def key_out_flat_background(img):
     def flood_key(src_img):
         out = src_img.copy()
         pix = out.load()
-        seen = [[False] * w for _ in range(h)]
-        q = deque()
-        for x in range(w):
-            for y in (0, h - 1):
+    seen = [[False] * w for _ in range(h)]
+    q = deque()
+    for x in range(w):
+        for y in (0, h - 1):
                 if not seen[y][x] and matches(x, y, pix):
-                    seen[y][x] = True
-                    q.append((x, y))
-        for y in range(1, h - 1):
-            for x in (0, w - 1):
+                seen[y][x] = True
+                q.append((x, y))
+    for y in range(1, h - 1):
+        for x in (0, w - 1):
                 if not seen[y][x] and matches(x, y, pix):
-                    seen[y][x] = True
-                    q.append((x, y))
+                seen[y][x] = True
+                q.append((x, y))
         while q:
             x, y = q.popleft()
             r, g, b, _ = pix[x, y]
@@ -1912,8 +1912,8 @@ def filter_ink_mask(mask, min_blob=3):
                         and not seen[ny][nx]
                         and mp[nx, ny]
                     ):
-                        seen[ny][nx] = True
-                        q.append((nx, ny))
+                seen[ny][nx] = True
+                q.append((nx, ny))
             if len(cells) < min_blob:
                 for ox, oy in cells:
                     mp[ox, oy] = 0
@@ -3825,6 +3825,26 @@ GEN2_FAITHFUL_DEFAULTS = FAITHFUL_DEFAULTS
 
 SPRITE_OVERRIDES = {
     # Curated Advanced palettes where auto-extract is weak.
+    # Shade slots match the grayscale sprite: light=body, dark=accent.
+    # (Pixel-swapping this one breaks the 2bpp read; swap palette instead.)
+    "AIPOM": {
+        # Front: white→cream face/belly/hands, light→purple body, dark→deep purple.
+        # (Do not put tan in the dark slot — that only tints the AA rim.)
+        "palette": [
+            (255, 236, 200),  # cream (white pixels)
+            (104, 48, 136),   # purple body (light gray)
+            (56, 28, 80),     # deep purple shade (dark gray)
+            (0, 0, 0),
+        ],
+    },
+    "MINUN": {
+        "palette": [
+            (255, 255, 255),  # white body (Gen2 forces slot 1 white)
+            (48, 72, 168),    # darker blue shadows
+            (88, 120, 224),   # brighter blue accents
+            (0, 0, 0),
+        ],
+    },
     "TREECKO": {
         "palette": [
             (255, 255, 255),
@@ -5157,7 +5177,7 @@ def process_sprite_v1(
     """
     try:
         img = key_out_flat_background(Image.open(input_path))
-
+        
         if palette_override:
             display_colors = [tuple(c) for c in palette_override[:4]]
             while len(display_colors) < 4:
@@ -5171,7 +5191,7 @@ def process_sprite_v1(
         bbox = img.getbbox()
         if bbox:
             img = img.crop(bbox)
-
+            
         # Scale nearest neighbor to preserve sharp pixel art edges
         w, h = img.size
         ratio = min(target_size[0] / w, target_size[1] / h)
@@ -5181,13 +5201,13 @@ def process_sprite_v1(
         if new_h < 1:
             new_h = 1
         img_resized = img.resize((new_w, new_h), Image.NEAREST)
-
+        
         # Center in target frame
         new_img = Image.new("RGBA", target_size, (255, 255, 255, 0))
         x = (target_size[0] - new_w) // 2
         y = (target_size[1] - new_h) // 2
         new_img.paste(img_resized, (x, y))
-
+        
         # Rejoin thin bridges NEAREST dropped (body↔limb bites).
         if close_gap and close_gap > 0:
             new_img = close_small_holes(new_img, max_gap=int(close_gap))
@@ -5217,7 +5237,7 @@ def process_sprite_v1(
         px = new_img.load()
         tw, th = target_size
         indexed_img = Image.new("P", target_size, 0)
-
+        
         def touches_empty(x, y):
             for nx, ny in ((x - 1, y), (x + 1, y), (x, y - 1), (x, y + 1)):
                 if not (0 <= nx < tw and 0 <= ny < th) or px[nx, ny][3] < 128:
@@ -5675,7 +5695,7 @@ def _process_sprite_gen3(input_path, output_path, target_size, opts, override=No
         # on backs so Advanced mode stays consistent with belly/stripe identity.
         if override.get("palette"):
             measure_colors = _normalize_palette(override["palette"])
-        else:
+                    else:
             measure_colors = _normalize_palette(
                 extract_species_palette(img, stretch=False)
             )
@@ -6019,7 +6039,7 @@ def _process_sprite_gen3(input_path, output_path, target_size, opts, override=No
                 if a < 128:
                     indexed_img.putpixel((px_x, py), 0)
                 elif r + g + b < 24:
-                    indexed_img.putpixel((px_x, py), 4)
+                        indexed_img.putpixel((px_x, py), 4)
                 else:
                     shade = shade_for_pixel(r, g, b, species_colors, mode=shade_mode)
                     indexed_img.putpixel((px_x, py), shade + 1)
@@ -6042,7 +6062,7 @@ def _process_sprite_gen3(input_path, output_path, target_size, opts, override=No
             indexed_img = dither_indexed_flats(
                 indexed_img, density=int(opts.get("flat_dither_density", 8))
             )
-
+                        
         palette = [
             255, 255, 255,  # 0: Transparent
             255, 255, 255,  # 1: White
@@ -6052,7 +6072,7 @@ def _process_sprite_gen3(input_path, output_path, target_size, opts, override=No
         ]
         palette += [0] * (768 - len(palette))
         indexed_img.putpalette(palette)
-
+        
         # Readability self-check: if the primary front bake is muddy, retry
         # with the soft option set and keep whichever scores higher.
         if (
@@ -6331,12 +6351,12 @@ def resprite_kanto_reforged(outdir, only=None, gen=None):
         body = re.sub(r'frontSize\s*=\s*\d+', f'frontSize = {front_size}', body, count=1)
         if not re.search(r'frontSize\s*=', body):
             if re.search(r'spriteBack\s*=', body):
-                body = re.sub(
+        body = re.sub(
                     r'(spriteBack\s*=\s*"[^"]*",)',
                     rf'\1\n    frontSize = {front_size},',
-                    body,
-                    count=1,
-                )
+            body,
+            count=1,
+        )
             else:
                 body = f'    frontSize = {front_size},\n' + body
         body = ensure_palette_field(body, name)
@@ -6822,7 +6842,7 @@ def main():
             
             front_mod_path = os.path.join(args.outdir, "assets", f"{p_name.lower()}_front.png")
             back_mod_path = os.path.join(args.outdir, "assets", f"{p_name.lower()}_back.png")
-
+            
             species_palette = None
             if front_url and download_sprite_file(front_url, front_cache_path):
                 ok, colors = process_sprite(
@@ -6885,22 +6905,22 @@ def main():
 
             def collect_level_up(vg_allow):
                 out = []
-                for move_entry in poke_data["moves"]:
-                    m_name = remap_move(move_entry["move"]["name"].upper().replace("-", "_"))
-                    for detail in move_entry["version_group_details"]:
-                        method = detail["move_learn_method"]["name"]
+            for move_entry in poke_data["moves"]:
+                m_name = remap_move(move_entry["move"]["name"].upper().replace("-", "_"))
+                for detail in move_entry["version_group_details"]:
+                    method = detail["move_learn_method"]["name"]
                         vg = detail["version_group"]["name"]
-                        if method == "level-up":
+                    if method == "level-up":
                             if vg_allow is None or vg in vg_allow:
                                 out.append({
-                                    "level": detail["level_learned_at"],
-                                    "move": m_name
-                                })
-                        elif method == "machine":
+                            "level": detail["level_learned_at"],
+                            "move": m_name
+                        })
+                    elif method == "machine":
                             if preferred_vgs is None or vg in preferred_vgs \
                                     or vg in ("emerald", "ruby-sapphire", "firered-leafgreen",
                                               "crystal", "gold-silver", "xd", "colosseum"):
-                                tmhm_set.add(m_name)
+                        tmhm_set.add(m_name)
                 return out
 
             if preferred_vgs:

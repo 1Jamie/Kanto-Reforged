@@ -75,12 +75,25 @@ function ModernXpShare.applyExpShare(battle, mon, split, announce)
   end
   local game = battle.game
   for _, lv in ipairs(levels) do
-    require("src.world.PikachuFollower")
-      .modifyHappiness(game.save, "LEVELUP", mon)
+    do
+      local Gen1Patch = require("mods.Kanto-Reforged.gen1_patch")
+      Gen1Patch.apply(require("src.world.PikachuFollower"), function(follower)
+        if type(follower.modifyHappiness) == "function" then
+          follower.modifyHappiness(game.save, "LEVELUP", mon)
+        end
+      end)
+    end
     battle:sayNext(Strings("%s grew\nto level %d!", name, lv))
     battle:uiNext(function()
       require("src.core.Sound").play(game.data, "Level_Up")
-      return require("src.battle.BattleState").StatBox.new(game, mon)
+      local box
+      local Gen1Patch = require("mods.Kanto-Reforged.gen1_patch")
+      Gen1Patch.apply(require("src.battle.BattleState"), function(bs)
+        if bs.StatBox and type(bs.StatBox.new) == "function" then
+          box = bs.StatBox.new(game, mon)
+        end
+      end)
+      return box
     end)
     if mon == battle.player.mon then battle:drainNext() end
     for _, moveId in ipairs(Experience.movesLearnedAt(
@@ -157,7 +170,8 @@ local function runFaintTailWithoutExp(battle, original)
 end
 
 function ModernXpShare.install(mod)
-  local BattleState = require("src.battle.BattleState")
+  local Gen1Patch = require("mods.Kanto-Reforged.gen1_patch")
+  Gen1Patch.apply(require("src.battle.BattleState"), function(BattleState)
   if BattleState._expansionModernXpShare then return end
 
   -- Live method so award() and tests can call battle:applyExpShare(...)
@@ -203,6 +217,7 @@ function ModernXpShare.install(mod)
   end
 
   BattleState._expansionModernXpShare = true
+  end)
 end
 
 return ModernXpShare

@@ -5,7 +5,29 @@
 # push to GitHub.
 # ---------------------------------------------------------------------------
 assets/
+assets-hold/
 map_previews/
+
+# Sevii — generated outputs + third-party pret dumps (rebuild locally)
+sevii/layout_data.lua
+sevii/layout_report.json
+sevii/tileset_data.lua
+sevii/encounters_data.lua
+sevii/trainers_data.lua
+sevii/blueprint.json
+sevii/import_report.json
+sevii/frlg_trainers.json
+sevii/tile_mapping/standins/
+sevii/tile_mapping/semantic/
+sevii/tile_mapping/*.png
+sevii/tile_mapping/cv_suggestions.json
+sevii/tile_mapping/frlg_oneisland_metatiles.json
+sevii/tile_mapping/gap_report.json
+sevii/tile_mapping/sevii_tileset.json
+sevii/tile_mapping/mid_lock.json
+sevii/tile_mapping/sources/*
+!sevii/tile_mapping/sources/README.md
+!sevii/tile_mapping/sources/sources_manifest.json
 
 # PokéAPI / sprite download cache (lives under the game repo tools/.cache)
 tools/.cache/

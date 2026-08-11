@@ -299,6 +299,15 @@ return function(T, Data, HeldItems, run)
   T.eq(BerryFarm.RETURN_CELL.x, BerryFarm.PC_DOOR.x, "return cell is farm mat")
   T.eq(BerryFarm.RETURN_CELL.y, BerryFarm.PC_DOOR.y, "return cell is farm mat y")
 
+  -- Route 22 door into the badge-check gate is also (8,5); must not hijack.
+  local route22Door = Data.maps.ROUTE_22.warps[1]
+  T.eq(route22Door.x, BerryFarm.EXIT.x, "Route 22 gate door shares farm EXIT x")
+  T.eq(route22Door.y, BerryFarm.EXIT.y, "Route 22 gate door shares farm EXIT y")
+  T.eq(route22Door.destMap, "ROUTE_22_GATE", "Route 22 door targets gate")
+  local gateMap, gateX, gateY = Warp.destination(Data, route22Door, nil)
+  T.eq(gateMap, "ROUTE_22_GATE", "Route 22 gate door not redirected to returnCenter")
+  T.check(gateX ~= nil and gateY ~= nil, "Route 22 gate door still has coords")
+
   -- Farm is OVERWORLD but must not become lastOutdoor (PC LAST_MAP bug)
   local OverworldState = require("src.world.OverworldController")
   local fakeOw = {

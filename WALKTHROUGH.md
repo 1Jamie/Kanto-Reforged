@@ -264,6 +264,10 @@ Use Radar until catch or KO. Optional.
 3. He gives the **DNA Key** and sends you to Birth Island.
 4. Deoxys is waiting there, Lv 70.
 
+### Sevii Islands (One Island + routes)
+
+**Parked / disabled** for now — content and tooling live under `sevii/` but are not loaded. Re-enable later via `SEVII_ENABLED` in `main.lua`.
+
 ### Jirachi
 
 1. Must be Champion.
@@ -305,6 +309,7 @@ Legendary overworld sprites look like gen1 birds / monsters / fairies on purpose
 | Roaming Radar | Beast Tracker after Silph |
 | Eon duo start | Indigo Plateau Lobby, after Champ |
 | DNA Key / Deoxys | Sailor at Vermilion Dock |
+| Rainbow Pass / One Island | Vermilion City dock sailor (post-Champ, after Anne leaves) |
 | Rayquaza gate | Hiker on Route 23 |
 | Celebi gate | Channeler in Viridian Forest |
 | Jirachi | Mt Moon B1F |

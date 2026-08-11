@@ -29,6 +29,7 @@ return function(T, Data, run)
   claimed("CINNABAR_LAB_METRONOME_ROOM", 3, "item_smith")
   claimed("ROUTE_23", 8, "legend_mythicals")
   claimed("POWER_PLANT", 16, "legend_regis")
+  -- Sevii ferry uses the existing Vermilion City gangway sailor (no new dock NPC)
 
   -- Double-claim must error
   local ok, err = pcall(HouseNpcs.claim, "CELADON_MANSION_2F", 1, "other")
@@ -126,7 +127,7 @@ return function(T, Data, run)
     T.eq(answered, true, "YES reaches ask callback")
   end
 
-  -- Circuit host party builds without error.
+  -- Circuit host party builds without error + scale rules.
   do
     local BattleState = require("src.battle.BattleState")
     local Pokemon = require("src.pokemon.Pokemon")
@@ -143,11 +144,97 @@ return function(T, Data, run)
       },
       stack = { push = function() end, pop = function() end, top = function() end },
     }
+    HouseNpcs._scaleGame = game
     local ok, battle = pcall(BattleState.newTrainer, game, "OPP_EXP_BATTLE_CLUB", 1)
+    HouseNpcs._scaleGame = nil
     T.check(ok and battle ~= nil, "Circuit Host battle constructs")
     if ok and battle then
       T.check(#battle.enemyParty >= 1, "Circuit Host has a party")
     end
+
+    local soft = HouseNpcs.softCap(nil, {
+      data = Data,
+      save = { flags = {}, inventory = {}, party = {} },
+    })
+    T.check(type(soft) == "number" and soft >= 14, "softCap is a milestone number")
+
+    local scaleGame = {
+      data = Data,
+      save = {
+        party = {
+          Pokemon.new(Data, "RATTATA", 5),
+          Pokemon.new(Data, "PIDGEOT", 40),
+        },
+        flags = {},
+        inventory = {},
+      },
+    }
+    T.eq(HouseNpcs.highestPartyLevel(scaleGame), 40,
+      "highestPartyLevel uses strongest mon, not lead")
+    T.eq(HouseNpcs.scaleCap(nil, scaleGame), math.max(soft, 40),
+      "scaleCap is max(softCap, highest party) when caps off")
+
+    scaleGame.save.party = {
+      Pokemon.new(Data, "RATTATA", 35),
+      Pokemon.new(Data, "PIDGEY", 10),
+    }
+    T.eq(HouseNpcs.highestPartyLevel(scaleGame), 35, "highest can be the lead")
+
+    scaleGame.save.party = {
+      { species = "BULBASAUR", isEgg = true, level = 99, eggCycles = 5 },
+      Pokemon.new(Data, "PIDGEY", 12),
+    }
+    T.eq(HouseNpcs.highestPartyLevel(scaleGame), 12, "eggs do not set scale")
+
+    scaleGame.save.party = { Pokemon.new(Data, "PIDGEY", 3) }
+    T.eq(HouseNpcs.scaleCap(nil, scaleGame), soft,
+      "underleveled party keeps softCap floor when caps off")
+
+    -- Caps on: stay on the story bracket even if party somehow reads higher.
+    local LevelCaps = require("mods.Kanto-Reforged.level_caps")
+    local fakeMod = {
+      save = {
+        get = function(_, key, default)
+          if key == LevelCaps.SAVE_KEY then return true end
+          return default
+        end,
+      },
+    }
+    scaleGame.save.party = { Pokemon.new(Data, "PIDGEOT", 99) }
+    T.eq(HouseNpcs.scaleCap(fakeMod, scaleGame), soft,
+      "caps on: Circuit stays at softCap (competitive bracket)")
+    T.eq(HouseNpcs.scaleCap(nil, scaleGame), math.max(soft, 99),
+      "caps off: overlevel still raises Circuit")
+
+    HouseNpcs._scaleGame = scaleGame
+    scaleGame.save.party = { Pokemon.new(Data, "PIKACHU", 55) }
+    local stashed = HouseNpcs.scaleCap(nil, nil)
+    HouseNpcs._scaleGame = nil
+    T.eq(stashed, math.max(soft, 55), "scaleCap reads _scaleGame stash")
+
+    local battleGame = {
+      data = Data,
+      save = {
+        party = {
+          Pokemon.new(Data, "RATTATA", 8),
+          Pokemon.new(Data, "FEAROW", 42),
+        },
+        player = { name = "RED" },
+        inventory = {},
+        options = { battleStyle = "set" },
+        pokedex = { seen = {}, owned = {} },
+        flags = {},
+        money = 0,
+      },
+      stack = { push = function() end, pop = function() end, top = function() end },
+    }
+    HouseNpcs._scaleGame = battleGame
+    local scaledBattle = BattleState.newTrainer(battleGame, "OPP_EXP_BATTLE_CLUB", 1)
+    HouseNpcs._scaleGame = nil
+    local aceMon = scaledBattle.enemyParty[#scaledBattle.enemyParty]
+    local expect = math.max(HouseNpcs.softCap(nil, battleGame), 42)
+    T.eq(aceMon.level, expect,
+      "Circuit ace level follows max(softCap, party high)")
   end
 
   -- Extra trades appended (vanilla 10 + 2)

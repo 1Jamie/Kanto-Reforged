@@ -1,6 +1,8 @@
--- Cinnabar Lab Metronome Room item blacksmith.
+-- Cinnabar item blacksmith.
+-- Gen1: lab Metronome room. Gold: Cinnabar Pokémon Center (lab is gone).
 
 local HouseNpcs = require("mods.Kanto-Reforged.house_npcs")
+local Host = require("mods.Kanto-Reforged.host")
 local Strings = require("src.core.Strings")
 
 local ItemSmith = {}
@@ -104,23 +106,27 @@ local function talk(mod)
 end
 
 function ItemSmith.register(mod)
-  -- Register DRAGON_SCALE if missing (for future exchanges)
   if not mod.content.items:get("DRAGON_SCALE") then
     mod.content.items:register("DRAGON_SCALE", {
       id = "DRAGON_SCALE", name = "DRAGON SCALE", price = 2100, tossable = true,
     })
   end
 
-  HouseNpcs.appendNpc(mod, "CINNABAR_LAB_METRONOME_ROOM", {
-    index = 3,
+  local mapId = Host.isGen2() and "CINNABAR_POKECENTER_1F" or "CINNABAR_LAB_METRONOME_ROOM"
+  local index = Host.isGen2() and 4 or 3
+  local x = Host.isGen2() and 1 or 5
+  local y = Host.isGen2() and 3 or 5
+
+  HouseNpcs.appendNpc(mod, mapId, {
+    index = index,
     name = "CINNABARLABMETRONOMEROOM_SMITH",
     sprite = "SPRITE_SCIENTIST",
     text = "TEXT_CINNABARLABMETRONOMEROOM_SMITH",
-    x = 5, y = 5,
+    x = x, y = y,
   }, ItemSmith.OWNER)
 
-  mod.content.map_scripts:register("CINNABAR_LAB_METRONOME_ROOM", {
-    talk = { TEXT_CINNABARLABMETRONOMEROOM_SMITH = talk(mod) },
+  HouseNpcs.bindTalk(mod, mapId, {
+    TEXT_CINNABARLABMETRONOMEROOM_SMITH = talk(mod),
   })
 end
 

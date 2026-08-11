@@ -1,6 +1,8 @@
 -- Celadon Circuit + Dark / Berry specialists (opt-in cap-scaled battles).
+-- Gold: stay on Kanto maps only (no Johto remaps).
 
 local HouseNpcs = require("mods.Kanto-Reforged.house_npcs")
+local Host = require("mods.Kanto-Reforged.host")
 local Strings = require("src.core.Strings")
 
 local BattleClubs = {}
@@ -56,28 +58,89 @@ local BERRY_TEAM = {
   { species = "SHIFTRY", level = 20 },
 }
 
+-- Gen1 house maps that do not exist on Gold → nearest Kanto indoor.
+local function clubMaps()
+  if Host.isGen2() then
+    return {
+      circuit = "CELADON_MANSION_2F",
+      dark = "VERMILION_FISHING_SPEECH_HOUSE",
+      berry = "CELADON_CAFE",
+    }
+  end
+  return {
+    circuit = "CELADON_MANSION_2F",
+    dark = "VERMILION_PIDGEY_HOUSE",
+    berry = "CELADON_HOTEL",
+  }
+end
+
 local function registerTrainers(mod)
-  mod.content.trainers:register(CLUB_CLASS, {
+  local defClub = {
     id = CLUB_CLASS,
     name = "CIRCUIT HOST",
     baseMoney = 40,
-    basePic = "OPP_HIKER",
     parties = { CLUB_TEAMS[1], CLUB_TEAMS[2], CLUB_TEAMS[3], CLUB_TEAMS[4] },
-  })
-  mod.content.trainers:register(DARK_CLASS, {
+  }
+  local defDark = {
     id = DARK_CLASS,
     name = "NIGHT EYES",
     baseMoney = 35,
-    basePic = "OPP_SUPER_NERD",
     parties = { DARK_TEAM },
-  })
-  mod.content.trainers:register(BERRY_CLASS, {
+  }
+  local defBerry = {
     id = BERRY_CLASS,
     name = "SNACK SCOUT",
     baseMoney = 30,
-    basePic = "OPP_LASS",
     parties = { BERRY_TEAM },
-  })
+  }
+  HouseNpcs.registerTrainerDef(CLUB_CLASS, defClub)
+  HouseNpcs.registerTrainerDef(DARK_CLASS, defDark)
+  HouseNpcs.registerTrainerDef(BERRY_CLASS, defBerry)
+
+  if Host.isGen2() then
+    -- Gen2 trainer schema expects class.trainers[].party, not Gen1 parties[][].
+    local function asGen2(def)
+      local trainers = {}
+      for i, party in ipairs(def.parties) do
+        trainers[i] = {
+          id = def.id .. "_" .. i,
+          name = def.name,
+          party = party,
+        }
+      end
+      return {
+        id = def.id,
+        name = def.name,
+        baseMoney = def.baseMoney or 0,
+        trainers = trainers,
+      }
+    end
+    mod.content.trainers:register(CLUB_CLASS, asGen2(defClub))
+    mod.content.trainers:register(DARK_CLASS, asGen2(defDark))
+    mod.content.trainers:register(BERRY_CLASS, asGen2(defBerry))
+  else
+    mod.content.trainers:register(CLUB_CLASS, {
+      id = CLUB_CLASS,
+      name = "CIRCUIT HOST",
+      baseMoney = 40,
+      basePic = "OPP_HIKER",
+      parties = { CLUB_TEAMS[1], CLUB_TEAMS[2], CLUB_TEAMS[3], CLUB_TEAMS[4] },
+    })
+    mod.content.trainers:register(DARK_CLASS, {
+      id = DARK_CLASS,
+      name = "NIGHT EYES",
+      baseMoney = 35,
+      basePic = "OPP_SUPER_NERD",
+      parties = { DARK_TEAM },
+    })
+    mod.content.trainers:register(BERRY_CLASS, {
+      id = BERRY_CLASS,
+      name = "SNACK SCOUT",
+      baseMoney = 30,
+      basePic = "OPP_LASS",
+      parties = { BERRY_TEAM },
+    })
+  end
 end
 
 local function scaleHook(mod)
@@ -86,8 +149,7 @@ local function scaleHook(mod)
     if oppClass ~= CLUB_CLASS and oppClass ~= DARK_CLASS and oppClass ~= BERRY_CLASS then
       return party
     end
-    local game = rawget(_G, "Game")
-    local ace = HouseNpcs.scaleCap(mod, game)
+    local ace = HouseNpcs.scaleCap(mod, nil)
     return HouseNpcs.scaleParty(party, ace)
   end)
 end
@@ -215,7 +277,9 @@ function BattleClubs.register(mod)
   registerTrainers(mod)
   scaleHook(mod)
 
-  HouseNpcs.appendNpc(mod, "CELADON_MANSION_2F", {
+  local maps = clubMaps()
+
+  HouseNpcs.appendNpc(mod, maps.circuit, {
     index = 1,
     name = "CELADONMANSION2F_BATTLE_CLUB",
     sprite = "SPRITE_HIKER",
@@ -224,36 +288,30 @@ function BattleClubs.register(mod)
     x = 2, y = 5,
   }, BattleClubs.OWNER)
 
-  HouseNpcs.appendNpc(mod, "VERMILION_PIDGEY_HOUSE", {
-    index = 4,
+  HouseNpcs.appendNpc(mod, maps.dark, {
+    index = Host.isGen2() and 10 or 4,
     name = "VERMILIONPIDGEYHOUSE_DARK_SPECIALIST",
     sprite = "SPRITE_SUPER_NERD",
     text = "TEXT_VERMILIONPIDGEYHOUSE_DARK_SPECIALIST",
     x = 6, y = 5,
   }, BattleClubs.OWNER)
 
-  HouseNpcs.appendNpc(mod, "CELADON_HOTEL", {
-    index = 4,
+  HouseNpcs.appendNpc(mod, maps.berry, {
+    index = Host.isGen2() and 10 or 4,
     name = "CELADONHOTEL_BERRY_SPECIALIST",
     sprite = "SPRITE_GIRL",
     text = "TEXT_CELADONHOTEL_BERRY_SPECIALIST",
     x = 6, y = 5,
   }, BattleClubs.OWNER)
 
-  mod.content.map_scripts:register("CELADON_MANSION_2F", {
-    talk = {
-      TEXT_CELADONMANSION2F_BATTLE_CLUB = clubTalk(mod),
-    },
+  HouseNpcs.bindTalk(mod, maps.circuit, {
+    TEXT_CELADONMANSION2F_BATTLE_CLUB = clubTalk(mod),
   })
-  mod.content.map_scripts:register("VERMILION_PIDGEY_HOUSE", {
-    talk = {
-      TEXT_VERMILIONPIDGEYHOUSE_DARK_SPECIALIST = darkTalk(mod),
-    },
+  HouseNpcs.bindTalk(mod, maps.dark, {
+    TEXT_VERMILIONPIDGEYHOUSE_DARK_SPECIALIST = darkTalk(mod),
   })
-  mod.content.map_scripts:register("CELADON_HOTEL", {
-    talk = {
-      TEXT_CELADONHOTEL_BERRY_SPECIALIST = berryTalk(mod),
-    },
+  HouseNpcs.bindTalk(mod, maps.berry, {
+    TEXT_CELADONHOTEL_BERRY_SPECIALIST = berryTalk(mod),
   })
 end
 

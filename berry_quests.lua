@@ -17,6 +17,17 @@ BerryQuests.BADGE_UNLOCKS = {
   { badge = "VOLCANOBADGE", berries = { "LUM_BERRY" } },
 }
 
+-- Johto badges stand in for early-game farm unlocks before Kanto.
+BerryQuests.BADGE_UNLOCKS_JOHTO = {
+  { badge = "ZEPHYR", berries = { "CHERI_BERRY" } },
+  { badge = "HIVE", berries = { "PECHA_BERRY" } },
+  { badge = "PLAIN", berries = { "RAWST_BERRY" } },
+  { badge = "FOG", berries = { "ASPEAR_BERRY", "CHESTO_BERRY" } },
+  { badge = "STORM", berries = { "PERSIM_BERRY" } },
+  { badge = "MINERAL", berries = { "LUM_BERRY" } },
+  { badge = "GLACIER", berries = { "LUM_BERRY" } },
+}
+
 BerryQuests.RECIPES = {
   {
     id = "hp_up",
@@ -60,7 +71,22 @@ BerryQuests.RECIPES = {
 }
 
 local function hasBadge(save, badge)
-  return save.inventory and (save.inventory[badge] or 0) > 0
+  return HouseNpcs.hasBadge(save, badge)
+end
+
+local function unlockRows()
+  local Host = require("mods.Kanto-Reforged.host")
+  if Host.isGen2() then
+    local rows = {}
+    for _, row in ipairs(BerryQuests.BADGE_UNLOCKS) do
+      rows[#rows + 1] = row
+    end
+    for _, row in ipairs(BerryQuests.BADGE_UNLOCKS_JOHTO) do
+      rows[#rows + 1] = row
+    end
+    return rows
+  end
+  return BerryQuests.BADGE_UNLOCKS
 end
 
 function BerryQuests.applyBadgeUnlocks(mod, game, opts)
@@ -70,7 +96,7 @@ function BerryQuests.applyBadgeUnlocks(mod, game, opts)
   local newly = {}
   local gifted = mod.save:get("gifted_berry_seeds", nil)
   if type(gifted) ~= "table" then gifted = {} end
-  for _, row in ipairs(BerryQuests.BADGE_UNLOCKS) do
+  for _, row in ipairs(unlockRows()) do
     if hasBadge(save, row.badge) then
       for _, berry in ipairs(row.berries) do
         local unlocked = BerryFarm.ensureUnlocked(mod)
@@ -249,7 +275,9 @@ local function blenderTalk(mod)
 end
 
 local function countOwnedSpecies(save)
-  local owned = save.pokedex and save.pokedex.owned or {}
+  -- Gen1 pokedex.owned; Gold pokedex.caught.
+  local dex = save and save.pokedex or {}
+  local owned = dex.owned or dex.caught or {}
   local n = 0
   for _ in pairs(owned) do n = n + 1 end
   return n
@@ -338,14 +366,12 @@ function BerryQuests.register(mod)
     x = 8, y = 14,
   }, BerryQuests.OWNER)
 
-  mod.content.map_scripts:register("CELADON_MANSION_3F", {
-    talk = { TEXT_CELADONMANSION3F_BLENDER = blenderTalk(mod) },
+  HouseNpcs.bindTalk(mod, "CELADON_MANSION_3F", {
+    TEXT_CELADONMANSION3F_BLENDER = blenderTalk(mod),
   })
-  mod.content.map_scripts:register("BERRY_FARM", {
-    talk = {
-      TEXT_BERRY_FARM_SOIL_EXPERT = soilTalk(mod),
-      TEXT_BERRY_FARM_MERCHANT = merchantTalk(mod),
-    },
+  HouseNpcs.bindTalk(mod, "BERRY_FARM", {
+    TEXT_BERRY_FARM_SOIL_EXPERT = soilTalk(mod),
+    TEXT_BERRY_FARM_MERCHANT = merchantTalk(mod),
   })
 
   -- Auto-unlock berries when badges are earned (on map enter farm or talk).

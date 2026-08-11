@@ -210,7 +210,7 @@ end
 
 local function depositMon(game, done)
   local TextBox = require("src.render.TextBox")
-  local PartyMenu = require("src.ui.PartyMenu")
+  local Host = require("mods.Kanto-Reforged.host")
   local Gender = require("mods.Kanto-Reforged.gender")
   local t = game.data.text
   local dc = ensureDaycare(game.save)
@@ -232,48 +232,61 @@ local function depositMon(game, done)
   game.stack:push(TextBox.new(game,
     t._DaycareGentlemanWhichMonText or "Which POKéMON\nshould I raise?",
     function()
-      game.stack:push(PartyMenu.new(game, {
-        pickOnly = true,
-        onSwitch = function(mon)
-          if Breeding.isEgg(mon) then
-            game.stack:push(TextBox.new(game,
-              "I can't raise\nan EGG!", done))
-            return
-          end
-          Gender.ensure(game.data, mon)
-          for i, m in ipairs(game.save.party) do
-            if m == mon then table.remove(game.save.party, i) break end
-          end
-          local name = monName(game, mon)
-          local slotKey, levelKey
-          if not dc.mon then
-            slotKey, levelKey = "mon", "depositLevel"
-          else
-            slotKey, levelKey = "mon2", "depositLevel2"
-          end
-          dc[slotKey] = mon
-          dc[levelKey] = mon.level
-          dc.steps = dc.steps or 0
-          if slotCount(dc) == 2 then
-            Breeding.resetBreedCountdown(dc)
-          end
+      local function onPick(mon)
+        if Breeding.isEgg(mon) then
           game.stack:push(TextBox.new(game,
-            fillDaycareText(
-              t._DaycareGentlemanWillLookAfterMonText
-                or "Fine, I'll look\nafter {RAM:wNameBuffer}\nfor a while.",
-              { player = playerName, wNameBuffer = name }),
-            function()
-              local extra = ""
-              if slotCount(dc) == 2 then
-                local compat = Breeding.compatibility(game.data, dc.mon, dc.mon2)
-                extra = "\f" .. Breeding.compatibilityLine(compat)
-              end
-              game.stack:push(TextBox.new(game,
-                (t._DaycareGentlemanComeSeeMeInAWhileText
-                  or "Come see me in\na while.") .. extra, done))
-            end))
-        end,
-      }))
+            "I can't raise\nan EGG!", done))
+          return
+        end
+        Gender.ensure(game.data, mon)
+        for i, m in ipairs(game.save.party) do
+          if m == mon then table.remove(game.save.party, i) break end
+        end
+        local name = monName(game, mon)
+        local slotKey, levelKey
+        if not dc.mon then
+          slotKey, levelKey = "mon", "depositLevel"
+        else
+          slotKey, levelKey = "mon2", "depositLevel2"
+        end
+        dc[slotKey] = mon
+        dc[levelKey] = mon.level
+        dc.steps = dc.steps or 0
+        if slotCount(dc) == 2 then
+          Breeding.resetBreedCountdown(dc)
+        end
+        game.stack:push(TextBox.new(game,
+          fillDaycareText(
+            t._DaycareGentlemanWillLookAfterMonText
+              or "Fine, I'll look\nafter {RAM:wNameBuffer}\nfor a while.",
+            { player = playerName, wNameBuffer = name }),
+          function()
+            local extra = ""
+            if slotCount(dc) == 2 then
+              local compat = Breeding.compatibility(game.data, dc.mon, dc.mon2)
+              extra = "\f" .. Breeding.compatibilityLine(compat)
+            end
+            game.stack:push(TextBox.new(game,
+              (t._DaycareGentlemanComeSeeMeInAWhileText
+                or "Come see me in\na while.") .. extra, done))
+          end))
+      end
+
+      if Host.isGen2() then
+        require("src.ui.Screens").push(game, "Gen2PartyMenu", {
+          prompt = "which",
+          onChoose = function(_index, mon)
+            game.stack:pop()
+            onPick(mon)
+          end,
+        })
+      else
+        local PartyMenu = require("src.ui.PartyMenu")
+        game.stack:push(PartyMenu.new(game, {
+          pickOnly = true,
+          onSwitch = onPick,
+        }))
+      end
     end))
 end
 
@@ -504,8 +517,11 @@ function Daycare.install(mod)
   local SaveData = require("src.core.SaveData")
 
   if not OverworldState._expDaycareBreedPatch then
-    local origOnStep = OverworldState.onStepComplete
-    OverworldState.onStepComplete = function(self)
+    local Gen1Patch = require("mods.Kanto-Reforged.gen1_patch")
+    Gen1Patch.apply(OverworldState, function(ow)
+      local origOnStep = ow.onStepComplete
+      if type(origOnStep) ~= "function" then return end
+      ow.onStepComplete = function(self)
       local dc = Game.save and Game.save.daycare
       -- Vanilla only ticks when daycare.mon is set; cover mon2-only.
       local needMon2Step = dc and dc.mon2 and not dc.mon
@@ -542,6 +558,7 @@ function Daycare.install(mod)
         end
       end
     end
+    end)
     OverworldState._expDaycareBreedPatch = true
   end
 

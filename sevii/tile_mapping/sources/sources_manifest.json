@@ -1,0 +1,83 @@
+{
+  "policy": "Only pret raw tilesheets + metatile bins. Never screenshots, never padded atlases, never treasure-one-island.png.",
+  "repos": {
+    "pokefirered": "https://github.com/pret/pokefirered",
+    "pokered": "https://github.com/pret/pokered"
+  },
+  "assets": [
+    {
+      "id": "frlg_general_tiles",
+      "url": "https://raw.githubusercontent.com/pret/pokefirered/master/data/tilesets/primary/general/tiles.png",
+      "file": "sources/frlg_general_tiles.png",
+      "note": "FRLG primary 8\u00d78 tilesheet (pret). No padding between tiles.",
+      "bytes": 8671,
+      "size": [
+        128,
+        320
+      ],
+      "mode": "P",
+      "tile_aligned": true
+    },
+    {
+      "id": "frlg_general_metatiles",
+      "url": "https://raw.githubusercontent.com/pret/pokefirered/master/data/tilesets/primary/general/metatiles.bin",
+      "file": "sources/frlg_general_metatiles.bin",
+      "note": "8 tile-entries per metatile \u00d7 2 layers",
+      "bytes": 10240
+    },
+    {
+      "id": "frlg_general_attr",
+      "url": "https://raw.githubusercontent.com/pret/pokefirered/master/data/tilesets/primary/general/metatile_attributes.bin",
+      "file": "sources/frlg_general_attr.bin",
+      "note": "u32 attrs; behavior in low 9 bits",
+      "bytes": 2560
+    },
+    {
+      "id": "frlg_sevii_tiles",
+      "url": "https://raw.githubusercontent.com/pret/pokefirered/master/data/tilesets/secondary/sevii_islands_123/tiles.png",
+      "file": "sources/frlg_sevii_tiles.png",
+      "note": "Sevii 1/2/3 secondary 8\u00d78 tilesheet (pret)",
+      "bytes": 2574,
+      "size": [
+        128,
+        192
+      ],
+      "mode": "P",
+      "tile_aligned": true
+    },
+    {
+      "id": "frlg_sevii_metatiles",
+      "url": "https://raw.githubusercontent.com/pret/pokefirered/master/data/tilesets/secondary/sevii_islands_123/metatiles.bin",
+      "file": "sources/frlg_sevii_metatiles.bin",
+      "note": "Sevii secondary metatile defs",
+      "bytes": 4560
+    },
+    {
+      "id": "frlg_sevii_attr",
+      "url": "https://raw.githubusercontent.com/pret/pokefirered/master/data/tilesets/secondary/sevii_islands_123/metatile_attributes.bin",
+      "file": "sources/frlg_sevii_attr.bin",
+      "note": "Sevii secondary attrs",
+      "bytes": 1140
+    },
+    {
+      "id": "frlg_oneisland_map",
+      "url": "https://raw.githubusercontent.com/pret/pokefirered/master/data/layouts/OneIsland/map.bin",
+      "file": "sources/frlg_OneIsland_map.bin",
+      "note": "Which metatile IDs appear on One Island",
+      "bytes": 960
+    },
+    {
+      "id": "pokered_overworld_tiles",
+      "url": "https://raw.githubusercontent.com/pret/pokered/master/gfx/tilesets/overworld.png",
+      "file": "sources/pokered_overworld_tiles.png",
+      "note": "Gen1 OVERWORLD 8\u00d78 sheet (pret/pokered). Already GB 2bpp art.",
+      "bytes": 1309,
+      "size": [
+        128,
+        48
+      ],
+      "mode": "L",
+      "tile_aligned": true
+    }
+  ]
+}

@@ -65,8 +65,12 @@ local function staticBattle(species, level, flag)
       HouseNpcs.pushText(game, Strings("..."), done)
       return
     end
-    local BattleState = require("src.battle.BattleState")
-    local battle = BattleState.newWild(game, species, level)
+    local Gen1Patch = require("mods.Kanto-Reforged.gen1_patch")
+    local battle
+    Gen1Patch.apply(require("src.battle.BattleState"), function(bs)
+      battle = bs.newWild(game, species, level)
+    end)
+    if not battle then if done then done() end return end
     battle.onFinish = function(result)
       if result == "win" or result == "caught" or result == "run" then
         game.save.flags = game.save.flags or {}
@@ -82,6 +86,8 @@ local function staticBattle(species, level, flag)
 end
 
 function LegendMythicals.register(mod)
+  local Host = require("mods.Kanto-Reforged.host")
+  if Host.isGen2() then return end
   mod.content.items:register("DNA_KEY", {
     id = "DNA_KEY", name = "DNA KEY", price = 0, keyItem = true, tossable = false,
   })
@@ -339,13 +345,19 @@ LegendMythicals.EXIT_WARPS = {
 }
 
 function LegendMythicals.install(mod)
+  local Host = require("mods.Kanto-Reforged.host")
+  if Host.isGen2() then return end
   local OverworldState = require("src.world.OverworldController")
   if not OverworldState._expansionLegendOutdoor then
-    local origRemember = OverworldState.rememberOutdoor
-    OverworldState.rememberOutdoor = function(self, id, x, y)
-      if LegendMythicals.CUSTOM_MAPS[id] then return end
-      return origRemember(self, id, x, y)
-    end
+    local Gen1Patch = require("mods.Kanto-Reforged.gen1_patch")
+    Gen1Patch.apply(OverworldState, function(ow)
+      local origRemember = ow.rememberOutdoor
+      if type(origRemember) ~= "function" then return end
+      ow.rememberOutdoor = function(self, id, x, y)
+        if LegendMythicals.CUSTOM_MAPS[id] then return end
+        return origRemember(self, id, x, y)
+      end
+    end)
     OverworldState._expansionLegendOutdoor = true
   end
 
