@@ -4,7 +4,18 @@ Gen 2 and 3 content for Red/Blue on this engine. Same Kanto story, more Pokemon,
 
 Mod id is `Kanto-Reforged`. Turn it on in the launcher Mods tab or the F10 manager.
 
-Has support for Gen1 Modern UI mod 
+Has support for Gen1 Modern UI mod.
+
+## Current status
+
+**RBY (generation 1 of gen1recomp++):**
+fully functional with the occasional bug still being chased down but fully playable and all 386 are obtainable
+
+**Gold (gen1recomp++):** In progress. Basic Gold support is wired in - KR content can load on Gold, with type-chart / move-type fixes, Gen2 palette registration for imported species, and related hooks already landing. Still tweaking, adjusting, and filling gaps so the full Kanto-Reforged feature set reaches Gen1 (Red) parity on Gold.
+still need to add abilities info to party pokemon pages and finish adding in all the kanto additions into kanto in kanto XD
+farm is sitll being implemented and extended in gen2
+
+**Sevii Islands:** On hold. Maps, ferry, and tooling live under `sevii/` but are not loaded (`SEVII_ENABLED = false`). Reserved map ids stay reserved; no Sevii play path until that work resumes.
 
 ## What it looks like
 
