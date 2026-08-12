@@ -76,6 +76,7 @@ return function(T, Data, HeldItems, run)
   local wildMon = { species = "PIDGEY" }
   HeldItems.maybeGiveWildHold(wildMon, function() return 0.0 end)
   T.check(HeldItems.isBerry(wildMon.heldItem), "0% roll gives a berry hold")
+  T.eq(wildMon.item, wildMon.heldItem, "wild hold syncs mon.item for Gold")
   local wildMon2 = { species = "PIDGEY" }
   HeldItems.maybeGiveWildHold(wildMon2, function() return 0.99 end)
   T.eq(wildMon2.heldItem, nil, "high roll skips wild berry")
@@ -129,11 +130,12 @@ return function(T, Data, HeldItems, run)
   T.eq(Data.items.LUM_BERRY.price, 2000, "Lum farm price")
 
   local BerryQuests = require("mods.Kanto-Reforged.berry_quests")
+  local Host = require("mods.Kanto-Reforged.host")
   T.eq(BerryQuests.UNLOCK_SEED_GIFT, 3, "Unlock gifts 3 berries per type")
   local mod = BerryFarm._mod or require("mods.Kanto-Reforged.level_caps")._mod
   T.check(mod and mod.save, "berry farm has mod save")
-  mod.save:set("unlocked_berries", { BERRY = true })
-  mod.save:set("gifted_berry_seeds", {})
+  Host.saveSet(mod.save, "unlocked_berries", { BERRY = true })
+  Host.saveSet(mod.save, "gifted_berry_seeds", {})
   local fakeGame = {
     save = {
       inventory = { BOULDERBADGE = 1, money = 10000 },
@@ -152,6 +154,100 @@ return function(T, Data, HeldItems, run)
   -- Second gift pass must not duplicate
   BerryQuests.applyBadgeUnlocks(mod, fakeGame, { gift = true })
   T.eq(fakeGame.save.inventory.CHERI_BERRY, 3, "unlock berry gift is one-shot")
+
+  -- Host-local badge tracks: Gen1 = Kanto inventory badges only;
+  -- Gen2 = Johto player.badges only (never kantoBadges rematches).
+  do
+    local rows1 = BerryQuests.unlockRows()
+    T.eq(rows1[1].badge, "BOULDERBADGE", "Gen1 unlock row starts at Boulder")
+    for _, row in ipairs(rows1) do
+      T.check(tostring(row.badge):find("BADGE", 1, true) ~= nil,
+        "Gen1 unlock badges are *BADGE inventory ids (" .. tostring(row.badge) .. ")")
+    end
+    T.eq(BerryQuests.blenderBadgeId(), "RAINBOWBADGE", "Gen1 blender wants Rainbow")
+
+    Host.force(2)
+    local rows2 = BerryQuests.unlockRows()
+    T.eq(rows2[1].badge, "ZEPHYR", "Gen2 unlock row starts at Zephyr")
+    for _, row in ipairs(rows2) do
+      T.check(tostring(row.badge):find("BADGE", 1, true) == nil,
+        "Gen2 unlock badges are Johto short names (" .. tostring(row.badge) .. ")")
+      T.check(row.badge ~= "BOULDER" and row.badge ~= "BOULDERBADGE",
+        "Gen2 rows never include Kanto Boulder")
+    end
+    T.eq(BerryQuests.blenderBadgeId(), "FOG", "Gen2 blender wants Fog")
+
+    Host.saveSet(mod.save, "unlocked_berries", { BERRY = true })
+    Host.saveSet(mod.save, "gifted_berry_seeds", {})
+    -- Gold save with only a Kanto rematch badge must NOT unlock farm berries.
+    local goldKantoOnly = {
+      save = {
+        inventory = {},
+        player = {
+          badges = {},
+          kantoBadges = { BOULDER = true, CASCADE = true, RAINBOW = true },
+          money = 10000,
+        },
+        party = {},
+        pokedex = { caught = {} },
+      },
+      data = Data,
+    }
+    local goldNewly = BerryQuests.applyBadgeUnlocks(mod, goldKantoOnly, { gift = true })
+    T.eq(#goldNewly, 0, "Gold kantoBadges alone unlock no farm berries")
+    T.eq(goldKantoOnly.save.inventory.CHERI_BERRY, nil,
+      "no Cheri gift from Kanto rematch badges on Gold")
+
+    -- Johto Zephyr unlocks Cheri on Gold.
+    goldKantoOnly.save.player.badges.ZEPHYR = true
+    goldNewly = BerryQuests.applyBadgeUnlocks(mod, goldKantoOnly, { gift = true })
+    T.check(#goldNewly >= 1, "Zephyr unlocks Cheri on Gold")
+    T.eq(goldKantoOnly.save.inventory.CHERI_BERRY, 3, "Zephyr gifts 3 Cheri")
+
+    Host.clearForce()
+    -- After leaving Gen2 force, Gen1 rows return.
+    T.eq(BerryQuests.unlockRows()[1].badge, "BOULDERBADGE",
+      "unlockRows returns to Kanto after Host.clearForce")
+  end
+
+  -- Host-prefixed mod.save: Red progress must not bleed into Gold keys.
+  do
+    local iso = {}
+    local isoSave = {
+      get = function(_, key, default)
+        if iso[key] == nil then return default end
+        return iso[key]
+      end,
+      set = function(_, key, value) iso[key] = value end,
+    }
+    Host.clearForce()
+    Host.saveSet(isoSave, "unlocked_berries", { BERRY = true, CHERI_BERRY = true })
+    T.check(iso[Host.saveKey("unlocked_berries")] ~= nil, "Gen1 unlock writes g1: key")
+    Host.force(2)
+    T.eq(Host.saveGet(isoSave, "unlocked_berries", nil), nil,
+      "Gen2 read does not see Gen1 unlock table")
+    Host.saveSet(isoSave, "unlocked_berries", { BERRY = true })
+    T.check(iso["g2:unlocked_berries"] ~= nil, "Gen2 unlock writes g2: key")
+    Host.clearForce()
+    local g1 = Host.saveGet(isoSave, "unlocked_berries", nil)
+    T.check(g1 and g1.CHERI_BERRY, "Gen1 unlock table survives Gen2 writes")
+  end
+
+  -- map.entered unlock must not require ev.game (engines never send it).
+  do
+    Host.saveSet(mod.save, "unlocked_berries", { BERRY = true })
+    local prevGame = package.loaded["src.core.Game"]
+    package.loaded["src.core.Game"] = {
+      save = { inventory = { BOULDERBADGE = 1 } },
+    }
+    -- Same resolve path berry_quests' map.entered listener uses.
+    local game = package.loaded["src.core.Game"] or rawget(_G, "Game")
+    BerryQuests.applyBadgeUnlocks(mod, game)
+    local unlocked = Host.saveGet(mod.save, "unlocked_berries", {})
+    T.check(unlocked.CHERI_BERRY == true,
+      "map.entered unlock resolves Game without ev.game")
+    package.loaded["src.core.Game"] = prevGame
+  end
 
   T.eq(Data.maps.BERRY_FARM.borderBlock, 15, "Farm border block is the tree wall")
   -- North and south rows fully close the map (yard + lake)
@@ -206,10 +302,7 @@ return function(T, Data, HeldItems, run)
     T.eq(m.blocks[3 * 7 + 5 + 1], 11, mapId .. " farm mat block 11")
   end
 
-  local farmBucket = {
-    farmSteps = 0,
-    plots = { [2] = { berryId = "CHERI_BERRY", plantedAtSteps = 0 } },
-  }
+  local farmBucket = {}
   local fakeMod = {
     save = {
       get = function(_, key, default)
@@ -219,13 +312,17 @@ return function(T, Data, HeldItems, run)
       set = function(_, key, value) farmBucket[key] = value end,
     },
   }
+  Host.saveSet(fakeMod.save, "farmSteps", 0)
+  Host.saveSet(fakeMod.save, "plots", {
+    [2] = { berryId = "CHERI_BERRY", plantedAtSteps = 0 },
+  })
   T.check(not BerryFarm.plotReady(fakeMod, 2), "fresh plant not ready")
   T.eq(BerryFarm.plotMarkerSprite(fakeMod, 2), "SPRITE_PLOT_GROWING",
     "freshly planted plot shows the shared growing sprite")
-  farmBucket.farmSteps = math.floor(BerryFarm.GROW_STEPS * 0.75)
+  Host.saveSet(fakeMod.save, "farmSteps", math.floor(BerryFarm.GROW_STEPS * 0.75))
   T.eq(BerryFarm.plotMarkerSprite(fakeMod, 2), "SPRITE_PLOT_GROWING",
     "still-growing plot keeps showing the growing sprite")
-  farmBucket.farmSteps = BerryFarm.GROW_STEPS
+  Host.saveSet(fakeMod.save, "farmSteps", BerryFarm.GROW_STEPS)
   T.check(BerryFarm.plotReady(fakeMod, 2), "plant ready after GROW_STEPS")
   T.eq(BerryFarm.plotMarkerSprite(fakeMod, 2), "SPRITE_PLOT_CHERI",
     "ripe Cheri plot shows the Cheri-specific sprite")
@@ -249,7 +346,7 @@ return function(T, Data, HeldItems, run)
   end
 
   -- No auto-seed: missing plots stay empty (all 9 independent slots)
-  local emptyBucket = { farmSteps = 0 }
+  local emptyBucket = {}
   local emptyMod = {
     save = {
       get = function(_, key, default)
@@ -260,22 +357,24 @@ return function(T, Data, HeldItems, run)
     },
   }
   BerryFarm.farmSteps(emptyMod)
-  T.check(emptyBucket.plots ~= nil, "plots table initialized")
-  T.eq(emptyBucket.plots["1"], nil, "plot 1 is not auto-planted")
-  T.eq(emptyBucket.plots[1], nil, "plot 1 numeric key also empty")
+  local emptyPlots = Host.saveGet(emptyMod.save, "plots", nil)
+  T.check(emptyPlots ~= nil, "plots table initialized")
+  T.eq(emptyPlots["1"], nil, "plot 1 is not auto-planted")
+  T.eq(emptyPlots[1], nil, "plot 1 numeric key also empty")
   T.check(not BerryFarm.plotReady(emptyMod, 1), "empty plot 1 not ready")
 
   -- Independence: planting/clearing one slot must not touch another
-  emptyBucket.farmSteps = BerryFarm.GROW_STEPS + 10
-  emptyBucket.plots = {
+  Host.saveSet(emptyMod.save, "farmSteps", BerryFarm.GROW_STEPS + 10)
+  Host.saveSet(emptyMod.save, "plots", {
     ["2"] = { berryId = "CHERI_BERRY", plantedAtSteps = BerryFarm.GROW_STEPS + 10 },
     ["5"] = { berryId = "PECHA_BERRY", plantedAtSteps = 0 },
-  }
+  })
   T.check(not BerryFarm.plotReady(emptyMod, 2), "plot 2 still growing")
   T.check(BerryFarm.plotReady(emptyMod, 5), "plot 5 ready (older plant)")
   -- clear plot 2 via write path
-  emptyBucket.plots["2"] = nil
-  emptyMod.save:set("plots", emptyBucket.plots)
+  local livePlots = Host.saveGet(emptyMod.save, "plots", {})
+  livePlots["2"] = nil
+  Host.saveSet(emptyMod.save, "plots", livePlots)
   T.check(not BerryFarm.plotReady(emptyMod, 2), "cleared plot 2 stays empty")
   T.check(BerryFarm.plotReady(emptyMod, 5), "plot 5 untouched after clearing 2")
   -- ensureState must not resurrect a free berry into plot 1
@@ -285,7 +384,7 @@ return function(T, Data, HeldItems, run)
 
   local Warp = require("src.world.Warp")
   run.loader.modSave["Kanto-Reforged"] = run.loader.modSave["Kanto-Reforged"] or {}
-  run.loader.modSave["Kanto-Reforged"].returnCenter = {
+  run.loader.modSave["Kanto-Reforged"][Host.saveKey("returnCenter")] = {
     map = "PEWTER_POKECENTER", x = 9, y = 7,
   }
   local exitWarp = {

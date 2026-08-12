@@ -33,6 +33,13 @@ end
 
 local function staticTalk(species, level, flag, needItem, weather)
   return function(game, ow, npc, done)
+    local SpeciesScope = require("mods.Kanto-Reforged.species_scope")
+    if not SpeciesScope.allowsSpeciesId(SpeciesScope._mod, species, nil) then
+      HouseNpcs.pushText(game, Strings(
+        "A presence flickers...\f"
+          .. "It won't answer under\nKANTO scope."), done)
+      return
+    end
     if game.save.flags and game.save.flags[flag] then
       HouseNpcs.pushText(game, Strings("..."), done)
       return
@@ -129,14 +136,19 @@ function LegendShrines.register(mod)
   mod.content.map_scripts:register("ROUTE_16_FLY_HOUSE", {
     talk = {
       TEXT_ROUTE16FLYHOUSE_WING_HUNTER = function(game, ow, npc, done)
+        local SpeciesScope = require("mods.Kanto-Reforged.species_scope")
+        if SpeciesScope.mode(SpeciesScope._mod or mod)
+            == SpeciesScope.MODE_KANTO then
+          HouseNpcs.pushText(game, Strings(
+            "Rainbow wings? With a\nKANTO-only DEX?\f"
+              .. "Come back on NATIONAL\nscope."), done)
+          return
+        end
         if hasItem(game.save, "RAINBOW_WING") then
           HouseNpcs.pushText(game, Strings("Take it to the\nCELADON roof."), done)
           return
         end
-        local owned = 0
-        for _ in pairs((game.save.pokedex and game.save.pokedex.owned) or {}) do
-          owned = owned + 1
-        end
+        local owned = SpeciesScope.ownedCountForGates(game, SpeciesScope._mod or mod)
         if owned < 60 then
           HouseNpcs.pushText(game, Strings(
             "Show me 60 owned\nPOKéMON first."), done)
@@ -151,6 +163,14 @@ function LegendShrines.register(mod)
   mod.content.map_scripts:register("ROUTE_12_GATE_2F", {
     talk = {
       TEXT_ROUTE12GATE2F_WING_HUNTER = function(game, ow, npc, done)
+        local SpeciesScope = require("mods.Kanto-Reforged.species_scope")
+        if SpeciesScope.mode(SpeciesScope._mod or mod)
+            == SpeciesScope.MODE_KANTO then
+          HouseNpcs.pushText(game, Strings(
+            "Silver wings won't\nshow for a KANTO\nDEX.\f"
+              .. "Switch to NATIONAL\nscope first."), done)
+          return
+        end
         if hasItem(game.save, "SILVER_WING") then
           HouseNpcs.pushText(game, Strings("SEAFOAM waits."), done)
           return
@@ -179,6 +199,14 @@ function LegendShrines.register(mod)
   mod.content.map_scripts:register("CINNABAR_LAB", {
     talk = {
       TEXT_CINNABARLAB_ORB_HUNTER = function(game, ow, npc, done)
+        local SpeciesScope = require("mods.Kanto-Reforged.species_scope")
+        if SpeciesScope.mode(SpeciesScope._mod or mod)
+            == SpeciesScope.MODE_KANTO then
+          HouseNpcs.pushText(game, Strings(
+            "Those orbs answer a\nwider world.\f"
+              .. "Not while you're on\nKANTO scope."), done)
+          return
+        end
         local flags = game.save.flags or {}
         if not flags.EVENT_BEAT_CHAMPION_RIVAL then
           HouseNpcs.pushText(game, Strings(

@@ -64,6 +64,13 @@ end
 local function sealTalk(species, level, flag, needType, needCount)
   needCount = needCount or 1
   return function(game, ow, npc, done)
+    local SpeciesScope = require("mods.Kanto-Reforged.species_scope")
+    if not SpeciesScope.allowsSpeciesId(SpeciesScope._mod, species, nil) then
+      HouseNpcs.pushText(game, Strings(
+        "The seal is quiet.\f"
+          .. "KANTO scope keeps it\nthat way."), done)
+      return
+    end
     if not (game.save.flags and game.save.flags.MOD_REGI_NOTES) then
       HouseNpcs.pushText(game, Strings(
         "An ancient seal...\f"

@@ -17,7 +17,8 @@ BerryQuests.BADGE_UNLOCKS = {
   { badge = "VOLCANOBADGE", berries = { "LUM_BERRY" } },
 }
 
--- Johto badges stand in for early-game farm unlocks before Kanto.
+-- Gold / Crystal: Johto gym order only. Never gate farm unlocks on
+-- save.player.kantoBadges (RBY rematches) — those are a separate track.
 BerryQuests.BADGE_UNLOCKS_JOHTO = {
   { badge = "ZEPHYR", berries = { "CHERI_BERRY" } },
   { badge = "HIVE", berries = { "PECHA_BERRY" } },
@@ -27,6 +28,10 @@ BerryQuests.BADGE_UNLOCKS_JOHTO = {
   { badge = "MINERAL", berries = { "LUM_BERRY" } },
   { badge = "GLACIER", berries = { "LUM_BERRY" } },
 }
+
+-- Blender unlock: 4th story badge (Rainbow / Fog).
+BerryQuests.BLENDER_BADGE_GEN1 = "RAINBOWBADGE"
+BerryQuests.BLENDER_BADGE_GEN2 = "FOG"
 
 BerryQuests.RECIPES = {
   {
@@ -74,29 +79,33 @@ local function hasBadge(save, badge)
   return HouseNpcs.hasBadge(save, badge)
 end
 
-local function unlockRows()
+-- Host-local unlock table only — RBY never reads Johto badges; Gold never
+-- reads Kanto inventory/rematch badges for farm progression.
+function BerryQuests.unlockRows()
   local Host = require("mods.Kanto-Reforged.host")
   if Host.isGen2() then
-    local rows = {}
-    for _, row in ipairs(BerryQuests.BADGE_UNLOCKS) do
-      rows[#rows + 1] = row
-    end
-    for _, row in ipairs(BerryQuests.BADGE_UNLOCKS_JOHTO) do
-      rows[#rows + 1] = row
-    end
-    return rows
+    return BerryQuests.BADGE_UNLOCKS_JOHTO
   end
   return BerryQuests.BADGE_UNLOCKS
 end
 
+function BerryQuests.blenderBadgeId()
+  local Host = require("mods.Kanto-Reforged.host")
+  if Host.isGen2() then
+    return BerryQuests.BLENDER_BADGE_GEN2
+  end
+  return BerryQuests.BLENDER_BADGE_GEN1
+end
+
 function BerryQuests.applyBadgeUnlocks(mod, game, opts)
   opts = opts or {}
+  local Host = require("mods.Kanto-Reforged.host")
   local save = game and game.save
   if not save then return {} end
   local newly = {}
-  local gifted = mod.save:get("gifted_berry_seeds", nil)
+  local gifted = Host.saveGet(mod.save, "gifted_berry_seeds", nil)
   if type(gifted) ~= "table" then gifted = {} end
-  for _, row in ipairs(unlockRows()) do
+  for _, row in ipairs(BerryQuests.unlockRows()) do
     if hasBadge(save, row.badge) then
       for _, berry in ipairs(row.berries) do
         local unlocked = BerryFarm.ensureUnlocked(mod)
@@ -113,7 +122,7 @@ function BerryQuests.applyBadgeUnlocks(mod, game, opts)
     end
   end
   if opts.gift then
-    mod.save:set("gifted_berry_seeds", gifted)
+    Host.saveSet(mod.save, "gifted_berry_seeds", gifted)
   end
   return newly
 end
@@ -124,6 +133,31 @@ BerryQuests.UNLOCK_SEED_GIFT = 3
 
 local function merchantStock(mod)
   return BerryFarm.plantableList(mod)
+end
+
+-- Gen1 ShopMenu reads save.money; Gold keeps ¥ on save.player.money, so a
+-- buy compare (nil < price) hard-crashes. Use Gen2MartMenu on Gold.
+function BerryQuests.openShop(game, stock, done)
+  local Host = require("mods.Kanto-Reforged.host")
+  if Host.isGen2() then
+    local Screens = require("src.ui.Screens")
+    Screens.push(game, "Gen2MartMenu", {
+      save = game.save,
+      items = game.data and game.data.items,
+      -- martId 0 → lists[1]; synthetic shelf from unlocked farm berries.
+      marts = { lists = { stock } },
+      martType = "STANDARD",
+      martId = 0,
+      text = game.world and game.world.text,
+      onClose = function()
+        if game.stack then game.stack:pop() end
+        if done then done() end
+      end,
+    })
+    return
+  end
+  local ShopMenu = require("src.ui.ShopMenu")
+  game.stack:push(ShopMenu.new(game, stock, done))
 end
 
 local function merchantTalk(mod)
@@ -139,26 +173,40 @@ local function merchantTalk(mod)
       "Berry stall!\f"
         .. "I sell berries you\nhave unlocked.\f"
         .. "Growing more on the\nplots is cheaper."), function()
-      local ShopMenu = require("src.ui.ShopMenu")
-      game.stack:push(ShopMenu.new(game, stock, done))
+      BerryQuests.openShop(game, stock, done)
     end)
   end
 end
 
 local function blenderGateOk(mod, game)
-  if hasBadge(game.save, "RAINBOWBADGE") then return true end
-  return (mod.save:get("soil_rank", 0) or 0) >= 1
+  local Host = require("mods.Kanto-Reforged.host")
+  if hasBadge(game.save, BerryQuests.blenderBadgeId()) then return true end
+  return (Host.saveGet(mod.save, "soil_rank", 0) or 0) >= 1
+end
+
+local function blenderGateHint()
+  local Host = require("mods.Kanto-Reforged.host")
+  if Host.isGen2() then
+    return Strings(
+      "We're still testing\njuice recipes...\f"
+        .. "Come back after the\nFOG BADGE!")
+  end
+  return Strings(
+    "We're still testing\njuice recipes...\f"
+      .. "Come back after the\nRAINBOW BADGE!")
 end
 
 local function blenderStepNeed(mod)
-  local rank = mod.save:get("soil_rank", 0) or 0
+  local Host = require("mods.Kanto-Reforged.host")
+  local rank = Host.saveGet(mod.save, "soil_rank", 0) or 0
   if rank >= 3 then return 480 end
   return 640
 end
 
 local function blenderReady(mod)
-  local steps = mod.save:get("farmSteps", 0) or 0
-  local anchor = mod.save:get("blender_steps_anchor", nil)
+  local Host = require("mods.Kanto-Reforged.host")
+  local steps = Host.saveGet(mod.save, "farmSteps", 0) or 0
+  local anchor = Host.saveGet(mod.save, "blender_steps_anchor", nil)
   if anchor == nil then return true end
   return steps >= (anchor + blenderStepNeed(mod))
 end
@@ -227,16 +275,15 @@ local function craftRecipe(mod, game, rec, done)
     HouseNpcs.pushText(game, Strings("The bag is full!"), done)
     return
   end
-  mod.save:set("blender_steps_anchor", mod.save:get("farmSteps", 0) or 0)
+  local Host = require("mods.Kanto-Reforged.host")
+  Host.saveSet(mod.save, "blender_steps_anchor", Host.saveGet(mod.save, "farmSteps", 0) or 0)
   HouseNpcs.pushText(game, Strings("Blended a\n%s!", rec.label), done)
 end
 
 local function blenderTalk(mod)
   return function(game, ow, npc, done)
     if not blenderGateOk(mod, game) then
-      HouseNpcs.pushText(game, Strings(
-        "We're still testing\njuice recipes...\f"
-          .. "Come back after the\nRAINBOW BADGE!"), done)
+      HouseNpcs.pushText(game, blenderGateHint(), done)
       return
     end
     if not blenderReady(mod) then
@@ -309,8 +356,9 @@ end
 
 local function soilTalk(mod)
   return function(game, ow, npc, done)
+    local Host = require("mods.Kanto-Reforged.host")
     local newly = BerryQuests.applyBadgeUnlocks(mod, game, { gift = true })
-    local rank = mod.save:get("soil_rank", 0) or 0
+    local rank = Host.saveGet(mod.save, "soil_rank", 0) or 0
     local msg = Strings("I study berry soil.\f")
     if #newly > 0 then
       msg = msg .. Strings(
@@ -321,15 +369,15 @@ local function soilTalk(mod)
     end
 
     if rank < 1 and countOwnedSpecies(game.save) >= 5 then
-      mod.save:set("soil_rank", 1)
+      Host.saveSet(mod.save, "soil_rank", 1)
       rank = 1
       msg = msg .. Strings("Rank 1! Berries\ngrow a bit faster.\f")
     elseif rank < 2 and hasGrassLevel(game, 20) then
-      mod.save:set("soil_rank", 2)
+      Host.saveSet(mod.save, "soil_rank", 2)
       rank = 2
       msg = msg .. Strings("Rank 2! Even\nfaster growth.\f")
     elseif rank < 3 and berryTypesInBag(game.save) >= 3 then
-      mod.save:set("soil_rank", 3)
+      Host.saveSet(mod.save, "soil_rank", 3)
       rank = 3
       msg = msg .. Strings("Rank 3! Top soil\nand cooler blender.\f")
     else
@@ -376,8 +424,17 @@ function BerryQuests.register(mod)
 
   -- Auto-unlock berries when badges are earned (on map enter farm or talk).
   mod.events:on("map.entered", function(ev)
-    if not ev or not ev.game then return end
-    BerryQuests.applyBadgeUnlocks(mod, ev.game)
+    -- Engines emit mapId/map/fromMapId/via — never ev.game.
+    local game = ev and ev.game
+    if not game then
+      local ok, SS = pcall(require, "mods.Kanto-Reforged.species_scope")
+      if ok and SS and SS._game then game = SS._game end
+    end
+    if not game then
+      game = package.loaded["src.core.Game"] or rawget(_G, "Game")
+    end
+    if not game then return end
+    BerryQuests.applyBadgeUnlocks(mod, game)
   end)
 end
 

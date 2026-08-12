@@ -61,6 +61,13 @@ end
 
 local function staticBattle(species, level, flag)
   return function(game, ow, npc, done)
+    local SpeciesScope = require("mods.Kanto-Reforged.species_scope")
+    if not SpeciesScope.allowsSpeciesId(SpeciesScope._mod, species, nil) then
+      HouseNpcs.pushText(game, Strings(
+        "Something stirs...\f"
+          .. "It ignores a KANTO-\nonly DEX."), done)
+      return
+    end
     if game.save.flags and game.save.flags[flag] then
       HouseNpcs.pushText(game, Strings("..."), done)
       return

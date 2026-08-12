@@ -15,29 +15,32 @@ BerryFarm.HARVEST_YIELD = 2
 BerryFarm.GROW_BY_RANK = { [0] = 320, [1] = 280, [2] = 240, [3] = 192 }
 
 function BerryFarm.growSteps(mod)
+  local Host = require("mods.Kanto-Reforged.host")
   local rank = 0
   if mod and mod.save then
-    rank = mod.save:get("soil_rank", 0) or 0
+    rank = Host.saveGet(mod.save, "soil_rank", 0) or 0
   end
   return BerryFarm.GROW_BY_RANK[rank] or BerryFarm.GROW_STEPS
 end
 
 function BerryFarm.ensureUnlocked(mod)
-  local unlocked = mod.save:get("unlocked_berries", nil)
+  local Host = require("mods.Kanto-Reforged.host")
+  local unlocked = Host.saveGet(mod.save, "unlocked_berries", nil)
   if type(unlocked) ~= "table" then
     unlocked = { BERRY = true }
-    mod.save:set("unlocked_berries", unlocked)
+    Host.saveSet(mod.save, "unlocked_berries", unlocked)
   elseif not unlocked.BERRY then
     unlocked.BERRY = true
-    mod.save:set("unlocked_berries", unlocked)
+    Host.saveSet(mod.save, "unlocked_berries", unlocked)
   end
   return unlocked
 end
 
 function BerryFarm.unlockBerry(mod, berryId)
+  local Host = require("mods.Kanto-Reforged.host")
   local unlocked = BerryFarm.ensureUnlocked(mod)
   unlocked[berryId] = true
-  mod.save:set("unlocked_berries", unlocked)
+  Host.saveSet(mod.save, "unlocked_berries", unlocked)
 end
 
 function BerryFarm.plantableList(mod)
@@ -107,11 +110,22 @@ BerryFarm.PC_BLOCKS_GEN2_KANTO = {
   18, 17, 39, 17, 39,
 }
 
--- Odd-shaped centres (Indigo): stairs-only, no mat rewrite.
+-- Odd-shaped Indigo lobby (9×7 TILESET_POKECENTER): SE stairs block 18 +
+-- warp on its BL collision cell (16,13). Plain floor warps never fire.
+-- Vanilla south row ends in floor 04; we rewrite the east cell to stairs.
 BerryFarm.ALL_POKECENTERS_GEN2_STAIRS_ONLY = {
   "INDIGO_PLATEAU_POKECENTER_1F",
 }
-BerryFarm.PC_DOOR_GEN2_INDIGO = { x = 17, y = 13 }
+BerryFarm.PC_DOOR_GEN2_INDIGO = { x = 16, y = 13 }
+BerryFarm.PC_BLOCKS_GEN2_INDIGO = {
+  23, 23, 23, 23, 23, 23, 23, 19, 19,
+  23, 23, 23, 23, 23, 23, 23, 18, 4,
+  23, 23, 23, 23, 23, 23, 23, 23, 4,
+  1, 2, 3, 8, 19, 42, 19, 44, 4,
+  5, 6, 7, 12, 4, 5, 5, 5, 4,
+  4, 4, 4, 4, 4, 4, 4, 4, 4,
+  18, 4, 17, 39, 4, 4, 4, 4, 18,
+}
 
 function BerryFarm.isGen2KantoCenter(mapId)
   for _, id in ipairs(BerryFarm.ALL_POKECENTERS_GEN2_KANTO) do
@@ -153,22 +167,102 @@ function BerryFarm.returnCell()
   return BerryFarm.RETURN_CELL
 end
 
--- OVERWORLD block ids (plain tree-wall border, same as the original layout)
-local WALL = 15          -- solid tree wall border
-local LEDGE = 26
-local COBBLE = 85        -- walkways
-local GRASS = 1          -- short grass — plots included; the soil-patch
-                          -- sprite (SPRITE_PLOT_SOIL) is what marks a plot as
-                          -- farmland, not the underlying block
-local ROOF_L, ROOF_M, ROOF_R = 12, 13, 14
-local WALL_L, DOOR, WALL_R = 16, 58, 0
-local FENCE_L, FENCE_H, FENCE_R = 110, 111, 109
-local FENCE_POST = 28
-local STUMP = 52
--- No dedicated "sand" tile is used: everything in the 90s/24/25/31/97-99
--- range in this tileset bakes in a rock/boulder graphic, so the shore is
--- just grass running straight up to the water like a small pond.
-local DEEP = 67          -- open lake water (surfable, no encounters registered)
+-- Gen1 OVERWORLD block ids only. Never reuse these on TILESET_JOHTO.
+local GEN1_TILES = {
+  WALL = 15,
+  LEDGE = 26,
+  COBBLE = 85,
+  GRASS = 1, -- short grass; soil-patch sprite marks plots, not the block
+  ROOF_L = 12, ROOF_M = 13, ROOF_R = 14,
+  WALL_L = 16, DOOR = 58, WALL_R = 0,
+  FENCE_L = 110, FENCE_H = 111, FENCE_R = 109, FENCE_POST = 28,
+  STUMP = 52,
+  -- No Gen1 "sand": 90s/24/25/31 bake in rocks, so shore is grass→water.
+  DEEP = 67, -- open lake (surfable, no encounters)
+}
+
+-- TILESET_JOHTO ids (pokecrystal johto_collision.asm). Same yard/lake
+-- geometry; Gen2-only — never written into the Gen1 OVERWORLD farm.
+local GEN2_TILES = {
+  WALL = 0x05,       -- pine tree wall (New Bark / Route border)
+  LEDGE = 0x02,      -- path (Gen1 terrace was a hop ledge; skip one-ways)
+  COBBLE = 0x02,     -- town path floor
+  GRASS = 0x01,      -- open floor under plot sprites
+  ROOF_L = 0x18, ROOF_M = 0x1f, ROOF_R = 0x19,
+  WALL_L = 0x1c, DOOR = 0x77, WALL_R = 0x1e,
+  FENCE_L = 0x05, FENCE_H = 0x05, FENCE_R = 0x05, FENCE_POST = 0x05,
+  STUMP = 0x01,
+  DEEP = 0x35,       -- open water (Cherrygrove pond)
+}
+
+-- Real Gold TILESET_JOHTO (collision quads). Do NOT treat Gen2Compat's
+-- Gen1-OVERWORLD stand-in under the same id as Johto — that would mix
+-- Gen1 graphics with Gen2 block numbers (or the reverse).
+local function johtoTilesetData(mod)
+  local Data = require("src.core.Data")
+  local fromData = Data.gen2Tilesets and Data.gen2Tilesets.TILESET_JOHTO
+  if fromData and type(fromData.collision) == "table" and #fromData.collision >= 64 then
+    return fromData
+  end
+  local ts = mod and mod.content and mod.content.tilesets
+    and mod.content.tilesets:get("TILESET_JOHTO")
+  if ts and type(ts.collision) == "table" and #ts.collision >= 64 then
+    return ts
+  end
+  return nil
+end
+
+local function usesJohtoBlocks(mod, tilesetId)
+  local Host = require("mods.Kanto-Reforged.host")
+  if not Host.isGen2() then return false end
+  if tilesetId and tilesetId ~= "TILESET_JOHTO" and tilesetId ~= "TILESET_JOHTO_MODERN" then
+    return false
+  end
+  return johtoTilesetData(mod) ~= nil
+end
+
+local function buildFarmBlocks(T)
+  local W, L, C, G = T.WALL, T.LEDGE, T.COBBLE, T.GRASS
+  local F = G -- plot cells: same ground; soil sprite marks farmland
+  local FL, FH, FR, FP = T.FENCE_L, T.FENCE_H, T.FENCE_R, T.FENCE_POST
+  local S, DP = T.STUMP, T.DEEP
+  local ROOF_L, ROOF_M, ROOF_R = T.ROOF_L, T.ROOF_M, T.ROOF_R
+  local WALL_L, DOOR, WALL_R = T.WALL_L, T.DOOR, T.WALL_R
+  -- Width 19: yard cols 0–8, grass buffer 9, shore 10, lake 11–17, wall 18.
+  return {
+    -- 0: north wall
+    W, W, W, W, W, W, W, W, W, W, W, W, W, W, W, W, W, W, W,
+    -- 1: west strip + shed roof
+    W, G, C, ROOF_L, ROOF_M, ROOF_R, C, S, G, G, G, DP, DP, DP, DP, DP, DP, DP, W,
+    -- 2: shed door
+    W, G, C, WALL_L, DOOR, WALL_R, C, G, G, G, G, DP, DP, DP, DP, DP, DP, DP, W,
+    -- 3: landing
+    W, G, C, C, C, C, C, C, C, G, G, DP, DP, DP, DP, DP, DP, DP, W,
+    -- 4: terrace (Gen1 ledge → Gen2 plain path)
+    W, G, L, L, C, L, L, L, C, G, G, DP, DP, DP, DP, DP, DP, DP, W,
+    -- 5: north fence + gate
+    W, G, FP, FH, C, FH, FH, FP, C, G, G, DP, DP, DP, DP, DP, DP, DP, W,
+    -- 6: plot row 1
+    W, G, FL, F, C, F, C, F, FR, G, G, DP, DP, DP, DP, DP, DP, DP, W,
+    -- 7: path between rows
+    W, G, FL, C, C, C, C, C, FR, G, G, DP, DP, DP, DP, DP, DP, DP, W,
+    -- 8: plot row 2
+    W, G, FL, F, C, F, C, F, FR, G, G, DP, DP, DP, DP, DP, DP, DP, W,
+    -- 9: path
+    W, G, FL, C, C, C, C, C, FR, G, G, DP, DP, DP, DP, DP, DP, DP, W,
+    -- 10: plot row 3
+    W, G, FL, F, C, F, C, F, FR, G, G, DP, DP, DP, DP, DP, DP, DP, W,
+    -- 11: south fence + lake shoreline wall
+    W, G, FP, FH, FH, FH, FH, FP, FR, W, W, W, W, W, W, W, W, W, W,
+  }
+end
+
+-- Exported for tests / diagnostics.
+BerryFarm.GEN1_TILES = GEN1_TILES
+BerryFarm.GEN2_TILES = GEN2_TILES
+BerryFarm.usesJohtoBlocks = usesJohtoBlocks
+BerryFarm.johtoTilesetData = johtoTilesetData
+BerryFarm.buildFarmBlocks = buildFarmBlocks
 
 -- Plots at block cols 3/5/7, rows 6/8/10 — one cobble block between each.
 BerryFarm.PLOT_RECTS = {
@@ -209,11 +303,16 @@ BerryFarm.PLOT_SPRITE_BY_BERRY = {
 }
 
 local function registerPlotSprites(mod)
+  -- Full-RGBA pokeemerald berry art — not grayscale OW sheets. Gen1 mostly
+  -- drew these raw; Gen2's SpriteRenderer remaps every NPC through PAL_OW_*
+  -- unless trueColor is set, which turns brown soil into weird green/pink.
   local function sprite(id, file)
     mod.content.sprites:register(id, {
       image = "mods/Kanto-Reforged/assets/" .. file,
       frames = 1,
       walker = false,
+      trueColor = true,
+      spriteType = "STILL_SPRITE",
     })
   end
   sprite(BerryFarm.PLOT_SPRITE_SOIL, "plot_soil.png")
@@ -274,6 +373,7 @@ end
 local function writePlots(mod, plots)
   -- Always store a fresh string-keyed table so a cleared slot cannot
   -- resurrect from a stale numeric-key alias or a shared reference.
+  local Host = require("mods.Kanto-Reforged.host")
   local stored = {}
   for i = 1, BerryFarm.PLOT_COUNT do
     local p = plots[plotKey(i)]
@@ -284,16 +384,17 @@ local function writePlots(mod, plots)
       }
     end
   end
-  mod.save:set("plots", stored)
+  Host.saveSet(mod.save, "plots", stored)
   return stored
 end
 
 local function ensureState(mod)
-  local steps = mod.save:get("farmSteps", 0)
+  local Host = require("mods.Kanto-Reforged.host")
+  local steps = Host.saveGet(mod.save, "farmSteps", 0)
   if type(steps) ~= "number" then steps = 0 end
-  local plots = readPlots(mod.save:get("plots", nil))
+  local plots = readPlots(Host.saveGet(mod.save, "plots", nil))
   -- Persist normalized shape once (migrates legacy [1]=... saves)
-  if mod.save:get("plots", nil) == nil then
+  if Host.saveGet(mod.save, "plots", nil) == nil then
     writePlots(mod, plots)
   end
   return steps, plots
@@ -367,9 +468,10 @@ end
 function BerryFarm.bumpStep(mod)
   mod = mod or BerryFarm._mod
   if not mod then return end
-  local steps = mod.save:get("farmSteps", 0)
+  local Host = require("mods.Kanto-Reforged.host")
+  local steps = Host.saveGet(mod.save, "farmSteps", 0)
   if type(steps) ~= "number" then steps = 0 end
-  mod.save:set("farmSteps", steps + 1)
+  Host.saveSet(mod.save, "farmSteps", steps + 1)
   syncPlotMarkers(mod)
 end
 
@@ -509,7 +611,8 @@ local function makePlotTalk(mod, plotIndex)
             Bag.remove(game.save, id, 1)
             setPlot(mod, live, plotIndex, {
               berryId = id,
-              plantedAtSteps = mod.save:get("farmSteps", 0),
+              plantedAtSteps = require("mods.Kanto-Reforged.host")
+                .saveGet(mod.save, "farmSteps", 0),
             })
             syncPlotMarkers(mod)
             local def = HeldItems.def(id)
@@ -552,45 +655,37 @@ function BerryFarm.register(mod)
   -- Width 19: farm yard cols 0–8, grass buffer col 9, shore col 10,
   -- lake cols 11–17, tree wall closes the east edge at col 18.
   local width, height = 19, 12
-  local W, L = WALL, LEDGE
-  -- F (plot cells) is plain grass now — same as G — the soil-patch sprite
-  -- is what visually marks it as farmland (see plotAnchor/syncPlotMarkers).
-  local C, F, G = COBBLE, GRASS, GRASS
-  local FL, FH, FR, FP = FENCE_L, FENCE_H, FENCE_R, FENCE_POST
-  local S = STUMP
-  local DP = DEEP
-  -- The lake is fully boxed in by the tree wall on every side (north, east,
-  -- south) — from the shore it reads as a normal pond; surf across it and
-  -- it opens up into open water with a tree line all around and the farm
-  -- sitting on the west shore. West strip (col 1) is plain grass on every
-  -- row, and the whole yard border is grass — no cobble/sand/rock tiles
-  -- outside the walkways and the water itself.
-  local blocks = {
-    -- 0: north wall closes the whole map (yard + lake)
-    W, W, W, W, W, W, W, W, W, W, W, W, W, W, W, W, W, W, W,
-    -- 1: west strip (grass) + shed
-    W, G, C, ROOF_L, ROOF_M, ROOF_R, C, S, G, G, G, DP, DP, DP, DP, DP, DP, DP, W,
-    -- 2: shed door
-    W, G, C, WALL_L, DOOR, WALL_R, C, G, G, G, G, DP, DP, DP, DP, DP, DP, DP, W,
-    -- 3: landing (arrive from the Pokémon Center)
-    W, G, C, C, C, C, C, C, C, G, G, DP, DP, DP, DP, DP, DP, DP, W,
-    -- 4: ledge terrace
-    W, G, L, L, C, L, L, L, C, G, G, DP, DP, DP, DP, DP, DP, DP, W,
-    -- 5: north fence + gate
-    W, G, FP, FH, C, FH, FH, FP, C, G, G, DP, DP, DP, DP, DP, DP, DP, W,
-    -- 6: plot row 1
-    W, G, FL, F, C, F, C, F, FR, G, G, DP, DP, DP, DP, DP, DP, DP, W,
-    -- 7: path between rows
-    W, G, FL, C, C, C, C, C, FR, G, G, DP, DP, DP, DP, DP, DP, DP, W,
-    -- 8: plot row 2
-    W, G, FL, F, C, F, C, F, FR, G, G, DP, DP, DP, DP, DP, DP, DP, W,
-    -- 9: path
-    W, G, FL, C, C, C, C, C, FR, G, G, DP, DP, DP, DP, DP, DP, DP, W,
-    -- 10: plot row 3
-    W, G, FL, F, C, F, C, F, FR, G, G, DP, DP, DP, DP, DP, DP, DP, W,
-    -- 11: south wall closes the whole map (farm fence + lake shoreline)
-    W, G, FP, FH, FH, FH, FH, FP, FR, W, W, W, W, W, W, W, W, W, W,
-  }
+  -- Gen1: OVERWORLD + GEN1_TILES only (custom plot sprites on top).
+  -- Gen2: TILESET_JOHTO + GEN2_TILES when Gold tilesets are present.
+  -- Never label a Gen1 stand-in as TILESET_JOHTO for this map.
+  local tileset = "OVERWORLD"
+  local destCenter = "VIRIDIAN_POKECENTER"
+  local tilePack = GEN1_TILES
+  if Host.isGen2() then
+    destCenter = "VIRIDIAN_POKECENTER_1F"
+    if not (mod.content.maps:get(destCenter)) then
+      destCenter = BerryFarm.MAP_ID
+    end
+    local realJohto = johtoTilesetData(mod)
+    if realJohto then
+      tileset = "TILESET_JOHTO"
+      tilePack = GEN2_TILES
+      local cur = mod.content.tilesets:get(tileset)
+      if not (cur and type(cur.collision) == "table" and #cur.collision >= 64) then
+        pcall(function()
+          if cur then
+            mod.content.tilesets:override(tileset, realJohto)
+          else
+            mod.content.tilesets:register(tileset, realJohto)
+          end
+        end)
+      end
+    end
+    -- No Gold Johto cache: keep OVERWORLD + GEN1_TILES (matched pair) rather
+    -- than inventing a fake TILESET_JOHTO from Red's sheet.
+  end
+  local WALL = tilePack.WALL
+  local blocks = buildFarmBlocks(tilePack)
 
   local talk = {
     TEXT_BERRY_FARM_GIRL = function(game, ow, npc, done)
@@ -617,19 +712,6 @@ function BerryFarm.register(mod)
 
   for i = 1, #BerryFarm.PLOT_RECTS do
     talk[plotTextId(i)] = makePlotTalk(mod, i)
-  end
-
-  local Host = require("mods.Kanto-Reforged.host")
-  local tileset = "OVERWORLD"
-  local destCenter = "VIRIDIAN_POKECENTER"
-  if Host.isGen2() then
-    local Gen2Compat = require("mods.Kanto-Reforged.gen2_compat")
-    tileset = Gen2Compat.ensureTileset(mod, "TILESET_JOHTO")
-    -- Default return is a Kanto centre (not Cherrygrove).
-    destCenter = "VIRIDIAN_POKECENTER_1F"
-    if not (mod.content.maps:get(destCenter)) then
-      destCenter = BerryFarm.MAP_ID
-    end
   end
 
   mod.content.maps:register(BerryFarm.MAP_ID, {
@@ -772,7 +854,19 @@ function BerryFarm.register(mod)
     for _, mapId in ipairs(BerryFarm.ALL_POKECENTERS_GEN2_STAIRS_ONLY) do
       pcall(function()
         local door = BerryFarm.gen2DoorFor(mapId)
-        appendFarmWarps(mapId, door, nil)
+        mod.content.maps:patch(mapId, {
+          blocks = BerryFarm.PC_BLOCKS_GEN2_INDIGO,
+          warps = {
+            __append = {
+              {
+                x = door.x,
+                y = door.y,
+                destMap = BerryFarm.MAP_ID,
+                destWarp = 1,
+              },
+            },
+          },
+        })
       end)
     end
     -- Kanto: exit-mat pair + south-row block rewrite (pad look).
@@ -811,10 +905,10 @@ function BerryFarm.install(mod)
   local function grantStarterBerry(game)
     if not game or not game.save then return end
     BerryFarm.ensureUnlocked(mod)
-    if mod.save:get("starterGranted", false) then return end
+    if Host.saveGet(mod.save, "starterGranted", false) then return end
     local Bag = require("src.inventory.Bag")
     Bag.add(game.save, "BERRY", 3)
-    mod.save:set("starterGranted", true)
+    Host.saveSet(mod.save, "starterGranted", true)
   end
 
   if Host.isGen1() then
@@ -845,7 +939,7 @@ function BerryFarm.install(mod)
     local from = ev.fromMap
     if type(from) == "string" and from:find("POKECENTER", 1, true) then
       local cell = BerryFarm.returnCellFor(from)
-      mod.save:set("returnCenter", {
+      Host.saveSet(mod.save, "returnCenter", {
         map = from,
         x = cell.x,
         y = cell.y,
@@ -853,7 +947,7 @@ function BerryFarm.install(mod)
     end
     local outdoor = currentOutdoor()
     if outdoor then
-      mod.save:set("savedOutdoor", outdoor)
+      Host.saveSet(mod.save, "savedOutdoor", outdoor)
     end
     local Game = package.loaded["src.core.Game"]
     grantStarterBerry(Game)
@@ -868,7 +962,7 @@ function BerryFarm.install(mod)
     if warp and warp.x == BerryFarm.EXIT.x and warp.y == BerryFarm.EXIT.y
         and type(warp.destMap) == "string"
         and warp.destMap:find("POKECENTER", 1, true) then
-      local ret = mod.save:get("returnCenter", nil)
+      local ret = Host.saveGet(mod.save, "returnCenter", nil)
       if ret and ret.map then
         local cell = BerryFarm.returnCellFor(ret.map)
         return ret.map, ret.x or cell.x, ret.y or cell.y
@@ -876,7 +970,7 @@ function BerryFarm.install(mod)
     end
 
     if mapId == BerryFarm.MAP_ID and warp and warp.destMap == "LAST_MAP" then
-      local saved = mod.save:get("savedOutdoor", nil) or currentOutdoor()
+      local saved = Host.saveGet(mod.save, "savedOutdoor", nil) or currentOutdoor()
       if saved and saved.id and saved.id ~= BerryFarm.MAP_ID then
         local destDef = ctx.data and ctx.data.maps and ctx.data.maps[saved.id]
         local dw = destDef and destDef.warps and destDef.warps[warp.destWarp]

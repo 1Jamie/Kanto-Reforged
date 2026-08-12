@@ -23,6 +23,10 @@ function QuarantineRecover.restore(save, data)
     return { mons = 0, items = 0 }
   end
 
+  local SpeciesScope = require("mods.Kanto-Reforged.species_scope")
+  local mod = SpeciesScope._mod
+  local kantoLock = mod and SpeciesScope.mode(mod) == SpeciesScope.MODE_KANTO
+
   local restoredMons, restoredItems = 0, 0
   save.party = save.party or {}
 
@@ -32,8 +36,13 @@ function QuarantineRecover.restore(save, data)
     for _, mon in ipairs(mons) do
       if type(mon) == "table" and known(data.pokemon, mon.species)
           and #save.party < 6 then
-        save.party[#save.party + 1] = mon
-        restoredMons = restoredMons + 1
+        if kantoLock and SpeciesScope.isOutOfScopeMon(mod, mon, { data = data, save = save }) then
+          -- Do not yank Gen3 into a kanto-locked party; leave orphaned.
+          keep[#keep + 1] = mon
+        else
+          save.party[#save.party + 1] = mon
+          restoredMons = restoredMons + 1
+        end
       else
         keep[#keep + 1] = mon
       end

@@ -6,6 +6,7 @@ local ModernXpShare = require("mods.Kanto-Reforged.modern_xp_share")
 local SplitSpecial = require("mods.Kanto-Reforged.split_special")
 local TrainerAi = require("mods.Kanto-Reforged.trainer_ai")
 local ExpTrainers = require("mods.Kanto-Reforged.trainers")
+local SpeciesScope = require("mods.Kanto-Reforged.species_scope")
 local Strings = require("src.core.Strings")
 
 local function battlerHasType(battler, typeId)
@@ -29,6 +30,7 @@ end
 local function spawnOptsFromOptions(mod)
   return {
     legendsInMix = mod.options and mod.options:get("legends_in_mix") and true or false,
+    speciesScope = SpeciesScope.mode(mod),
   }
 end
 
@@ -47,6 +49,29 @@ local function applySpawnTables(mod, pokemon_data)
     (mode == "full_random" and opts.legendsInMix) and "+legends" or "")
 end
 
+local function refreshScopeContent(mod, game, scopeMode)
+  local pokemon_data = package.loaded["mods.Kanto-Reforged.pokemon_data"]
+  -- Content registries freeze after load; live Data writes still apply for
+  -- mid-session toggles (and headless tests).
+  pcall(function() applySpawnTables(mod, pokemon_data) end)
+  local Host = require("mods.Kanto-Reforged.host")
+  if Host.isGen1() then
+    pcall(function() ExpTrainers.apply(mod) end)
+  end
+  local okClubs, BattleClubs = pcall(require, "mods.Kanto-Reforged.battle_clubs")
+  if okClubs and BattleClubs.refreshScope then
+    pcall(function() BattleClubs.refreshScope(mod, scopeMode) end)
+  end
+  local okFossils, FossilsGen3 = pcall(require, "mods.Kanto-Reforged.fossils_gen3")
+  if okFossils and FossilsGen3.refreshScope then
+    pcall(function() FossilsGen3.refreshScope(mod, scopeMode) end)
+  end
+  local okTrades, TradesExtra = pcall(require, "mods.Kanto-Reforged.trades_extra")
+  if okTrades and TradesExtra.refreshScope then
+    pcall(function() TradesExtra.refreshScope(mod, scopeMode) end)
+  end
+end
+
 return function(mod)
   local Host = require("mods.Kanto-Reforged.host")
   local PokemonGen2 = require("mods.Kanto-Reforged.pokemon_gen2")
@@ -59,6 +84,7 @@ return function(mod)
 
   -- Manager / card options (host-aware labels / visibility).
   local optionDefs = {
+    SpeciesScope.optionDef(),
     {
       key = "full_spawn_random",
       label = "FULL SPAWN MIX",
@@ -84,13 +110,20 @@ return function(mod)
   end
   mod.options:define(optionDefs)
 
+  SpeciesScope._refreshContent = refreshScopeContent
+  SpeciesScope.install(mod)
+
   ExpMoveEffects.register(mod)
   ExpMoveEffects.install(mod)
 
+  HeldItems.register(mod)
   if Host.isGen1() then
-    HeldItems.register(mod)
     HeldItems.registerMarts(mod)
-    HeldItems.install(mod)
+  end
+  -- Party GIVE/TAKE + bag berry USE on both hosts; Gen1 also patches
+  -- BattleState / MoveEffects, Gen2 wires item heldEffect + wild holds.
+  HeldItems.install(mod)
+  if Host.isGen1() then
     Gender.register(mod)
     Gender.install(mod)
     local Breeding = require("mods.Kanto-Reforged.breeding")
@@ -99,9 +132,6 @@ return function(mod)
     local Daycare = require("mods.Kanto-Reforged.daycare")
     Daycare.register(mod)
     Daycare.install(mod)
-  else
-    -- Gold: item defs for berries / holds (no Gen1 mart text_pointers / UI).
-    HeldItems.register(mod)
   end
 
   local BerryFarm = require("mods.Kanto-Reforged.berry_farm")
@@ -417,11 +447,17 @@ return function(mod)
       local TrainersGen2 = require("mods.Kanto-Reforged.trainers_gen2")
       TrainersGen2.install(mod)
       mod.events:on("mod.options_changed", function(ev)
-        if ev and ev.mod == mod.id
-            and (ev.key == "full_spawn_random" or ev.key == "legends_in_mix") then
+        if not (ev and ev.mod == mod.id) then return end
+        if ev.key == "species_scope" then
+          SpeciesScope.onOptionsChanged(mod, rawget(_G, "Game"), ev)
+          return
+        end
+        if ev.key == "full_spawn_random" or ev.key == "legends_in_mix" then
           applySpawnTables(mod, pokemon_data)
         end
       end)
+      SpeciesScope.refresh(mod, nil, SpeciesScope.mode(mod))
+      mod.save:set(SpeciesScope.APPLIED_KEY, SpeciesScope.mode(mod))
     else
       PokemonGen2.applyGen1DerivedSprites(mod, pokemon_data)
       local species_registered = 0
@@ -434,6 +470,7 @@ return function(mod)
         end
       end
       mod.log:info("Registered %d custom Pokémon species", species_registered)
+      -- National dex size by default; SpeciesScope.refresh may clamp to 151.
       mod.content.constants:patch("dexSize", highestDex)
       mod.content.constants:patch("dexDigits", math.max(3, #tostring(highestDex)))
       mod.log:info("Pokédex extended to %d", highestDex)
@@ -445,11 +482,17 @@ return function(mod)
       local nTrainers = ExpTrainers.apply(mod)
       mod.log:info("Trainer parties mixed (%d classes)", nTrainers)
       mod.events:on("mod.options_changed", function(ev)
-        if ev and ev.mod == mod.id
-            and (ev.key == "full_spawn_random" or ev.key == "legends_in_mix") then
+        if not (ev and ev.mod == mod.id) then return end
+        if ev.key == "species_scope" then
+          SpeciesScope.onOptionsChanged(mod, rawget(_G, "Game"), ev)
+          return
+        end
+        if ev.key == "full_spawn_random" or ev.key == "legends_in_mix" then
           applySpawnTables(mod, pokemon_data)
         end
       end)
+      SpeciesScope.refresh(mod, nil, SpeciesScope.mode(mod))
+      mod.save:set(SpeciesScope.APPLIED_KEY, SpeciesScope.mode(mod))
     end
 
     if dexTexts > 0 then
@@ -578,6 +621,8 @@ return function(mod)
         end
       end
       mod.log:info("Patched evolutions for %d vanilla Pokémon species", evos_patched)
+      SpeciesScope.captureEvoBaselines(mod, true)
+      SpeciesScope.applyEvoScope(mod, SpeciesScope.mode(mod))
     end
 
     -- Patch Gen 1 species with Gen 2/3 level-up + TM learnset additions.
@@ -1335,6 +1380,11 @@ return function(mod)
   -- never push a TextBox during EvolutionState's apply→congrats window.
   mod.events:on("pokemon.evolved", function(ev)
     if ev.fromSpecies ~= "NINCADA" or ev.toSpecies ~= "NINJASK" then
+      return
+    end
+    -- Gen1 KANTO scope: Shedinja is out of dex range — skip the split.
+    if Host.isGen1()
+        and SpeciesScope.mode(mod) == SpeciesScope.MODE_KANTO then
       return
     end
     local game = ev.game or mod._evoGame or mod.activeGame

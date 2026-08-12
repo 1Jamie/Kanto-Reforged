@@ -198,9 +198,9 @@ return function(T, Data, run)
           local gap = batch.gap or 0
           local rowW = batch.tw * 4 + gap * 3
           local top = {
-            batch.atk:gsub("^ATK ", "ATK. "),
-            batch.def:gsub("^DEF ", "DEF. "),
-            batch.spd:gsub("^SPD ", "SPD. "),
+            (batch.atk:gsub("^ATK ", "ATK. ")),
+            (batch.def:gsub("^DEF ", "DEF. ")),
+            (batch.spd:gsub("^SPD ", "SPD. ")),
           }
           local bot = {
             ("SP.A %s"):format(spa), ("SP.D %s"):format(sdf),

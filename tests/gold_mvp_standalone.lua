@@ -15,6 +15,23 @@ pcall(function()
   Data:load()
 end)
 
+-- Prefer a local Gold ROM cache so TILESET_JOHTO collision is real (berry farm
+-- block remap). Game2 boots load this via data/generated under the gold root.
+do
+  local home = os.getenv("HOME") or ""
+  local paths = {
+    home .. "/.local/share/love/pokemon-love2d/gold/data/generated/tilesets.lua",
+    "data/generated/tilesets.lua",
+  }
+  for _, p in ipairs(paths) do
+    local ok, ts = pcall(dofile, p)
+    if ok and ts and ts.TILESET_JOHTO and ts.TILESET_JOHTO.collision then
+      Data.gen2Tilesets = ts
+      break
+    end
+  end
+end
+
 local run = T.sdk.loadMods({
   "mods/pokegear_cards",
   "mods/Kanto-Reforged",
@@ -62,11 +79,138 @@ local BerryFarm = require("mods.Kanto-Reforged.berry_farm")
 local HouseNpcs = require("mods.Kanto-Reforged.house_npcs")
 T.eq(BerryFarm.PC_DOOR_GEN2_STAIRS.x, 8, "Johto farm stairs at warp-tile x=8")
 T.eq(BerryFarm.PC_DOOR_GEN2_PAD.x, 7, "Kanto farm pad left warp-tile")
+T.eq(BerryFarm.PC_DOOR_GEN2_INDIGO.x, 16, "Indigo farm stairs warp at BL x=16")
+T.eq(BerryFarm.PC_DOOR_GEN2_INDIGO.y, 13, "Indigo farm stairs warp at BL y=13")
+T.eq(BerryFarm.PC_BLOCKS_GEN2_INDIGO[7 * 9], 18,
+  "Indigo SE corner block is stairs (warp collision)")
 T.check(HouseNpcs._talks.TEXT_BERRY_FARM_GIRL ~= nil,
   "Gold talk dispatch has farm girl")
 T.check(HouseNpcs._talks.TEXT_BERRY_FARM_MERCHANT ~= nil
     or HouseNpcs._talks.TEXT_BERRY_FARM_SOIL_EXPERT ~= nil,
   "Gold talk dispatch has berry quest NPCs")
+
+-- Gen1 OVERWORLD ids on TILESET_JOHTO turn cobble into water and fences into
+-- hop ledges. When Gold tilesets are present the farm must use Johto ids.
+if Data.gen2Tilesets and Data.gen2Tilesets.TILESET_JOHTO then
+  T.check(farm and farm.tileset == "TILESET_JOHTO",
+    "Berry farm uses TILESET_JOHTO when Gold tilesets exist")
+  T.eq(farm.borderBlock, BerryFarm.GEN2_TILES.WALL,
+    "Johto farm border is pine tree wall $05")
+  T.eq(farm.blocks[2 * 19 + 5], BerryFarm.GEN2_TILES.DOOR,
+    "Johto shed door block is $77")
+  -- Cobble walkways must not be water ($55 was Gen1 cobble → Johto water).
+  local waterish = { [0x35] = true, [0x43] = true, [0x54] = true, [0x55] = true,
+    [0x58] = true, [0x59] = true, [0x76] = true }
+  local yardWater = 0
+  for row = 1, 10 do
+    for col = 1, 8 do
+      local b = farm.blocks[row * 19 + col + 1]
+      if waterish[b] then yardWater = yardWater + 1 end
+    end
+  end
+  T.eq(yardWater, 0, "Johto farm yard has no water blocks on paths/plots")
+  -- Lake columns stay water.
+  T.eq(farm.blocks[3 * 19 + 12], BerryFarm.GEN2_TILES.DEEP,
+    "Johto farm lake uses open-water block")
+
+  local Permissions = require("src.world.gen2.Permissions")
+  local coll = Data.gen2Tilesets.TILESET_JOHTO.collision
+  local function blockWalkable(bid)
+    local quad = coll[bid + 1]
+    if not quad then return false end
+    for _, c in ipairs(quad) do
+      if Permissions.isWalkable(c) and not Permissions.isWater(c) then
+        return true
+      end
+    end
+    return false
+  end
+  T.check(blockWalkable(BerryFarm.GEN2_TILES.COBBLE),
+    "Johto path block is land-walkable")
+  T.check(blockWalkable(BerryFarm.GEN2_TILES.GRASS),
+    "Johto plot ground is land-walkable")
+  T.check(not blockWalkable(BerryFarm.GEN2_TILES.WALL),
+    "Johto tree wall is not land-walkable")
+  local doorQuad = coll[BerryFarm.GEN2_TILES.DOOR + 1]
+  local hasDoor = false
+  for _, c in ipairs(doorQuad or {}) do
+    if c == 0x71 then hasDoor = true end
+  end
+  T.check(hasDoor, "Johto shed door block has COLL_DOOR")
+end
+
+-- Plot markers are full-RGBA custom art; Gen2 must not remap them via PAL_OW_*.
+do
+  local sprites = Data.gen2Sprites or Data.sprites or {}
+  local soil = sprites.SPRITE_PLOT_SOIL
+  T.check(soil ~= nil, "SPRITE_PLOT_SOIL registered on Gold")
+  if soil then
+    T.eq(soil.trueColor, true, "plot soil sprite is trueColor (skip OW palette)")
+    T.check(type(soil.image) == "string" and soil.image:find("plot_soil", 1, true),
+      "plot soil points at custom asset")
+  end
+  local growing = sprites.SPRITE_PLOT_GROWING
+  T.check(growing and growing.trueColor == true,
+    "plot growing sprite is trueColor")
+  local cheri = sprites.SPRITE_PLOT_CHERI
+  T.check(cheri and cheri.trueColor == true,
+    "ripe plot sprites are trueColor")
+end
+
+-- Berry vendor: Gen1 ShopMenu crashes on Gold (save.money is nil). Buy via
+-- Gen2MartMenu against player.money instead.
+do
+  local BerryQuests = require("mods.Kanto-Reforged.berry_quests")
+  local Save = require("src.core.gen2.Save")
+  local input = {
+    pressed = {},
+    press = function(self, btn) self.pressed[btn] = true end,
+    wasPressed = function(self, btn)
+      if self.pressed[btn] then self.pressed[btn] = nil; return true end
+      return false
+    end,
+    isDown = function() return false end,
+  }
+  local stack = { _items = {} }
+  function stack:push(s) self._items[#self._items + 1] = s end
+  function stack:pop() return table.remove(self._items) end
+  function stack:top() return self._items[#self._items] end
+  local save = Save.newGame()
+  save.player.money = 5000
+  save.inventory = {}
+  local game = {
+    save = save,
+    input = input,
+    data = {
+      items = {
+        BERRY = { id = "BERRY", name = "BERRY", price = 300, tossable = true },
+        CHERI_BERRY = { id = "CHERI_BERRY", name = "CHERI BERRY",
+          price = 600, tossable = true },
+      },
+    },
+    stack = stack,
+  }
+  BerryQuests.openShop(game, { "BERRY", "CHERI_BERRY" }, function() end)
+  local mart = stack:top()
+  T.check(mart ~= nil and mart.phase ~= nil, "Gold berry shop opens Gen2MartMenu")
+  if mart then
+    T.eq(#mart.entries, 2, "Berry stall shelves unlocked stock")
+    local function press(btn)
+      input:press(btn)
+      mart:update(0)
+    end
+    -- STANDARD: top BUY/SELL/QUIT → BUY → first item → qty 1 → YES
+    press("a") -- BUY
+    T.eq(mart.phase, "buy", "Berry stall entered buy list")
+    press("a") -- BERRY
+    T.eq(mart.phase, "buyQuantity", "Berry stall asks quantity")
+    press("a") -- confirm qty 1
+    T.check(mart.confirm ~= nil, "Berry stall price confirm")
+    press("a") -- YES
+    T.eq(save.inventory.BERRY, 1, "Bought one BERRY from stall")
+    T.eq(save.player.money, 4700, "Gold money deducted on berry buy")
+  end
+end
 
 local cherrygrove = Data.gen2Maps and Data.gen2Maps.CHERRYGROVE_POKECENTER_1F
 if cherrygrove then
@@ -253,6 +397,73 @@ do
     "Gold index builds from pack/registry")
   T.check(not (index.meta.MEWTWO and not index.meta.MEWTWO.rare),
     "Mewtwo not a normal wild entry")
+
+  -- Route 30 is dry grassland/forest — curated guests must not be fish.
+  local r30pool = EncountersGen2._poolFor({ "grassland", "forest" }, 6)
+  local r30hasFish = false
+  for _, sp in ipairs(r30pool) do
+    if sp == "BARBOACH" or sp == "CARVANHA" or sp == "CORPHISH"
+        or sp == "WAILMER" then
+      r30hasFish = true
+    end
+  end
+  T.check(not r30hasFish, "Route 30 curated pool has no fish/water-only mons")
+  local guests30 = EncountersGen2._pickGuests({
+    content = {
+      pokemon = {
+        get = function(_, id)
+          return pack.species and pack.species[id] or { id = id }
+        end,
+      },
+    },
+  }, "ROUTE_30", { level = 6, habitats = { "grassland", "forest" }, count = 2 })
+  for _, sp in ipairs(guests30) do
+    T.check(sp ~= "BARBOACH", "Route 30 guest is not Barboach (" .. tostring(sp) .. ")")
+  end
+  local habs30 = EncountersGen2._habitatsForMap("ROUTE_30")
+
+  -- Gold Kanto curated postgame tables must stay populated (not Absol-only /
+  -- empty after Johto-early level bands filtered everything out).
+  do
+    local kantoPools = EncountersGen2._KANTO_HABITAT_POOL
+    T.check(kantoPools ~= nil, "Kanto postgame habitat pools exported")
+    local r9 = EncountersGen2._poolFor({ "mountain" }, 34, kantoPools)
+    T.check(#r9 >= 4, "Route 9 postgame mountain pool has real variety")
+    local absolOnly = #r9 == 1 and r9[1] == "ABSOL"
+    T.check(not absolOnly, "Route 9 is not Absol-only")
+    local r24 = EncountersGen2._poolFor({ "waters-edge", "forest" }, 32, kantoPools)
+    T.check(#r24 >= 4, "Routes 24/25 postgame pool is non-empty")
+    local r21 = EncountersGen2._poolFor({ "sea", "grassland" }, 32, kantoPools)
+    local hasSea = false
+    for _, sp in ipairs(r21) do
+      if sp == "PELIPPER" or sp == "WAILMER" or sp == "CARVANHA" then
+        hasSea = true
+      end
+    end
+    T.check(hasSea, "Route 21 pool includes sea Gen3")
+    -- Johto lakeside: bank + rock, not desert Trapinch as the only rock pick.
+    local r42 = EncountersGen2._pickGuests({
+      content = {
+        pokemon = {
+          get = function(_, id)
+            return pack.species and pack.species[id] or { id = id }
+          end,
+        },
+      },
+    }, "ROUTE_42", {
+      level = 20, habitats = { "waters-edge", "mountain" }, count = 2,
+    })
+    local hasTrapinch = false
+    for _, sp in ipairs(r42) do
+      if sp == "TRAPINCH" then hasTrapinch = true end
+    end
+    T.check(not hasTrapinch, "Route 42 guests skip desert Trapinch")
+  end
+  local hasWaterHab = false
+  for _, h in ipairs(habs30) do
+    if h == "waters-edge" or h == "sea" then hasWaterHab = true end
+  end
+  T.check(not hasWaterHab, "Route 30 map habitats stay dry")
 
   -- Live full_random when Gold encounter grass tables exist
   local grass = Data.gen2Encounters and Data.gen2Encounters.grass

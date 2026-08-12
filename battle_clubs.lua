@@ -44,11 +44,45 @@ local CLUB_TEAMS = {
   },
 }
 
+local CLUB_TEAMS_KANTO = {
+  {
+    { species = "PIDGEOTTO", level = 20 },
+    { species = "KADABRA", level = 20 },
+    { species = "IVYSAUR", level = 20 },
+    { species = "NINETALES", level = 20 },
+  },
+  {
+    { species = "GRAVELER", level = 20 },
+    { species = "VAPOREON", level = 20 },
+    { species = "ONIX", level = 20 },
+    { species = "ARCANINE", level = 20 },
+  },
+  {
+    { species = "VULPIX", level = 20 },
+    { species = "EXEGGUTOR", level = 20 },
+    { species = "FEAROW", level = 20 },
+    { species = "RHYDON", level = 20 },
+  },
+  {
+    { species = "MACHOKE", level = 20 },
+    { species = "GYARADOS", level = 20 },
+    { species = "GOLBAT", level = 20 },
+    { species = "PERSIAN", level = 20 },
+  },
+}
+
 local DARK_TEAM = {
   { species = "MURKROW", level = 20 },
   { species = "SABLEYE", level = 20 },
   { species = "HOUNDOUR", level = 20 },
   { species = "UMBREON", level = 20 },
+}
+
+local DARK_TEAM_KANTO = {
+  { species = "ARBOK", level = 20 },
+  { species = "PERSIAN", level = 20 },
+  { species = "GOLBAT", level = 20 },
+  { species = "VILEPLUME", level = 20 },
 }
 
 local BERRY_TEAM = {
@@ -57,6 +91,32 @@ local BERRY_TEAM = {
   { species = "BRELOOM", level = 20 },
   { species = "SHIFTRY", level = 20 },
 }
+
+local BERRY_TEAM_KANTO = {
+  { species = "VILEPLUME", level = 20 },
+  { species = "WEEPINBELL", level = 20 },
+  { species = "VICTREEBEL", level = 20 },
+  { species = "EXEGGUTOR", level = 20 },
+}
+
+local function activeClubParties()
+  local SpeciesScope = require("mods.Kanto-Reforged.species_scope")
+  if Host.isGen1() and SpeciesScope.mode(SpeciesScope._mod) == SpeciesScope.MODE_KANTO then
+    return {
+      club = {
+        CLUB_TEAMS_KANTO[1], CLUB_TEAMS_KANTO[2],
+        CLUB_TEAMS_KANTO[3], CLUB_TEAMS_KANTO[4],
+      },
+      dark = { DARK_TEAM_KANTO },
+      berry = { BERRY_TEAM_KANTO },
+    }
+  end
+  return {
+    club = { CLUB_TEAMS[1], CLUB_TEAMS[2], CLUB_TEAMS[3], CLUB_TEAMS[4] },
+    dark = { DARK_TEAM },
+    berry = { BERRY_TEAM },
+  }
+end
 
 -- Gen1 house maps that do not exist on Gold → nearest Kanto indoor.
 local function clubMaps()
@@ -75,23 +135,24 @@ local function clubMaps()
 end
 
 local function registerTrainers(mod)
+  local parties = activeClubParties()
   local defClub = {
     id = CLUB_CLASS,
     name = "CIRCUIT HOST",
     baseMoney = 40,
-    parties = { CLUB_TEAMS[1], CLUB_TEAMS[2], CLUB_TEAMS[3], CLUB_TEAMS[4] },
+    parties = parties.club,
   }
   local defDark = {
     id = DARK_CLASS,
     name = "NIGHT EYES",
     baseMoney = 35,
-    parties = { DARK_TEAM },
+    parties = parties.dark,
   }
   local defBerry = {
     id = BERRY_CLASS,
     name = "SNACK SCOUT",
     baseMoney = 30,
-    parties = { BERRY_TEAM },
+    parties = parties.berry,
   }
   HouseNpcs.registerTrainerDef(CLUB_CLASS, defClub)
   HouseNpcs.registerTrainerDef(DARK_CLASS, defDark)
@@ -124,23 +185,51 @@ local function registerTrainers(mod)
       name = "CIRCUIT HOST",
       baseMoney = 40,
       basePic = "OPP_HIKER",
-      parties = { CLUB_TEAMS[1], CLUB_TEAMS[2], CLUB_TEAMS[3], CLUB_TEAMS[4] },
+      parties = parties.club,
     })
     mod.content.trainers:register(DARK_CLASS, {
       id = DARK_CLASS,
       name = "NIGHT EYES",
       baseMoney = 35,
       basePic = "OPP_SUPER_NERD",
-      parties = { DARK_TEAM },
+      parties = parties.dark,
     })
     mod.content.trainers:register(BERRY_CLASS, {
       id = BERRY_CLASS,
       name = "SNACK SCOUT",
       baseMoney = 30,
       basePic = "OPP_LASS",
-      parties = { BERRY_TEAM },
+      parties = parties.berry,
     })
   end
+end
+
+function BattleClubs.refreshScope(mod, scopeMode)
+  if not mod then return end
+  local parties = activeClubParties()
+  local function patchParties(classId, partyList)
+    local ok = pcall(function()
+      mod.content.trainers:patch(classId, { parties = partyList })
+    end)
+    if not ok then
+      local Data = require("src.core.Data")
+      if Data.trainers and Data.trainers[classId] then
+        Data.trainers[classId].parties = partyList
+      end
+    end
+  end
+  patchParties(CLUB_CLASS, parties.club)
+  patchParties(DARK_CLASS, parties.dark)
+  patchParties(BERRY_CLASS, parties.berry)
+  HouseNpcs.registerTrainerDef(CLUB_CLASS, {
+    id = CLUB_CLASS, name = "CIRCUIT HOST", baseMoney = 40, parties = parties.club,
+  })
+  HouseNpcs.registerTrainerDef(DARK_CLASS, {
+    id = DARK_CLASS, name = "NIGHT EYES", baseMoney = 35, parties = parties.dark,
+  })
+  HouseNpcs.registerTrainerDef(BERRY_CLASS, {
+    id = BERRY_CLASS, name = "SNACK SCOUT", baseMoney = 30, parties = parties.berry,
+  })
 end
 
 local function scaleHook(mod)

@@ -38,6 +38,10 @@ TradesExtra.TRADES = {
 
 local heldByGet = {}
 
+function TradesExtra.refreshScope(mod, scopeMode)
+  -- Trades stay registered; talk gate below refuses under kanto.
+end
+
 function TradesExtra.register(mod)
   local patch = {}
   for _, row in ipairs(TradesExtra.TRADES) do
@@ -64,9 +68,22 @@ function TradesExtra.register(mod)
     }, TradesExtra.OWNER)
     mod.content.map_scripts:register(row.map, {
       talk = {
-        [row.text] = {
-          { "trade", tradeIndex, row.flag },
-        },
+        [row.text] = function(game, ow, npc, done)
+          local SpeciesScope = require("mods.Kanto-Reforged.species_scope")
+          if not SpeciesScope.allowsSpeciesId(mod, row.get, nil) then
+            local Strings = require("src.core.Strings")
+            HouseNpcs.pushText(game, Strings(
+              "Hmm... my offer's for\na NATIONAL DEX run.\f"
+                .. "Come back off KANTO\nscope."), done)
+            return
+          end
+          -- Fall through to scripted trade command list
+          local Commands = require("src.script.Commands")
+          if Commands and Commands.trade then
+            Commands.trade({ game = game, save = game.save }, tradeIndex, row.flag)
+          end
+          if done then done() end
+        end,
       },
     })
   end

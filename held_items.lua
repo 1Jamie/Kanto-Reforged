@@ -213,18 +213,60 @@ end
 
 function HeldItems.register(mod)
   -- Gold already ships type boosters / leftovers / etc.; only fill gaps.
+  -- On Gen2, farm berries need heldEffect so Battle:tickHeldItem can fire.
+  local Host = require("mods.Kanto-Reforged.host")
+  local GEN2_STATUS_HELD = {
+    PAR = "HELD_HEAL_PARALYZE",
+    SLP = "HELD_HEAL_SLEEP",
+    PSN = "HELD_HEAL_POISON",
+    BRN = "HELD_HEAL_BURN",
+    FRZ = "HELD_HEAL_FREEZE",
+    confusion = "HELD_HEAL_CONFUSION",
+    any = "HELD_HEAL_STATUS",
+  }
+  local function gen2HeldFields(rec)
+    if rec.holdEffect == "leftovers" then
+      return "HELD_LEFTOVERS", 10
+    elseif rec.holdEffect == "focus_band" then
+      return "HELD_FOCUS_BAND", 30
+    elseif rec.holdEffect == "berry" then
+      return "HELD_BERRY", rec.heal or 10
+    elseif rec.holdEffect == "berry_status" then
+      return GEN2_STATUS_HELD[rec.cure], 0
+    elseif rec.holdEffect == "type_boost" and rec.boostType then
+      local t = rec.boostType == "PSYCHIC_TYPE" and "PSYCHIC" or rec.boostType
+      return "HELD_" .. t .. "_BOOST", 10
+    end
+    return nil, nil
+  end
+
   for id, rec in pairs(HeldItems.CATALOG) do
+    local payload = {
+      id = rec.id,
+      name = rec.name,
+      price = rec.price,
+      tossable = true,
+    }
+    if Host.isGen2() then
+      local he, hp = gen2HeldFields(rec)
+      if he then
+        payload.heldEffect = he
+        payload.heldParameter = hp
+      end
+    end
     if not mod.content.items:get(id) then
-      mod.content.items:register(id, {
-        id = rec.id,
-        name = rec.name,
-        price = rec.price,
-        tossable = true,
-      })
+      mod.content.items:register(id, payload)
+    elseif Host.isGen2() and payload.heldEffect then
+      local existing = mod.content.items:get(id)
+      if existing and not existing.heldEffect then
+        mod.content.items:patch(id, {
+          heldEffect = payload.heldEffect,
+          heldParameter = payload.heldParameter,
+        })
+      end
     end
   end
 
-  local Host = require("mods.Kanto-Reforged.host")
   if Host.isGen1() then
     mod.content.link_fields:register("held_item", {
       rev = 1,
@@ -257,7 +299,8 @@ end
 -- Wild berries only from unlocked plant types (berry economy).
 function HeldItems.unlockedBerryList(mod)
   if not mod or not mod.save then return { "BERRY" } end
-  local unlocked = mod.save:get("unlocked_berries", nil)
+  local Host = require("mods.Kanto-Reforged.host")
+  local unlocked = Host.saveGet(mod.save, "unlocked_berries", nil)
   if type(unlocked) ~= "table" then return { "BERRY" } end
   local list = {}
   for _, id in ipairs(HeldItems.BERRY_PACK) do
@@ -660,11 +703,12 @@ function HeldItems.maybeGiveWildHold(mon, rng)
     roll = 1
   end
   if roll >= HeldItems.WILD_BERRY_CHANCE then return end
-  mon.heldItem = HeldItems.pickWildBerry(rng)
+  HeldItems.set(mon, HeldItems.pickWildBerry(rng))
 end
 
 function HeldItems.install(mod)
   HeldItems._mod = mod
+  local Host = require("mods.Kanto-Reforged.host")
   local Bag = require("src.inventory.Bag")
   local ListMenu = require("src.ui.ListMenu")
   local TextBox = require("src.render.TextBox")
@@ -675,17 +719,17 @@ function HeldItems.install(mod)
     if type(out) ~= "table" then return out end
     if ctx and ctx.battle then return out end
 
-    if mon.heldItem then
+    if HeldItems.get(mon) then
       out[#out + 1] = {
         label = Strings("TAKE"),
         onSelect = function(m, g)
-          local id = m.heldItem
+          local id = HeldItems.get(m)
           if not id then return end
           if not Bag.add(g.save, id, 1) then
             g.stack:push(TextBox.new(g, Strings("The bag is full!")))
             return
           end
-          m.heldItem = nil
+          HeldItems.set(m, nil)
           local def = HeldItems.def(id)
           g.stack:push(TextBox.new(g, Strings("Took the\n%s.", def and def.name or id)))
         end,
@@ -718,6 +762,56 @@ function HeldItems.install(mod)
     return out
   end)
 
+  if Host.isGen2() then
+    -- Gold Battle already ticks Leftovers / HELD_BERRY / status cures via
+    -- mon.item + heldEffect. Wire bag USE + wild holds only.
+    local ItemEffects = require("src.core.gen2.ItemEffects")
+    if not ItemEffects._krBerryBag then
+      local originalPartyAction = ItemEffects.partyAction
+      ItemEffects.partyAction = function(itemId, data)
+        if HeldItems.isBerry(itemId) then
+          local def = HeldItems.def(itemId)
+          if def and def.holdEffect == "berry" then return "heal" end
+          return "status"
+        end
+        return originalPartyAction(itemId, data)
+      end
+
+      local originalUseOnMon = ItemEffects.useOnMon
+      ItemEffects.useOnMon = function(itemId, mon, data)
+        if HeldItems.isBerry(itemId) then
+          local result, msgs = HeldItems.tryBagUse(data, nil, itemId, mon, nil)
+          if result == "consumed" then
+            return { used = true, text = msgs and msgs[1] }
+          end
+          if result == "failed" then
+            return {
+              used = false,
+              text = (msgs and msgs[1]) or ItemEffects.TEXT_NO_EFFECT,
+            }
+          end
+        end
+        return originalUseOnMon(itemId, mon, data)
+      end
+      ItemEffects._krBerryBag = true
+    end
+
+    mod.events:on("battle.started", function(ev)
+      if not ev or ev.kind ~= "wild" or not ev.battle then return end
+      local mon = ev.battle.enemy
+      if not mon or HeldItems.get(mon) then return end
+      local rng = (ev.battle.random and function(n)
+        -- Gen2 Battle.random is 0..n-1; maybeGiveWildHold wants [0,1) or 0..99.
+        if n then return (ev.battle.random(n + 1) or 0) end
+        return (ev.battle.random(100) or 0) / 100
+      end) or love.math.random
+      HeldItems.maybeGiveWildHold(mon, rng)
+    end)
+    return
+  end
+
+  -- ---- Gen1 battle / bag hooks below ----
+
   -- Leftovers residual + status berries that were given mid-status
   mod.events:on("battle.turn_ended", function(ev)
     if not ev.battle then return end
@@ -739,9 +833,6 @@ function HeldItems.install(mod)
     tick(ev.battle.player)
     tick(ev.battle.enemy)
   end)
-
-  -- HP Berry is hooked from applyDamage below (covers moves, confusion
-  -- self-hits, recoil, trap ticks — not only EffectRegistry's damage_dealt).
 
   -- Status berries: only on status_inflicted (single fire)
   mod.events:on("battle.status_inflicted", function(ev)

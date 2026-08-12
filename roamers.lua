@@ -29,6 +29,10 @@ function Roamers.getLocation(mod, species)
 end
 
 function Roamers.isActive(mod, species)
+  local SpeciesScope = require("mods.Kanto-Reforged.species_scope")
+  if SpeciesScope.mode(mod) == SpeciesScope.MODE_KANTO then
+    return false
+  end
   local s = state(mod)
   return s.active[species] and not s.beaten[species]
 end
@@ -109,6 +113,13 @@ function Roamers.register(mod)
   mod.content.map_scripts:register("CELADON_MANSION_2F", {
     talk = {
       TEXT_CELADONMANSION2F_BEAST_TRACKER = function(game, ow, npc, done)
+        local SpeciesScope = require("mods.Kanto-Reforged.species_scope")
+        if SpeciesScope.mode(mod) == SpeciesScope.MODE_KANTO then
+          HouseNpcs.pushText(game, Strings(
+            "Beasts? On a KANTO-\nonly DEX?\f"
+              .. "Switch to NATIONAL\nif you want them."), done)
+          return
+        end
         local flags = game.save.flags or {}
         if not flags.EVENT_BEAT_SILPH_CO_GIOVANNI
             and not flags.EVENT_BEAT_SILPH_CO_GIOVANNI then
@@ -151,6 +162,13 @@ function Roamers.register(mod)
   mod.content.map_scripts:register("INDIGO_PLATEAU_LOBBY", {
     talk = {
       TEXT_INDIGOPLATEAULOBBY_EON_WATCHER = function(game, ow, npc, done)
+        local SpeciesScope = require("mods.Kanto-Reforged.species_scope")
+        if SpeciesScope.mode(mod) == SpeciesScope.MODE_KANTO then
+          HouseNpcs.pushText(game, Strings(
+            "Eon POKéMON skip\nKANTO-scope trainers.\f"
+              .. "Try NATIONAL if you\nwant a chase."), done)
+          return
+        end
         local flags = game.save.flags or {}
         if not flags.EVENT_BEAT_CHAMPION_RIVAL then
           HouseNpcs.pushText(game, Strings(
@@ -217,6 +235,10 @@ function Roamers.install(mod)
   -- (Repel still sees high level). Prefer species hook so vanilla roll RNG
   -- is preserved when no roamer.
   mod.hooks:wrap("encounter.species", function(next, enc, ctx)
+    local SpeciesScope = require("mods.Kanto-Reforged.species_scope")
+    if SpeciesScope.mode(mod) == SpeciesScope.MODE_KANTO then
+      return next(enc, ctx)
+    end
     local mapId = ctx and ctx.mapId
     if mapId then
       local found = roamerOnMap(mod, mapId)

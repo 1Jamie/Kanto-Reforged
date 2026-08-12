@@ -275,6 +275,22 @@ end
 -- Re-applying modes always starts from this baseline.
 local baselines = {}
 
+local function livePatchEncounter(mod, mapId, partial)
+  local ok = pcall(function()
+    mod.content.encounters:patch(mapId, partial)
+  end)
+  if ok then return end
+  local Data = require("src.core.Data")
+  local dest = Data.encounters[mapId]
+  if not dest then
+    Data.encounters[mapId] = {}
+    dest = Data.encounters[mapId]
+  end
+  for kind, block in pairs(partial or {}) do
+    dest[kind] = block
+  end
+end
+
 function Encounters.captureBaselines(mod)
   for mapId, mapDef in pairs(MAPS) do
     if not baselines[mapId] then
@@ -480,7 +496,7 @@ local function ensureBaseCoverage(mod, index)
             for _, cand in ipairs(candidates) do
               if tryPlace(counts, claimed, speciesId, mapId, kind, cand.index,
                   slots, avg, maxLv, minScore) then
-                mod.content.encounters:patch(mapId, { [kind] = { slots = slots } })
+                livePatchEncounter(mod, mapId, { [kind] = { slots = slots } })
                 return true
               end
             end
@@ -571,7 +587,7 @@ local function mixCurated(mod, index)
             end
           end
         end
-        mod.content.encounters:patch(mapId, { [kind] = { slots = slots } })
+        livePatchEncounter(mod, mapId, { [kind] = { slots = slots } })
       end
     end
   end
@@ -663,7 +679,7 @@ local function mixFullRandom(mod, index, opts)
             end
           end
         end
-        mod.content.encounters:patch(mapId, { [kind] = { slots = slots } })
+        livePatchEncounter(mod, mapId, { [kind] = { slots = slots } })
       end
     end
   end
@@ -671,9 +687,25 @@ end
 
 -- mode: "curated" (default) or "full_random"
 -- opts.legendsInMix: only used for full_random
+-- opts.speciesScope: "kanto" strips dex>151 from the mix index
 function Encounters.apply(mod, pokemon_data, mode, opts)
   Encounters.captureBaselines(mod)
   local index = Encounters.buildIndex(pokemon_data)
+  opts = opts or {}
+  if opts.speciesScope == "kanto" then
+    local meta, byHabitat = {}, {}
+    for id, m in pairs(index.meta or {}) do
+      local spec = pokemon_data.species and pokemon_data.species[id]
+      local dex = spec and spec.dex
+      if not dex or dex <= 151 then
+        meta[id] = m
+        local hab = m.habitat or "grassland"
+        byHabitat[hab] = byHabitat[hab] or {}
+        byHabitat[hab][#byHabitat[hab] + 1] = id
+      end
+    end
+    index = { meta = meta, byHabitat = byHabitat, parents = index.parents }
+  end
   if mode == "full_random" then
     mixFullRandom(mod, index, opts)
   else

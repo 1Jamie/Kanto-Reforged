@@ -44,6 +44,7 @@ function TrainersGen2.install(mod)
     if not guests or type(result) ~= "table" or #result == 0 then
       return result
     end
+    local SpeciesScope = require("mods.Kanto-Reforged.species_scope")
     -- Rotate guest when a second option exists (still one mon max).
     local guestId = guests[1]
     local mid = tostring(memberId or "")
@@ -52,6 +53,9 @@ function TrainersGen2.install(mod)
       guestId = guests[2]
     end
     if not mod.content.pokemon:get(guestId) then
+      return result
+    end
+    if not SpeciesScope.allowsTrainerGuest(mod, classId, guestId) then
       return result
     end
     local out = copyParty(result)

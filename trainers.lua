@@ -369,6 +369,10 @@ function Trainers.apply(mod)
 
   for _, row in ipairs(MIX) do
     local class, pi, action, species, level = row[1], row[2], row[3], row[4], row[5]
+    local SpeciesScope = require("mods.Kanto-Reforged.species_scope")
+    if species and not SpeciesScope.allowsSpeciesId(mod, species, nil) then
+      -- Skip out-of-scope MIX rows under Gen1 kanto (rebuild from baseline).
+    else
     local base = snap[class]
     if base then
       local parties = ensurePatched(patched, snap, class)
@@ -391,6 +395,7 @@ function Trainers.apply(mod)
         end
       end
     end
+    end
   end
 
   for _, row in ipairs(ACE_BERRIES) do
@@ -406,7 +411,15 @@ function Trainers.apply(mod)
 
   local n = 0
   for class, parties in pairs(patched) do
-    mod.content.trainers:patch(class, { parties = parties })
+    local ok = pcall(function()
+      mod.content.trainers:patch(class, { parties = parties })
+    end)
+    if not ok then
+      local Data = require("src.core.Data")
+      if Data.trainers and Data.trainers[class] then
+        Data.trainers[class].parties = parties
+      end
+    end
     n = n + 1
   end
   return n

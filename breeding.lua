@@ -466,6 +466,17 @@ function Breeding.tryCreateDaycareEgg(data, save, opts)
     Breeding.resetBreedCountdown(dc, rng)
     return false, err
   end
+  -- Gen1 Kanto scope: refuse Gen3 (and other out-of-scope) eggs.
+  local Host = require("mods.Kanto-Reforged.host")
+  local SpeciesScope = require("mods.Kanto-Reforged.species_scope")
+  local mod = Breeding._mod or SpeciesScope._mod
+  if Host.isGen1() and mod
+      and SpeciesScope.mode(mod) == SpeciesScope.MODE_KANTO
+      and egg.species
+      and not SpeciesScope.allowsSpeciesId(mod, egg.species, nil) then
+    Breeding.resetBreedCountdown(dc, rng)
+    return false, "scope"
+  end
   dc.egg = egg
   dc.breedSteps = nil
   return true

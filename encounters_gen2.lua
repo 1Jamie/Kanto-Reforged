@@ -1,7 +1,7 @@
 -- Gen2 encounter mixing:
 --   curated (default):
---     * Kanto — full Gen3 grass tables (TOD-biased habitat pools, postgame
---       levels). No legendaries / starters / mid-stage cocoons.
+--     * Kanto — full Gen3 grass tables at postgame levels (mid/final forms
+--       that fit the band; TOD-biased). No legendaries / starters / Shedinja.
 --     * Johto — keep Gold natives; inject a couple of habitat-fitting Gen3
 --       basics into rare slots, clamped to each species' wild level band.
 --   full_random (FULL SPAWN MIX toggle):
@@ -25,14 +25,16 @@ local KANTO_GRASS = {
   ROUTE_10_NORTH = { level = 34, habitats = { "mountain" } },
   ROUTE_10_SOUTH = { level = 34, habitats = { "mountain" } },
   ROUTE_11 = { level = 32, habitats = { "grassland", "urban" } },
-  ROUTE_12 = { level = 34, habitats = { "grassland", "waters-edge" } },
+  -- Long east coast: reed bank first so Lombre/Corphish actually land in slots.
+  ROUTE_12 = { level = 34, habitats = { "waters-edge", "grassland" } },
   ROUTE_13 = { level = 34, habitats = { "grassland" } },
   ROUTE_14 = { level = 34, habitats = { "grassland" } },
   ROUTE_15 = { level = 34, habitats = { "grassland" } },
   ROUTE_16 = { level = 36, habitats = { "mountain" } },
   ROUTE_17 = { level = 36, habitats = { "grassland" } },
   ROUTE_18 = { level = 36, habitats = { "grassland" } },
-  ROUTE_21 = { level = 32, habitats = { "grassland", "sea" } },
+  -- Cinnabar ferry grass: sea birds/sharks first, then shore grass.
+  ROUTE_21 = { level = 32, habitats = { "sea", "grassland" } },
   ROUTE_22 = { level = 30, habitats = { "grassland" } },
   ROUTE_24 = { level = 32, habitats = { "waters-edge", "forest" } },
   ROUTE_25 = { level = 32, habitats = { "waters-edge", "forest" } },
@@ -55,10 +57,12 @@ local JOHTO_GUESTS = {
   ROUTE_37 = { level = 16, habitats = { "forest" }, count = 2 },
   ROUTE_38 = { level = 18, habitats = { "grassland" }, count = 2 },
   ROUTE_39 = { level = 18, habitats = { "grassland" }, count = 2 },
-  ROUTE_42 = { level = 20, habitats = { "mountain", "waters-edge" }, count = 2 },
+  -- Lakeside cliffs (Mahogany): bank mons first, then rock.
+  ROUTE_42 = { level = 20, habitats = { "waters-edge", "mountain" }, count = 2 },
   ROUTE_43 = { level = 22, habitats = { "forest", "waters-edge" }, count = 2 },
   ROUTE_44 = { level = 24, habitats = { "mountain" }, count = 2 },
-  ROUTE_45 = { level = 26, habitats = { "mountain" }, count = 2 },
+  -- Highland / rocky: allow rough-terrain (Trapinch, Cacnea) with mountain.
+  ROUTE_45 = { level = 26, habitats = { "mountain", "rough-terrain" }, count = 2 },
   ROUTE_46 = { level = 10, habitats = { "mountain", "grassland" }, count = 2 },
   ILEX_FOREST = { level = 12, habitats = { "forest" }, count = 2 },
   NATIONAL_PARK = { level = 14, habitats = { "grassland", "forest" }, count = 2 },
@@ -69,8 +73,8 @@ local JOHTO_GUESTS = {
   SLOWPOKE_WELL_B1F = { level = 10, habitats = { "cave", "waters-edge" }, count = 2 },
 }
 
--- Habitat pools for Kanto full reloads (postgame levels). Still no
--- legendaries / starters / mid-stage cocoons — only wild-sensible forms.
+-- Johto curated injects: early/mid Gen3 basics only (Gold natives stay).
+-- Still no legendaries / starters / cocoons / fish-in-grass.
 local HABITAT_POOL = {
   grassland = {
     "POOCHYENA", "ZIGZAGOON", "SEEDOT", "RALTS", "WHISMUR", "SKITTY",
@@ -82,40 +86,101 @@ local HABITAT_POOL = {
     "SLAKOTH", "TAILLOW", "VOLBEAT", "ILLUMISE",
   },
   mountain = {
-    "ARON", "NUMEL", "MAKUHITA", "MEDITITE", "ABSOL", "TRAPINCH",
+    "ARON", "NUMEL", "MAKUHITA", "MEDITITE", "ABSOL",
+  },
+  ["rough-terrain"] = {
+    "TRAPINCH", "CACNEA", "BALTOY",
   },
   urban = {
     "POOCHYENA", "ZIGZAGOON", "SKITTY", "ELECTRIKE", "SPOINK", "SHUPPET",
     "DUSKULL", "PLUSLE", "MINUN",
   },
   ["waters-edge"] = {
-    "LOTAD", "SURSKIT", "BARBOACH", "CORPHISH", "CARVANHA",
+    -- Tall-grass-near-water only. True fish (Barboach, Carvanha, …) stay in
+    -- water encounter tables — never Route 30 grass via curated inject.
+    "LOTAD", "SURSKIT",
   },
   sea = { "WINGULL", "CARVANHA", "WAILMER" },
-  cave = { "WHISMUR", "ARON", "NOSEPASS", "MAWILE", "SABLEYE", "DUSKULL" },
+  cave = { "WHISMUR", "ARON", "NOSEPASS", "MAWILE", "SABLEYE", "DUSKULL", "LAIRON" },
 }
 
--- Wild level bands (min..max). Johto inject and Kanto slot builds both
--- refuse species outside the route's band so Route 29 never rolls Absol
--- and Victory Road never rolls Zigzagoon.
+-- Gold Kanto is postgame (lv ~28–40). Bases with Johto-early bands would
+-- otherwise empty out (Absol-only mountains, blank Routes 24/25). Use
+-- mid/final Gen3 forms that fit the band — still no legends/starters/Shedinja.
+local KANTO_HABITAT_POOL = {
+  grassland = {
+    "LINOONE", "MIGHTYENA", "SWELLOW", "MANECTRIC", "ROSELIA",
+    "SPOINK", "GRUMPIG", "SWABLU", "ALTARIA",
+    "ZANGOOSE", "SEVIPER", "KECLEON", "VOLBEAT", "ILLUMISE",
+  },
+  forest = {
+    "NUZLEAF", "SHIFTRY", "BRELOOM", "VIGOROTH", "NINJASK",
+    "TROPIUS", "KECLEON", "ALTARIA", "VOLBEAT", "ILLUMISE",
+  },
+  mountain = {
+    -- Lairon (not Aggron: evolves at 42). Numel only mid; Camerupt late.
+    "LAIRON", "NUMEL", "CAMERUPT", "TORKOAL",
+    "HARIYAMA", "MEDICHAM", "ABSOL", "VIBRAVA",
+    "SPOINK", "GRUMPIG",
+  },
+  ["rough-terrain"] = {
+    "VIBRAVA", "CACNEA", "CACTURNE", "BALTOY", "CLAYDOL",
+  },
+  urban = {
+    -- Ghosts: Shuppet/Duskull mid; Banette/Dusclops only after evo lv 37.
+    "KIRLIA", "GARDEVOIR", "DELCATTY", "MANECTRIC",
+    "SHUPPET", "BANETTE", "DUSKULL", "DUSCLOPS",
+  },
+  ["waters-edge"] = {
+    -- Bank / reed grass (not surf slots). Lombre mid; Ludicolo/Crawdaunt late.
+    "LOMBRE", "LUDICOLO", "CORPHISH", "CRAWDAUNT",
+  },
+  sea = { "PELIPPER", "CARVANHA", "WAILMER" },
+  cave = {
+    "LAIRON", "LOUDRED", "NOSEPASS",
+    "MAWILE", "SABLEYE", "LUNATONE", "SOLROCK",
+  },
+}
+
+-- Wild level bands (min..max). Mins for evolved forms track RSE evolve
+-- levels so we never spawn Aggron before 42, Medicham before 37, etc.
+-- Johto inject and Kanto slot builds both refuse species outside the
+-- route's band (with +4 slack on max).
 local WILD_LEVEL = {
-  -- early Johto commons
+  -- early Johto commons (match Hoenn Routes 101–116 style bands)
   ZIGZAGOON = { 2, 12 }, POOCHYENA = { 2, 14 }, WURMPLE = { 2, 10 },
   TAILLOW = { 2, 14 }, WINGULL = { 2, 16 }, LOTAD = { 2, 14 },
   SEEDOT = { 2, 14 }, RALTS = { 4, 16 }, WHISMUR = { 4, 16 },
   SHROOMISH = { 4, 16 }, SLAKOTH = { 4, 16 }, NINCADA = { 4, 16 },
   SKITTY = { 4, 16 }, ELECTRIKE = { 4, 16 }, PLUSLE = { 4, 16 },
-  MINUN = { 4, 16 }, SURSKIT = { 4, 16 }, ARON = { 5, 20 },
-  MAKUHITA = { 6, 20 }, MEDITITE = { 6, 20 },
-  -- mid
-  GULPIN = { 10, 22 }, SPOINK = { 12, 24 }, SWABLU = { 12, 26 },
-  NUMEL = { 12, 26 }, TRAPINCH = { 12, 26 }, VOLBEAT = { 12, 24 },
-  ILLUMISE = { 12, 24 }, BARBOACH = { 10, 24 }, CORPHISH = { 10, 24 },
-  CARVANHA = { 14, 28 }, SHUPPET = { 14, 28 }, DUSKULL = { 14, 28 },
-  NOSEPASS = { 14, 28 }, MAWILE = { 16, 30 }, SABLEYE = { 16, 30 },
-  WAILMER = { 16, 32 },
-  -- late / postgame
-  ZANGOOSE = { 24, 45 }, SEVIPER = { 24, 45 }, ABSOL = { 28, 45 },
+  MINUN = { 4, 16 }, SURSKIT = { 4, 16 }, ARON = { 5, 22 },
+  MAKUHITA = { 6, 24 }, MEDITITE = { 6, 24 },
+  CACNEA = { 10, 28 }, BALTOY = { 12, 28 },
+  -- mid (unevolved / early evo)
+  GULPIN = { 10, 22 }, SPOINK = { 12, 28 }, SWABLU = { 12, 30 },
+  NUMEL = { 12, 28 }, TRAPINCH = { 12, 32 }, VOLBEAT = { 12, 30 },
+  ILLUMISE = { 12, 30 }, BARBOACH = { 10, 24 }, CORPHISH = { 10, 28 },
+  CARVANHA = { 14, 32 }, SHUPPET = { 14, 34 }, DUSKULL = { 14, 34 },
+  NOSEPASS = { 14, 40 }, MAWILE = { 16, 40 }, SABLEYE = { 16, 40 },
+  WAILMER = { 16, 36 },
+  -- evolved: band min >= RSE evolve level (stones use late-game floors)
+  LINOONE = { 20, 40 }, MIGHTYENA = { 18, 40 }, SWELLOW = { 22, 42 },
+  MANECTRIC = { 26, 42 }, ROSELIA = { 20, 38 }, KECLEON = { 25, 40 },
+  ALTARIA = { 35, 45 }, GRUMPIG = { 32, 42 },
+  NUZLEAF = { 14, 28 }, SHIFTRY = { 28, 42 }, BRELOOM = { 23, 40 },
+  VIGOROTH = { 18, 34 }, NINJASK = { 20, 36 }, TROPIUS = { 28, 42 },
+  LAIRON = { 32, 44 }, AGGRON = { 42, 50 },
+  CAMERUPT = { 33, 45 }, TORKOAL = { 24, 42 },
+  HARIYAMA = { 24, 42 }, MEDICHAM = { 37, 45 },
+  VIBRAVA = { 35, 44 }, FLYGON = { 45, 50 }, CACTURNE = { 32, 42 },
+  CLAYDOL = { 36, 45 },
+  KIRLIA = { 20, 34 }, GARDEVOIR = { 30, 45 }, DELCATTY = { 20, 36 },
+  BANETTE = { 37, 45 }, DUSCLOPS = { 37, 45 },
+  LOMBRE = { 14, 28 }, LUDICOLO = { 28, 42 }, CRAWDAUNT = { 30, 42 },
+  PELIPPER = { 25, 40 }, WAILORD = { 40, 48 },
+  LOUDRED = { 20, 36 }, EXPLOUD = { 40, 48 },
+  LUNATONE = { 28, 42 }, SOLROCK = { 28, 42 },
+  ZANGOOSE = { 24, 45 }, SEVIPER = { 24, 45 }, ABSOL = { 25, 45 },
 }
 
 local function levelBand(species)
@@ -171,10 +236,11 @@ local function fitsTod(species, tod)
   return true
 end
 
-local function poolFor(habitats, routeLevel)
+local function poolFor(habitats, routeLevel, habitatPools)
+  habitatPools = habitatPools or HABITAT_POOL
   local seen, out = {}, {}
   for _, h in ipairs(habitats or {}) do
-    for _, sp in ipairs(HABITAT_POOL[h] or {}) do
+    for _, sp in ipairs(habitatPools[h] or {}) do
       if not seen[sp] and fitsRouteLevel(sp, routeLevel) then
         seen[sp] = true
         out[#out + 1] = sp
@@ -241,16 +307,17 @@ local function todSlots(speciesList, level, tod)
   return full
 end
 
-local function slotsFor(mod, habitats, level, tod)
-  local base = filterRegistered(mod, poolFor(habitats, level))
+local function slotsFor(mod, habitats, level, tod, habitatPools)
+  local base = filterRegistered(mod, poolFor(habitats, level, habitatPools))
   if #base == 0 then return nil end
   return todSlots(orderForTod(base, tod), level, tod)
 end
 
 local function patchMap(mod, mapId, info)
-  local morn = slotsFor(mod, info.habitats, info.level, "MORN")
-  local day = slotsFor(mod, info.habitats, info.level, "DAY")
-  local nite = slotsFor(mod, info.habitats, info.level, "NITE")
+  local pools = KANTO_HABITAT_POOL
+  local morn = slotsFor(mod, info.habitats, info.level, "MORN", pools)
+  local day = slotsFor(mod, info.habitats, info.level, "DAY", pools)
+  local nite = slotsFor(mod, info.habitats, info.level, "NITE", pools)
   if not (morn and day and nite) then return false end
 
   local block = {
@@ -283,7 +350,21 @@ end
 -- band only — no evolved lines, no out-of-place biomes.
 local function pickGuests(mod, mapId, info)
   local count = info.count or 2
+  local SpeciesScope = require("mods.Kanto-Reforged.species_scope")
+  local maxDex = SpeciesScope.maxDexForMap(mod, mapId)
   local pool = filterRegistered(mod, poolFor(info.habitats, info.level))
+  if maxDex then
+    local clipped = {}
+    local registry = mod and mod.content and mod.content.pokemon
+    for _, sp in ipairs(pool) do
+      local def = registry and registry.get and registry:get(sp)
+      local dex = def and def.dex
+      if not dex or dex <= maxDex then
+        clipped[#clipped + 1] = sp
+      end
+    end
+    pool = clipped
+  end
   if #pool == 0 then return {} end
   local start = (hashId(mapId) % #pool) + 1
   local out, used = {}, {}
@@ -465,6 +546,15 @@ local function isKantoMap(mapId)
   return false
 end
 
+-- Water biomes never belong in grass tables (Barboach on Route 30).
+local WATER_HABITAT = {
+  ["waters-edge"] = true, sea = true,
+}
+local LAND_HABITAT = {
+  grassland = true, forest = true, mountain = true, urban = true,
+  cave = true, ["rough-terrain"] = true,
+}
+
 local function habitatsForMap(mapId)
   local info = KANTO_GRASS[mapId] or JOHTO_GUESTS[mapId]
   if info and info.habitats then return info.habitats end
@@ -477,10 +567,32 @@ local function habitatsForMap(mapId)
   if mapId:find("FOREST", 1, true) or mapId:find("PARK", 1, true) then
     return { "forest", "grassland" }
   end
-  if mapId:find("LAKE", 1, true) or mapId:find("WATER", 1, true) then
+  if mapId:find("LAKE", 1, true) or mapId:find("WATER", 1, true)
+      or mapId:find("POND", 1, true) then
     return { "waters-edge", "sea" }
   end
-  return { "grassland", "forest", "urban", "mountain", "waters-edge" }
+  -- Dry land default — never sneak waters-edge into unknown grass maps.
+  return { "grassland", "forest", "urban", "mountain" }
+end
+
+local function poolIsWater(habitats)
+  for _, h in ipairs(habitats or {}) do
+    if WATER_HABITAT[h] then return true end
+  end
+  return false
+end
+
+local function habitatAllowedInPool(habitat, habitats, allowSoftLand)
+  if not habitat then return false end
+  for _, h in ipairs(habitats or {}) do
+    if h == habitat then return true end
+  end
+  if not allowSoftLand then return false end
+  -- Soft land miss: forest↔grassland etc. Still never fish on dirt.
+  if poolIsWater(habitats) then
+    return WATER_HABITAT[habitat] and true or false
+  end
+  return LAND_HABITAT[habitat] and true or false
 end
 
 local function bstOf(rec)
@@ -491,9 +603,21 @@ local function bstOf(rec)
       + (b.specialDefense or 0)
 end
 
-local function buildGoldIndex(mod, pokemon_data, allowLegends)
+local function buildGoldIndex(mod, pokemon_data, allowLegends, mapId)
   local ExpEncounters = require("mods.Kanto-Reforged.encounters")
+  local SpeciesScope = require("mods.Kanto-Reforged.species_scope")
+  local maxDex = SpeciesScope.maxDexForMap(mod, mapId)
   local index = ExpEncounters.buildIndex(pokemon_data or { species = {} })
+  -- Clip pack-built index under Johto-native (non-Kanto maps).
+  if maxDex then
+    for id in pairs(index.meta or {}) do
+      local rec = pokemon_data and pokemon_data.species and pokemon_data.species[id]
+      local dex = rec and rec.dex
+      if dex and dex > maxDex then
+        index.meta[id] = nil
+      end
+    end
+  end
   local reg = mod and mod.content and mod.content.pokemon
   if not (reg and reg.each) then return index end
 
@@ -502,7 +626,9 @@ local function buildGoldIndex(mod, pokemon_data, allowLegends)
       -- always out
     elseif not index.meta[id] and type(rec) == "table" then
       local dex = rec.dex or rec.pokedex or 0
-      if dex >= 1 and dex <= 386 then
+      if maxDex and dex > maxDex then
+        -- out of species scope for this region
+      elseif dex >= 1 and dex <= 386 then
         local habitat = rec.habitat or "grassland"
         local isLegend = habitat == "rare" or NO_WILD_LEGEND[id]
         if isLegend and not allowLegends then
@@ -521,7 +647,10 @@ local function buildGoldIndex(mod, pokemon_data, allowLegends)
         end
       end
     elseif index.meta[id] then
-      if NO_WILD_LEGEND[id] or index.meta[id].habitat == "rare" then
+      local dex = rec.dex or rec.pokedex or 0
+      if maxDex and dex > maxDex then
+        index.meta[id] = nil
+      elseif NO_WILD_LEGEND[id] or index.meta[id].habitat == "rare" then
         index.meta[id].rare = true
         if allowLegends and (index.meta[id].minLevel or 1) < 40 then
           index.meta[id].minLevel = 40
@@ -561,8 +690,9 @@ local function eligibleForSlot(index, habitats, slotLevel, avg, maxLv, allowLege
   local ExpEncounters = require("mods.Kanto-Reforged.encounters")
   local routeMaxStage = ExpEncounters.maxStageFor(avg, maxLv)
   local seen, preferred, fallback = {}, {}, {}
+  local waterPool = poolIsWater(habitats)
 
-  local function consider(id)
+  local function consider(id, into)
     if seen[id] then return end
     local m = index.meta[id]
     if not m then return end
@@ -572,29 +702,33 @@ local function eligibleForSlot(index, habitats, slotLevel, avg, maxLv, allowLege
     if slotLevel < (m.minLevel or 1) then return end
     if not m.rare and m.bst > ExpEncounters.bstCap(avg, m.stage) then return end
     seen[id] = true
-    preferred[#preferred + 1] = id
+    into[#into + 1] = id
   end
 
   for _, hab in ipairs(habitats or {}) do
     for _, id in ipairs(index.byHabitat[hab] or {}) do
-      consider(id)
+      consider(id, preferred)
     end
   end
   if allowLegends then
     for _, id in ipairs(index.byHabitat.rare or {}) do
-      consider(id)
+      consider(id, preferred)
     end
   end
 
-  -- Soft habitat miss: still allow any eligible Gen1–3 so early Johto
-  -- is not stuck with a tiny Hoenn-only curated pool.
+  -- Soft habitat miss for thin pools — land stays land, water stays water.
+  -- Never put Barboach / Carvanha on Route 30 grass.
   for id, m in pairs(index.meta) do
     if not seen[id] and m
         and (not m.rare or allowLegends)
         and (m.rare or m.stage <= routeMaxStage)
         and slotLevel >= (m.minLevel or 1)
         and (m.rare or m.bst <= ExpEncounters.bstCap(avg, m.stage)) then
-      fallback[#fallback + 1] = id
+      if waterPool then
+        if WATER_HABITAT[m.habitat] then consider(id, fallback) end
+      elseif not WATER_HABITAT[m.habitat] and LAND_HABITAT[m.habitat] then
+        consider(id, fallback)
+      end
     end
   end
 
@@ -680,6 +814,7 @@ end
 
 -- Ensure each region hosts a solid share of the pool so Johto and Kanto
 -- both feel full (Kanto especially — otherwise postgame feels hollow).
+-- Density injects must still respect land vs water (no Barboach in grass).
 local function enrichRegion(mod, index, mapIds, regionTag, targetShare)
   local grass = liveGrass(mod)
   if not grass then return 0 end
@@ -693,9 +828,11 @@ local function enrichRegion(mod, index, mapIds, regionTag, targetShare)
     end
   end
 
+  -- Land bases only — water/sea forms belong in water tables.
   local bases = {}
   for id, meta in pairs(index.meta) do
-    if meta.stage == 0 and not meta.rare then
+    if meta.stage == 0 and not meta.rare
+        and not WATER_HABITAT[meta.habitat] then
       bases[#bases + 1] = id
     end
   end
@@ -705,19 +842,25 @@ local function enrichRegion(mod, index, mapIds, regionTag, targetShare)
   for _ in pairs(placed) do have = have + 1 end
   if have >= want then return 0 end
 
-  local missing = {}
-  for _, id in ipairs(bases) do
-    if not placed[id] then missing[#missing + 1] = id end
-  end
-
   local injected = 0
-  local mi = 1
   for _, mapId in ipairs(mapIds) do
-    if mi > #missing then break end
+    if have + injected >= want then break end
     local block = grass[mapId]
     if block and block.slots then
+      local mapHabs = habitatsForMap(mapId)
+      local missing = {}
+      for _, id in ipairs(bases) do
+        if not placed[id] then
+          local meta = index.meta[id]
+          if meta and habitatAllowedInPool(meta.habitat, mapHabs, true)
+              and not WATER_HABITAT[meta.habitat] then
+            missing[#missing + 1] = id
+          end
+        end
+      end
       local day = copySlots(block.slots.DAY)
-      if day and #day >= 2 then
+      if #missing > 0 and day and #day >= 2 then
+        local mi = 1
         -- Overwrite the two rarest Day slots; mirror into MORN/NITE.
         for off = 0, 1 do
           if mi > #missing then break end
@@ -744,7 +887,6 @@ local function enrichRegion(mod, index, mapIds, regionTag, targetShare)
         end)
       end
     end
-    if have + injected >= want then break end
   end
   if injected > 0 then
     mod.log:info("Gen2 full_random: injected %d unique bases into %s for density",
@@ -756,7 +898,9 @@ end
 local function applyFullRandom(mod, pokemon_data, opts)
   opts = opts or {}
   local allowLegends = opts.legendsInMix and true or false
-  local index = buildGoldIndex(mod, pokemon_data, allowLegends)
+  -- Separate pools so Johto-native can cap Gen3 on Johto maps only.
+  local indexJohto = buildGoldIndex(mod, pokemon_data, allowLegends, "ROUTE_29")
+  local indexKanto = buildGoldIndex(mod, pokemon_data, allowLegends, "ROUTE_1")
   local grassMaps, waterMaps = {}, {}
   for mapId in pairs(baselines.grass) do
     grassMaps[#grassMaps + 1] = mapId
@@ -767,14 +911,18 @@ local function applyFullRandom(mod, pokemon_data, opts)
   end
   table.sort(waterMaps)
 
+  local function indexFor(mapId)
+    return isKantoMap(mapId) and indexKanto or indexJohto
+  end
+
   local nGrass, nWater = 0, 0
   for _, mapId in ipairs(grassMaps) do
-    if patchGrassRandom(mod, index, mapId, baselines.grass[mapId], allowLegends) then
+    if patchGrassRandom(mod, indexFor(mapId), mapId, baselines.grass[mapId], allowLegends) then
       nGrass = nGrass + 1
     end
   end
   for _, mapId in ipairs(waterMaps) do
-    if patchWaterRandom(mod, index, mapId, baselines.water[mapId], allowLegends) then
+    if patchWaterRandom(mod, indexFor(mapId), mapId, baselines.water[mapId], allowLegends) then
       nWater = nWater + 1
     end
   end
@@ -788,8 +936,8 @@ local function applyFullRandom(mod, pokemon_data, opts)
     end
   end
   -- Johto first region density, then Kanto so the second region stays rich.
-  enrichRegion(mod, index, johto, "Johto", 0.45)
-  enrichRegion(mod, index, kanto, "Kanto", 0.45)
+  enrichRegion(mod, indexJohto, johto, "Johto", 0.45)
+  enrichRegion(mod, indexKanto, kanto, "Kanto", 0.45)
 
   mod.log:info(
     "Gen2 encounters full_random: %d grass + %d water maps (Johto %d / Kanto %d%s)",
@@ -821,5 +969,10 @@ EncountersGen2._fitsRouteLevel = fitsRouteLevel
 EncountersGen2._pickGuests = pickGuests
 EncountersGen2._isKantoMap = isKantoMap
 EncountersGen2._buildGoldIndex = buildGoldIndex
+EncountersGen2._habitatsForMap = habitatsForMap
+EncountersGen2._eligibleForSlot = eligibleForSlot
+EncountersGen2._WATER_HABITAT = WATER_HABITAT
+EncountersGen2._KANTO_HABITAT_POOL = KANTO_HABITAT_POOL
+EncountersGen2._HABITAT_POOL = HABITAT_POOL
 
 return EncountersGen2
