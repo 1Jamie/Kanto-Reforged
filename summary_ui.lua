@@ -1,8 +1,9 @@
 -- Extra SummaryMenu page: ability + held item (Gen 2/3 Kanto Reforged fields).
--- Wraps the builtin two-page status screen without editing src/.
+-- Gen1: wraps the two-page status screen with page 3 (ability/held/gender).
+-- Gen2: wraps Gen2SummaryMenu with page 4 after pink/green/blue.
 --
--- Publishes a read-only page-3 snapshot + advance() for Gen1 Modern UI when
--- that mod is present. Native Gen1 draw/input is unchanged when it is absent.
+-- Publishes a read-only abilityPage() snapshot + Gen1 advance() for Modern UI
+-- when that mod is present. Native draw/input is unchanged when it is absent.
 
 local Font = require("src.render.Font")
 local Strings = require("src.core.Strings")
@@ -14,13 +15,17 @@ local SplitSpecial = require("mods.Kanto-Reforged.split_special")
 
 local SummaryUi = {}
 
+-- Gen2 stock pages are 1..3; ability is appended as page 4.
+SummaryUi.GEN2_ABILITY_PAGE = 4
+
 local function abilityLabel(id)
   if not id or id == "" or id == "NONE" then return nil end
   return id:gsub("_", " ")
 end
 
 local function heldLabel(mon, data)
-  local id = mon and mon.heldItem
+  -- Gen1/mod holds use heldItem; stock Gold party mons use item.
+  local id = mon and (mon.heldItem or mon.item)
   if not id then return nil end
   local def = HeldItems.def(id) or (data.items and data.items[id])
   return def and def.name or id:gsub("_", " ")
@@ -151,29 +156,146 @@ local function drawAbilityPage(self)
   love.graphics.setColor(1, 1, 1, 1)
 end
 
+-- Gen2 lower half for page 4: gender / held item / ability + description.
+-- Upper half (pic, name, page arrows) stays on drawUpperHalf.
+local function drawGen2AbilityLower(self)
+  local Chrome = require("src.ui.gen2.Chrome")
+  local page = SummaryUi.abilityPage(self.mon, self.game and self.game.data)
+
+  Chrome.print(Strings("GENDER/"), 0, 8)
+  Chrome.print(page.gender, 8, 8)
+  Chrome.print(Strings("ITEM/"), 0, 10)
+  Chrome.print(page.heldItem, 6, 10)
+  Chrome.print(Strings("ABILITY/"), 0, 12)
+  Chrome.print(page.ability, 1, 13)
+
+  local lines = page.description or {}
+  for i = 1, math.min(#lines, 4) do
+    Chrome.print(lines[i], 1, 14 + i - 1)
+  end
+end
+
+local function wrapGen2Summary(Builtin, game, opts)
+  local self = Builtin.new(game, opts)
+  local maxPage = SummaryUi.GEN2_ABILITY_PAGE
+  local abilityPage = SummaryUi.GEN2_ABILITY_PAGE
+  local pinkPage = Builtin.PINK_PAGE or 1
+  local greenPage = Builtin.GREEN_PAGE or 2
+
+  function self:turnPage(delta)
+    local page = self.page + delta
+    if page > maxPage then page = pinkPage end
+    if page < pinkPage then page = maxPage end
+    self.page = page
+  end
+
+  -- Four 2x2 squares between the ◀ / ▶ arrows (stock uses three).
+  function self:drawPageIndicators()
+    local columns = { 11, 13, 15, 17 }
+    for i, tx in ipairs(columns) do
+      self:drawPageSquare(tx, 5, i == self.page)
+    end
+  end
+
+  local baseDrawPanel = self.drawPanel
+  function self:drawPanel()
+    local mon = self.mon
+    if self.page == abilityPage and not self.moveDetail
+        and not (type(mon) == "table" and mon.isEgg) then
+      local wasBattle = Font.useBattleExtra(true)
+      local Chrome = require("src.ui.gen2.Chrome")
+      Chrome.clear()
+      self:drawUpperHalf()
+      drawGen2AbilityLower(self)
+      Font.useBattleExtra(wasBattle)
+      love.graphics.setColor(1, 1, 1, 1)
+      return
+    end
+    return baseDrawPanel(self)
+  end
+
+  -- Mirror stock update, but A closes on the ability page (not blue).
+  function self:update(_dt)
+    local input = self.game and self.game.input
+    if not input then return end
+    if self.moveDetail then
+      self:updateMoveDetail(input)
+      return
+    end
+    if type(self.mon) == "table" and self.mon.isEgg then
+      if input:wasPressed("a") or input:wasPressed("b") then
+        self:close()
+      elseif input:wasPressed("up") then
+        self:switchMon(-1)
+      elseif input:wasPressed("down") then
+        self:switchMon(1)
+      end
+      return
+    end
+    if input:wasPressed("b") then
+      self:close()
+      return
+    end
+    if input:wasPressed("left") then
+      self:turnPage(-1)
+      return
+    end
+    if input:wasPressed("right") then
+      self:turnPage(1)
+      return
+    end
+    if input:wasPressed("a") then
+      if self.page == abilityPage then
+        self:close()
+      else
+        self:turnPage(1)
+      end
+      return
+    end
+    if input:wasPressed("up") then
+      self:switchMon(-1)
+      return
+    end
+    if input:wasPressed("down") then
+      self:switchMon(1)
+      return
+    end
+    if input:wasPressed("select") and self.page == greenPage then
+      self.moveDetail = true
+      self.moveIndex = 1
+    end
+  end
+
+  -- Green page ITEM row: prefer heldItem when stock item is empty.
+  local baseItemName = self.itemName
+  function self:itemName()
+    local name = baseItemName(self)
+    if name then return name end
+    local mon = self.mon or {}
+    local id = mon.heldItem
+    if not id then return nil end
+    local def = self.items and self.items[id]
+    if not def then def = HeldItems.def(id) end
+    return (def and def.name) or id
+  end
+
+  return self
+end
+
+-- Exposed for tests / Gold registration.
+SummaryUi.wrapGen2Summary = wrapGen2Summary
+
 function SummaryUi.register(mod)
   local Host = require("mods.Kanto-Reforged.host")
   if Host.isGen2() then
     local ok, Builtin = pcall(require, "src.ui.gen2.SummaryMenu")
     if not ok or not Builtin or not Builtin.new then
-      mod.log:warn("Gen2 SummaryMenu unavailable; ability overlay skipped")
+      mod.log:warn("Gen2 SummaryMenu unavailable; ability page skipped")
       return
     end
     mod.content.screens:register("Gen2SummaryMenu", {
       new = function(game, opts)
-        local self = Builtin.new(game, opts)
-        local baseDraw = self.draw
-        function self:draw()
-          baseDraw(self)
-          -- Pink page: ability name under the status/type block.
-          if (self.page or 1) == 1 and self.mon then
-            local page = SummaryUi.abilityPage(self.mon, self.game and self.game.data)
-            love.graphics.setColor(0, 0, 0, 1)
-            Font.draw(Strings("ABILITY/") .. page.ability, 1 * 8, 7 * 8)
-            love.graphics.setColor(1, 1, 1, 1)
-          end
-        end
-        return self
+        return wrapGen2Summary(Builtin, game, opts)
       end,
     })
     return

@@ -2,6 +2,7 @@
 -- tune SPRITE_OVERRIDES in generate_pokemon_mod.py and --resprite.
 -- Per-species SGB palettes so Advanced color mode does not fall
 -- through to MEWMON (peach/purple).
+-- Gen2 shade rebake updated palettes for washout fixes.
 return {
   ABSOL = {
     { 255, 255, 255 },
@@ -15,9 +16,6 @@ return {
     { 168, 56, 72 },
     { 0, 0, 0 },
   },
-  -- Front grayscale: white=face/belly/hands, light=body, dark=AA, black=ink.
-  -- Cream must live in the white slot (face is white pixels). Tan-in-dark
-  -- only paints the thin AA rim and looks wrong. Dark slot = deeper purple.
   AIPOM = {
     { 255, 236, 200 },
     { 104, 48, 136 },
@@ -44,8 +42,8 @@ return {
   },
   ARIADOS = {
     { 255, 255, 255 },
-    { 255, 133, 119 },
-    { 107, 62, 140 },
+    { 222, 82, 66 },
+    { 115, 49, 165 },
     { 0, 0, 0 },
   },
   ARMALDO = {
@@ -62,8 +60,8 @@ return {
   },
   AZUMARILL = {
     { 255, 255, 255 },
-    { 135, 173, 242 },
-    { 138, 64, 49 },
+    { 82, 123, 197 },
+    { 181, 58, 33 },
     { 0, 0, 0 },
   },
   AZURILL = {
@@ -230,8 +228,8 @@ return {
   },
   CORSOLA = {
     { 255, 255, 255 },
-    { 237, 122, 237 },
-    { 140, 57, 81 },
+    { 255, 90, 255 },
+    { 230, 58, 107 },
     { 0, 0, 0 },
   },
   CRADILY = {
@@ -248,14 +246,14 @@ return {
   },
   CROBAT = {
     { 255, 255, 255 },
-    { 218, 130, 245 },
-    { 56, 90, 130 },
+    { 148, 66, 173 },
+    { 33, 74, 123 },
     { 0, 0, 0 },
   },
   CROCONAW = {
     { 255, 255, 255 },
-    { 138, 170, 249 },
-    { 137, 63, 59 },
+    { 99, 140, 239 },
+    { 214, 66, 58 },
     { 0, 0, 0 },
   },
   CYNDAQUIL = {
@@ -398,8 +396,8 @@ return {
   },
   GLIGAR = {
     { 255, 255, 255 },
-    { 255, 109, 212 },
-    { 79, 73, 155 },
+    { 206, 49, 148 },
+    { 66, 58, 165 },
     { 0, 0, 0 },
   },
   GOREBYSS = {
@@ -482,8 +480,8 @@ return {
   },
   HO_OH = {
     { 255, 255, 255 },
-    { 255, 116, 83 },
-    { 64, 103, 44 },
+    { 255, 58, 25 },
+    { 58, 123, 25 },
     { 0, 0, 0 },
   },
   HUNTAIL = {
@@ -524,8 +522,8 @@ return {
   },
   KINGDRA = {
     { 255, 255, 255 },
-    { 255, 189, 58 },
     { 99, 140, 247 },
+    { 255, 189, 58 },
     { 0, 0, 0 },
   },
   KIRLIA = {
@@ -548,8 +546,8 @@ return {
   },
   LANTURN = {
     { 255, 255, 255 },
-    { 239, 197, 115 },
     { 107, 82, 230 },
+    { 239, 197, 115 },
     { 0, 0, 0 },
   },
   LARVITAR = {
@@ -620,8 +618,8 @@ return {
   },
   LUGIA = {
     { 255, 255, 255 },
-    { 206, 140, 230 },
-    { 82, 0, 255 },
+    { 176, 192, 224 },
+    { 72, 96, 200 },
     { 0, 0, 0 },
   },
   LUNATONE = {
@@ -644,8 +642,8 @@ return {
   },
   MAGCARGO = {
     { 255, 255, 255 },
-    { 255, 119, 136 },
-    { 88, 76, 117 },
+    { 214, 58, 74 },
+    { 82, 66, 123 },
     { 0, 0, 0 },
   },
   MAKUHITA = {
@@ -745,9 +743,9 @@ return {
     { 0, 0, 0 },
   },
   MINUN = {
-    { 255, 255, 255 },  -- white body (Gen2 forces slot 1 to white)
-    { 48, 72, 168 },    -- darker blue shadows (light-gray pixels)
-    { 88, 120, 224 },   -- brighter blue accents (ears / cheeks / paws)
+    { 255, 255, 255 },
+    { 48, 72, 168 },
+    { 88, 120, 224 },
     { 0, 0, 0 },
   },
   MISDREAVUS = {
@@ -968,8 +966,8 @@ return {
   },
   SCIZOR = {
     { 255, 255, 255 },
-    { 255, 125, 125 },
-    { 76, 83, 116 },
+    { 214, 66, 66 },
+    { 58, 66, 107 },
     { 0, 0, 0 },
   },
   SEALEO = {
@@ -1256,8 +1254,8 @@ return {
   },
   TOTODILE = {
     { 255, 255, 255 },
-    { 139, 173, 233 },
-    { 139, 65, 45 },
+    { 99, 140, 214 },
+    { 230, 74, 33 },
     { 0, 0, 0 },
   },
   TRAPINCH = {

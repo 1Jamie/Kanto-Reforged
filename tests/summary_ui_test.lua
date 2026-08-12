@@ -79,6 +79,50 @@ return function(T, Data, run)
   T.eq(page.ability, "STATIC", "abilityPage ability label")
   T.check(type(page.description) == "table", "abilityPage description lines")
 
+  -- Gen2 stock fields: item (not heldItem) + "male"/"female" gender strings.
+  local g2mon = {
+    species = "PIKACHU",
+    item = "BERRY",
+    gender = "male",
+  }
+  local g2page = SummaryUi.abilityPage(g2mon, Data)
+  T.eq(g2page.gender, "♂", "abilityPage reads Gen2 male string")
+  T.eq(Gender.of(g2mon), "M", "Gender.of accepts male")
+  T.eq(Gender.of({ gender = "female" }), "F", "Gender.of accepts female")
+  T.check(g2page.heldItem ~= "-----", "abilityPage reads Gen2 mon.item")
+  T.eq(SummaryUi.GEN2_ABILITY_PAGE, 4, "Gen2 ability page is page 4")
+
+  -- Gen2 wrapper: pink→green→blue→ability→pink; A closes on ability page.
+  do
+    local okG2, Builtin = pcall(require, "src.ui.gen2.SummaryMenu")
+    if okG2 and Builtin and SummaryUi.wrapGen2Summary then
+      local closed = false
+      local g2menu = SummaryUi.wrapGen2Summary(Builtin, fakeGame, {
+        mon = mon,
+        page = 1,
+        onClose = function() closed = true end,
+      })
+      T.eq(g2menu.page, 1, "Gen2 summary starts on pink")
+      g2menu:turnPage(1)
+      T.eq(g2menu.page, 2, "Gen2 page → green")
+      g2menu:turnPage(1)
+      T.eq(g2menu.page, 3, "Gen2 page → blue")
+      g2menu:turnPage(1)
+      T.eq(g2menu.page, 4, "Gen2 page → ability")
+      g2menu:turnPage(1)
+      T.eq(g2menu.page, 1, "Gen2 ability wraps to pink")
+      g2menu:turnPage(-1)
+      T.eq(g2menu.page, 4, "Gen2 left from pink wraps to ability")
+      fakeGame.input = {
+        wasPressed = function(_, key) return key == "a" end,
+      }
+      g2menu:update(0)
+      T.check(closed, "Gen2 A on ability page closes")
+    else
+      T.check(true, "Gen2 SummaryMenu wrap skipped (unavailable)")
+    end
+  end
+
   if ok and menu then
     T.check(type(menu.advance) == "function", "summary exposes advance()")
     menu.page = 2

@@ -40,6 +40,9 @@ function Gender.of(mon)
   if not mon then return nil end
   local g = mon.gender
   if g == "M" or g == "F" then return g end
+  -- Stock Gen2 summary / party mons use "male" / "female".
+  if g == "male" then return "M" end
+  if g == "female" then return "F" end
   return nil
 end
 

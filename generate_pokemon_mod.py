@@ -4018,6 +4018,54 @@ SPRITE_OVERRIDES = {
     "SPOINK": {"shade": "nearest"},
     "ANORITH": {"shade": "nearest"},
     "SHIFTRY": {"shade": "nearest"},
+    # Gen2 washout fixes (Crystal light-chroma must land on shade 1, not white).
+    "KINGDRA": {
+        "palette": [
+            (255, 255, 255),
+            (99, 140, 247),   # blue body
+            (255, 189, 58),   # yellow fins
+            (0, 0, 0),
+        ],
+    },
+    "LUGIA": {
+        "palette": [
+            (255, 255, 255),
+            (176, 192, 224),  # silver-blue body (Crystal lavender was cheeto-pink)
+            (72, 96, 200),    # blue accents
+            (0, 0, 0),
+        ],
+    },
+    "MAGCARGO": {
+        "palette": [
+            (255, 255, 255),
+            (214, 58, 74),    # lava red
+            (82, 66, 123),    # shell purple
+            (0, 0, 0),
+        ],
+    },
+    "LANTURN": {
+        "palette": [
+            (255, 255, 255),
+            (107, 82, 230),   # blue body
+            (239, 197, 115),  # yellow light
+            (0, 0, 0),
+        ],
+    },
+    # Tyranitar: Crystal-faithful washout is unreadable under Gen1 2bpp.
+    # Keep species_palettes.lua TYRANITAR colors locked.  Pipeline uses the
+    # curated HOLD geometry (clean outline/highlights) and only grows the
+    # existing purple belly blob — never a full Crystal recolor spray.
+    # Regenerate alone: --resprite --only TYRANITAR
+    "TYRANITAR": {
+        "pipeline": "emerald_locked",
+        "preserve_palette": True,
+        "hold_base": True,
+        "purple_grow": 3,
+        "purple_lower_frac": 0.50,
+        "outline": "full",
+        "flat_dither": False,
+        "depth": False,
+    },
 }
 
 
@@ -4950,6 +4998,97 @@ DMG_SHADE_RGB = [
 ]
 
 
+def process_sprite_emerald_locked(
+    input_path, output_path, target_size, species_id=None, override=None
+):
+    """Tyranitar-only Gen2 escape hatch.
+
+    Crystal's 3-color Tyranitar becomes salt-and-pepper noise under Gen1
+    2bpp.  We keep the curated HOLD sprite (clean outline + highlights),
+    optionally grow the existing purple belly into adjacent green, and
+    never rewrite species_palettes.lua when preserve_palette is set.
+
+    Returns (ok, palette_or_None).  Palette is None when preserve_palette
+    so callers do not clobber the locked Advanced colors.
+    """
+    from collections import Counter, deque
+
+    override = override or {}
+    try:
+        mod_assets = os.path.join(os.path.dirname(os.path.abspath(output_path)))
+        # Prefer assets-hold pristine base when hold_base is set.
+        hold_dir = os.path.join(os.path.dirname(mod_assets), "assets-hold")
+        base_name = os.path.basename(output_path)
+        hold_path = os.path.join(hold_dir, base_name)
+        if override.get("hold_base") and os.path.exists(hold_path):
+            src_path = hold_path
+        elif os.path.exists(output_path):
+            src_path = output_path
+        else:
+            src_path = input_path
+
+        img = Image.open(src_path)
+        if img.mode != "P":
+            # Fall back to faithful path material — should not happen for HOLD.
+            print(f"emerald_locked: expected indexed HOLD PNG at {src_path}")
+            return False, None
+
+        out = img.copy()
+        if out.size != target_size:
+            # HOLD already matches canvas; do not rescale foreign sources here.
+            canvas = Image.new("P", target_size, 0)
+            pal = []
+            pal.extend([255, 255, 255])
+            for rgb in DMG_SHADE_RGB:
+                pal.extend(list(rgb))
+            pal.extend([0] * (768 - len(pal)))
+            canvas.putpalette(pal)
+            ox = (target_size[0] - out.size[0]) // 2
+            oy = target_size[1] - out.size[1]
+            canvas.paste(out, (max(0, ox), max(0, oy)))
+            out = canvas
+
+        grow = int(override.get("purple_grow", 0) or 0)
+        lower_frac = float(override.get("purple_lower_frac", 0.50))
+        if grow > 0:
+            px = out.load()
+            w, h = out.size
+            opaque = [(x, y) for y in range(h) for x in range(w) if px[x, y]]
+            if opaque:
+                ys = [y for _, y in opaque]
+                y_cut = min(ys) + int((max(ys) - min(ys) + 1) * (1.0 - lower_frac))
+                seeds = [(x, y) for x, y in opaque if px[x, y] == 3 and y >= y_cut]
+                if not seeds:
+                    seeds = [(x, y) for x, y in opaque if px[x, y] == 3]
+                frontier = set(seeds)
+                for _ in range(grow):
+                    nxt = set()
+                    for x, y in frontier:
+                        for nx, ny in (
+                            (x - 1, y), (x + 1, y), (x, y - 1), (x, y + 1),
+                            (x - 1, y - 1), (x + 1, y - 1),
+                            (x - 1, y + 1), (x + 1, y + 1),
+                        ):
+                            if (
+                                0 <= nx < w and 0 <= ny < h
+                                and px[nx, ny] == 2
+                                and ny >= y_cut - 1
+                            ):
+                                nxt.add((nx, ny))
+                    for x, y in nxt:
+                        px[x, y] = 3
+                    frontier = nxt
+
+        os.makedirs(os.path.dirname(output_path) or ".", exist_ok=True)
+        out.save(output_path, transparency=0)
+        if override.get("preserve_palette"):
+            return True, None
+        # Should not retune Tyranitar; keep return shape compatible.
+        return True, None
+    except Exception as e:
+        print(f"Failed emerald_locked sprite {input_path}: {e}")
+        return False, None
+
 
 # Gen 1 battle fronts are 40 / 48 / 56 px (frontSize 5 / 6 / 7 tiles).
 # Kanto Reforged sprites used to be force-fitted to 56x56, so small mons like
@@ -5380,6 +5519,13 @@ def process_sprite(input_path, output_path, target_size, species_id=None, dex=No
             input_path, output_path, target_size, opts, override=override
         )
     if is_gen2_dex(dex):
+        # Tyranitar: Crystal 3-color sheet → noisy Gen1 conversion.  Dedicated
+        # Emerald→locked-palette bake (palette must stay untouched).
+        if override.get("pipeline") == "emerald_locked":
+            return process_sprite_emerald_locked(
+                input_path, output_path, target_size, species_id=species_id,
+                override=override,
+            )
         # White-shell backs (Forretress): v1 NEAREST keeps the body; the
         # faithful majority-vote path shrinks it to a handful of pixels.
         if is_back and override.get("back_v1"):

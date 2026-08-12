@@ -694,9 +694,105 @@ local function mixFullRandom(mod, index, opts)
   end
 end
 
--- mode: "curated" (default) or "full_random"
--- opts.legendsInMix: only used for full_random
--- opts.speciesScope: "kanto" strips dex>151 from the mix index
+-- Pure chaos: pick from the whole allowed dex. No habitat / stage / BST gates.
+-- Still honors dex scope + legends_in_mix + NEVER_WILD.
+-- Seeded so a mix persists across mod loads until PURE RANDOM is toggled again.
+local PURE_LEGENDS = {
+  ARTICUNO = true, ZAPDOS = true, MOLTRES = true, MEWTWO = true, MEW = true,
+  RAIKOU = true, ENTEI = true, SUICUNE = true, LUGIA = true, HO_OH = true,
+  CELEBI = true, REGIROCK = true, REGICE = true, REGISTEEL = true,
+  LATIAS = true, LATIOS = true, KYOGRE = true, GROUDON = true,
+  RAYQUAZA = true, JIRACHI = true, DEOXYS = true,
+}
+
+Encounters.PURE_SEED_KEY = "pure_spawn_seed"
+
+function Encounters.newPureSeed()
+  local t = (os.time() % 1000000) * 1000
+  local r
+  if love and love.math and love.math.random then
+    r = love.math.random(1, 999999)
+  else
+    r = math.random(1, 999999)
+  end
+  return t + r
+end
+
+-- Park-Miller LCG → 1..n. Local state so we never touch love.math's global seed.
+function Encounters.makePureRng(seed)
+  local s = math.floor(tonumber(seed) or 1) % 2147483647
+  if s <= 0 then s = 1 end
+  return function(n)
+    if not n or n <= 0 then return 1 end
+    s = (s * 48271) % 2147483647
+    return 1 + (s % n)
+  end
+end
+
+local function isLegendId(id, def)
+  if PURE_LEGENDS[id] then return true end
+  return def and def.habitat == "rare"
+end
+
+function Encounters.buildPurePool(pokemon_data, opts)
+  opts = opts or {}
+  local allowLegends = opts.legendsInMix and true or false
+  local maxDex = nil
+  if opts.speciesScope == "kanto" then
+    maxDex = 151
+  elseif opts.maxDex then
+    maxDex = opts.maxDex
+  end
+  local pool, seen = {}, {}
+  local function consider(id, def)
+    if not id or seen[id] or NEVER_WILD[id] then return end
+    def = def or (pokemon_data and pokemon_data.species and pokemon_data.species[id])
+    local dex = def and def.dex
+    if maxDex and dex and dex > maxDex then return end
+    if isLegendId(id, def) and not allowLegends then return end
+    seen[id] = true
+    pool[#pool + 1] = id
+  end
+  if pokemon_data and pokemon_data.species then
+    for id, def in pairs(pokemon_data.species) do
+      consider(id, def)
+    end
+  end
+  local ok, Data = pcall(require, "src.core.Data")
+  if ok and Data and Data.pokemon then
+    for id, def in pairs(Data.pokemon) do
+      consider(id, def)
+    end
+  end
+  table.sort(pool)
+  return pool
+end
+
+local function mixPureRandom(mod, pokemon_data, opts)
+  opts = opts or {}
+  local pool = Encounters.buildPurePool(pokemon_data, opts)
+  if #pool == 0 then return end
+  local rng = opts.rng or Encounters.makePureRng(opts.seed or Encounters.newPureSeed())
+  local mapIds = {}
+  for id in pairs(MAPS) do mapIds[#mapIds + 1] = id end
+  table.sort(mapIds)
+  for _, mapId in ipairs(mapIds) do
+    local mapDef = MAPS[mapId]
+    for _, kind in ipairs(mapDef.kinds) do
+      local slots = baselineSlots(mapId, kind)
+      if slots and #slots > 0 then
+        for _, slot in ipairs(slots) do
+          slot.species = pool[rng(#pool)]
+        end
+        livePatchEncounter(mod, mapId, { [kind] = { slots = slots } })
+      end
+    end
+  end
+end
+
+-- mode: "curated" (default), "full_random", or "pure_random"
+-- opts.legendsInMix: used by full_random / pure_random
+-- opts.speciesScope: "kanto" strips dex>151 from the mix index / pure pool
 function Encounters.apply(mod, pokemon_data, mode, opts)
   Encounters.captureBaselines(mod)
   local index = Encounters.buildIndex(pokemon_data)
@@ -715,7 +811,9 @@ function Encounters.apply(mod, pokemon_data, mode, opts)
     end
     index = { meta = meta, byHabitat = byHabitat, parents = index.parents }
   end
-  if mode == "full_random" then
+  if mode == "pure_random" then
+    mixPureRandom(mod, pokemon_data, opts)
+  elseif mode == "full_random" then
     mixFullRandom(mod, index, opts)
   else
     mixCurated(mod, index)

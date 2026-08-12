@@ -309,6 +309,22 @@ end
 T.check(Data.type_chart and Data.type_chart.types and Data.type_chart.types.FAIRY,
   "FAIRY type registered")
 
+-- Gen3 Pokédex rows must exist on Gold (gen2Pokedex.entries, not Data.text).
+do
+  local entries = Data.gen2Pokedex and Data.gen2Pokedex.entries
+  T.check(entries ~= nil, "Gold gen2Pokedex.entries present")
+  local tree = entries and entries.TREECKO
+  T.check(tree ~= nil, "Gold Pokédex has TREECKO entry")
+  T.check(tree and type(tree.text) == "string" and #tree.text > 0,
+    "TREECKO dex text is non-empty")
+  T.check(tree and tree.text:find("<NEXT>", 1, true),
+    "TREECKO dex text uses Gen2 <NEXT> breaks")
+  T.check(tree and tree.dex == 252, "TREECKO dex number 252")
+  -- Johto ROM entries must stay (we only fill missing).
+  T.check(entries.CHIKORITA ~= nil and entries.CHIKORITA.text ~= nil,
+    "Gold keeps ROM CHIKORITA dex entry")
+end
+
 -- Gen3 type/matchup/move parity with Red (same KR patches on Gold)
 local function getMatchup(attacker, defender)
   for _, row in ipairs(Data.type_chart.matchups or {}) do
@@ -503,20 +519,107 @@ do
         options = { get = function(_, k) return k == "full_spawn_random" end },
       }
     end
+
+    local function dayList(mapId)
+      local out = {}
+      for i, s in ipairs(Data.gen2Encounters.grass[mapId].slots.DAY) do
+        out[i] = s.species
+      end
+      return out
+    end
+    local function listsDiffer(a, b)
+      if #a ~= #b then return true end
+      for i = 1, #a do if a[i] ~= b[i] then return true end end
+      return false
+    end
+
     EncountersGen2.clearBaselines()
     local before29 = grass.ROUTE_29.slots.DAY[1].species
     EncountersGen2.apply(modApi, pack, "full_random")
     local after29 = Data.gen2Encounters.grass.ROUTE_29.slots.DAY[1].species
     local after1 = Data.gen2Encounters.grass.ROUTE_1.slots.DAY[1].species
     T.check(after29 ~= nil and after1 ~= nil, "full_random fills Johto and Kanto slots")
+
+    -- Mid-session toggle: registry frozen, must still rewrite Data.gen2Encounters.
+    local frozenApi = {
+      id = "Kanto-Reforged",
+      log = { info = function() end, warn = function() end },
+      options = {
+        get = function(_, k)
+          if k == "species_scope" then return "national" end
+          if k == "full_spawn_random" then return true end
+          if k == "legends_in_mix" then return true end
+        end,
+      },
+      content = {
+        encounters = {
+          get = function(_, kind) return Data.gen2Encounters[kind] end,
+          patch = function()
+            error("encounters: content is frozen after load")
+          end,
+        },
+        pokemon = {
+          each = function() return pairs(Data.pokemon or {}) end,
+          get = function(_, id) return Data.pokemon and Data.pokemon[id] end,
+        },
+      },
+    }
+    EncountersGen2.apply(modApi, pack, "curated")
+    local curated29 = dayList("ROUTE_29")
+    local curated1 = dayList("ROUTE_1")
+    EncountersGen2.apply(frozenApi, pack, "full_random", {
+      legendsInMix = true,
+      speciesScope = "national",
+    })
+    T.check(Data.gen2Encounters.grass.ROUTE_29.slots.DAY[1] ~= nil
+        and Data.gen2Encounters.grass.ROUTE_1.slots.DAY[1] ~= nil,
+      "frozen full_random still fills Johto + Kanto")
+    T.check(listsDiffer(curated29, dayList("ROUTE_29")),
+      "frozen full_random reshuffles Johto away from curated")
+    T.check(listsDiffer(curated1, dayList("ROUTE_1")),
+      "frozen full_random reshuffles Kanto away from curated")
+
+    -- Full random must share one species set across MORN/DAY/NITE. Independent
+    -- TOD rewrites used to triple DexNav uniques (~24 on ROUTE_30).
+    local function todSpecies(mapId, tod)
+      local out = {}
+      for i, s in ipairs(Data.gen2Encounters.grass[mapId].slots[tod]) do
+        out[i] = s.species
+      end
+      return out
+    end
+    local r30Day = todSpecies("ROUTE_30", "DAY")
+    T.check(not listsDiffer(r30Day, todSpecies("ROUTE_30", "MORN")),
+      "full_random+legends ROUTE_30 MORN matches DAY species")
+    T.check(not listsDiffer(r30Day, todSpecies("ROUTE_30", "NITE")),
+      "full_random+legends ROUTE_30 NITE matches DAY species")
+    do
+      local DexNav = require("mods.Kanto-Reforged.dexnav")
+      local items = DexNav.buildItems(Data, "ROUTE_30", { seen = {}, caught = {} }, nil, nil)
+      local n = items and #items or 0
+      local waterN = #(Data.gen2Encounters.water.ROUTE_30
+        and Data.gen2Encounters.water.ROUTE_30.slots or {})
+      local maxOk = #r30Day + waterN
+      T.check(n > 0 and n <= maxOk,
+        "ROUTE_30 DexNav not tripled by TOD (got " .. n .. ", max " .. maxOk .. ")")
+    end
+
     -- Restore curated so later DexNav assumptions stay sane if any
     EncountersGen2.apply(modApi, pack, "curated")
     T.check(true, "curated reapplies after full_random (" .. tostring(before29) .. "→" .. tostring(after29) .. ")")
   else
     T.check(true, "full_random live rewrite skipped (no Gold encounter cache)")
     T.check(true, "curated reapply skipped (no Gold encounter cache)")
+    T.check(true, "frozen full_random skipped (no Gold encounter cache)")
+    T.check(true, "frozen full_random Johto skip")
+    T.check(true, "frozen full_random Kanto skip")
+    T.check(true, "ROUTE_30 MORN/DAY skip")
+    T.check(true, "ROUTE_30 NITE/DAY skip")
+    T.check(true, "ROUTE_30 DexNav TOD skip")
   end
 end
+
+require("mods.Kanto-Reforged.tests.spawn_matrix_test")(T, Data, run, { skipGen1 = true })
 
 run.release()
 Host.clearForce()

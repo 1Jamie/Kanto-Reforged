@@ -116,6 +116,43 @@ return function(T, Data, run)
     T.check(hasTree, "Treecko restored from stash")
   end
 
+  -- Pokédex seen/owned for Gen2+ must survive KANTO → NATIONAL.
+  do
+    setMode(SpeciesScope.MODE_NATIONAL)
+    mod.save:set(SpeciesScope.APPLIED_KEY, SpeciesScope.MODE_NATIONAL)
+    mod.save:set(SpeciesScope.STASH_KEY, nil)
+    local save = freshSave()
+    save.party = { Pokemon.new(Data, "PIKACHU", 10) }
+    save.pokedex.owned.PIKACHU = true
+    save.pokedex.seen.PIKACHU = true
+    save.pokedex.owned.TREECKO = true
+    save.pokedex.seen.TREECKO = true
+    save.pokedex.owned.CHIKORITA = true
+    save.pokedex.seen.CHIKORITA = true
+    Boxes.ensure(save)
+    local game = makeGame(save)
+    SpeciesScope._game = game
+
+    setMode(SpeciesScope.MODE_KANTO)
+    T.eq(SpeciesScope.applyTransition(mod, game, SpeciesScope.MODE_KANTO), true,
+      "dex-flag stash enter kanto")
+    -- Simulate validate wiping post-151 flags while Kanto-locked.
+    save.pokedex.owned.TREECKO = nil
+    save.pokedex.seen.TREECKO = nil
+    save.pokedex.owned.CHIKORITA = nil
+    save.pokedex.seen.CHIKORITA = nil
+    T.eq(save.pokedex.owned.PIKACHU, true, "Kanto owned flag kept during wipe sim")
+
+    setMode(SpeciesScope.MODE_NATIONAL)
+    T.eq(SpeciesScope.applyTransition(mod, game, SpeciesScope.MODE_NATIONAL), true,
+      "dex-flag restore national")
+    T.eq(save.pokedex.owned.TREECKO, true, "TREECKO owned restored after NATIONAL")
+    T.eq(save.pokedex.seen.TREECKO, true, "TREECKO seen restored after NATIONAL")
+    T.eq(save.pokedex.owned.CHIKORITA, true, "CHIKORITA owned restored after NATIONAL")
+    T.eq(save.pokedex.owned.PIKACHU, true, "PIKACHU owned still set")
+    T.eq(Data.constants.dexSize >= 252, true, "dexSize restored past Johto")
+  end
+
   -- Refuse empty party (only Gen3, empty PC)
   do
     setMode(SpeciesScope.MODE_NATIONAL)

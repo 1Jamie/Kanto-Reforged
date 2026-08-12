@@ -46,8 +46,9 @@ Configured in the mod manager / F10 options:
 | Option | Default | Effect |
 |---|---|---|
 | **DEX SCOPE** (Gen1) / **JOHTO SCOPE** (Gen2) | NATIONAL / FULL | Restricts wilds, trainers, and legends. Gen1 **KANTO** locks to the original 151 (out-of-scope party/PC mons are stored and restored when you switch back). Gen2 **JOHTO 251** caps Johto spawns at dex 251 while Kanto maps keep Gen3 guests. |
-| **FULL SPAWN MIX** | Off | Rebuilds wild tables from the full Gen 1–3 pool instead of curated mixes. On **Gold**, reshuffles Johto and Kanto grass/water and keeps both regions dense (so Kanto does not feel hollow). Flip **before** a long session; it rewrites encounter data. |
-| **LEGENDS IN MIX** | Off | When FULL SPAWN MIX is on, allow legendaries/mythicals into the random wild pool (still level-gated). Curated mode ignores this. |
+| **FULL SPAWN MIX** | Off | Rebuilds wild tables from the full Gen 1–3 pool instead of curated mixes (habitat / level gated, deterministic). On **Gold**, reshuffles Johto and Kanto grass/water. Mid-session toggles apply live. |
+| **PURE RANDOM SPAWN** | Off | Chaos mode: seeded pick from the whole allowed dex (respects DEX/JOHTO SCOPE). No habitat, stage, or BST gates. Overrides FULL SPAWN MIX when both are on. Rolls once when toggled on and persists across loads; toggle off/on for a new mix. |
+| **LEGENDS IN MIX** | Off | When FULL SPAWN MIX or PURE RANDOM SPAWN is on, allow legendaries/mythicals into the wild pool. Curated mode ignores this. |
 | **XP SHARE (SLOT 2)** | On | Splits the Gen 1 XP pool: ~70% to fighters, up to ~30% to party slot 2 (never more than a solo share total). Replaces EXP.ALL while enabled. |
 | **SMARTER AI** | On | Trainers (and wild scoring hooks) prefer useful damage and skip moves that would fail. |
 | **SWITCH HIT AI** | Classic | Free-hit timing when you switch: classic picks after send-out; Gen 3 locks against the outgoing mon. Labels are **GEN 1 / GEN 3** on Red, **GEN 2 / GEN 3** on Gold. |

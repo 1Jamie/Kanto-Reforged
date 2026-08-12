@@ -402,10 +402,101 @@ local function getStash(mod)
 end
 
 local function setStash(mod, stash)
-  if not stash or not stash.entries or #stash.entries == 0 then
+  if not stash then
+    mod.save:set(SpeciesScope.STASH_KEY, nil)
+    return
+  end
+  local hasEntries = stash.entries and #stash.entries > 0
+  local dex = stash.dex
+  local hasDex = type(dex) == "table" and (
+    (dex.seen and next(dex.seen) ~= nil)
+    or (dex.owned and next(dex.owned) ~= nil))
+  if not hasEntries and not hasDex then
     mod.save:set(SpeciesScope.STASH_KEY, nil)
   else
     mod.save:set(SpeciesScope.STASH_KEY, stash)
+  end
+end
+
+-- Remember Johto/Hoenn seen/owned flags while KANTO hides them from the
+-- list. SaveData.validate can also drop flags for species briefly missing
+-- from data.pokemon — the snapshot is the source of truth on restore.
+local function snapshotOutOfScopeDex(mod, game, stash)
+  local save = game and game.save
+  local dex = save and save.pokedex
+  if type(dex) ~= "table" then return end
+  stash.dex = stash.dex or { seen = {}, owned = {} }
+  for _, key in ipairs({ "seen", "owned" }) do
+    stash.dex[key] = stash.dex[key] or {}
+    local bucket = dex[key]
+    if type(bucket) == "table" then
+      for id, on in pairs(bucket) do
+        if on then
+          local d = SpeciesScope.dexOf(game, id)
+          if d and d > SpeciesScope.KANTO_MAX_DEX then
+            stash.dex[key][id] = true
+          end
+        end
+      end
+    end
+  end
+end
+
+local function restoreStashedDex(game, stash)
+  local save = game and game.save
+  if not save then return 0 end
+  save.pokedex = save.pokedex or { seen = {}, owned = {} }
+  local dex = save.pokedex
+  dex.seen = dex.seen or {}
+  dex.owned = dex.owned or {}
+  local n = 0
+  local snap = stash and stash.dex
+  if type(snap) ~= "table" then return 0 end
+  for _, key in ipairs({ "seen", "owned" }) do
+    for id, on in pairs(snap[key] or {}) do
+      if on and not dex[key][id] then
+        dex[key][id] = true
+        n = n + 1
+      elseif on then
+        dex[key][id] = true
+      end
+    end
+  end
+  return n
+end
+
+local function markDexForMon(save, mon)
+  if not save or not mon or not mon.species then return end
+  if breedingIsEgg(mon) then return end
+  save.pokedex = save.pokedex or { seen = {}, owned = {} }
+  save.pokedex.seen = save.pokedex.seen or {}
+  save.pokedex.owned = save.pokedex.owned or {}
+  save.pokedex.seen[mon.species] = true
+  save.pokedex.owned[mon.species] = true
+end
+
+-- Any mon you still have must stay registered after a scope flip.
+local function resyncDexFromCollection(mod, game, stash)
+  local save = game and game.save
+  if not save then return end
+  for _, mon in ipairs(save.party or {}) do
+    markDexForMon(save, mon)
+  end
+  local Boxes = require("src.pokemon.Boxes")
+  local boxes = Boxes.ensure(save)
+  for bi = 1, Boxes.COUNT do
+    for _, mon in ipairs(boxes[bi] or {}) do
+      markDexForMon(save, mon)
+    end
+  end
+  local dc = save.daycare
+  if type(dc) == "table" then
+    markDexForMon(save, dc.mon)
+    markDexForMon(save, dc.mon2)
+    markDexForMon(save, dc.egg)
+  end
+  for _, entry in ipairs((stash and stash.entries) or {}) do
+    markDexForMon(save, entry.mon)
   end
 end
 
@@ -562,6 +653,9 @@ local function applyEnterKanto(mod, game, plan)
   local Bag = require("src.inventory.Bag")
   local stash = getStash(mod)
   stash.mode = "kanto"
+  -- Capture National dex progress for post-151 before anything else can
+  -- drop those flags (validate, list rebuild, etc.).
+  snapshotOutOfScopeDex(mod, game, stash)
   local fossilReturned = false
 
   -- Fossil revert
@@ -743,6 +837,11 @@ local function applyRestoreNational(mod, game)
   end
 
   stash.entries = remaining
+  -- Put Johto/Hoenn dex flags back, then ensure every mon you still hold
+  -- (party / PC / leftover stash) is marked owned again.
+  restoreStashedDex(game, stash)
+  resyncDexFromCollection(mod, game, stash)
+  if stash.dex then stash.dex = nil end
   setStash(mod, stash)
 
   local msg
@@ -775,10 +874,11 @@ function SpeciesScope.captureEvoBaselines(mod, force)
 end
 
 local function writeConstant(mod, key, value)
-  local ok = pcall(function()
+  -- Content is frozen after boot; patch usually fails. Always write the live
+  -- Data.constants table so mid-session KANTO↔NATIONAL flips update dexSize.
+  pcall(function()
     mod.content.constants:patch(key, value)
   end)
-  if ok then return end
   local data = (SpeciesScope._game and SpeciesScope._game.data)
     or require("src.core.Data")
   if data and data.constants then
@@ -1137,6 +1237,44 @@ end
 function SpeciesScope.install(mod)
   SpeciesScope._mod = mod
   local Gen1Patch = require("mods.Kanto-Reforged.gen1_patch")
+
+  if Host.isGen1() then
+    -- Keep KR seen/owned flags across SaveData.validate even if a species is
+    -- briefly absent from data.pokemon (scope flips / partial loads).
+    local SaveData = require("src.core.SaveData")
+    if not SaveData._krScopeDexPreserve then
+      local origValidate = SaveData.validate
+      SaveData.validate = function(save, data)
+        local preserved = { seen = {}, owned = {} }
+        local dex = save and save.pokedex
+        local packOk, pack = pcall(require, "mods.Kanto-Reforged.pokemon_data")
+        local species = packOk and pack and pack.species
+        if type(dex) == "table" and type(species) == "table" then
+          for _, key in ipairs({ "seen", "owned" }) do
+            if type(dex[key]) == "table" then
+              for id, on in pairs(dex[key]) do
+                if on and species[id] then
+                  preserved[key][id] = true
+                end
+              end
+            end
+          end
+        end
+        local report = origValidate(save, data)
+        if type(dex) == "table" then
+          dex.seen = dex.seen or {}
+          dex.owned = dex.owned or {}
+          for _, key in ipairs({ "seen", "owned" }) do
+            for id, on in pairs(preserved[key]) do
+              if on then dex[key][id] = true end
+            end
+          end
+        end
+        return report
+      end
+      SaveData._krScopeDexPreserve = true
+    end
+  end
   if Host.isGen1() then
     Gen1Patch.apply(require("src.world.OverworldController"), function(OW)
       local target = OW.OverworldState or OW

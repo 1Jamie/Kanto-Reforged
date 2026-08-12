@@ -21,6 +21,10 @@ local mixEncounters = require("mods.Kanto-Reforged.encounters").mix
 local ExpEncounters = require("mods.Kanto-Reforged.encounters")
 
 local function spawnModeFromOptions(mod)
+  -- PURE RANDOM overrides the gated FULL SPAWN MIX when both are on.
+  if mod.options and mod.options:get("pure_spawn_random") then
+    return "pure_random"
+  end
   if mod.options and mod.options:get("full_spawn_random") then
     return "full_random"
   end
@@ -34,19 +38,38 @@ local function spawnOptsFromOptions(mod)
   }
 end
 
-local function applySpawnTables(mod, pokemon_data)
+local function applySpawnTables(mod, pokemon_data, flags)
   if not pokemon_data then return end
+  flags = flags or {}
   local mode = spawnModeFromOptions(mod)
   local opts = spawnOptsFromOptions(mod)
   local Host = require("mods.Kanto-Reforged.host")
+  if flags.clearPureSeed and mod.save then
+    Host.saveSet(mod.save, ExpEncounters.PURE_SEED_KEY, nil)
+  end
+  if mode == "pure_random" then
+    -- Roll once on toggle-on / first apply; reuse across mod loads.
+    local seed = mod.save and Host.saveGet(mod.save, ExpEncounters.PURE_SEED_KEY, nil)
+    if flags.rerollPure or seed == nil then
+      seed = ExpEncounters.newPureSeed()
+      if mod.save then
+        Host.saveSet(mod.save, ExpEncounters.PURE_SEED_KEY, seed)
+      end
+      mod.log:info("Pure random spawn seed %s", tostring(seed))
+    end
+    opts.seed = seed
+  end
   if Host.isGen2() then
     local EncountersGen2 = require("mods.Kanto-Reforged.encounters_gen2")
     EncountersGen2.apply(mod, pokemon_data, mode, opts)
   else
     ExpEncounters.apply(mod, pokemon_data, mode, opts)
   end
-  mod.log:info("Wild encounters applied (%s%s)", mode,
-    (mode == "full_random" and opts.legendsInMix) and "+legends" or "")
+  local tag = mode
+  if (mode == "full_random" or mode == "pure_random") and opts.legendsInMix then
+    tag = mode .. "+legends"
+  end
+  mod.log:info("Wild encounters applied (%s)", tag)
 end
 
 local function refreshScopeContent(mod, game, scopeMode)
@@ -88,6 +111,12 @@ return function(mod)
     {
       key = "full_spawn_random",
       label = "FULL SPAWN MIX",
+      type = "toggle",
+      default = false,
+    },
+    {
+      key = "pure_spawn_random",
+      label = "PURE RANDOM SPAWN",
       type = "toggle",
       default = false,
     },
@@ -443,6 +472,8 @@ return function(mod)
       PokemonGen2.registerForGold(mod, pokemon_data, {
         goldDataReady = goldDataReady,
       })
+      -- Gold dex UI reads gen2Pokedex.entries (not Data.text). Fill Hoenn rows.
+      DexEntries.bindGen2Pokedex(mod, pokemon_data.species)
       applySpawnTables(mod, pokemon_data)
       local TrainersGen2 = require("mods.Kanto-Reforged.trainers_gen2")
       TrainersGen2.install(mod)
@@ -450,6 +481,14 @@ return function(mod)
         if not (ev and ev.mod == mod.id) then return end
         if ev.key == "species_scope" then
           SpeciesScope.onOptionsChanged(mod, rawget(_G, "Game"), ev)
+          return
+        end
+        if ev.key == "pure_spawn_random" then
+          if mod.options:get("pure_spawn_random") then
+            applySpawnTables(mod, pokemon_data, { rerollPure = true })
+          else
+            applySpawnTables(mod, pokemon_data, { clearPureSeed = true })
+          end
           return
         end
         if ev.key == "full_spawn_random" or ev.key == "legends_in_mix" then
@@ -485,6 +524,14 @@ return function(mod)
         if not (ev and ev.mod == mod.id) then return end
         if ev.key == "species_scope" then
           SpeciesScope.onOptionsChanged(mod, rawget(_G, "Game"), ev)
+          return
+        end
+        if ev.key == "pure_spawn_random" then
+          if mod.options:get("pure_spawn_random") then
+            applySpawnTables(mod, pokemon_data, { rerollPure = true })
+          else
+            applySpawnTables(mod, pokemon_data, { clearPureSeed = true })
+          end
           return
         end
         if ev.key == "full_spawn_random" or ev.key == "legends_in_mix" then

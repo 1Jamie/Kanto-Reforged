@@ -19,7 +19,14 @@ function Host.generation()
   if forced == 1 or forced == 2 then
     return forced
   end
-  return GameVersion.generation()
+  -- Engines before Gold support (e.g. 0.1.75) have no GameVersion.generation.
+  if type(GameVersion.generation) == "function" then
+    return GameVersion.generation()
+  end
+  if type(GameVersion.isGold) == "function" and GameVersion.isGold() then
+    return 2
+  end
+  return 1
 end
 
 function Host.isGen1()

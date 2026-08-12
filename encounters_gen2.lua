@@ -6,9 +6,12 @@
 --       basics into rare slots, clamped to each species' wild level band.
 --   full_random (FULL SPAWN MIX toggle):
 --     * All Johto + Kanto grass/water maps reshuffled from Gen 1–3
---       (level/stage gated, legends excluded).
+--       (level/stage gated, legends excluded unless legends_in_mix).
 --     * Density pass so both regions keep a solid unique share (Kanto
 --       especially, so the second region does not feel hollow).
+--   pure_random (PURE RANDOM SPAWN toggle):
+--     * Seeded pick from the whole allowed dex (scope + legends toggle).
+--       No habitat / stage / BST gates. Seed persists until toggle off/on.
 local EncountersGen2 = {}
 
 -- Gold Kanto outdoor grass maps (postgame bands). Levels biased above Gen1 early-game.
@@ -313,6 +316,42 @@ local function slotsFor(mod, habitats, level, tod, habitatPools)
   return todSlots(orderForTod(base, tod), level, tod)
 end
 
+-- Prefer live Data after the boot merge: registry:get stays frozen/stale
+-- once content freezes, but the engine rolls wilds from Data.gen2Encounters.
+local function liveGrass(_mod)
+  local Data = require("src.core.Data")
+  if Data.gen2Encounters and Data.gen2Encounters.grass then
+    return Data.gen2Encounters.grass
+  end
+  local reg = _mod and _mod.content and _mod.content.encounters
+  if not (reg and reg.get) then return nil end
+  return reg:get("grass")
+end
+
+local function liveWater(_mod)
+  local Data = require("src.core.Data")
+  if Data.gen2Encounters and Data.gen2Encounters.water then
+    return Data.gen2Encounters.water
+  end
+  local reg = _mod and _mod.content and _mod.content.encounters
+  if not (reg and reg.get) then return nil end
+  return reg:get("water")
+end
+
+-- Registry patch during load; after freeze write Data.gen2Encounters so
+-- FULL SPAWN MIX / scope toggles still reshuffle (same class of bug as Gen1).
+local function livePatchKind(mod, kind, mapId, block)
+  local ok = pcall(function()
+    mod.content.encounters:patch(kind, { [mapId] = block })
+  end)
+  if ok then return true end
+  local Data = require("src.core.Data")
+  Data.gen2Encounters = Data.gen2Encounters or {}
+  Data.gen2Encounters[kind] = Data.gen2Encounters[kind] or {}
+  Data.gen2Encounters[kind][mapId] = block
+  return true
+end
+
 local function patchMap(mod, mapId, info)
   local pools = KANTO_HABITAT_POOL
   local morn = slotsFor(mod, info.habitats, info.level, "MORN", pools)
@@ -328,11 +367,8 @@ local function patchMap(mod, mapId, info)
       NITE = nite,
     },
   }
-  local ok, err = pcall(function()
-    mod.content.encounters:patch("grass", { [mapId] = block })
-  end)
-  if not ok then
-    mod.log:warn("encounters_gen2 patch %s failed: %s", mapId, tostring(err))
+  if not livePatchKind(mod, "grass", mapId, block) then
+    mod.log:warn("encounters_gen2 patch %s failed", mapId)
     return false
   end
   return true
@@ -407,18 +443,6 @@ local function injectGuests(slots, guests)
   return out
 end
 
-local function liveGrass(mod)
-  local reg = mod and mod.content and mod.content.encounters
-  if not (reg and reg.get) then return nil end
-  return reg:get("grass")
-end
-
-local function liveWater(mod)
-  local reg = mod and mod.content and mod.content.encounters
-  if not (reg and reg.get) then return nil end
-  return reg:get("water")
-end
-
 local function injectJohtoMap(mod, mapId, info)
   local grassAll = liveGrass(mod)
   local grass = grassAll and grassAll[mapId]
@@ -434,11 +458,8 @@ local function injectJohtoMap(mod, mapId, info)
       NITE = injectGuests(grass.slots.NITE, guests),
     },
   }
-  local ok, err = pcall(function()
-    mod.content.encounters:patch("grass", { [mapId] = block })
-  end)
-  if not ok then
-    mod.log:warn("encounters_gen2 johto inject %s failed: %s", mapId, tostring(err))
+  if not livePatchKind(mod, "grass", mapId, block) then
+    mod.log:warn("encounters_gen2 johto inject %s failed", mapId)
     return false
   end
   return true
@@ -484,14 +505,10 @@ end
 
 local function restoreBaselines(mod)
   for mapId, block in pairs(baselines.grass) do
-    pcall(function()
-      mod.content.encounters:patch("grass", { [mapId] = copyGrassBlock(block) })
-    end)
+    livePatchKind(mod, "grass", mapId, copyGrassBlock(block))
   end
   for mapId, block in pairs(baselines.water) do
-    pcall(function()
-      mod.content.encounters:patch("water", { [mapId] = copyWaterBlock(block) })
-    end)
+    livePatchKind(mod, "water", mapId, copyWaterBlock(block))
   end
 end
 
@@ -781,35 +798,48 @@ local function rewriteWaterSlots(index, mapId, slots, allowLegends)
   return out
 end
 
+-- Stamp one species sequence onto every TOD. Keeps each TOD's level layout,
+-- but prevents MORN/DAY/NITE from tripling DexNav unique counts (vanilla shares
+-- mostly the same species set across times of day).
+local function stampSpeciesAcrossTod(block, speciesBySlot)
+  if not block or not block.slots or not speciesBySlot then return end
+  for _, tod in ipairs({ "MORN", "DAY", "NITE" }) do
+    local slots = copySlots(block.slots[tod]) or copySlots(block.slots.DAY)
+    if slots then
+      for i, s in ipairs(slots) do
+        local sp = speciesBySlot[i]
+        if sp then
+          s.species = sp
+        end
+      end
+      block.slots[tod] = slots
+    end
+  end
+end
+
+local function speciesSeqFromSlots(slots)
+  local out = {}
+  for i, s in ipairs(slots or {}) do
+    out[i] = s.species
+  end
+  return out
+end
+
 local function patchGrassRandom(mod, index, mapId, base, allowLegends)
   local block = copyGrassBlock(base)
-  if not block then return false end
-  for _, tod in ipairs({ "MORN", "DAY", "NITE" }) do
-    block.slots[tod] = rewriteGrassSlots(
-      index, mapId .. ":" .. tod, block.slots[tod], allowLegends)
-  end
-  local ok, err = pcall(function()
-    mod.content.encounters:patch("grass", { [mapId] = block })
-  end)
-  if not ok then
-    mod.log:warn("encounters_gen2 full_random grass %s: %s", mapId, tostring(err))
-    return false
-  end
-  return true
+  if not block or not block.slots then return false end
+  -- One rewrite from DAY; mirror species into MORN/NITE (shared set).
+  local daySlots = rewriteGrassSlots(
+    index, mapId, block.slots.DAY, allowLegends)
+  stampSpeciesAcrossTod(block, speciesSeqFromSlots(daySlots))
+  return livePatchKind(mod, "grass", mapId, block)
 end
 
 local function patchWaterRandom(mod, index, mapId, base, allowLegends)
   local block = copyWaterBlock(base)
   if not block then return false end
   block.slots = rewriteWaterSlots(index, mapId, block.slots, allowLegends)
-  local ok, err = pcall(function()
-    mod.content.encounters:patch("water", { [mapId] = block })
-  end)
-  if not ok then
-    mod.log:warn("encounters_gen2 full_random water %s: %s", mapId, tostring(err))
-    return false
-  end
-  return true
+  return livePatchKind(mod, "water", mapId, block)
 end
 
 -- Ensure each region hosts a solid share of the pool so Johto and Kanto
@@ -877,14 +907,10 @@ local function enrichRegion(mod, index, mapIds, regionTag, targetShare)
         end
         local morn = copySlots(day)
         local nite = copySlots(day)
-        pcall(function()
-          mod.content.encounters:patch("grass", {
-            [mapId] = {
-              rates = block.rates,
-              slots = { MORN = morn, DAY = day, NITE = nite },
-            },
-          })
-        end)
+        livePatchKind(mod, "grass", mapId, {
+          rates = block.rates,
+          slots = { MORN = morn, DAY = day, NITE = nite },
+        })
       end
     end
   end
@@ -945,13 +971,92 @@ local function applyFullRandom(mod, pokemon_data, opts)
   return nGrass + nWater
 end
 
--- mode: "curated" (default) or "full_random"
--- opts.legendsInMix: only used for full_random
+local function rewriteSlotsPure(slots, pool, rng)
+  if not slots or #slots == 0 or not pool or #pool == 0 then return slots end
+  local out = copySlots(slots)
+  for _, slot in ipairs(out) do
+    slot.species = pool[rng(#pool)]
+  end
+  return out
+end
+
+local function applyPureRandom(mod, pokemon_data, opts)
+  opts = opts or {}
+  local ExpEncounters = require("mods.Kanto-Reforged.encounters")
+  local SpeciesScope = require("mods.Kanto-Reforged.species_scope")
+  local allowLegends = opts.legendsInMix and true or false
+  local rng = opts.rng or ExpEncounters.makePureRng(
+    opts.seed or ExpEncounters.newPureSeed())
+
+  local function poolForMap(mapId)
+    local maxDex = SpeciesScope.maxDexForMap(mod, mapId)
+    return ExpEncounters.buildPurePool(pokemon_data, {
+      legendsInMix = allowLegends,
+      maxDex = maxDex,
+    })
+  end
+
+  -- Cache pools by maxDex key (nil = national unlimited).
+  local poolCache = {}
+  local function cachedPool(mapId)
+    local maxDex = SpeciesScope.maxDexForMap(mod, mapId)
+    local key = maxDex or "all"
+    if not poolCache[key] then
+      poolCache[key] = poolForMap(mapId)
+    end
+    return poolCache[key]
+  end
+
+  local grassMaps, waterMaps = {}, {}
+  for mapId in pairs(baselines.grass) do
+    grassMaps[#grassMaps + 1] = mapId
+  end
+  table.sort(grassMaps)
+  for mapId in pairs(baselines.water) do
+    waterMaps[#waterMaps + 1] = mapId
+  end
+  table.sort(waterMaps)
+
+  local nGrass, nWater = 0, 0
+  for _, mapId in ipairs(grassMaps) do
+    local pool = cachedPool(mapId)
+    local block = copyGrassBlock(baselines.grass[mapId])
+    if block and #pool > 0 then
+      -- One rewrite from DAY; mirror species into MORN/NITE (shared set).
+      local daySlots = rewriteSlotsPure(block.slots.DAY, pool, rng)
+      stampSpeciesAcrossTod(block, speciesSeqFromSlots(daySlots))
+      if livePatchKind(mod, "grass", mapId, block) then
+        nGrass = nGrass + 1
+      end
+    end
+  end
+  for _, mapId in ipairs(waterMaps) do
+    local pool = cachedPool(mapId)
+    local block = copyWaterBlock(baselines.water[mapId])
+    if block and #pool > 0 then
+      block.slots = rewriteSlotsPure(block.slots, pool, rng)
+      if livePatchKind(mod, "water", mapId, block) then
+        nWater = nWater + 1
+      end
+    end
+  end
+
+  mod.log:info(
+    "Gen2 encounters pure_random: %d grass + %d water maps%s",
+    nGrass, nWater, allowLegends and " (legends on)" or "")
+  return nGrass + nWater
+end
+
+-- mode: "curated" (default), "full_random", or "pure_random"
+-- opts.legendsInMix: used by full_random / pure_random
 function EncountersGen2.apply(mod, pokemon_data, mode, opts)
   mode = mode or "curated"
   captureBaselines(mod)
   restoreBaselines(mod)
   EncountersGen2._mod = mod
+  if mode == "pure_random" then
+    return applyPureRandom(mod, pokemon_data, opts)
+  end
   if mode == "full_random" then
     return applyFullRandom(mod, pokemon_data, opts)
   end

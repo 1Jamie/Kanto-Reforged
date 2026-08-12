@@ -159,6 +159,25 @@ do
   T.check(joined:find("temperature", 1, true) or joined:find("leaf", 1, true)
       or joined:find("sunbathe", 1, true),
     "owned Chikorita dex page draws flavor text")
+
+  -- Tyranitar (Gen2) must resolve too — regression for "Data unknown" reports.
+  local tyr = Data.pokemon.TYRANITAR
+  T.check(tyr and tyr.dexEntry and Data.text[tyr.dexEntry.text],
+    "Tyranitar dex text registered")
+  drawn = {}
+  Font.draw = function(text, x, y)
+    drawn[#drawn + 1] = tostring(text)
+    if oldDraw then return oldDraw(text, x, y) end
+  end
+  ok = pcall(DexEntryMenu.render, {
+    data = Data,
+    save = { pokedex = { owned = { TYRANITAR = true } } },
+  }, tyr, nil, true, false)
+  Font.draw = oldDraw
+  T.check(ok, "DexEntryMenu.render succeeds for owned Tyranitar")
+  joined = table.concat(drawn, "\n")
+  T.check(not joined:find("Data unknown", 1, true),
+    "owned Tyranitar dex page is not Data unknown")
 end
 
 -- 2. Verify custom moves registration
@@ -283,7 +302,7 @@ T.check(cardOk and type(card) == "table", "mod.card returns a table")
 T.check(type(card.summary) == "string" and #card.summary > 0, "mod.card has a summary")
 T.check(card.author ~= nil and card.author ~= "", "mod.card names an author")
 local schema = run.loader.optionSchemas["Kanto-Reforged"]
-T.check(schema ~= nil and #schema >= 5, "Kanto-Reforged option schema registered")
+T.check(schema ~= nil and #schema >= 6, "Kanto-Reforged option schema registered")
 T.eq(schema[1].key, "species_scope", "species scope choice key")
 T.eq(schema[1].type, "choice", "species scope is a choice")
 T.eq(schema[1].default, "national", "DEX SCOPE defaults national")
@@ -291,17 +310,21 @@ T.eq(schema[1].label, "DEX SCOPE", "Gen1 DEX SCOPE label")
 T.eq(schema[2].key, "full_spawn_random", "spawn toggle key")
 T.eq(schema[2].type, "toggle", "spawn toggle is a toggle")
 T.eq(schema[2].default, false, "FULL SPAWN MIX defaults off")
-T.eq(schema[3].key, "legends_in_mix", "legends-in-mix toggle key")
-T.eq(schema[3].type, "toggle", "legends-in-mix is a toggle")
-T.eq(schema[3].default, false, "LEGENDS IN MIX defaults off")
-T.eq(schema[3].label, "LEGENDS IN MIX", "legends-in-mix label")
-T.eq(schema[4].key, "modern_xp_share", "slot-2 XP share toggle key")
-T.eq(schema[4].type, "toggle", "slot-2 XP share is a toggle")
-T.eq(schema[4].default, true, "XP SHARE (SLOT 2) defaults on")
-T.eq(schema[4].label, "XP SHARE (SLOT 2)", "slot-2 XP share label")
-T.eq(schema[5].key, "smarter_ai", "smarter AI toggle key")
-T.eq(schema[5].type, "toggle", "smarter AI is a toggle")
-T.eq(schema[5].default, true, "SMARTER AI defaults on")
+T.eq(schema[3].key, "pure_spawn_random", "pure random spawn key")
+T.eq(schema[3].type, "toggle", "pure random is a toggle")
+T.eq(schema[3].default, false, "PURE RANDOM SPAWN defaults off")
+T.eq(schema[3].label, "PURE RANDOM SPAWN", "pure random label")
+T.eq(schema[4].key, "legends_in_mix", "legends-in-mix toggle key")
+T.eq(schema[4].type, "toggle", "legends-in-mix is a toggle")
+T.eq(schema[4].default, false, "LEGENDS IN MIX defaults off")
+T.eq(schema[4].label, "LEGENDS IN MIX", "legends-in-mix label")
+T.eq(schema[5].key, "modern_xp_share", "slot-2 XP share toggle key")
+T.eq(schema[5].type, "toggle", "slot-2 XP share is a toggle")
+T.eq(schema[5].default, true, "XP SHARE (SLOT 2) defaults on")
+T.eq(schema[5].label, "XP SHARE (SLOT 2)", "slot-2 XP share label")
+T.eq(schema[6].key, "smarter_ai", "smarter AI toggle key")
+T.eq(schema[6].type, "toggle", "smarter AI is a toggle")
+T.eq(schema[6].default, true, "SMARTER AI defaults on")
 local function optByKey(key)
   for _, o in ipairs(schema) do
     if o.key == key then return o end
@@ -2161,6 +2184,7 @@ require("mods.Kanto-Reforged.tests.bag_pockets_test")(T, Data, run)
   -- Sevii parked (WIP); suite lives at sevii/sevii_phase0_test.lua
 require("mods.Kanto-Reforged.tests.rollout_test")(T, Data, run)
 require("mods.Kanto-Reforged.tests.species_scope_test")(T, Data, run)
+require("mods.Kanto-Reforged.tests.spawn_matrix_test")(T, Data, run, { skipGen2 = true })
 pcall(function()
   require("mods.Kanto-Reforged.tests.move_anims_test")(T, Data, run)
 end)
