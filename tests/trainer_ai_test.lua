@@ -15,6 +15,8 @@ return function(T, Data, run)
 
   local layer = Data.ai_classes and Data.ai_classes[TrainerAi.LAYER_ID]
   T.check(layer ~= nil and layer.kind == "layer", "EXP_SMART layer registered")
+  T.check(layer.flag == "EXP_KR_ONLY",
+    "EXP_SMART gated so Gold Ai.layersFor does not auto-inject it")
   T.check(type(layer.score) == "function", "EXP_SMART has a score function")
 
   -- Helper view for scoring unit checks
@@ -588,6 +590,106 @@ return function(T, Data, run)
     "elite", "Rocket#6 (Nugget Bridge) is elite")
   T.eq(TrainerAi.isElite("OPP_ROCKET", 3), true, "Rocket#3 is elite")
   T.eq(TrainerAi.isElite("OPP_ROCKET", 5), false, "Rocket#5 is not elite")
+
+  -- Gold / Gen2: class ids without OPP_, string memberIds must still be elite.
+  T.eq(TrainerAi.isElite("FALKNER", 1), true, "Falkner party 1 is elite")
+  T.eq(TrainerAi.isElite("FALKNER", "FALKNER_1"), true,
+    "Falkner string memberId still resolves elite (not silent lite)")
+  T.eq(TrainerAi.tier(fakeBattle({
+    class = "FALKNER", party = "FALKNER_1", map = "VIOLET_GYM",
+  })), "elite", "Falkner on VIOLET_GYM stays elite with Gen2 memberId")
+  T.eq(TrainerAi.tier(fakeBattle({
+    class = "CLAIR", party = 1, map = "BLACKTHORN_GYM",
+  })), "elite", "Clair is elite")
+  T.eq(TrainerAi.tier(fakeBattle({
+    class = "YOUNGSTER", party = 1, map = "VIOLET_GYM",
+  })), "lite", "Violet gym Youngster is lite")
+  T.eq(TrainerAi.tier(fakeBattle({ class = "RIVAL1", party = "RIVAL1_1_CHIKORITA" })),
+    "elite", "Gold Rival1 is elite for every memberId")
+  T.check(TrainerAi.THEMES.FALKNER ~= nil, "Falkner elite theme registered")
+  T.check(TrainerAi.THEMES.WILL ~= nil, "Will elite theme registered")
+
+  -- Gen2 volatile / screen / lock awareness for scorers + chooseWithMargin.
+  do
+    local BattleCompat = require("mods.Kanto-Reforged.battle_compat")
+    local confuseMove = Data.moves.CONFUSE_RAY or Data.moves.SUPERSONIC
+    local seedMove = Data.moves.LEECH_SEED
+    local reflectMove = Data.moves.REFLECT
+    local g2Battle = {
+      screens = { player = {}, enemy = { reflect = true } },
+      sideOf = function(_, bat)
+        return (bat and bat.isPlayer) and "player" or "enemy"
+      end,
+      volatile = function(_, bat) return bat._vol or {} end,
+      forcedMove = function(_, bat)
+        local vol = bat._vol or {}
+        return vol.rolloutLock or vol.encore
+      end,
+      usableMoves = function(_, bat)
+        local forced = bat._vol and (bat._vol.chargeMove or bat._vol.rolloutLock)
+        local out = {}
+        for _, mv in ipairs(bat.curMoves or {}) do
+          if not forced or mv.id == forced then out[#out + 1] = mv end
+        end
+        return out
+      end,
+    }
+    if confuseMove then
+      local vConf = view({
+        userMon = { hp = 80, stats = { hp = 100 } },
+      })
+      vConf.battle = g2Battle
+      vConf.target._vol = { confuseCount = 2 }
+      T.check(TrainerAi.score(vConf, confuseMove, 10) >= 16,
+        "smart AI dumps Confuse Ray when Gen2 confuseCount is set")
+    end
+    if seedMove then
+      local vSeed = view({
+        userMon = { hp = 80, stats = { hp = 100 } },
+      })
+      vSeed.battle = g2Battle
+      vSeed.target._vol = { leechSeed = true }
+      T.check(TrainerAi.score(vSeed, seedMove, 10) >= 16,
+        "smart AI dumps Leech Seed when Gen2 leechSeed volatile is set")
+    end
+    if reflectMove then
+      local vRef = view({
+        userMon = { hp = 80, stats = { hp = 100 } },
+      })
+      vRef.battle = g2Battle
+      vRef.user.isPlayer = false
+      T.check(TrainerAi.score(vRef, reflectMove, 10) >= 16,
+        "smart AI dumps Reflect when Gen2 side screen is already up")
+    end
+
+    local digger = {
+      curMoves = {
+        { id = "DIG", pp = 10 },
+        { id = "TACKLE", pp = 35 },
+        { id = "GROWL", pp = 40 },
+      },
+      _vol = { chargeMove = "DIG" },
+    }
+    local pick = TrainerAi.chooseWithMargin(digger, function() return 1 end, {
+      enemyAIMods = { TrainerAi.LAYER_ID },
+      data = Data,
+      player = { curTypes = { "NORMAL" }, hp = 50, stats = { hp = 50 } },
+      ruleset = { enemyUnlimitedPP = true },
+      volatile = g2Battle.volatile,
+      forcedMove = g2Battle.forcedMove,
+      usableMoves = g2Battle.usableMoves,
+      screens = g2Battle.screens,
+      weatherTurns = 0, -- marks Gen2 for BattleCompat.isGen2
+      wild = false,
+    }, 1)
+    T.eq(pick and pick.id, "DIG",
+      "chooseWithMargin honors Gen2 Dig charge lock")
+    T.eq(BattleCompat.forcedMoveId({
+      weatherTurns = 0,
+      volatile = g2Battle.volatile,
+      forcedMove = g2Battle.forcedMove,
+    }, digger), "DIG", "forcedMoveId returns chargeMove before scoring")
+  end
 
   -- Wild natural vs soft threat rules.
   T.eq(TrainerAi.tier(fakeBattle({

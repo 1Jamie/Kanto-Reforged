@@ -193,11 +193,9 @@ function Abilities.onEntry(battle, battler)
   local name = displayName(battle, battler)
 
   if ability == "INTIMIDATE" then
-    local target = battler.isPlayer and battle.enemy or battle.player
-    -- Gen2: isPlayer may be absent; compare identity to battle.player.
-    if target == nil and battle.player and battle.enemy then
-      target = (battler == battle.player) and battle.enemy or battle.player
-    end
+    -- Gen2 battlers lack isPlayer; compare identity to battle.player.
+    local target = (battler == battle.player or battler.isPlayer)
+      and battle.enemy or battle.player
     triggerIntimidate(battle, battler, target)
   elseif ability == "FORECAST" then
     Abilities.updateForecast(battle, battler)

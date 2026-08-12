@@ -172,11 +172,15 @@ function BattleCompat.changeStages(battle, battler, changes)
   return any
 end
 
-function BattleCompat.types(battler)
+function BattleCompat.types(battler, data)
   if not battler then return { "NORMAL" } end
   if battler.curTypes then return battler.curTypes end
   local mon = BattleCompat.mon(battler)
   if mon and mon.types then return mon.types end
+  -- Gen2 party mons often omit .types; resolve from species data.
+  local species = mon and mon.species
+  local poke = species and data and data.pokemon and data.pokemon[species]
+  if poke and poke.types then return poke.types end
   return { "NORMAL" }
 end
 
@@ -406,7 +410,7 @@ function BattleCompat.prepareAiBattler(battle, battler)
     }
   end
   if not battler.curTypes then
-    battler.curTypes = BattleCompat.types(battler)
+    battler.curTypes = BattleCompat.types(battler, battle and battle.data)
   end
   if not battler.curMoves then
     battler.curMoves = mon.moves or battler.moves or {}
@@ -423,6 +427,12 @@ end
 
 function BattleCompat.prepareAiBattle(battle)
   if not battle then return end
+  if battle.data and battle.data.type_chart then
+    local ok, TypeChart = pcall(require, "src.battle.TypeChart")
+    if ok and TypeChart and TypeChart.load then
+      pcall(TypeChart.load, battle.data)
+    end
+  end
   BattleCompat.prepareAiBattler(battle, battle.player)
   BattleCompat.prepareAiBattler(battle, battle.enemy)
   if battle.kind == nil then
@@ -433,12 +443,155 @@ function BattleCompat.prepareAiBattle(battle)
       or battle.trainer.id
   end
   if battle.expPartyIndex == nil and battle.trainer then
-    battle.expPartyIndex = battle.trainer.index or 1
+    -- Prefer numeric roster index. Gen2 World puts memberId as a string id
+    -- (FALKNER_1); that must not replace the party slot used by isElite.
+    local t = battle.trainer
+    if type(t.member) == "number" then
+      battle.expPartyIndex = t.member
+    elseif type(t.index) == "number" then
+      battle.expPartyIndex = t.index
+    else
+      battle.expPartyIndex = 1
+    end
+    if t.memberId or t.id then
+      battle.expMemberId = t.memberId or t.id
+    end
   end
   -- Gen2 has no wAICount; treat as always allowed for elite move brain.
   if BattleCompat.isGen2(battle) and battle.aiUses == nil then
     battle.aiUses = 99
   end
+end
+
+--- Gen2 volatile table for a battler (nil-safe).
+function BattleCompat.volatile(battle, battler)
+  if not battle or not battler then return nil end
+  if type(battle.volatile) == "function" then
+    local ok, vol = pcall(function() return battle:volatile(battler) end)
+    if ok then return vol end
+  end
+  return battler.volatile
+end
+
+function BattleCompat.isConfused(battle, battler)
+  if not battler then return false end
+  if battler.confusedTurns and battler.confusedTurns > 0 then return true end
+  local vol = BattleCompat.volatile(battle, battler)
+  return vol and (vol.confuseCount or 0) > 0
+end
+
+function BattleCompat.isSeeded(battle, battler)
+  if not battler then return false end
+  if battler.leechSeeded then return true end
+  local vol = BattleCompat.volatile(battle, battler)
+  return vol and vol.leechSeed and true or false
+end
+
+function BattleCompat.hasSubstitute(battle, battler)
+  if not battler then return false end
+  if battler.substituteHP and battler.substituteHP > 0 then return true end
+  local vol = BattleCompat.volatile(battle, battler)
+  return vol and vol.substitute and true or false
+end
+
+function BattleCompat.hasMist(battle, battler)
+  if not battler then return false end
+  if battler.mist then return true end
+  local vol = BattleCompat.volatile(battle, battler)
+  return vol and vol.mist and true or false
+end
+
+function BattleCompat.disabledMoveId(battle, battler)
+  if not battler then return nil end
+  if battler.disabledSlot and battler.curMoves and battler.curMoves[battler.disabledSlot] then
+    return battler.curMoves[battler.disabledSlot].id
+  end
+  local vol = BattleCompat.volatile(battle, battler)
+  return vol and vol.disabled or nil
+end
+
+--- Screen / side field flag. key: lightScreen, reflect, mist, focusEnergy, expSafeguard.
+function BattleCompat.hasScreen(battle, battler, key)
+  if not battler or not key then return false end
+  if battler[key] then return true end
+  if key == "focusEnergy" then
+    local vol = BattleCompat.volatile(battle, battler)
+    if vol and vol.focusEnergy then return true end
+  end
+  if key == "mist" then return BattleCompat.hasMist(battle, battler) end
+  if not battle then return false end
+  local sideKey
+  if type(battle.sideOf) == "function" then
+    local ok, side = pcall(function() return battle:sideOf(battler) end)
+    if ok then sideKey = side end
+  end
+  if not sideKey then
+    sideKey = (battler == battle.player) and "player" or "enemy"
+  end
+  local screens = battle.screens and battle.screens[sideKey]
+  if screens then
+    if key == "lightScreen" and screens.lightScreen then return true end
+    if key == "reflect" and screens.reflect then return true end
+    if key == "expSafeguard" and (screens.safeguard or screens.expSafeguard) then
+      return true
+    end
+  end
+  local sides = battle.sides and battle.sides[sideKey]
+  if sides and key == "expSafeguard" and (sides.expSafeguardTurns or 0) > 0 then
+    return true
+  end
+  return false
+end
+
+--- Map Gen1 "special" stage name onto Gen2 specialAttack when needed.
+function BattleCompat.stageStat(stat, battle)
+  if stat == "special" and BattleCompat.isGen2(battle) then
+    return "specialAttack"
+  end
+  return stat
+end
+
+--- Forced / locked move id: Gen2 charge (Dig/Fly), Rollout/Thrash, Encore;
+--- Gen1 lockedAction.
+function BattleCompat.forcedMoveId(battle, battler)
+  if not battle or not battler then return nil end
+  if BattleCompat.isGen2(battle) then
+    -- Dig/Fly second turn is not in forcedMove(); vanilla enemy AI returns it
+    -- before usableMoves scoring (Battle.lua enemy choose).
+    local vol = BattleCompat.volatile(battle, battler)
+    if vol and vol.chargeMove then return vol.chargeMove end
+    if type(battle.forcedMove) == "function" then
+      local ok, id = pcall(function() return battle:forcedMove(battler) end)
+      if ok and id then return id end
+    end
+    return nil
+  end
+  if type(battle.lockedAction) == "function" then
+    local ok, act = pcall(function() return battle:lockedAction(battler) end)
+    if ok and act then
+      return type(act) == "table" and (act.id or act.move) or act
+    end
+  end
+  return nil
+end
+
+--- Moves the AI may legally pick this turn.
+function BattleCompat.usableMoves(battle, battler)
+  if not battler then return {} end
+  if BattleCompat.isGen2(battle) and type(battle.usableMoves) == "function" then
+    local ok, moves = pcall(function() return battle:usableMoves(battler) end)
+    if ok and moves and #moves > 0 then return moves end
+  end
+  local out = {}
+  local disabledId = BattleCompat.disabledMoveId(battle, battler)
+  for i, mv in ipairs(battler.curMoves or battler.moves or {}) do
+    if (not battler.disabledSlot or battler.disabledSlot ~= i)
+        and (not disabledId or mv.id ~= disabledId)
+        and (mv.pp or 0) > 0 then
+      out[#out + 1] = mv
+    end
+  end
+  return out
 end
 
 return BattleCompat

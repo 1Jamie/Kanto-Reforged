@@ -45,10 +45,13 @@ Configured in the mod manager / F10 options:
 
 | Option | Default | Effect |
 |---|---|---|
-| **FULL SPAWN MIX** | Off | Rebuilds wild tables from the full Gen 1–3 pool instead of curated mixes. Flip **before** a long session; it rewrites encounter data. |
+| **FULL SPAWN MIX** | Off | Rebuilds wild tables from the full Gen 1–3 pool instead of curated mixes. On **Gold**, reshuffles Johto and Kanto grass/water and keeps both regions dense (so Kanto does not feel hollow). Flip **before** a long session; it rewrites encounter data. |
+| **LEGENDS IN MIX** | Off | When FULL SPAWN MIX is on, allow legendaries/mythicals into the random wild pool (still level-gated). Curated mode ignores this. |
 | **XP SHARE (SLOT 2)** | On | Splits the Gen 1 XP pool: ~70% to fighters, up to ~30% to party slot 2 (never more than a solo share total). Replaces EXP.ALL while enabled. |
 | **SMARTER AI** | On | Trainers (and wild scoring hooks) prefer useful damage and skip moves that would fail. |
-| **SP.ATK / SP.DEF** | Off | Special moves use separate Sp.Atk / Sp.Def bases (PokeAPI) instead of Gen 1 Special. Summary and Modern UI party/PC detail show both stats (`SAT` / `SDF`). Stages, DVs, and Calcium stay Gen 1 (one shared Special). |
+| **SWITCH HIT AI** | Classic | Free-hit timing when you switch: classic picks after send-out; Gen 3 locks against the outgoing mon. Labels are **GEN 1 / GEN 3** on Red, **GEN 2 / GEN 3** on Gold. |
+| **SP.ATK / SP.DEF** | Off | **Red only.** Special moves use separate Sp.Atk / Sp.Def bases (PokeAPI) instead of Gen 1 Special. Summary and Modern UI party/PC detail show both stats (`SAT` / `SDF`). Stages, DVs, and Calcium stay Gen 1 (one shared Special). Hidden on Gold (already split). |
+| **DEXNAV** | DEXNAV | **Red only.** Start-menu label / off. Gold DexNav is a Pokegear card (no rename toggle). |
 
 ---
 
@@ -98,7 +101,7 @@ Cute Charm / Attract / Captivate interact with the gender system (below).
 
 ### Wilds
 
-Default mode is **curated**: habitats and levels mix Gen 2–3 species into Kanto routes without replacing the whole table. A coverage pass then ensures every non-legendary **line** is obtainable (catch the base — or a gift/rod root — then evolve / breed); mid and final forms do not all need their own grass slots. Optional **FULL SPAWN MIX** randomizes from Gen 1–3.
+Default mode is **curated**: habitats and levels mix Gen 2–3 species into Kanto routes without replacing the whole table. A coverage pass then ensures every non-legendary **line** is obtainable (catch the base — or a gift/rod root — then evolve / breed); mid and final forms do not all need their own grass slots. On Gold, curated keeps Johto mostly native with a few Gen3 guests and rebuilds Kanto grass for postgame. Optional **FULL SPAWN MIX** randomizes from Gen 1–3 (Gold: all Johto + Kanto maps).
 
 Wilds can hold berries (~**5%** chance). The berry is rolled only from types you have already **unlocked** for the farm. Catching the mon keeps `heldItem`; use party **TAKE** to move it to the bag.
 
@@ -303,7 +306,7 @@ Step cool-down between crafts: **640** farm steps (480 at soil rank 3). No berry
 
 - **Pockets:** Items, Balls, Key Items, TMs & HMs, Berries.
 - Bag capacity **60**.
-- **DexNav** on the start menu (Red) / Pokegear (Gold, via optional `pokegear_cards` lib) after you have the Pokédex: current map species (more detail once seen/caught). Footer notes Super Rod on fishable maps. If a roamer is on this map, an optional **ROAM** row appears. Mod setting **DEXNAV**: `DEXNAV` (default), `DEXNAV-KR` (rename to tell it apart from another DexNav mod), or `OFF` (hide KR’s entry).
+- **DexNav** on the start menu (Red) / Pokegear (Gold, via optional `pokegear_cards` lib) after you have the Pokédex: current map species (more detail once seen/caught). Footer notes Super Rod on fishable maps. If a roamer is on this map, an optional **ROAM** row appears. On Red, mod setting **DEXNAV**: `DEXNAV` (default), `DEXNAV-KR` (rename), or `OFF`. On Gold there is no rename toggle — it is always the Pokegear card.
 - **Summary** page shows ability, held item, and gender glyph.
 - **Optional [Gen1 Modern UI](https://github.com/ArmstrongThomas/gen1-modern-ui):** when that mod is installed, bag pockets and the summary ability page use its presenters; DexNav and party Give/Take keep working through the existing start-menu / party submenu hooks. With Modern UI absent, all of this still draws and plays as stock Gen 1 UI.
 

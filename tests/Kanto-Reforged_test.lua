@@ -287,21 +287,32 @@ T.check(schema ~= nil and #schema >= 5, "Kanto-Reforged option schema registered
 T.eq(schema[1].key, "full_spawn_random", "spawn toggle key")
 T.eq(schema[1].type, "toggle", "spawn toggle is a toggle")
 T.eq(schema[1].default, false, "FULL SPAWN MIX defaults off")
-T.eq(schema[2].key, "modern_xp_share", "slot-2 XP share toggle key")
-T.eq(schema[2].type, "toggle", "slot-2 XP share is a toggle")
-T.eq(schema[2].default, true, "XP SHARE (SLOT 2) defaults on")
-T.eq(schema[2].label, "XP SHARE (SLOT 2)", "slot-2 XP share label")
-T.eq(schema[3].key, "smarter_ai", "smarter AI toggle key")
-T.eq(schema[3].type, "toggle", "smarter AI is a toggle")
-T.eq(schema[3].default, true, "SMARTER AI defaults on")
-T.eq(schema[4].key, "split_special", "split special toggle key")
-T.eq(schema[4].type, "toggle", "split special is a toggle")
-T.eq(schema[4].default, false, "SP.ATK / SP.DEF defaults off")
-T.eq(schema[4].label, "SP.ATK / SP.DEF", "split special label")
-T.eq(schema[5].key, "dexnav_mode", "DexNav mode key")
-T.eq(schema[5].type, "choice", "DexNav mode is a choice")
-T.eq(schema[5].default, "dexnav", "DexNav defaults to DEXNAV label")
-T.eq(schema[5].label, "DEXNAV", "DexNav option label")
+T.eq(schema[2].key, "legends_in_mix", "legends-in-mix toggle key")
+T.eq(schema[2].type, "toggle", "legends-in-mix is a toggle")
+T.eq(schema[2].default, false, "LEGENDS IN MIX defaults off")
+T.eq(schema[2].label, "LEGENDS IN MIX", "legends-in-mix label")
+T.eq(schema[3].key, "modern_xp_share", "slot-2 XP share toggle key")
+T.eq(schema[3].type, "toggle", "slot-2 XP share is a toggle")
+T.eq(schema[3].default, true, "XP SHARE (SLOT 2) defaults on")
+T.eq(schema[3].label, "XP SHARE (SLOT 2)", "slot-2 XP share label")
+T.eq(schema[4].key, "smarter_ai", "smarter AI toggle key")
+T.eq(schema[4].type, "toggle", "smarter AI is a toggle")
+T.eq(schema[4].default, true, "SMARTER AI defaults on")
+local function optByKey(key)
+  for _, o in ipairs(schema) do
+    if o.key == key then return o end
+  end
+end
+local splitOpt = optByKey("split_special")
+T.check(splitOpt ~= nil, "split special option present")
+T.eq(splitOpt.type, "toggle", "split special is a toggle")
+T.eq(splitOpt.default, false, "SP.ATK / SP.DEF defaults off")
+T.eq(splitOpt.label, "SP.ATK / SP.DEF", "split special label")
+local dexOpt = optByKey("dexnav_mode")
+T.check(dexOpt ~= nil, "DexNav option present")
+T.eq(dexOpt.type, "choice", "DexNav mode is a choice")
+T.eq(dexOpt.default, "dexnav", "DexNav defaults to DEXNAV label")
+T.eq(dexOpt.label, "DEXNAV", "DexNav option label")
 
 -- Full Gen1–3 random mode rewrites unprotected slots from baselines
 local apiShim = {
@@ -332,12 +343,49 @@ for i, slot in ipairs(fullRoute1.grass.slots) do
   if meta then
     T.check(slot.level >= meta.minLevel,
       "full mix Route 1 " .. slot.species .. " level gated")
+    T.check(not meta.rare,
+      "full mix default excludes legends on Route 1 (" .. slot.species .. ")")
   end
   if slot.species ~= "PIDGEY" and slot.species ~= "RATTATA" then
     changedSlots = changedSlots + 1
   end
 end
 T.check(changedSlots >= 3, "full spawn mix rewrites multiple Route 1 slots")
+
+-- LEGENDS IN MIX: rare habitat species allowed into the full pool
+do
+  ExpEncounters.apply(apiShim, packData, "full_random", { legendsInMix = true })
+  local sawRare = false
+  for mapId, mapDef in pairs(ExpEncounters.MAPS) do
+    local enc = Data.encounters[mapId]
+    local slots = enc and enc.grass and enc.grass.slots
+    for _, slot in ipairs(slots or {}) do
+      local meta = encIndex.meta[slot.species]
+      if meta and meta.rare then sawRare = true break end
+      if slot.species == "MEWTWO" or slot.species == "MEW"
+          or slot.species == "ARTICUNO" then
+        sawRare = true
+        break
+      end
+    end
+    if sawRare then break end
+  end
+  -- Not guaranteed every seed places one, but pool inclusion means late
+  -- maps with allowRare should be able to; verify eligibility instead.
+  local rares = ExpEncounters.eligible(
+    encIndex, { "rare", "cave" }, 50, 50, 55, {
+      allowRare = true, rareOnly = false, preferStage = 0,
+    })
+  local hasPackRare = false
+  for _, id in ipairs(rares) do
+    if encIndex.meta[id] and encIndex.meta[id].rare then
+      hasPackRare = true
+      break
+    end
+  end
+  T.check(hasPackRare or sawRare,
+    "legendsInMix makes rare habitat species eligible for full mix")
+end
 
 -- Switching back to curated restores baseline then re-mixes a few slots
 ExpEncounters.apply(apiShim, packData, "curated")

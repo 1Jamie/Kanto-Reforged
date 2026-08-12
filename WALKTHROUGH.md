@@ -14,8 +14,11 @@ One important heads up before anything else: **static legendaries despawn if you
 2. Decide these options early:
    - **XP SHARE (SLOT 2)** (default on): fighters get most of the XP pool, party slot 2 gets a share. Ignores the old EXP.ALL behavior while its on.
    - **SMARTER AI** (default on): trainers play less dumb. Turn off if you want classic gen1 chaos.
-   - **FULL SPAWN MIX** (default off): fully random gen1-3 wilds. It rewrites encounter tables, so flip it before a long run if you care.
-   - **SP.ATK / SP.DEF** (default off): special damage and the summary use Sp.Atk / Sp.Def instead of Gen 1 Special. Leave off for classic mechanics.
+   - **SWITCH HIT AI**: classic free-hit on switch vs Gen 3 lock (Red shows GEN 1/3; Gold shows GEN 2/3).
+   - **FULL SPAWN MIX** (default off): fully random gen1-3 wilds. On Gold this covers Johto and Kanto (with a density pass so Kanto stays full). It rewrites encounter tables, so flip it before a long run if you care.
+   - **LEGENDS IN MIX** (default off): only matters with FULL SPAWN MIX on — lets legendaries/mythicals roll into wild grass (still level-gated).
+   - **SP.ATK / SP.DEF** (Red only, default off): special damage and the summary use Sp.Atk / Sp.Def instead of Gen 1 Special. Leave off for classic mechanics.
+   - **DEXNAV** (Red only): start-menu label or off. Gold DexNav is on the Pokegear with no rename toggle.
 3. After Oak gives you the Pokédex, open the start menu. **DexNav** shows up under Pokédex. It lists whats on the current map (`????` until seen, more detail once owned). If a roamer is here it also shows a ROAM row later.
 
 **Level caps are opt-in.** In Viridian, stand outside the Poké Mart and look east along the path. Theres a kid offering Rare Candies. If you accept:

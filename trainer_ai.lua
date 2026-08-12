@@ -29,21 +29,34 @@ TrainerAi.OPTION = {
 }
 
 -- Voluntary-switch free-hit timing (player Switch → enemy attack).
--- gen1 (default): pick after send-out (engine / classic Gen 1 timing).
+-- classic (stored as "gen1"): pick after send-out (engine / pre-Gen3 timing).
 -- gen3: lock AI move against the outgoing mon, then land it on the switch-in.
 TrainerAi.SWITCH_LOCK_KEY = "switch_hit_ai"
 TrainerAi.SWITCH_LOCK_GEN3 = "gen3"
-TrainerAi.SWITCH_LOCK_GEN1 = "gen1"
-TrainerAi.SWITCH_LOCK_OPTION = {
-  key = TrainerAi.SWITCH_LOCK_KEY,
-  label = "SWITCH HIT AI",
-  type = "choice",
-  default = TrainerAi.SWITCH_LOCK_GEN1,
-  choices = {
-    { "GEN 1", TrainerAi.SWITCH_LOCK_GEN1 },
-    { "GEN 3", TrainerAi.SWITCH_LOCK_GEN3 },
-  },
-}
+TrainerAi.SWITCH_LOCK_GEN1 = "gen1" -- classic timing value (label is host-aware)
+
+local function switchLockOption(classicLabel)
+  return {
+    key = TrainerAi.SWITCH_LOCK_KEY,
+    label = "SWITCH HIT AI",
+    type = "choice",
+    default = TrainerAi.SWITCH_LOCK_GEN1,
+    choices = {
+      { classicLabel, TrainerAi.SWITCH_LOCK_GEN1 },
+      { "GEN 3", TrainerAi.SWITCH_LOCK_GEN3 },
+    },
+  }
+end
+
+-- Red/Blue: GEN 1 vs GEN 3. Gold: GEN 2 vs GEN 3 (same stored values).
+TrainerAi.SWITCH_LOCK_OPTION = switchLockOption("GEN 1")
+TrainerAi.SWITCH_LOCK_OPTION_GEN2 = switchLockOption("GEN 2")
+
+function TrainerAi.switchLockOptionForHost()
+  local Host = require("mods.Kanto-Reforged.host")
+  if Host.isGen2() then return TrainerAi.SWITCH_LOCK_OPTION_GEN2 end
+  return TrainerAi.SWITCH_LOCK_OPTION
+end
 
 function TrainerAi.enabled(mod)
   return mod and mod.options and mod.options:get(TrainerAi.OPTION_KEY) and true or false
@@ -231,13 +244,46 @@ local THEMES = {
   OPP_RIVAL3 = { preferKO = 1, preferSE = 1, greedyItems = true },
   OPP_ROCKET = { preferAttack = 0.5 },
 }
+-- Gold class ids share the same themes (no OPP_ prefix / Johto leaders).
+THEMES.BROCK = THEMES.OPP_BROCK
+THEMES.MISTY = THEMES.OPP_MISTY
+THEMES.LT_SURGE = THEMES.OPP_LT_SURGE
+THEMES.ERIKA = THEMES.OPP_ERIKA
+THEMES.KOGA = THEMES.OPP_KOGA
+THEMES.SABRINA = THEMES.OPP_SABRINA
+THEMES.BLAINE = THEMES.OPP_BLAINE
+THEMES.LORELEI = THEMES.OPP_LORELEI
+THEMES.BRUNO = THEMES.OPP_BRUNO
+THEMES.AGATHA = THEMES.OPP_AGATHA
+THEMES.LANCE = THEMES.OPP_LANCE
+THEMES.BLUE = THEMES.OPP_RIVAL3
+THEMES.RED = THEMES.OPP_RIVAL3
+THEMES.RIVAL1 = { preferSE = 1 }
+THEMES.RIVAL2 = { preferSE = 1, preferKO = 1 }
+THEMES.WILL = { preferStatus = 1, preferType = "PSYCHIC" }
+THEMES.KAREN = { preferType = "DARK", preferStatus = 1 }
+THEMES.FALKNER = { preferType = "FLYING", preferSpeed = 1 }
+THEMES.BUGSY = { preferType = "BUG" }
+THEMES.WHITNEY = { preferType = "NORMAL", preferStatus = 1 }
+THEMES.MORTY = { preferType = "GHOST", preferStatus = 1 }
+THEMES.CHUCK = { preferType = "FIGHTING", preferAttack = 1 }
+THEMES.JASMINE = { preferType = "STEEL", preferDefense = 1 }
+THEMES.PRYCE = { preferType = "ICE", preferStatus = 1 }
+THEMES.CLAIR = { preferType = "DRAGON", preferSE = 1 }
+THEMES.JANINE = { preferPoison = 1, preferStatus = 1 }
 TrainerAi.THEMES = THEMES
 
 function TrainerAi.isElite(oppClass, partyIndex)
   if not oppClass then return false end
   if ELITE_ALL_PARTIES[oppClass] then return true end
   local parties = ELITE_PARTIES[oppClass]
-  return parties and parties[partyIndex or 1] and true or false
+  if not parties then return false end
+  -- Gen2 battles often carry a string memberId (RIVAL1_1_CHIKORITA) instead
+  -- of a numeric party slot. Gold elite rosters are [1]-keyed; map unknowns
+  -- to slot 1 so gym leaders/E4 are not silently downgraded to lite.
+  local idx = partyIndex
+  if type(idx) ~= "number" then idx = 1 end
+  return parties[idx] and true or false
 end
 
 function TrainerAi.isGymMap(mapId)
@@ -319,12 +365,20 @@ local STATUS_EFFECTS = {
   PARALYZE_EFFECT = true,
   EXP_BURN_EFFECT = true,
   EXP_YAWN_EFFECT = true,
+  -- Gold / Gen2 effect ids
+  EFFECT_SLEEP = true, EFFECT_POISON = true, EFFECT_TOXIC = true,
+  EFFECT_PARALYZE = true, EFFECT_BURN = true, EFFECT_FREEZE = true,
+  EFFECT_SLEEP_HIT = true,
 }
 
 local CONFUSE_EFFECTS = {
   CONFUSION_EFFECT = true,
   EXP_ATTRACT_EFFECT = true,
   EXP_SWAGGER_EFFECT = true,
+  EFFECT_CONFUSE = true,
+  EFFECT_CONFUSE_HIT = true,
+  EFFECT_SWAGGER = true,
+  EFFECT_ATTRACT = true,
 }
 
 local STAGE_EFFECTS = {
@@ -352,6 +406,24 @@ local STAGE_EFFECTS = {
   SPECIAL_DOWN2_EFFECT = { "special", -1 },
   ACCURACY_DOWN2_EFFECT = { "accuracy", -1 },
   EVASION_DOWN2_EFFECT = { "evasion", -1 },
+  -- Gold / Gen2
+  EFFECT_ATTACK_UP = { "attack", 1 },
+  EFFECT_DEFENSE_UP = { "defense", 1 },
+  EFFECT_SP_ATK_UP = { "specialAttack", 1 },
+  EFFECT_EVASION_UP = { "evasion", 1 },
+  EFFECT_ATTACK_UP_2 = { "attack", 1 },
+  EFFECT_DEFENSE_UP_2 = { "defense", 1 },
+  EFFECT_SPEED_UP_2 = { "speed", 1 },
+  EFFECT_SP_DEF_UP_2 = { "specialDefense", 1 },
+  EFFECT_DEFENSE_CURL = { "defense", 1 },
+  EFFECT_ATTACK_DOWN = { "attack", -1 },
+  EFFECT_DEFENSE_DOWN = { "defense", -1 },
+  EFFECT_SPEED_DOWN = { "speed", -1 },
+  EFFECT_ACCURACY_DOWN = { "accuracy", -1 },
+  EFFECT_EVASION_DOWN = { "evasion", -1 },
+  EFFECT_ATTACK_DOWN_2 = { "attack", -1 },
+  EFFECT_DEFENSE_DOWN_2 = { "defense", -1 },
+  EFFECT_SPEED_DOWN_2 = { "speed", -1 },
 }
 
 local SCREEN_EFFECTS = {
@@ -360,7 +432,6 @@ local SCREEN_EFFECTS = {
   MIST_EFFECT = "mist",
   FOCUS_ENERGY_EFFECT = "focusEnergy",
   EXP_SAFEGUARD_EFFECT = "expSafeguard",
-  -- Gold native effect ids after Gen2Compat remap.
   EFFECT_LIGHT_SCREEN = "lightScreen",
   EFFECT_REFLECT = "reflect",
   EFFECT_MIST = "mist",
@@ -368,9 +439,34 @@ local SCREEN_EFFECTS = {
   EFFECT_SAFEGUARD = "expSafeguard",
 }
 
+local LEECH_SEED_EFFECTS = {
+  LEECH_SEED_EFFECT = true,
+  EFFECT_LEECH_SEED = true,
+}
+
+local HEAL_SELF_EFFECTS = {
+  HEAL_EFFECT = true,
+  EFFECT_HEAL = true,
+  EFFECT_MORNING_SUN = true,
+  EFFECT_SYNTHESIS = true,
+  EFFECT_MOONLIGHT = true,
+  EFFECT_SOFTBOILED = true,
+  EFFECT_REST = true,
+}
+
+local SUBSTITUTE_EFFECTS = {
+  SUBSTITUTE_EFFECT = true,
+  EFFECT_SUBSTITUTE = true,
+}
+
+local DISABLE_EFFECTS = {
+  DISABLE_EFFECT = true,
+  EFFECT_DISABLE = true,
+}
+
 local function softOpenerEffect(effect)
   return STATUS_EFFECTS[effect] or CONFUSE_EFFECTS[effect]
-    or STAGE_EFFECTS[effect] or effect == "LEECH_SEED_EFFECT"
+    or STAGE_EFFECTS[effect] or LEECH_SEED_EFFECTS[effect]
 end
 
 -- After using an opener, raise its score penalty; decays 1 per AI turn back to 0.
@@ -426,7 +522,7 @@ local HEAL_ITEMS = {
 }
 local X_ITEMS = {
   X_ATTACK = "attack", X_DEFEND = "defense", X_SPEED = "speed",
-  X_SPECIAL = "special",
+  X_SPECIAL = "specialAttack", X_SP_ATK = "specialAttack",
 }
 
 local PRIORITY_MOVES = {
@@ -443,8 +539,19 @@ local function hasType(types, id)
   return false
 end
 
-local function stageOf(battler, stat)
-  return (battler and battler.stages and battler.stages[stat]) or 0
+local function stageOf(battler, stat, battle)
+  if not battler then return 0 end
+  local BattleCompat = require("mods.Kanto-Reforged.battle_compat")
+  local key = BattleCompat.stageStat(stat, battle or (battler and battler._krBattle))
+  local stages = battler.stages
+  if stages then
+    if stages[key] ~= nil then return stages[key] end
+    -- Gen1 "special" vs Gen2 specialAttack fallback either direction.
+    if key == "specialAttack" and stages.special ~= nil then return stages.special end
+    if key == "special" and stages.specialAttack ~= nil then return stages.specialAttack end
+    return stages[key] or 0
+  end
+  return 0
 end
 
 local function hpRatio(battler)
@@ -457,10 +564,10 @@ local function hpRatio(battler)
 end
 
 -- Residual chip that makes self-setup suicidal next turns.
-local function hasResidual(battler)
+local function hasResidual(battler, battle)
   if not battler then return false end
-  if battler.leechSeeded then return true end
   local BattleCompat = require("mods.Kanto-Reforged.battle_compat")
+  if BattleCompat.isSeeded(battle, battler) then return true end
   return BattleCompat.hasStatus(battler, "PSN", "BRN", "TOX", "poison", "burn", "toxic")
 end
 
@@ -514,7 +621,13 @@ function TrainerAi.estimateDamage(battle, attacker, defender, moveDef, opts)
   if not aMon or not aMon.level then return nil, nil, 10 end
 
   local defTypes = defender.curTypes or BattleCompat.types(defender)
-  local mult = TypeChart.effectiveness(moveDef.type, defTypes)
+  local data = battle and battle.data
+  if data and data.type_chart then
+    pcall(TypeChart.load, data)
+  end
+  local mult = 10
+  local okMult, got = pcall(TypeChart.effectiveness, moveDef.type, defTypes)
+  if okMult and got then mult = got end
 
   if BattleCompat.isGen2(battle) then
     local ok, G2Damage = pcall(require, "src.battle.gen2.Damage")
@@ -522,15 +635,40 @@ function TrainerAi.estimateDamage(battle, attacker, defender, moveDef, opts)
       return nil, nil, mult
     end
     local chart = battle.data and battle.data.type_chart
+    local typesTable = chart and chart.types
+    local physical = G2Damage.isPhysical and G2Damage.isPhysical(moveDef.type, typesTable)
+    if physical == nil then
+      -- Fallback: Gen2 physical if not in special list — Damage.isPhysical is source of truth.
+      physical = true
+    end
+    local atk = attacker.curStats.attack
+    local spa = attacker.curStats.specialAttack or attacker.curStats.special
+    -- Burn halves physical Attack (DamageStats / statusPenaltyFor).
+    if physical and BattleCompat.hasStatus(attacker, "BRN", "burn") then
+      atk = math.max(1, math.floor(atk / 2))
+    end
+    local weatherPercent = 10
+    do
+      local okE, Effects = pcall(require, "src.battle.gen2.Effects")
+      if okE and Effects and Effects.weatherModifier and battle.weather then
+        weatherPercent = math.floor(
+          Effects.weatherModifier(battle.weather, moveDef.type, moveDef.effect) * 10)
+      end
+    end
+    local screen = false
+    if physical then
+      screen = BattleCompat.hasScreen(battle, defender, "reflect")
+    else
+      screen = BattleCompat.hasScreen(battle, defender, "lightScreen")
+    end
     local function roll(variation)
       local dmg = G2Damage.calc({
         level = aMon.level,
         power = moveDef.power,
         moveType = moveDef.type,
         attacker = {
-          attack = attacker.curStats.attack,
-          specialAttack = attacker.curStats.specialAttack
-            or attacker.curStats.special,
+          attack = atk,
+          specialAttack = spa,
           types = attacker.curTypes or BattleCompat.types(attacker),
           stages = attacker.stages or {},
         },
@@ -541,10 +679,12 @@ function TrainerAi.estimateDamage(battle, attacker, defender, moveDef, opts)
           types = defTypes,
           stages = defender.stages or {},
         },
-        types = chart and chart.types,
+        types = typesTable,
         matchups = chart and chart.matchups,
         critical = false,
         variation = variation,
+        weatherPercent = weatherPercent,
+        screen = screen,
       })
       return dmg or 0
     end
@@ -599,7 +739,8 @@ local function boardPressure(view, mode)
     return cache
   end
   local wantHigh = mode == "elite"
-  local targetHp = target.mon and target.mon.hp or 0
+  local BattleCompat = require("mods.Kanto-Reforged.battle_compat")
+  local targetHp = BattleCompat.hp(target)
   for _, mv in ipairs(user.curMoves) do
     local def = data.moves[mv.id]
     if def and (def.power or 0) > 0 then
@@ -710,6 +851,7 @@ function TrainerAi.situation(view, mode)
   if cached and cached.mode == mode then return cached end
   local user = view and view.user
   local target = view and view.target
+  local BattleCompat = require("mods.Kanto-Reforged.battle_compat")
   local sit = {
     mode = mode,
     userHp = hpRatio(user),
@@ -717,9 +859,9 @@ function TrainerAi.situation(view, mode)
     faster = nil,
     threatened = false,
     canKo = false,
-    foeStatus = target and target.mon and target.mon.status or nil,
-    foeConfused = target and target.confusedTurns and true or false,
-    foeSeeded = target and target.leechSeeded and true or false,
+    foeStatus = target and BattleCompat.status(target) or nil,
+    foeConfused = target and BattleCompat.isConfused(view and view.battle, target) or false,
+    foeSeeded = target and BattleCompat.isSeeded(view and view.battle, target) or false,
   }
   if view and view.battle and user and user.curStats and target and target.curStats then
     sit.faster = TrainerAi.isAiFaster(view.battle)
@@ -748,6 +890,7 @@ end
 -- Score polarity: lower is better (prefer), higher is dump.
 function TrainerAi.scoreNatural(view, def, score)
   if not def then return score end
+  local BattleCompat = require("mods.Kanto-Reforged.battle_compat")
   local user, target = view.user, view.target
   local power = def.power or 0
   local effect = def.effect
@@ -755,7 +898,7 @@ function TrainerAi.scoreNatural(view, def, score)
 
   if stageInfo then
     local stat, dir = stageInfo[1], stageInfo[2]
-    local cur = stageOf(dir < 0 and target or user, stat)
+    local cur = stageOf(dir < 0 and target or user, stat, view.battle)
     if dir < 0 then
       local isAccEva = (stat == "accuracy" or stat == "evasion")
       if isAccEva and cur <= -1 then return score + 6 end
@@ -765,39 +908,43 @@ function TrainerAi.scoreNatural(view, def, score)
     end
   end
 
-  if power == 0 and STATUS_EFFECTS[effect] and target.mon and target.mon.status then
+  if power == 0 and STATUS_EFFECTS[effect] and BattleCompat.status(target) then
     return score + 6
   end
   if effect == "EXP_YAWN_EFFECT" then
-    if (target.mon and target.mon.status) or target.expYawnTurns then
+    if BattleCompat.status(target) or target.expYawnTurns then
       return score + 6
     end
   end
-  if CONFUSE_EFFECTS[effect] and target.confusedTurns then
+  if CONFUSE_EFFECTS[effect] and BattleCompat.isConfused(view.battle, target) then
     return score + 6
   end
-  if effect == "LEECH_SEED_EFFECT" then
-    if target.leechSeeded or hasType(target.curTypes, "GRASS") then
+  if LEECH_SEED_EFFECTS[effect] then
+    if BattleCompat.isSeeded(view.battle, target) or hasType(target.curTypes, "GRASS") then
       return score + 6
     end
   end
   if (effect == "POISON_EFFECT" or effect == "POISON_SIDE_EFFECT1"
-      or effect == "POISON_SIDE_EFFECT2")
+      or effect == "POISON_SIDE_EFFECT2" or effect == "EFFECT_POISON"
+      or effect == "EFFECT_TOXIC" or effect == "EFFECT_POISON_HIT")
       and (hasType(target.curTypes, "POISON") or hasType(target.curTypes, "STEEL")) then
     return score + 6
   end
-  if effect == "HEAL_EFFECT" and user.mon
-     and user.mon.hp >= (user.mon.stats and user.mon.stats.hp or 0) then
-    return score + 6
+  if HEAL_SELF_EFFECTS[effect] then
+    local mon = BattleCompat.mon(user)
+    local maxHp = mon and ((mon.stats and mon.stats.hp) or mon.maxHp or 0) or 0
+    if mon and maxHp > 0 and (mon.hp or 0) >= maxHp then
+      return score + 6
+    end
   end
   local screenKey = SCREEN_EFFECTS[effect]
-  if screenKey and user[screenKey] then
+  if screenKey and BattleCompat.hasScreen(view.battle, user, screenKey) then
     return score + 6
   end
-  if effect == "SUBSTITUTE_EFFECT" and user.substituteHP then
+  if SUBSTITUTE_EFFECTS[effect] and BattleCompat.hasSubstitute(view.battle, user) then
     return score + 6
   end
-  if effect == "DISABLE_EFFECT" and target.disabledSlot then
+  if DISABLE_EFFECTS[effect] and BattleCompat.disabledMoveId(view.battle, target) then
     return score + 6
   end
 
@@ -818,7 +965,7 @@ local function applySoftSituation(view, def, score, power)
   local effect = def.effect
   local isOpener = softOpenerEffect(effect)
   local isStatusLike = STATUS_EFFECTS[effect] or CONFUSE_EFFECTS[effect]
-      or effect == "LEECH_SEED_EFFECT"
+      or LEECH_SEED_EFFECTS[effect]
   local stageInfo = STAGE_EFFECTS[effect]
   local selfSetup = stageInfo and stageInfo[2] > 0
 
@@ -833,7 +980,7 @@ local function applySoftSituation(view, def, score, power)
 
   -- User low HP: heal/drain over theater.
   if sit.userHp < 0.35 then
-    if effect == "HEAL_EFFECT" or (power > 0 and isDrainEffect(effect)) then
+    if HEAL_SELF_EFFECTS[effect] or (power > 0 and isDrainEffect(effect)) then
       score = score - 1
     elseif selfSetup or isStatusLike then
       score = score + 1
@@ -869,6 +1016,7 @@ end
 
 function TrainerAi.score(view, def, score)
   if not def then return score end
+  local BattleCompat = require("mods.Kanto-Reforged.battle_compat")
   local user, target = view.user, view.target
   local power = def.power or 0
   local effect = def.effect
@@ -879,7 +1027,7 @@ function TrainerAi.score(view, def, score)
   -- a half-applied Sand Attack still outscores every attack forever.
   if stageInfo then
     local stat, dir = stageInfo[1], stageInfo[2]
-    local cur = stageOf(dir < 0 and target or user, stat)
+    local cur = stageOf(dir < 0 and target or user, stat, view.battle)
     if dir < 0 then
       local isAccEva = (stat == "accuracy" or stat == "evasion")
       if isAccEva then
@@ -900,39 +1048,43 @@ function TrainerAi.score(view, def, score)
   -- then falls 1 per AI turn back to baseline (no permanent try-once ban).
   score = score + moveWeightPenalty(user, def.id)
 
-  if power == 0 and STATUS_EFFECTS[effect] and target.mon and target.mon.status then
+  if power == 0 and STATUS_EFFECTS[effect] and BattleCompat.status(target) then
     return score + 6
   end
   if effect == "EXP_YAWN_EFFECT" then
-    if (target.mon and target.mon.status) or target.expYawnTurns then
+    if BattleCompat.status(target) or target.expYawnTurns then
       return score + 6
     end
   end
-  if CONFUSE_EFFECTS[effect] and target.confusedTurns then
+  if CONFUSE_EFFECTS[effect] and BattleCompat.isConfused(view.battle, target) then
     return score + 6
   end
-  if effect == "LEECH_SEED_EFFECT" then
-    if target.leechSeeded or hasType(target.curTypes, "GRASS") then
+  if LEECH_SEED_EFFECTS[effect] then
+    if BattleCompat.isSeeded(view.battle, target) or hasType(target.curTypes, "GRASS") then
       return score + 6
     end
   end
   if (effect == "POISON_EFFECT" or effect == "POISON_SIDE_EFFECT1"
-      or effect == "POISON_SIDE_EFFECT2")
+      or effect == "POISON_SIDE_EFFECT2" or effect == "EFFECT_POISON"
+      or effect == "EFFECT_TOXIC" or effect == "EFFECT_POISON_HIT")
       and (hasType(target.curTypes, "POISON") or hasType(target.curTypes, "STEEL")) then
     return score + 6
   end
-  if effect == "HEAL_EFFECT" and user.mon
-     and user.mon.hp >= (user.mon.stats and user.mon.stats.hp or 0) then
-    return score + 6
+  if HEAL_SELF_EFFECTS[effect] then
+    local mon = BattleCompat.mon(user)
+    local maxHp = mon and ((mon.stats and mon.stats.hp) or mon.maxHp or 0) or 0
+    if mon and maxHp > 0 and (mon.hp or 0) >= maxHp then
+      return score + 6
+    end
   end
   local screenKey = SCREEN_EFFECTS[effect]
-  if screenKey and user[screenKey] then
+  if screenKey and BattleCompat.hasScreen(view.battle, user, screenKey) then
     return score + 6
   end
-  if effect == "SUBSTITUTE_EFFECT" and user.substituteHP then
+  if SUBSTITUTE_EFFECTS[effect] and BattleCompat.hasSubstitute(view.battle, user) then
     return score + 6
   end
-  if effect == "DISABLE_EFFECT" and target.disabledSlot then
+  if DISABLE_EFFECTS[effect] and BattleCompat.disabledMoveId(view.battle, target) then
     return score + 6
   end
 
@@ -941,7 +1093,7 @@ function TrainerAi.score(view, def, score)
     if hasType(user.curTypes, def.type) then
       score = score - 1
     end
-    local row = TypeChart.rows(def.type, target.curTypes)[1]
+    local row = TypeChart.rows(def.type, target.curTypes or {})[1]
     if row == 0 then
       score = score + 6
     elseif row and row > 10 then
@@ -958,20 +1110,20 @@ function TrainerAi.score(view, def, score)
 
   -- Major status / confusion: mild healthy prefer at baseline weight; decay
   -- penalty above handles not chaining the same opener every turn.
-  if STATUS_EFFECTS[effect] and target.mon and not target.mon.status then
+  if STATUS_EFFECTS[effect] and not BattleCompat.status(target) then
     if userHp > 0.5 then
       score = score - 1
     end
   end
 
-  if CONFUSE_EFFECTS[effect] and not target.confusedTurns then
+  if CONFUSE_EFFECTS[effect] and not BattleCompat.isConfused(view.battle, target) then
     if userHp > 0.5 then
       score = score - 1
     end
   end
 
-  if effect == "LEECH_SEED_EFFECT"
-     and not target.leechSeeded
+  if LEECH_SEED_EFFECTS[effect]
+     and not BattleCompat.isSeeded(view.battle, target)
      and not hasType(target.curTypes, "GRASS") then
     if userHp > 0.4 then
       score = score - 1
@@ -980,10 +1132,10 @@ function TrainerAi.score(view, def, score)
 
   if stageInfo then
     local stat, dir = stageInfo[1], stageInfo[2]
-    local cur = stageOf(dir < 0 and target or user, stat)
+    local cur = stageOf(dir < 0 and target or user, stat, view.battle)
     if dir > 0 then
       -- Self setup: mild once while unboosted; dump under residual chip.
-      if hasResidual(user) then
+      if hasResidual(user, view.battle) then
         score = score + 3
       elseif cur < 1 and userHp > 0.4 then
         score = score - 1
@@ -998,14 +1150,14 @@ function TrainerAi.score(view, def, score)
     end
   end
 
-  if screenKey and not user[screenKey] and userHp > 0.4 then
+  if screenKey and not BattleCompat.hasScreen(view.battle, user, screenKey) and userHp > 0.4 then
     score = score - 1
   end
-  if effect == "SUBSTITUTE_EFFECT" and not user.substituteHP and userHp > 0.4 then
+  if SUBSTITUTE_EFFECTS[effect] and not BattleCompat.hasSubstitute(view.battle, user) and userHp > 0.4 then
     score = score - 1
   end
 
-  if effect == "HEAL_EFFECT" then
+  if HEAL_SELF_EFFECTS[effect] then
     if userHp <= 0.25 then
       score = score - 4
     elseif userHp <= 0.5 then
@@ -1024,8 +1176,9 @@ local function scoreTactical(view, def, score, mode)
   local user, target = view.user, view.target
   local power = def.power or 0
   local effect = def.effect
+  local BattleCompat = require("mods.Kanto-Reforged.battle_compat")
   local userHp = hpRatio(user)
-  local targetHp = target.mon and target.mon.hp or 0
+  local targetHp = BattleCompat.hp(target)
   local pressure = boardPressure(view, mode)
   local theme = (mode == "elite" and themeFor(view.battle)) or {}
   local coarse = mode == "lite"
@@ -1033,18 +1186,19 @@ local function scoreTactical(view, def, score, mode)
   if theme.preferKO then koBias = koBias + theme.preferKO end
 
   -- Belt-and-suspenders: never double-sleep / stack major status (Gen 1 AI fail).
-  if power == 0 and STATUS_EFFECTS[effect] and target.mon and target.mon.status then
+  if power == 0 and STATUS_EFFECTS[effect] and BattleCompat.status(target) then
     return score + 6
   end
-  if CONFUSE_EFFECTS[effect] and target.confusedTurns then
+  if CONFUSE_EFFECTS[effect] and BattleCompat.isConfused(view.battle, target) then
     return score + 6
   end
-  if effect == "LEECH_SEED_EFFECT"
-     and (target.leechSeeded or hasType(target.curTypes, "GRASS")) then
+  if LEECH_SEED_EFFECTS[effect]
+     and (BattleCompat.isSeeded(view.battle, target) or hasType(target.curTypes, "GRASS")) then
     return score + 6
   end
   if (effect == "POISON_EFFECT" or effect == "POISON_SIDE_EFFECT1"
-      or effect == "POISON_SIDE_EFFECT2")
+      or effect == "POISON_SIDE_EFFECT2" or effect == "EFFECT_POISON"
+      or effect == "EFFECT_TOXIC" or effect == "EFFECT_POISON_HIT")
       and (hasType(target.curTypes, "POISON") or hasType(target.curTypes, "STEEL")) then
     return score + 6
   end
@@ -1117,7 +1271,7 @@ local function scoreTactical(view, def, score, mode)
       score = score - theme.preferAttack
     end
     if theme.preferDrain and (effect == "DRAIN_HP_EFFECT" or effect == "MEGA_DRAIN_EFFECT"
-        or effect == "LEECH_SEED_EFFECT") then
+        or LEECH_SEED_EFFECTS[effect]) then
       score = score - theme.preferDrain
     end
     -- Lite situational: capitalize when foe is already disrupted.
@@ -1132,13 +1286,12 @@ local function scoreTactical(view, def, score, mode)
 
   -- Non-damaging under pressure: dump setup/status when a KO is on the board or foe is low.
   local canKo = pressure.midKo or (mode == "elite" and pressure.highKo)
-  local foeLow = target.mon and target.mon.stats and target.mon.stats.hp > 0
-    and (target.mon.hp / target.mon.stats.hp) <= 0.4
+  local foeLow = hpRatio(target) <= 0.4
   local sit = TrainerAi.situation(view, mode)
   if canKo or (mode == "elite" and foeLow) or (mode == "lite" and sit.threatened) then
     if STATUS_EFFECTS[effect] or CONFUSE_EFFECTS[effect]
        or STAGE_EFFECTS[effect] or SCREEN_EFFECTS[effect]
-       or effect == "SUBSTITUTE_EFFECT" or effect == "LEECH_SEED_EFFECT" then
+       or SUBSTITUTE_EFFECTS[effect] or LEECH_SEED_EFFECTS[effect] then
       score = score + (mode == "elite" and 4 or 2)
     end
   end
@@ -1146,7 +1299,7 @@ local function scoreTactical(view, def, score, mode)
   -- Self-setup gating: dump if user HP < 50%, foe low, threatened, or residual.
   local stageInfo = STAGE_EFFECTS[effect]
   if stageInfo and stageInfo[2] > 0 then
-    if userHp < 0.5 or foeLow or hasResidual(user)
+    if userHp < 0.5 or foeLow or hasResidual(user, view.battle)
         or (mode == "lite" and sit.threatened) then
       score = score + (mode == "elite" and 4 or 2)
     end
@@ -1154,14 +1307,16 @@ local function scoreTactical(view, def, score, mode)
 
   -- Lite speed control: slower and cannot KO → slight prefer para / speed drop.
   if mode == "lite" and not canKo and sit.faster == false then
-    if effect == "PARALYZE_EFFECT" then
+    if effect == "PARALYZE_EFFECT" or effect == "EFFECT_PARALYZE"
+        or effect == "EFFECT_PARALYZE_HIT" then
       score = score - 1
     elseif stageInfo and stageInfo[1] == "speed" and stageInfo[2] < 0 then
       score = score - 1
     end
   end
   if mode == "lite" and canKo and sit.faster == true then
-    if effect == "PARALYZE_EFFECT"
+    if effect == "PARALYZE_EFFECT" or effect == "EFFECT_PARALYZE"
+        or effect == "EFFECT_PARALYZE_HIT"
        or (stageInfo and stageInfo[1] == "speed") then
       score = score + 1
     end
@@ -1175,14 +1330,17 @@ local function scoreTactical(view, def, score, mode)
     if CONFUSE_EFFECTS[effect] and theme.preferConfuse then
       score = score - theme.preferConfuse
     end
-    if effect == "PARALYZE_EFFECT" and theme.preferPara then
+    if (effect == "PARALYZE_EFFECT" or effect == "EFFECT_PARALYZE"
+        or effect == "EFFECT_PARALYZE_HIT") and theme.preferPara then
       score = score - theme.preferPara
     end
     if (effect == "POISON_EFFECT" or effect == "POISON_SIDE_EFFECT1"
-        or effect == "POISON_SIDE_EFFECT2") and theme.preferPoison then
+        or effect == "POISON_SIDE_EFFECT2" or effect == "EFFECT_POISON"
+        or effect == "EFFECT_TOXIC" or effect == "EFFECT_POISON_HIT")
+        and theme.preferPoison then
       score = score - theme.preferPoison
     end
-    if effect == "LEECH_SEED_EFFECT" and theme.preferSeed then
+    if LEECH_SEED_EFFECTS[effect] and theme.preferSeed then
       score = score - theme.preferSeed
     end
     if stageInfo and stageInfo[2] > 0 and theme.preferSetup then
@@ -1200,7 +1358,7 @@ local function scoreTactical(view, def, score, mode)
       score = score - theme.preferScreens
     end
     if theme.preferDisruption and (STATUS_EFFECTS[effect] or CONFUSE_EFFECTS[effect]
-        or effect == "DISABLE_EFFECT") then
+        or DISABLE_EFFECTS[effect]) then
       score = score - theme.preferDisruption
     end
   end
@@ -1223,11 +1381,29 @@ function TrainerAi.chooseWithMargin(battler, rng, battle, margin)
   rng = rng or love.math.random
   margin = margin or 0
   TrainerAi.decayMoveWeights(battler)
+  local BattleCompat = require("mods.Kanto-Reforged.battle_compat")
+  -- Dig/Fly charge, Rollout/Thrash, Encore: no free choice this turn.
+  local forcedId = BattleCompat.forcedMoveId(battle, battler)
+  if forcedId then
+    local moves = battler.curMoves or battler.moves or {}
+    for _, mv in ipairs(moves) do
+      if mv.id == forcedId then return mv end
+    end
+    return { id = forcedId, pp = 1 }
+  end
   local unlimited = battle and battle.ruleset and battle.ruleset.enemyUnlimitedPP
   local usable = {}
-  for i, mv in ipairs(battler.curMoves) do
-    if battler.disabledSlot ~= i and (unlimited or mv.pp > 0) then
-      usable[#usable + 1] = mv
+  local fromEngine = BattleCompat.usableMoves(battle, battler)
+  if fromEngine and #fromEngine > 0 then
+    usable = fromEngine
+  else
+    local disabledId = BattleCompat.disabledMoveId(battle, battler)
+    for i, mv in ipairs(battler.curMoves or {}) do
+      if (not battler.disabledSlot or battler.disabledSlot ~= i)
+          and (not disabledId or mv.id ~= disabledId)
+          and (unlimited or (mv.pp or 0) > 0) then
+        usable[#usable + 1] = mv
+      end
     end
   end
   if #usable == 0 then
@@ -1242,7 +1418,7 @@ function TrainerAi.chooseWithMargin(battler, rng, battle, margin)
     return usable[rng(1, #usable)]
   end
 
-  local classes = battle.data and battle.data.ai_classes
+  local classes = battle.data and (battle.data.ai_classes or battle.data.gen2AiClasses)
   local layers, view = {}, nil
   for _, modId in ipairs(mods) do
     local id = type(modId) == "string" and modId or ("LAYER_" .. tostring(modId))
@@ -1327,6 +1503,13 @@ function TrainerAi.bestSwitchIndex(battle)
 end
 
 local function classItem(battle)
+  -- Gold trainers carry items on the trainer record; Gen1 uses ai_classes.
+  local trainer = battle and battle.trainer
+  if trainer and trainer.items then
+    for _, item in ipairs(trainer.items) do
+      if item then return item end
+    end
+  end
   local class = TrainerAI.classFor(battle)
   return class and class.item, class
 end
@@ -1465,11 +1648,11 @@ function TrainerAi.eliteAction(battle)
     if foeLowThreat then
       local item = classItem(battle)
       local xStat = item and X_ITEMS[item]
-      if xStat and stageOf(enemy, xStat) < 1 then
+      if xStat and stageOf(enemy, xStat, battle) < 1 then
         recordItemUsed(battle, item)
         return { special = "aiItem", item = item }
       end
-      if item == "GUARD_SPEC" and not enemy.mist then
+      if item == "GUARD_SPEC" and not BattleCompat.hasMist(battle, enemy) then
         recordItemUsed(battle, item)
         return { special = "aiItem", item = item }
       end
@@ -1604,7 +1787,12 @@ function TrainerAi.applyGen2AiAction(battle, act)
       local s = battle.stages.enemy
       s[key] = math.min(6, (s[key] or 0) + 1)
     elseif item == "GUARD_SPEC" then
+      -- Gen2 mist lives on the volatile / screen side; Gen1 uses battler.mist.
       enemy.mist = true
+      if type(battle.volatile) == "function" then
+        local vol = battle:volatile(enemy)
+        if vol then vol.mist = true end
+      end
     else
       return false
     end
@@ -1761,20 +1949,25 @@ end
 -- ------- Register / install -------------------------------------------------
 
 function TrainerAi.register(mod)
+  -- Gold Ai.layersFor auto-includes every flagless kind=layer for any
+  -- trainer with AI bits. These scorers expect Gen1 view.user/target and
+  -- must only run via KR injection (enemyAIMods / pickScoredMove) — gate
+  -- with a flag name that is never in Gen2 Ai.FLAGS.
+  local krOnly = { kind = "layer", flag = "EXP_KR_ONLY" }
   mod.content.ai_classes:register(TrainerAi.LAYER_NATURAL, {
-    kind = "layer",
+    kind = krOnly.kind, flag = krOnly.flag,
     score = TrainerAi.scoreNatural,
   })
   mod.content.ai_classes:register(TrainerAi.LAYER_ID, {
-    kind = "layer",
+    kind = krOnly.kind, flag = krOnly.flag,
     score = TrainerAi.score,
   })
   mod.content.ai_classes:register(TrainerAi.LAYER_TACTICAL, {
-    kind = "layer",
+    kind = krOnly.kind, flag = krOnly.flag,
     score = TrainerAi.scoreTactical,
   })
   mod.content.ai_classes:register(TrainerAi.LAYER_TACTICAL_LITE, {
-    kind = "layer",
+    kind = krOnly.kind, flag = krOnly.flag,
     score = TrainerAi.scoreTacticalLite,
   })
 end
@@ -1870,9 +2063,22 @@ function TrainerAi.install(mod)
       if not b then return end
       b.kind = ev.kind or (b.wild and "wild" or "trainer")
       b.oppClass = ev.trainerId or b.oppClass
+        or (b.trainer and (b.trainer.classId or b.trainer.class or b.trainer.id))
       if b.trainer then
-        b.expPartyIndex = b.trainer.index or 1
+        -- Prefer numeric roster slot for isElite. Keep string id separately —
+        -- Gen2 World sets memberId to FALKNER_1 / RIVAL1_1_CHIKORITA.
+        local t = b.trainer
+        if type(t.member) == "number" then
+          b.expPartyIndex = t.member
+        elseif type(t.index) == "number" then
+          b.expPartyIndex = t.index
+        else
+          b.expPartyIndex = 1
+        end
+        b.expMemberId = t.memberId or t.id
       end
+      b.expMapId = b.expMapId or currentMapId(mod.activeGame)
+        or currentMapId(ev.game)
       b.expAiSwitches = 0
       b.expBattleItemsUsed = 0
       b.expMonItemsUsed = {}
@@ -1889,14 +2095,17 @@ function TrainerAi.install(mod)
       local original = Battle.enemyTrySwitchOrItem
       Battle.enemyTrySwitchOrItem = function(self)
         if TrainerAi.enabled(mod) and self.trainer and not self.wild then
-          BattleCompat.prepareAiBattle(self)
-          local tier = TrainerAi.tier(self)
-          if tier == "elite" or tier == "lite" then
-            local act = (tier == "elite") and TrainerAi.eliteAction(self)
-              or TrainerAi.liteAction(self)
-            if act and act.special
-                and TrainerAi.applyGen2AiAction(self, act) then
-              return true
+          local okPrep = pcall(BattleCompat.prepareAiBattle, self)
+          if okPrep then
+            local tier = TrainerAi.tier(self)
+            if tier == "elite" or tier == "lite" then
+              local ok, act = pcall(
+                (tier == "elite") and TrainerAi.eliteAction or TrainerAi.liteAction,
+                self)
+              if ok and act and act.special
+                  and TrainerAi.applyGen2AiAction(self, act) then
+                return true
+              end
             end
           end
         end
@@ -1908,13 +2117,22 @@ function TrainerAi.install(mod)
   -- Shared overhaul: both gens use the same enemy_action brain.
   mod.hooks:wrap("battle.enemy_action", function(next, battle)
     if not TrainerAi.enabled(mod) then return next(battle) end
-    BattleCompat.prepareAiBattle(battle)
-
-    local forced = preferSharedSetup(battle, nil)
-    if forced then return forced end
+    local okPrep = pcall(BattleCompat.prepareAiBattle, battle)
+    if not okPrep then return next(battle) end
 
     local tier = TrainerAi.tier(battle)
     local gen2 = BattleCompat.isGen2(battle)
+
+    -- Dig/Fly second turn, Rollout/Thrash, Encore — must run before scoring
+    -- or Fake Out preference (vanilla Gen2 AI returns chargeMove first).
+    local forcedId = BattleCompat.forcedMoveId(battle, battle.enemy)
+    if forcedId then
+      if gen2 then return forcedId end
+      return { id = forcedId, pp = 1 }
+    end
+
+    local okForced, forced = pcall(preferSharedSetup, battle, nil)
+    if okForced and forced then return forced end
 
     if not gen2 and (tier == "soft" or tier == "natural") then
       local chosen = next(battle)
@@ -1930,14 +2148,15 @@ function TrainerAi.install(mod)
     if locked then return locked end
 
     if tier == "elite" or tier == "lite" then
-      local act = (tier == "elite") and TrainerAi.eliteAction(battle)
-        or TrainerAi.liteAction(battle)
+      local ok, act = pcall(
+        (tier == "elite") and TrainerAi.eliteAction or TrainerAi.liteAction,
+        battle)
       -- Gen2 specials are consumed in enemyTrySwitchOrItem; ignore here.
-      if act and not (gen2 and act.special) then return act end
+      if ok and act and not (gen2 and act.special) then return act end
     end
 
-    local picked = TrainerAi.pickScoredMove(mod, battle)
-    if not picked then return next(battle) end
+    local okPick, picked = pcall(TrainerAi.pickScoredMove, mod, battle)
+    if not okPick or not picked then return next(battle) end
     local id = preferSharedSetup(battle, picked.id) or picked.id
     if gen2 then return id end
     if id ~= picked.id then

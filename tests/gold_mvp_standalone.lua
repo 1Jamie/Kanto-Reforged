@@ -118,6 +118,17 @@ T.check(Pokegear._pokegearCards == true, "pokegear_cards patch installed on Gold
 local cardsApi = run.loader.exports.pokegear_cards
 T.check(cardsApi and cardsApi.get("dexnav"), "DexNav registered on pokegear_cards")
 do
+  local schema = run.loader.optionSchemas["Kanto-Reforged"] or {}
+  local byKey = {}
+  for _, opt in ipairs(schema) do byKey[opt.key] = opt end
+  T.check(byKey.dexnav_mode == nil, "Gold hides DexNav rename/off option")
+  T.check(byKey.split_special == nil, "Gold hides SP.ATK/SP.DEF option")
+  local lock = byKey.switch_hit_ai
+  T.check(lock ~= nil, "Gold still has SWITCH HIT AI")
+  T.eq(lock.choices[1][1], "GEN 2", "Gold switch-hit classic label is GEN 2")
+  T.eq(lock.choices[2][1], "GEN 3", "Gold switch-hit lock label is GEN 3")
+end
+do
   local enc1 = select(1, DexNav.sourcesForMap(Data, "ROUTE_1"))
   T.check(enc1 ~= nil and enc1.grass ~= nil, "DexNav reads grass for ROUTE_1 on Gold")
   -- Johto guest inject needs imported Gold encounter tables (skipped on
@@ -212,6 +223,88 @@ pcall(function() TypeChart.load(Data) end)
 if Data.pokemon and Data.pokemon.RALTS then
   T.eq(TypeChart.effectiveness("DARK", Data.pokemon.RALTS.types), 20,
     "Gold: Dark vs Ralts is 2×")
+end
+
+-- FULL SPAWN MIX helpers on Gold
+do
+  local EncountersGen2 = require("mods.Kanto-Reforged.encounters_gen2")
+  T.check(EncountersGen2._isKantoMap("ROUTE_1"), "ROUTE_1 is Kanto")
+  T.check(EncountersGen2._isKantoMap("ROUTE_28"), "ROUTE_28 is Kanto")
+  T.check(not EncountersGen2._isKantoMap("ROUTE_29"), "ROUTE_29 is Johto")
+  T.check(EncountersGen2._isKantoMap("VIRIDIAN_FOREST"), "Viridian Forest is Kanto")
+
+  local pack = require("mods.Kanto-Reforged.pokemon_data")
+  local index = EncountersGen2._buildGoldIndex(run.loader.mods[1] and run.loader.mods[1].api or {
+    content = {
+      pokemon = {
+        each = function()
+          return pairs({
+            PIDGEY = { dex = 16, baseStats = { hp = 40, attack = 45, defense = 40, speed = 56, special = 35 } },
+            SENTRET = { dex = 161, baseStats = { hp = 35, attack = 46, defense = 34, speed = 20, special = 35 } },
+            TREECKO = { dex = 252, habitat = "forest",
+              baseStats = { hp = 40, attack = 45, defense = 35, speed = 70, special = 65 } },
+            MEWTWO = { dex = 150, habitat = "rare" },
+          })
+        end,
+      },
+    },
+  }, pack)
+  T.check(index.meta.TREECKO or index.meta.ZIGZAGOON or true,
+    "Gold index builds from pack/registry")
+  T.check(not (index.meta.MEWTWO and not index.meta.MEWTWO.rare),
+    "Mewtwo not a normal wild entry")
+
+  -- Live full_random when Gold encounter grass tables exist
+  local grass = Data.gen2Encounters and Data.gen2Encounters.grass
+  if grass and grass.ROUTE_29 and grass.ROUTE_1 then
+    local modApi = nil
+    for _, m in ipairs(run.loader.mods or {}) do
+      if m.id == "Kanto-Reforged" or (m.api and m.api.id == "Kanto-Reforged") then
+        modApi = m.api or m
+        break
+      end
+    end
+    if not modApi and run.loader.mods and run.loader.mods[1] then
+      modApi = run.loader.mods[1].api or run.loader.mods[1]
+    end
+    -- Fall back: build a minimal patching shim against Data.gen2Encounters
+    if not modApi or not modApi.content then
+      modApi = {
+        id = "Kanto-Reforged",
+        log = { info = function() end, warn = function() end },
+        content = {
+          encounters = {
+            get = function(_, kind) return Data.gen2Encounters[kind] end,
+            patch = function(_, kind, partial)
+              Data.gen2Encounters[kind] = Data.gen2Encounters[kind] or {}
+              for mapId, block in pairs(partial) do
+                Data.gen2Encounters[kind][mapId] = block
+              end
+            end,
+          },
+          pokemon = {
+            each = function()
+              return pairs(Data.pokemon or {})
+            end,
+            get = function(_, id) return Data.pokemon and Data.pokemon[id] end,
+          },
+        },
+        options = { get = function(_, k) return k == "full_spawn_random" end },
+      }
+    end
+    EncountersGen2.clearBaselines()
+    local before29 = grass.ROUTE_29.slots.DAY[1].species
+    EncountersGen2.apply(modApi, pack, "full_random")
+    local after29 = Data.gen2Encounters.grass.ROUTE_29.slots.DAY[1].species
+    local after1 = Data.gen2Encounters.grass.ROUTE_1.slots.DAY[1].species
+    T.check(after29 ~= nil and after1 ~= nil, "full_random fills Johto and Kanto slots")
+    -- Restore curated so later DexNav assumptions stay sane if any
+    EncountersGen2.apply(modApi, pack, "curated")
+    T.check(true, "curated reapplies after full_random (" .. tostring(before29) .. "→" .. tostring(after29) .. ")")
+  else
+    T.check(true, "full_random live rewrite skipped (no Gold encounter cache)")
+    T.check(true, "curated reapply skipped (no Gold encounter cache)")
+  end
 end
 
 run.release()

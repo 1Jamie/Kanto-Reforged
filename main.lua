@@ -26,11 +26,25 @@ local function spawnModeFromOptions(mod)
   return "curated"
 end
 
+local function spawnOptsFromOptions(mod)
+  return {
+    legendsInMix = mod.options and mod.options:get("legends_in_mix") and true or false,
+  }
+end
+
 local function applySpawnTables(mod, pokemon_data)
   if not pokemon_data then return end
   local mode = spawnModeFromOptions(mod)
-  ExpEncounters.apply(mod, pokemon_data, mode)
-  mod.log:info("Wild encounters applied (%s)", mode)
+  local opts = spawnOptsFromOptions(mod)
+  local Host = require("mods.Kanto-Reforged.host")
+  if Host.isGen2() then
+    local EncountersGen2 = require("mods.Kanto-Reforged.encounters_gen2")
+    EncountersGen2.apply(mod, pokemon_data, mode, opts)
+  else
+    ExpEncounters.apply(mod, pokemon_data, mode, opts)
+  end
+  mod.log:info("Wild encounters applied (%s%s)", mode,
+    (mode == "full_random" and opts.legendsInMix) and "+legends" or "")
 end
 
 return function(mod)
@@ -43,21 +57,32 @@ return function(mod)
     ExpTrainers.install(mod)
   end
 
-  -- Manager / card options
-  mod.options:define({
+  -- Manager / card options (host-aware labels / visibility).
+  local optionDefs = {
     {
       key = "full_spawn_random",
       label = "FULL SPAWN MIX",
       type = "toggle",
       default = false,
     },
+    {
+      key = "legends_in_mix",
+      label = "LEGENDS IN MIX",
+      type = "toggle",
+      default = false,
+    },
     ModernXpShare.OPTION,
     TrainerAi.OPTION,
-    TrainerAi.SWITCH_LOCK_OPTION,
+    TrainerAi.switchLockOptionForHost(),
     HeldItems.BAG_GIVE_OPTION,
-    SplitSpecial.OPTION,
-    require("mods.Kanto-Reforged.dexnav").OPTION,
-  })
+  }
+  -- SpA/SpD split is a Gen1 single-Special concern; Gold already has both.
+  if Host.isGen1() then
+    optionDefs[#optionDefs + 1] = SplitSpecial.OPTION
+    -- DexNav label/off is only for the start-menu entry; Gold uses Pokegear.
+    optionDefs[#optionDefs + 1] = require("mods.Kanto-Reforged.dexnav").OPTION
+  end
+  mod.options:define(optionDefs)
 
   ExpMoveEffects.register(mod)
   ExpMoveEffects.install(mod)
@@ -388,10 +413,15 @@ return function(mod)
       PokemonGen2.registerForGold(mod, pokemon_data, {
         goldDataReady = goldDataReady,
       })
-      local EncountersGen2 = require("mods.Kanto-Reforged.encounters_gen2")
-      EncountersGen2.apply(mod, pokemon_data)
+      applySpawnTables(mod, pokemon_data)
       local TrainersGen2 = require("mods.Kanto-Reforged.trainers_gen2")
       TrainersGen2.install(mod)
+      mod.events:on("mod.options_changed", function(ev)
+        if ev and ev.mod == mod.id
+            and (ev.key == "full_spawn_random" or ev.key == "legends_in_mix") then
+          applySpawnTables(mod, pokemon_data)
+        end
+      end)
     else
       PokemonGen2.applyGen1DerivedSprites(mod, pokemon_data)
       local species_registered = 0
@@ -415,7 +445,8 @@ return function(mod)
       local nTrainers = ExpTrainers.apply(mod)
       mod.log:info("Trainer parties mixed (%d classes)", nTrainers)
       mod.events:on("mod.options_changed", function(ev)
-        if ev and ev.mod == mod.id and ev.key == "full_spawn_random" then
+        if ev and ev.mod == mod.id
+            and (ev.key == "full_spawn_random" or ev.key == "legends_in_mix") then
           applySpawnTables(mod, pokemon_data)
         end
       end)
@@ -1079,19 +1110,8 @@ return function(mod)
     if ma == 1 and mb == 1 and not trick then
       return next(a, aMove, b, bMove, ctx)
     end
-    -- Gen1: mutate curStats.speed temporarily.
-    if a.curStats and b.curStats then
-      local TurnOrder = require("src.battle.TurnOrder")
-      local oldA, oldB = a.curStats.speed, b.curStats.speed
-      a.curStats.speed = math.floor(oldA * ma)
-      b.curStats.speed = math.floor(oldB * mb)
-      local first = TurnOrder.firstMover(a, aMove, b, bMove,
-        (ctx and ctx.rng) or love.math.random, ctx and ctx.invertTie)
-      a.curStats.speed, b.curStats.speed = oldA, oldB
-      if trick then return not first end
-      return first
-    end
-    -- Gen2: compare battleStat × stages × speedMult (and priority).
+    -- Gen2 first: prepareAiBattle may stamp curStats on party mons for AI,
+    -- which must not take the Gen1 TurnOrder.mon path.
     if BattleCompat.isGen2(battle) and type(battle.battleStat) == "function" then
       local G2Damage = require("src.battle.gen2.Damage")
       local function effSpeed(mon)
@@ -1113,6 +1133,18 @@ return function(mod)
       if sa ~= sb then return sa > sb end
       local rng = (ctx and ctx.rng) or love.math.random
       return rng(2) == 1
+    end
+    -- Gen1: mutate curStats.speed temporarily.
+    if a.curStats and b.curStats then
+      local TurnOrder = require("src.battle.TurnOrder")
+      local oldA, oldB = a.curStats.speed, b.curStats.speed
+      a.curStats.speed = math.floor(oldA * ma)
+      b.curStats.speed = math.floor(oldB * mb)
+      local first = TurnOrder.firstMover(a, aMove, b, bMove,
+        (ctx and ctx.rng) or love.math.random, ctx and ctx.invertTie)
+      a.curStats.speed, b.curStats.speed = oldA, oldB
+      if trick then return not first end
+      return first
     end
     if trick then
       local first = next(a, aMove, b, bMove, ctx)
@@ -1195,9 +1227,10 @@ return function(mod)
   local function ensureTypeChart(data)
     if not data or not data.type_chart then return end
     local ok, TypeChart = pcall(require, "src.battle.TypeChart")
-    if ok and TypeChart and TypeChart.load then
-      TypeChart.load(data)
-    end
+    if not ok or not TypeChart or not TypeChart.load then return end
+    local matchups = data.type_chart.matchups
+    if type(matchups) ~= "table" then return end
+    pcall(TypeChart.load, data)
   end
 
   mod.events:on("game.ready", function(ev)

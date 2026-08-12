@@ -138,10 +138,13 @@ The Route 5 Day Care house (same building as vanilla) is Gen 3-style when this m
 
 ## Options
 
-- FULL SPAWN MIX (default off): random Gen 1 through 3 wild tables
+- FULL SPAWN MIX (default off): random Gen 1 through 3 wild tables (Red: Kanto routes; Gold: Johto + Kanto, with a density pass so Kanto stays full)
+- LEGENDS IN MIX (default off): with FULL SPAWN MIX on, legendaries/mythicals can appear in wild tables (level-gated)
 - XP SHARE (SLOT 2) (default on): fighters split 70% of the Gen 1 XP pool; party slot 2 gets up to 30% (clamped below actives)
 - SMARTER AI (default on): prefer useful damage, skip moves that would fail
-- SP.ATK / SP.DEF (default off): use separate Special Attack / Special Defense from PokeAPI for special damage and summary UI; off keeps Gen 1 single Special
+- SWITCH HIT AI: classic free-hit timing vs Gen 3 lock-on-switch (labels GEN 1/3 on Red, GEN 2/3 on Gold)
+- SP.ATK / SP.DEF (Red only, default off): use separate Special Attack / Special Defense from PokeAPI for special damage and summary UI; off keeps Gen 1 single Special
+- DEXNAV (Red only): start-menu label / off (Gold uses Pokegear, no toggle)
 
 ## Generating the data files
 

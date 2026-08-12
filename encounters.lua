@@ -581,7 +581,23 @@ end
 
 -- Full mix: every unprotected slot is a pick from Gen 1 locals on that
 -- route plus eligible Gen 2/3 forms for the habitat / level band.
-local function mixFullRandom(mod, index)
+-- opts.legendsInMix: include habitat=rare legendaries/mythicals in the pool.
+local NATIVE_LEGENDS = {
+  "ARTICUNO", "ZAPDOS", "MOLTRES", "MEWTWO", "MEW",
+}
+
+local function mixFullRandom(mod, index, opts)
+  opts = opts or {}
+  local allowLegends = opts.legendsInMix and true or false
+  if allowLegends then
+    for _, id in ipairs(NATIVE_LEGENDS) do
+      if not index.meta[id] then
+        index.meta[id] = {
+          stage = 0, minLevel = 40, bst = 680, habitat = "rare", rare = true,
+        }
+      end
+    end
+  end
   local mapIds = {}
   for id in pairs(MAPS) do mapIds[#mapIds + 1] = id end
   table.sort(mapIds)
@@ -609,7 +625,7 @@ local function mixFullRandom(mod, index)
             if not VANILLA_RARES[slot.species] then
               local gen23 = Encounters.eligible(
                 index, mapDef.habitats, slot.level, avg, maxLv, {
-                  allowRare = false,
+                  allowRare = allowLegends,
                   rareOnly = false,
                   preferStage = Encounters.maxStageFor(avg, maxLv),
                 })
@@ -622,7 +638,13 @@ local function mixFullRandom(mod, index)
               end
               for _, id in ipairs(locals) do add(id) end
               for _, id in ipairs(gen23) do add(id) end
-              if mapDef.rare and slotIndex >= 7 then
+              -- Late enough routes can also roll Gen1 birds / Mewtwo / Mew.
+              if allowLegends and (slot.level or 0) >= 40 then
+                for _, id in ipairs(NATIVE_LEGENDS) do add(id) end
+              end
+              -- Rare maps always bias late slots toward legends; with
+              -- legendsInMix the whole pool already allows them.
+              if mapDef.rare and slotIndex >= 7 and not allowLegends then
                 local rares = Encounters.eligible(
                   index, mapDef.habitats, slot.level, avg, maxLv, {
                     allowRare = true, rareOnly = true, preferStage = 0,
@@ -648,11 +670,12 @@ local function mixFullRandom(mod, index)
 end
 
 -- mode: "curated" (default) or "full_random"
-function Encounters.apply(mod, pokemon_data, mode)
+-- opts.legendsInMix: only used for full_random
+function Encounters.apply(mod, pokemon_data, mode, opts)
   Encounters.captureBaselines(mod)
   local index = Encounters.buildIndex(pokemon_data)
   if mode == "full_random" then
-    mixFullRandom(mod, index)
+    mixFullRandom(mod, index, opts)
   else
     mixCurated(mod, index)
   end
@@ -660,8 +683,8 @@ function Encounters.apply(mod, pokemon_data, mode)
 end
 
 -- Back-compat alias used by main.lua
-function Encounters.mix(mod, pokemon_data, mode)
-  return Encounters.apply(mod, pokemon_data, mode or "curated")
+function Encounters.mix(mod, pokemon_data, mode, opts)
+  return Encounters.apply(mod, pokemon_data, mode or "curated", opts)
 end
 
 Encounters.MAPS = MAPS
