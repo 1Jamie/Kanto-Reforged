@@ -8,6 +8,8 @@
 --     line is obtainable: catch the base (or an earlier stage), then evolve
 --     / breed. Not every mid/final needs its own wild slot.
 
+local Merge = require("src.mods.Merge")
+
 local Encounters = {}
 
 local VANILLA_RARES = {
@@ -280,6 +282,9 @@ local function livePatchEncounter(mod, mapId, partial)
     mod.content.encounters:patch(mapId, partial)
   end)
   if ok then return end
+  -- Registry is frozen after boot merge (game.ready scope refresh, option
+  -- toggles).  Merge slot updates into live Data.encounters — assigning
+  -- dest[kind] = block drops rate/buckets and crashes Encounter.roll.
   local Data = require("src.core.Data")
   local dest = Data.encounters[mapId]
   if not dest then
@@ -287,7 +292,11 @@ local function livePatchEncounter(mod, mapId, partial)
     dest = Data.encounters[mapId]
   end
   for kind, block in pairs(partial or {}) do
-    dest[kind] = block
+    if type(block) == "table" and type(dest[kind]) == "table" then
+      Merge.deepMerge(dest[kind], block, "record")
+    else
+      dest[kind] = block
+    end
   end
 end
 

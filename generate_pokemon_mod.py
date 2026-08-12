@@ -1244,18 +1244,18 @@ def key_out_flat_background(img):
     def flood_key(src_img):
         out = src_img.copy()
         pix = out.load()
-    seen = [[False] * w for _ in range(h)]
-    q = deque()
-    for x in range(w):
-        for y in (0, h - 1):
+        seen = [[False] * w for _ in range(h)]
+        q = deque()
+        for x in range(w):
+            for y in (0, h - 1):
                 if not seen[y][x] and matches(x, y, pix):
-                seen[y][x] = True
-                q.append((x, y))
-    for y in range(1, h - 1):
-        for x in (0, w - 1):
+                    seen[y][x] = True
+                    q.append((x, y))
+        for y in range(1, h - 1):
+            for x in (0, w - 1):
                 if not seen[y][x] and matches(x, y, pix):
-                seen[y][x] = True
-                q.append((x, y))
+                    seen[y][x] = True
+                    q.append((x, y))
         while q:
             x, y = q.popleft()
             r, g, b, _ = pix[x, y]
@@ -1912,8 +1912,8 @@ def filter_ink_mask(mask, min_blob=3):
                         and not seen[ny][nx]
                         and mp[nx, ny]
                     ):
-                seen[ny][nx] = True
-                q.append((nx, ny))
+                        seen[ny][nx] = True
+                        q.append((nx, ny))
             if len(cells) < min_blob:
                 for ox, oy in cells:
                     mp[ox, oy] = 0
@@ -4819,6 +4819,9 @@ def nearest_palette_index(r, g, b, colors, hue_aware=False):
     # yellow only) — orange belly-adjacent rim pixels must stay off white
     # or the whole cheek becomes a white blob.  Skip when accent itself is
     # yellow (Ampharos) so the accent slot still receives those pixels.
+    # When the body slot *is* yellow (Cyndaquil, Elekid, Pichu, …) route
+    # those pixels to shade 1 instead — otherwise the whole body bakes as
+    # DMG white and reads colorless in Advanced/GBC mode.
     if (
         hue_aware
         and pix_sat >= 80
@@ -4827,6 +4830,12 @@ def nearest_palette_index(r, g, b, colors, hue_aware=False):
         and 32 <= pix_hue <= 55
         and len(colors) >= 3
     ):
+        body = colors[1]
+        body_sat = _rgb_sat(body)
+        body_hue = _rgb_hue(body) if body_sat >= 28 else None
+        body_is_yellow = body_hue is not None and 28 <= body_hue <= 70
+        if body_is_yellow:
+            return 1
         accent = colors[2]
         accent_sat = _rgb_sat(accent)
         accent_hue = _rgb_hue(accent) if accent_sat >= 28 else None
@@ -5695,7 +5704,7 @@ def _process_sprite_gen3(input_path, output_path, target_size, opts, override=No
         # on backs so Advanced mode stays consistent with belly/stripe identity.
         if override.get("palette"):
             measure_colors = _normalize_palette(override["palette"])
-                    else:
+        else:
             measure_colors = _normalize_palette(
                 extract_species_palette(img, stretch=False)
             )
@@ -6351,12 +6360,12 @@ def resprite_kanto_reforged(outdir, only=None, gen=None):
         body = re.sub(r'frontSize\s*=\s*\d+', f'frontSize = {front_size}', body, count=1)
         if not re.search(r'frontSize\s*=', body):
             if re.search(r'spriteBack\s*=', body):
-        body = re.sub(
+                body = re.sub(
                     r'(spriteBack\s*=\s*"[^"]*",)',
                     rf'\1\n    frontSize = {front_size},',
-            body,
-            count=1,
-        )
+                    body,
+                    count=1,
+                )
             else:
                 body = f'    frontSize = {front_size},\n' + body
         body = ensure_palette_field(body, name)

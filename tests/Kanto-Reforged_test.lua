@@ -405,6 +405,25 @@ end
 T.check(curatedMixed >= 1 and curatedMixed <= 10,
   "curated mode mixes a bounded set of Route 1 slots")
 
+-- Post-boot spawn refresh uses the Data fallback (registry frozen); must keep rate.
+do
+  local frozenMod = {
+    content = {
+      encounters = {
+        get = function(_, id) return Data.encounters[id] end,
+        patch = function()
+          error("encounters: content is frozen after load")
+        end,
+      },
+    },
+  }
+  local rate = Data.encounters.ROUTE_1.grass.rate
+  T.check(rate and rate > 0, "Route 1 grass rate before frozen re-apply")
+  ExpEncounters.apply(frozenMod, packData, "curated", { speciesScope = "national" })
+  T.eq(Data.encounters.ROUTE_1.grass.rate, rate,
+    "frozen registry re-apply keeps grass.rate for wild rolls")
+end
+
 -- Route 11: must receive Gen 2/3 grass assignments (not Spearow-only leftovers).
 do
   local r11 = Data.encounters.ROUTE_11
