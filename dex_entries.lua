@@ -7,7 +7,8 @@
 --
 -- Gen2: Gold's PokedexMenu reads `Data.gen2Pokedex.entries[species]` with
 -- inline `text` / `text2` (`<NEXT>` line breaks). Hoenn species are absent
--- from the ROM sheet — we fill those rows (and append them to the orders).
+-- from the ROM sheet — we fill those rows. NEW / A-Z orders are rebuilt from
+-- Johto wild availability (see johto_dex.lua).
 
 local DexEntries = {}
 
@@ -185,59 +186,75 @@ function DexEntries.toGen2Entry(speciesId, record)
   }
 end
 
-local function listHas(list, id)
-  for _, s in ipairs(list or {}) do
-    if s == id then return true end
-  end
-  return false
-end
-
 -- Fill missing Gold dex rows (Hoenn / any KR species absent from the ROM sheet).
+-- Does NOT append Gen3 onto newOrder — JohtoDex.rebuildOrders owns NEW / A-Z
+-- from live Johto availability after spawn tables apply.
 function DexEntries.bindGen2Pokedex(mod, speciesTable)
+  local JohtoDex = require("mods.Kanto-Reforged.johto_dex")
+  local data = JohtoDex._liveData(mod)
   local ok, Data = pcall(require, "src.core.Data")
-  if not ok or not Data then return 0 end
-  Data.gen2Pokedex = Data.gen2Pokedex or {}
-  local dex = Data.gen2Pokedex
+  if not data then
+    if not ok or not Data then return 0 end
+    data = Data
+  end
+  data.gen2Pokedex = data.gen2Pokedex or {}
+  local dex = data.gen2Pokedex
   dex.entries = dex.entries or {}
   dex.newOrder = dex.newOrder or {}
   dex.alphabeticalOrder = dex.alphabeticalOrder or {}
+  -- Freeze ROM Johto order before any later rebuild mutates newOrder.
+  JohtoDex.snapshotVanillaNewOrder(mod)
 
-  local added = {}
   local n = 0
   for id, record in pairs(speciesTable or {}) do
     if not dex.entries[id] then
       local row = DexEntries.toGen2Entry(id, record)
       if row then
         dex.entries[id] = row
-        added[#added + 1] = { id = id, dex = row.dex or 0, name = record.name or id }
         n = n + 1
       end
     end
   end
 
-  table.sort(added, function(a, b)
-    if a.dex ~= b.dex then return a.dex < b.dex end
-    return a.id < b.id
-  end)
-  for _, row in ipairs(added) do
-    if not listHas(dex.newOrder, row.id) then
-      dex.newOrder[#dex.newOrder + 1] = row.id
-    end
-  end
-
-  table.sort(added, function(a, b)
-    return tostring(a.name) < tostring(b.name)
-  end)
-  for _, row in ipairs(added) do
-    if not listHas(dex.alphabeticalOrder, row.id) then
-      dex.alphabeticalOrder[#dex.alphabeticalOrder + 1] = row.id
-    end
+  if ok and Data and Data ~= data then
+    Data.gen2Pokedex = dex
   end
 
   if mod and mod.log and n > 0 then
     mod.log:info("Gold Pokédex: filled %d missing entries (Gen3+)", n)
   end
   return n
+end
+
+-- Safety net: DexEntryMenu looks up game.data.text[e.text]. If a species
+-- still carries inline prose (not a _KEY), register it so the page is not blank.
+function DexEntries.installInlineTextFallback(mod)
+  local Gen1Patch = require("mods.Kanto-Reforged.gen1_patch")
+  local ok, DEM = pcall(require, "src.ui.DexEntryMenu")
+  if not ok or not DEM or DEM._krInlineText then return end
+  Gen1Patch.apply(DEM, function(DexEntryMenu)
+    if DexEntryMenu._krInlineText then return end
+    local orig = DexEntryMenu.render
+    if type(orig) ~= "function" then return end
+    DexEntryMenu.render = function(game, def, sprite, forceOwned, trueColor)
+      local e = def and def.dexEntry
+      if game and e and type(e.text) == "string" and not isTextKey(e.text) then
+        local key = DexEntries.textKey(def.id or "UNKNOWN")
+        local body = DexEntries.wrap(e.text)
+        if game.data then
+          game.data.text = game.data.text or {}
+          game.data.text[key] = body
+        end
+        writeDataText(key, body)
+        e.text = key
+      end
+      return orig(game, def, sprite, forceOwned, trueColor)
+    end
+    DexEntryMenu._krInlineText = true
+  end)
+  if mod and mod.log then
+    mod.log:info("Dex entries: inline text fallback for DexEntryMenu")
+  end
 end
 
 return DexEntries

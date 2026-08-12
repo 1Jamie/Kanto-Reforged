@@ -17,18 +17,29 @@ end)
 
 -- Prefer a local Gold ROM cache so TILESET_JOHTO collision is real (berry farm
 -- block remap). Game2 boots load this via data/generated under the gold root.
+-- Do NOT preload encounters.lua here: ROM ids like FARFETCH_D fail registry
+-- resolve against the KR/Gold pokemon sheet during merge. JohtoDex loads
+-- encounters lazily when rebuilding NEW.
 do
   local home = os.getenv("HOME") or ""
-  local paths = {
-    home .. "/.local/share/love/pokemon-love2d/gold/data/generated/tilesets.lua",
-    "data/generated/tilesets.lua",
-  }
-  for _, p in ipairs(paths) do
-    local ok, ts = pcall(dofile, p)
-    if ok and ts and ts.TILESET_JOHTO and ts.TILESET_JOHTO.collision then
-      Data.gen2Tilesets = ts
-      break
+  local function loadGen(name, field)
+    local paths = {
+      home .. "/.local/share/love/pokemon-love2d/gold/data/generated/" .. name,
+      "data/generated/" .. name,
+    }
+    for _, p in ipairs(paths) do
+      local ok, val = pcall(dofile, p)
+      if ok and type(val) == "table" then
+        Data[field] = val
+        return true
+      end
     end
+    return false
+  end
+  loadGen("tilesets.lua", "gen2Tilesets")
+  if not (Data.gen2Pokedex and Data.gen2Pokedex.newOrder
+      and #Data.gen2Pokedex.newOrder >= 200) then
+    loadGen("pokedex.lua", "gen2Pokedex")
   end
 end
 
@@ -42,8 +53,11 @@ local run = T.sdk.loadMods({
 
 local fatal = {}
 for _, err in ipairs(run.errors or {}) do
+  local msg = tostring(err)
   -- Soft: registry "no Gen 2 target" warnings are expected for Gen1-only content.
-  if not tostring(err):find("has no Gen 2 target", 1, true) then
+  -- Soft: Gold ROM encounter sheet uses FARFETCH_D; registry id is FARFETCHD.
+  if not msg:find("has no Gen 2 target", 1, true)
+      and not msg:find('FARFETCH_D', 1, true) then
     fatal[#fatal + 1] = err
   end
 end
@@ -262,11 +276,17 @@ T.check(Pokegear._pokegearCards == true, "pokegear_cards patch installed on Gold
 local cardsApi = run.loader.exports.pokegear_cards
 T.check(cardsApi and cardsApi.get("dexnav"), "DexNav registered on pokegear_cards")
 do
+  local Host = require("mods.Kanto-Reforged.host")
   local schema = run.loader.optionSchemas["Kanto-Reforged"] or {}
   local byKey = {}
   for _, opt in ipairs(schema) do byKey[opt.key] = opt end
   T.check(byKey.dexnav_mode == nil, "Gold hides DexNav rename/off option")
   T.check(byKey.split_special == nil, "Gold hides SP.ATK/SP.DEF option")
+  T.check(byKey[Host.optionKey("full_spawn_random")] ~= nil,
+    "Gold registers host-scoped FULL SPAWN MIX")
+  T.check(byKey[Host.optionKey("species_scope")] ~= nil,
+    "Gold registers host-scoped JOHTO SCOPE")
+  T.check(byKey.full_spawn_random == nil, "Gold does not use unprefixed spawn key")
   local lock = byKey.switch_hit_ai
   T.check(lock ~= nil, "Gold still has SWITCH HIT AI")
   T.eq(lock.choices[1][1], "GEN 2", "Gold switch-hit classic label is GEN 2")
@@ -323,6 +343,230 @@ do
   -- Johto ROM entries must stay (we only fill missing).
   T.check(entries.CHIKORITA ~= nil and entries.CHIKORITA.text ~= nil,
     "Gold keeps ROM CHIKORITA dex entry")
+end
+
+-- NEW (Johto) order follows live Johto availability, not every Gen3 species.
+do
+  local JohtoDex = require("mods.Kanto-Reforged.johto_dex")
+  local EncountersGen2 = require("mods.Kanto-Reforged.encounters_gen2")
+  local Host = require("mods.Kanto-Reforged.host")
+  local pack = require("mods.Kanto-Reforged.pokemon_data")
+  local dex = Data.gen2Pokedex
+  local newOrder = dex and dex.newOrder
+  T.check(newOrder ~= nil and #newOrder > 0, "Johto NEW order present after boot")
+
+  local function inNew(id)
+    for _, sp in ipairs(newOrder or {}) do
+      if sp == id then return true end
+    end
+    return false
+  end
+
+  -- Static Johto legends always stay in NEW.
+  T.check(inNew("RAIKOU") and inNew("LUGIA") and inNew("CELEBI"),
+    "Johto NEW keeps unmixed static legends")
+
+  -- TREECKO is Gen3 starter — only in NEW if it actually appears in Johto wilds.
+  local avail = JohtoDex.obtainableSet({
+    id = "Kanto-Reforged",
+    content = {
+      pokemon = {
+        get = function(_, id) return Data.pokemon and Data.pokemon[id] end,
+      },
+    },
+  })
+  if avail.TREECKO then
+    T.check(inNew("TREECKO"), "TREECKO in NEW when Johto-available")
+  else
+    T.check(not inNew("TREECKO"),
+      "TREECKO absent from NEW when not in Johto wilds (curated)")
+  end
+
+  -- OLD / entries still have full Gen3 (national).
+  T.check(dex.entries.TREECKO ~= nil, "OLD/national still has TREECKO entry")
+
+  -- AREA nests resolve against gen2Encounters + gen2Maps. Dex AREA itself also
+  -- needs pokegear.maps (pokedex.gfx has no town map). Load ROM cache sheets
+  -- here: the MVP harness skips encounters.lua at boot (FARFETCH_D), and KR
+  -- map registrations are not full Gold map headers with landmark bytes.
+  do
+    local Nests = require("src.core.gen2.Nests")
+    local home = os.getenv("HOME") or ""
+    local function loadGold(name)
+      local paths = {
+        home .. "/.local/share/love/pokemon-love2d/gold/data/generated/" .. name,
+        "data/generated/" .. name,
+      }
+      for _, p in ipairs(paths) do
+        local ok, val = pcall(dofile, p)
+        if ok and type(val) == "table" then return val end
+      end
+      return nil
+    end
+    local enc = loadGold("encounters.lua")
+    local maps = loadGold("maps.lua")
+    local menuGfx = Data.gen2MenuGfx or loadGold("menu_gfx.lua")
+    if enc and enc.grass and maps and maps.SILVER_CAVE_ROOM_1
+        and maps.SILVER_CAVE_ROOM_1.landmark then
+      local nests = Nests.find({
+        gen2Encounters = enc,
+        gen2Maps = maps,
+      }, "LARVITAR", "johto", nil)
+      T.check(#nests > 0, "LARVITAR has Johto AREA nest landmarks")
+      -- Live curated Kanto guest must also resolve via the same find path.
+      local live = Data.gen2Encounters
+      local guestSp, guestMap
+      if live and live.grass then
+        for mapId, block in pairs(live.grass) do
+          for _, slot in ipairs((block.slots and block.slots.DAY) or {}) do
+            local rec = Data.pokemon and Data.pokemon[slot.species]
+            if rec and rec.dex and rec.dex > 251 then
+              guestSp, guestMap = slot.species, mapId
+              break
+            end
+          end
+          if guestSp then break end
+        end
+      end
+      if guestSp and maps[guestMap] then
+        local gNests = Nests.find({
+          gen2Encounters = live,
+          gen2Maps = maps,
+        }, guestSp, nil, nil)
+        T.check(#gNests > 0,
+          "curated Gen3 wild guest has AREA nest landmarks (" .. guestSp .. ")")
+      else
+        T.check(true, "curated Gen3 AREA nest skipped (no live guest)")
+      end
+    else
+      T.check(true, "LARVITAR AREA nest skipped (no Gold cache)")
+      T.check(true, "curated Gen3 AREA nest skipped (no Gold cache)")
+    end
+    T.check(menuGfx and menuGfx.pokegear and menuGfx.pokegear.maps
+        and menuGfx.pokegear.maps.johto ~= nil,
+      "Pokegear town map available for dex AREA fallback")
+  end
+
+  -- Find a curated Johto guest from live grass and require it (or its evo) in NEW.
+  local guestInNew = false
+  local grass = Data.gen2Encounters and Data.gen2Encounters.grass
+  if grass then
+    local SpeciesScope = require("mods.Kanto-Reforged.species_scope")
+    for mapId, block in pairs(grass) do
+      if not SpeciesScope.isKantoMap(mapId) then
+        for _, slot in ipairs((block.slots and block.slots.DAY) or {}) do
+          local sp = slot.species
+          local rec = Data.pokemon and Data.pokemon[sp]
+          local dexN = rec and rec.dex
+          if dexN and dexN > 251 and inNew(sp) then
+            guestInNew = true
+            break
+          end
+        end
+      end
+      if guestInNew then break end
+    end
+  end
+  if grass and grass.ROUTE_29 then
+    T.check(guestInNew,
+      "curated Johto Gen3 guest appears in NEW order")
+  else
+    T.check(true, "curated Johto guest NEW check skipped (no encounter cache)")
+  end
+
+  -- johto_native: no dex>251 in NEW except static legends.
+  if grass and grass.ROUTE_29 and grass.ROUTE_1 then
+    local modApi = {
+      id = "Kanto-Reforged",
+      log = { info = function() end, warn = function() end },
+      options = {
+        get = function(_, k)
+          local Host = require("mods.Kanto-Reforged.host")
+          if k == Host.optionKey("species_scope") then return "johto_native" end
+        end,
+      },
+      content = {
+        encounters = {
+          get = function(_, kind) return Data.gen2Encounters[kind] end,
+          patch = function()
+            error("encounters: content is frozen after load")
+          end,
+        },
+        pokemon = {
+          each = function() return pairs(Data.pokemon or {}) end,
+          get = function(_, id) return Data.pokemon and Data.pokemon[id] end,
+        },
+      },
+    }
+    local savedEnc = require("src.mods.Merge").deepCopy(Data.gen2Encounters)
+    local savedNew = {}
+    for i, id in ipairs(Data.gen2Pokedex.newOrder or {}) do savedNew[i] = id end
+    EncountersGen2.clearBaselines()
+    EncountersGen2.apply(modApi, pack, "curated", { speciesScope = "johto_native" })
+    JohtoDex.rebuildOrders(modApi)
+    local bad = 0
+    for _, sp in ipairs(Data.gen2Pokedex.newOrder or {}) do
+      if not JohtoDex.STATIC_LEGENDS[sp] then
+        local rec = Data.pokemon and Data.pokemon[sp]
+        local d = (Data.gen2Pokedex.entries[sp] and Data.gen2Pokedex.entries[sp].dex)
+          or (rec and rec.dex) or 0
+        if d > 251 then bad = bad + 1 end
+      end
+    end
+    T.eq(bad, 0, "johto_native NEW has no Gen3 except static legends")
+
+    -- full_random: NEW ⊆ obtainable; Kanto-only species out of NEW.
+    EncountersGen2.clearBaselines()
+    Data.gen2Encounters = require("src.mods.Merge").deepCopy(savedEnc)
+    EncountersGen2.apply(modApi, pack, "full_random", {
+      legendsInMix = false, speciesScope = "national",
+    })
+    -- Force national scope for availability collect
+    modApi.options.get = function(_, k)
+      local Host = require("mods.Kanto-Reforged.host")
+      if k == Host.optionKey("species_scope") then return "national" end
+    end
+    JohtoDex.rebuildOrders(modApi)
+    local avail2 = JohtoDex.obtainableSet(modApi)
+    local over = 0
+    for _, sp in ipairs(Data.gen2Pokedex.newOrder or {}) do
+      if not avail2[sp] then over = over + 1 end
+    end
+    T.eq(over, 0, "full_random NEW ⊆ Johto obtainable set")
+
+    -- Restore curated surface for later checks.
+    Data.gen2Encounters = savedEnc
+    EncountersGen2.clearBaselines()
+    EncountersGen2.apply({
+      id = "Kanto-Reforged",
+      log = { info = function() end, warn = function() end },
+      content = {
+        encounters = {
+          get = function(_, kind) return Data.gen2Encounters[kind] end,
+          patch = function(_, kind, partial)
+            Data.gen2Encounters[kind] = Data.gen2Encounters[kind] or {}
+            for mapId, block in pairs(partial) do
+              Data.gen2Encounters[kind][mapId] = block
+            end
+          end,
+        },
+        pokemon = {
+          each = function() return pairs(Data.pokemon or {}) end,
+          get = function(_, id) return Data.pokemon and Data.pokemon[id] end,
+        },
+      },
+      options = {
+        get = function(_, k)
+          local Host = require("mods.Kanto-Reforged.host")
+          if k == Host.optionKey("species_scope") then return "national" end
+        end,
+      },
+    }, pack, "curated", { speciesScope = "national" })
+    JohtoDex.rebuildOrders(modApi)
+  else
+    T.check(true, "johto_native NEW skip (no encounter cache)")
+    T.check(true, "full_random NEW skip (no encounter cache)")
+  end
 end
 
 -- Gen3 type/matchup/move parity with Red (same KR patches on Gold)
@@ -604,6 +848,65 @@ do
         "ROUTE_30 DexNav not tripled by TOD (got " .. n .. ", max " .. maxOk .. ")")
     end
 
+    -- Game2 boot: live wilds live on Game.data, NOT the Gen1 Data module.
+    -- Mid-session toggle must rewrite Game.data.gen2Encounters (what World
+    -- reads). Writing only require("src.core.Data") is a silent no-op on Gold.
+    do
+      local function deepCopy(v)
+        if type(v) ~= "table" then return v end
+        local out = {}
+        for k, x in pairs(v) do out[k] = deepCopy(x) end
+        return out
+      end
+      local live = deepCopy(Data.gen2Encounters)
+      local prevDataEnc = Data.gen2Encounters
+      local prevGame = rawget(_G, "Game")
+      Data.gen2Encounters = nil
+      local stubGame = {
+        data = { gen2Encounters = live },
+        world = { encounters = live },
+      }
+      rawset(_G, "Game", stubGame)
+      local goldApi = {
+        id = "Kanto-Reforged",
+        game = stubGame,
+        log = { info = function() end, warn = function() end },
+        content = {
+          encounters = {
+            get = function(_, kind) return live[kind] end,
+            patch = function()
+              error("encounters: content is frozen after load")
+            end,
+          },
+          pokemon = {
+            each = function() return pairs(Data.pokemon or {}) end,
+            get = function(_, id) return Data.pokemon and Data.pokemon[id] end,
+          },
+        },
+      }
+      -- Restore Data.pokemon path for index build; only encounters were nil'd.
+      Data.gen2Encounters = nil
+      EncountersGen2.clearBaselines()
+      EncountersGen2.apply(goldApi, pack, "curated")
+      local before = live.grass.ROUTE_29.slots.DAY[1].species
+      EncountersGen2.apply(goldApi, pack, "full_random", {
+        legendsInMix = false,
+        speciesScope = "national",
+      })
+      local after = live.grass.ROUTE_29.slots.DAY[1].species
+      T.check(after ~= nil, "Game.data full_random fills ROUTE_29")
+      T.check(after ~= before,
+        "Game.data mid-session full_random reshuffles (not Data module)")
+      T.check(Data.gen2Encounters == nil
+          or Data.gen2Encounters.grass == nil
+          or Data.gen2Encounters.grass.ROUTE_29 == nil
+          or Data.gen2Encounters.grass.ROUTE_29.slots.DAY[1].species ~= after,
+        "orphan Data.gen2Encounters is not the live write target")
+      Data.gen2Encounters = prevDataEnc
+      rawset(_G, "Game", prevGame)
+      EncountersGen2.clearBaselines()
+    end
+
     -- Restore curated so later DexNav assumptions stay sane if any
     EncountersGen2.apply(modApi, pack, "curated")
     T.check(true, "curated reapplies after full_random (" .. tostring(before29) .. "→" .. tostring(after29) .. ")")
@@ -616,6 +919,9 @@ do
     T.check(true, "ROUTE_30 MORN/DAY skip")
     T.check(true, "ROUTE_30 NITE/DAY skip")
     T.check(true, "ROUTE_30 DexNav TOD skip")
+    T.check(true, "Game.data mid-session skip")
+    T.check(true, "Game.data reshuffle skip")
+    T.check(true, "orphan Data skip")
   end
 end
 

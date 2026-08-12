@@ -316,39 +316,58 @@ local function slotsFor(mod, habitats, level, tod, habitatPools)
   return todSlots(orderForTod(base, tod), level, tod)
 end
 
--- Prefer live Data after the boot merge: registry:get stays frozen/stale
--- once content freezes, but the engine rolls wilds from Data.gen2Encounters.
-local function liveGrass(_mod)
+-- Gold keeps wild tables on game.data.gen2Encounters (Game2 builds its own
+-- data table). Gen1's Data *module* is NOT that table — writing only there
+-- makes mid-session FULL/PURE SPAWN MIX look like a no-op on Gold while Red
+-- still works. Prefer game.data, then Data (headless tests), then registry.
+local function liveEncountersRoot(mod)
+  local game = (mod and mod.game) or rawget(_G, "Game")
+  local root = game and game.data and game.data.gen2Encounters
+  if root then return root, game end
   local Data = require("src.core.Data")
-  if Data.gen2Encounters and Data.gen2Encounters.grass then
-    return Data.gen2Encounters.grass
-  end
-  local reg = _mod and _mod.content and _mod.content.encounters
+  if Data.gen2Encounters then return Data.gen2Encounters, game end
+  return nil, game
+end
+
+local function liveGrass(mod)
+  local root = liveEncountersRoot(mod)
+  if root and root.grass then return root.grass end
+  local reg = mod and mod.content and mod.content.encounters
   if not (reg and reg.get) then return nil end
   return reg:get("grass")
 end
 
-local function liveWater(_mod)
-  local Data = require("src.core.Data")
-  if Data.gen2Encounters and Data.gen2Encounters.water then
-    return Data.gen2Encounters.water
-  end
-  local reg = _mod and _mod.content and _mod.content.encounters
+local function liveWater(mod)
+  local root = liveEncountersRoot(mod)
+  if root and root.water then return root.water end
+  local reg = mod and mod.content and mod.content.encounters
   if not (reg and reg.get) then return nil end
   return reg:get("water")
 end
 
--- Registry patch during load; after freeze write Data.gen2Encounters so
--- FULL SPAWN MIX / scope toggles still reshuffle (same class of bug as Gen1).
+-- Registry patch during load; always also write the live game.data table so
+-- toggles after freeze reach World.encounters (same ref as game.data).
 local function livePatchKind(mod, kind, mapId, block)
-  local ok = pcall(function()
+  pcall(function()
     mod.content.encounters:patch(kind, { [mapId] = block })
   end)
-  if ok then return true end
-  local Data = require("src.core.Data")
-  Data.gen2Encounters = Data.gen2Encounters or {}
-  Data.gen2Encounters[kind] = Data.gen2Encounters[kind] or {}
-  Data.gen2Encounters[kind][mapId] = block
+  local root, game = liveEncountersRoot(mod)
+  if not root then
+    local Data = require("src.core.Data")
+    Data.gen2Encounters = Data.gen2Encounters or {}
+    root = Data.gen2Encounters
+    if game and game.data and game.data.gen2Encounters == nil then
+      game.data.gen2Encounters = root
+    end
+  end
+  root[kind] = root[kind] or {}
+  root[kind][mapId] = block
+  -- World normally aliases game.data.gen2Encounters; if it diverged, stamp it.
+  local world = game and game.world
+  if world and world.encounters and world.encounters ~= root then
+    world.encounters[kind] = world.encounters[kind] or {}
+    world.encounters[kind][mapId] = block
+  end
   return true
 end
 

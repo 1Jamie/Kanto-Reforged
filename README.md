@@ -17,6 +17,8 @@ farm is sitll being implemented and extended in gen2
 
 **Sevii Islands:** On hold. Maps, ferry, and tooling live under `sevii/` but are not loaded (`SEVII_ENABLED = false`). Reserved map ids stay reserved; no Sevii play path until that work resumes.
 
+If you are trying to play ignore the instructions below and go to the releases and get the latest zip, it has my custom sprites avaiable in the release but are not in the repo. you do not need to do all this yourself, just install the zip into your game.
+
 ## What it looks like
 
 ![Party with Johto/Hoenn mons](screen-shots/party-menu.png)

@@ -44,9 +44,10 @@ local function breedingIsEgg(mon)
 end
 
 function SpeciesScope.optionDef()
+  local key = Host.optionKey(SpeciesScope.OPTION_KEY)
   if Host.isGen2() then
     return {
-      key = SpeciesScope.OPTION_KEY,
+      key = key,
       label = "JOHTO SCOPE",
       type = "choice",
       default = SpeciesScope.MODE_NATIONAL,
@@ -57,7 +58,7 @@ function SpeciesScope.optionDef()
     }
   end
   return {
-    key = SpeciesScope.OPTION_KEY,
+    key = key,
     label = "DEX SCOPE",
     type = "choice",
     default = SpeciesScope.MODE_NATIONAL,
@@ -69,7 +70,8 @@ function SpeciesScope.optionDef()
 end
 
 function SpeciesScope.mode(mod)
-  local v = mod and mod.options and mod.options:get(SpeciesScope.OPTION_KEY)
+  local v = mod and mod.options
+    and mod.options:get(Host.optionKey(SpeciesScope.OPTION_KEY))
   if Host.isGen2() then
     if v == SpeciesScope.MODE_JOHTO_NATIVE then
       return SpeciesScope.MODE_JOHTO_NATIVE
@@ -207,8 +209,8 @@ local function notify(game, msg)
 end
 
 function SpeciesScope.setOptionValue(mod, value)
-  local loader = mod and mod._loader
-  -- Prefer walking via Runtime / global Game mods loader
+  local key = Host.optionKey(SpeciesScope.OPTION_KEY)
+  local loader = Host.modLoader(mod)
   local game = SpeciesScope._game or rawget(_G, "Game")
   if game and game.mods then
     loader = game.mods
@@ -216,13 +218,13 @@ function SpeciesScope.setOptionValue(mod, value)
   if loader then
     loader.modOptions = loader.modOptions or {}
     loader.modOptions[mod.id] = loader.modOptions[mod.id] or {}
-    loader.modOptions[mod.id][SpeciesScope.OPTION_KEY] = value
+    loader.modOptions[mod.id][key] = value
   end
   if game and game.save and game.save.options then
     game.save.options.modOptions = game.save.options.modOptions or {}
     game.save.options.modOptions[mod.id] =
       game.save.options.modOptions[mod.id] or {}
-    game.save.options.modOptions[mod.id][SpeciesScope.OPTION_KEY] = value
+    game.save.options.modOptions[mod.id][key] = value
   end
 end
 
@@ -1105,7 +1107,8 @@ end
 
 function SpeciesScope.onOptionsChanged(mod, game, ev)
   if SpeciesScope._ignoreOptionEvent then return end
-  if not ev or ev.mod ~= mod.id or ev.key ~= SpeciesScope.OPTION_KEY then
+  if not ev or ev.mod ~= mod.id
+      or not Host.optionEventIs(ev.key, SpeciesScope.OPTION_KEY) then
     return
   end
   SpeciesScope._game = game or SpeciesScope._game or rawget(_G, "Game")
@@ -1297,7 +1300,7 @@ function SpeciesScope.install(mod)
       local origSet = MS.setOption
       if type(origSet) ~= "function" then return end
       MS.setOption = function(self, modId, key, value)
-        if key == SpeciesScope.OPTION_KEY and modId == mod.id
+        if Host.optionEventIs(key, SpeciesScope.OPTION_KEY) and modId == mod.id
             and not SpeciesScope._ignoreOptionEvent then
           local game = self.game or SpeciesScope._game or rawget(_G, "Game")
           local allowed, reason = SpeciesScope.canChangeScope(game)

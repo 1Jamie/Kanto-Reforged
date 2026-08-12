@@ -303,18 +303,19 @@ T.check(type(card.summary) == "string" and #card.summary > 0, "mod.card has a su
 T.check(card.author ~= nil and card.author ~= "", "mod.card names an author")
 local schema = run.loader.optionSchemas["Kanto-Reforged"]
 T.check(schema ~= nil and #schema >= 6, "Kanto-Reforged option schema registered")
-T.eq(schema[1].key, "species_scope", "species scope choice key")
+local Host = require("mods.Kanto-Reforged.host")
+T.eq(schema[1].key, Host.optionKey("species_scope"), "species scope choice key")
 T.eq(schema[1].type, "choice", "species scope is a choice")
 T.eq(schema[1].default, "national", "DEX SCOPE defaults national")
 T.eq(schema[1].label, "DEX SCOPE", "Gen1 DEX SCOPE label")
-T.eq(schema[2].key, "full_spawn_random", "spawn toggle key")
+T.eq(schema[2].key, Host.optionKey("full_spawn_random"), "spawn toggle key")
 T.eq(schema[2].type, "toggle", "spawn toggle is a toggle")
 T.eq(schema[2].default, false, "FULL SPAWN MIX defaults off")
-T.eq(schema[3].key, "pure_spawn_random", "pure random spawn key")
+T.eq(schema[3].key, Host.optionKey("pure_spawn_random"), "pure random spawn key")
 T.eq(schema[3].type, "toggle", "pure random is a toggle")
 T.eq(schema[3].default, false, "PURE RANDOM SPAWN defaults off")
 T.eq(schema[3].label, "PURE RANDOM SPAWN", "pure random label")
-T.eq(schema[4].key, "legends_in_mix", "legends-in-mix toggle key")
+T.eq(schema[4].key, Host.optionKey("legends_in_mix"), "legends-in-mix toggle key")
 T.eq(schema[4].type, "toggle", "legends-in-mix is a toggle")
 T.eq(schema[4].default, false, "LEGENDS IN MIX defaults off")
 T.eq(schema[4].label, "LEGENDS IN MIX", "legends-in-mix label")
@@ -325,6 +326,85 @@ T.eq(schema[5].label, "XP SHARE (SLOT 2)", "slot-2 XP share label")
 T.eq(schema[6].key, "smarter_ai", "smarter AI toggle key")
 T.eq(schema[6].type, "toggle", "smarter AI is a toggle")
 T.eq(schema[6].default, true, "SMARTER AI defaults on")
+
+-- Host-scoped spawn toggles: Red and Gold buckets stay independent.
+do
+  local bucket = run.loader.modOptions["Kanto-Reforged"] or {}
+  run.loader.modOptions["Kanto-Reforged"] = bucket
+  bucket["g1:full_spawn_random"] = true
+  bucket["g2:full_spawn_random"] = false
+  bucket["full_spawn_random"] = nil
+  Host.force(1)
+  T.eq(Host.optionKey("full_spawn_random"), "g1:full_spawn_random", "Gen1 option key")
+  T.check(bucket[Host.optionKey("full_spawn_random")] == true, "Gen1 spawn mix on")
+  Host.force(2)
+  T.eq(Host.optionKey("full_spawn_random"), "g2:full_spawn_random", "Gen2 option key")
+  T.check(bucket[Host.optionKey("full_spawn_random")] == false, "Gen2 spawn mix off")
+  -- Legacy unprefixed migrates into the active host key only.
+  bucket["g1:legends_in_mix"] = nil
+  bucket["g2:legends_in_mix"] = nil
+  bucket["legends_in_mix"] = true
+  Host.force(1)
+  local modApi = { id = "Kanto-Reforged", _loader = run.loader, options = {
+    get = function(_, k)
+      local stored = run.loader.modOptions["Kanto-Reforged"]
+      if stored and stored[k] ~= nil then return stored[k] end
+      return nil
+    end,
+  }}
+  Host.migrateScopedOptions(modApi)
+  T.check(bucket["g1:legends_in_mix"] == true, "legacy legends migrates to g1")
+  T.check(bucket["g2:legends_in_mix"] == nil, "legacy legends does not write g2 while on Gen1")
+  Host.clearForce()
+end
+
+-- Host-scoped spawn keys must round-trip through top-level options.modOptions
+-- (Loader reads that on boot; Gold used to stash only under options.gold).
+do
+  local Host = require("mods.Kanto-Reforged.host")
+  local SaveData = require("src.core.SaveData")
+  local Save = require("src.core.gen2.Save")
+  local disk = { textSpeed = 3, modOptions = {} }
+  -- Fill enough defaultOptions keys so saveOptions treats this as a full table
+  -- when we need — actually persistModOptions calls loadOptions then merge.
+  local origLoad, origSave = SaveData.loadOptions, SaveData.saveOptions
+  SaveData.loadOptions = function()
+    return disk
+  end
+  SaveData.saveOptions = function(opts)
+    disk = opts
+  end
+  Host.force(1)
+  local key = Host.optionKey("full_spawn_random")
+  run.loader.modOptions["Kanto-Reforged"] =
+    run.loader.modOptions["Kanto-Reforged"] or {}
+  run.loader.modOptions["Kanto-Reforged"][key] = true
+  Host.persistModOptions({ id = "Kanto-Reforged", _loader = run.loader })
+  T.check(disk.modOptions
+      and disk.modOptions["Kanto-Reforged"]
+      and disk.modOptions["Kanto-Reforged"][key] == true,
+    "persistModOptions writes g1 spawn key to top-level modOptions")
+
+  -- Gold Save.saveOptions (KR shim) must also lift modOptions to top-level for Loader.
+  disk = { textSpeed = 3, modOptions = {} }
+  Host.installEngineShims({ id = "Kanto-Reforged", log = { info = function() end } })
+  Save.saveOptions({
+    textSpeed = 3,
+    battleStyle = "SHIFT",
+    modOptions = {
+      ["Kanto-Reforged"] = { ["g2:pure_spawn_random"] = true },
+    },
+  })
+  T.check(disk.modOptions
+      and disk.modOptions["Kanto-Reforged"]
+      and disk.modOptions["Kanto-Reforged"]["g2:pure_spawn_random"] == true,
+    "Gold Save.saveOptions lifts modOptions to top-level")
+  T.check(disk.gold ~= nil, "Gold Save.saveOptions still writes options.gold")
+
+  SaveData.loadOptions, SaveData.saveOptions = origLoad, origSave
+  Host.clearForce()
+end
+
 local function optByKey(key)
   for _, o in ipairs(schema) do
     if o.key == key then return o end

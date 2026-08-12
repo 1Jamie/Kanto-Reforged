@@ -21,19 +21,22 @@ local mixEncounters = require("mods.Kanto-Reforged.encounters").mix
 local ExpEncounters = require("mods.Kanto-Reforged.encounters")
 
 local function spawnModeFromOptions(mod)
+  local Host = require("mods.Kanto-Reforged.host")
   -- PURE RANDOM overrides the gated FULL SPAWN MIX when both are on.
-  if mod.options and mod.options:get("pure_spawn_random") then
+  if mod.options and mod.options:get(Host.optionKey("pure_spawn_random")) then
     return "pure_random"
   end
-  if mod.options and mod.options:get("full_spawn_random") then
+  if mod.options and mod.options:get(Host.optionKey("full_spawn_random")) then
     return "full_random"
   end
   return "curated"
 end
 
 local function spawnOptsFromOptions(mod)
+  local Host = require("mods.Kanto-Reforged.host")
   return {
-    legendsInMix = mod.options and mod.options:get("legends_in_mix") and true or false,
+    legendsInMix = mod.options
+      and mod.options:get(Host.optionKey("legends_in_mix")) and true or false,
     speciesScope = SpeciesScope.mode(mod),
   }
 end
@@ -62,6 +65,11 @@ local function applySpawnTables(mod, pokemon_data, flags)
   if Host.isGen2() then
     local EncountersGen2 = require("mods.Kanto-Reforged.encounters_gen2")
     EncountersGen2.apply(mod, pokemon_data, mode, opts)
+    local JohtoDex = require("mods.Kanto-Reforged.johto_dex")
+    pcall(function()
+      local n = JohtoDex.rebuildOrders(mod)
+      mod.log:info("Johto Pokédex NEW order rebuilt (%d species)", n or 0)
+    end)
   else
     ExpEncounters.apply(mod, pokemon_data, mode, opts)
   end
@@ -106,22 +114,23 @@ return function(mod)
   end
 
   -- Manager / card options (host-aware labels / visibility).
+  -- Spawn + dex-scope keys are g1:/g2: so Red and Gold keep separate state.
   local optionDefs = {
     SpeciesScope.optionDef(),
     {
-      key = "full_spawn_random",
+      key = Host.optionKey("full_spawn_random"),
       label = "FULL SPAWN MIX",
       type = "toggle",
       default = false,
     },
     {
-      key = "pure_spawn_random",
+      key = Host.optionKey("pure_spawn_random"),
       label = "PURE RANDOM SPAWN",
       type = "toggle",
       default = false,
     },
     {
-      key = "legends_in_mix",
+      key = Host.optionKey("legends_in_mix"),
       label = "LEGENDS IN MIX",
       type = "toggle",
       default = false,
@@ -138,6 +147,8 @@ return function(mod)
     optionDefs[#optionDefs + 1] = require("mods.Kanto-Reforged.dexnav").OPTION
   end
   mod.options:define(optionDefs)
+  Host.installEngineShims(mod)
+  Host.migrateScopedOptions(mod)
 
   SpeciesScope._refreshContent = refreshScopeContent
   SpeciesScope.install(mod)
@@ -452,6 +463,7 @@ return function(mod)
     
     local DexEntries = require("mods.Kanto-Reforged.dex_entries")
     local dexTexts = DexEntries.bindAll(mod, pokemon_data.species)
+    DexEntries.installInlineTextFallback(mod)
 
     local okPals, species_palettes = pcall(require, "mods.Kanto-Reforged.species_palettes")
     local PaletteGen2 = require("mods.Kanto-Reforged.palette_gen2")
@@ -475,23 +487,28 @@ return function(mod)
       -- Gold dex UI reads gen2Pokedex.entries (not Data.text). Fill Hoenn rows.
       DexEntries.bindGen2Pokedex(mod, pokemon_data.species)
       applySpawnTables(mod, pokemon_data)
+      local JohtoDex = require("mods.Kanto-Reforged.johto_dex")
+      JohtoDex.installNests(mod)
+      JohtoDex.installArea(mod)
       local TrainersGen2 = require("mods.Kanto-Reforged.trainers_gen2")
       TrainersGen2.install(mod)
       mod.events:on("mod.options_changed", function(ev)
         if not (ev and ev.mod == mod.id) then return end
-        if ev.key == "species_scope" then
+        Host.persistModOptions(mod)
+        if Host.optionEventIs(ev.key, "species_scope") then
           SpeciesScope.onOptionsChanged(mod, rawget(_G, "Game"), ev)
           return
         end
-        if ev.key == "pure_spawn_random" then
-          if mod.options:get("pure_spawn_random") then
+        if Host.optionEventIs(ev.key, "pure_spawn_random") then
+          if mod.options:get(Host.optionKey("pure_spawn_random")) then
             applySpawnTables(mod, pokemon_data, { rerollPure = true })
           else
             applySpawnTables(mod, pokemon_data, { clearPureSeed = true })
           end
           return
         end
-        if ev.key == "full_spawn_random" or ev.key == "legends_in_mix" then
+        if Host.optionEventIs(ev.key, "full_spawn_random")
+            or Host.optionEventIs(ev.key, "legends_in_mix") then
           applySpawnTables(mod, pokemon_data)
         end
       end)
@@ -522,19 +539,21 @@ return function(mod)
       mod.log:info("Trainer parties mixed (%d classes)", nTrainers)
       mod.events:on("mod.options_changed", function(ev)
         if not (ev and ev.mod == mod.id) then return end
-        if ev.key == "species_scope" then
+        Host.persistModOptions(mod)
+        if Host.optionEventIs(ev.key, "species_scope") then
           SpeciesScope.onOptionsChanged(mod, rawget(_G, "Game"), ev)
           return
         end
-        if ev.key == "pure_spawn_random" then
-          if mod.options:get("pure_spawn_random") then
+        if Host.optionEventIs(ev.key, "pure_spawn_random") then
+          if mod.options:get(Host.optionKey("pure_spawn_random")) then
             applySpawnTables(mod, pokemon_data, { rerollPure = true })
           else
             applySpawnTables(mod, pokemon_data, { clearPureSeed = true })
           end
           return
         end
-        if ev.key == "full_spawn_random" or ev.key == "legends_in_mix" then
+        if Host.optionEventIs(ev.key, "full_spawn_random")
+            or Host.optionEventIs(ev.key, "legends_in_mix") then
           applySpawnTables(mod, pokemon_data)
         end
       end)

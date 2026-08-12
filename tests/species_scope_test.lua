@@ -12,10 +12,11 @@ return function(T, Data, run)
   T.check(mod.save ~= nil, "mod.save API present")
 
   -- Schema
+  local scopeKey = Host.optionKey(SpeciesScope.OPTION_KEY)
   local schema = run.loader.optionSchemas["Kanto-Reforged"]
   local scopeOpt
   for _, opt in ipairs(schema or {}) do
-    if opt.key == SpeciesScope.OPTION_KEY then scopeOpt = opt break end
+    if opt.key == scopeKey then scopeOpt = opt break end
   end
   T.check(scopeOpt ~= nil, "species_scope option registered")
   T.eq(scopeOpt.type, "choice", "species_scope is a choice")
@@ -51,7 +52,7 @@ return function(T, Data, run)
   run.loader.modOptions["Kanto-Reforged"] =
     run.loader.modOptions["Kanto-Reforged"] or {}
   local opts = run.loader.modOptions["Kanto-Reforged"]
-  local savedMode = opts[SpeciesScope.OPTION_KEY]
+  local savedMode = opts[scopeKey]
   local savedApplied = mod.save:get(SpeciesScope.APPLIED_KEY, nil)
   local savedStash = mod.save:get(SpeciesScope.STASH_KEY, nil)
 
@@ -59,7 +60,7 @@ return function(T, Data, run)
   SpeciesScope._ignoreOptionEvent = true
 
   local function setMode(mode)
-    opts[SpeciesScope.OPTION_KEY] = mode
+    opts[Host.optionKey(SpeciesScope.OPTION_KEY)] = mode
   end
 
   -- maxDex / allows
@@ -558,7 +559,7 @@ return function(T, Data, run)
   end
 
   -- Restore prior option state + live national surface for later suites
-  opts[SpeciesScope.OPTION_KEY] = savedMode or SpeciesScope.MODE_NATIONAL
+  opts[scopeKey] = savedMode or SpeciesScope.MODE_NATIONAL
   setMode(SpeciesScope.MODE_NATIONAL)
   SpeciesScope.applyTransition(mod, makeGame(freshSave()), SpeciesScope.MODE_NATIONAL)
   SpeciesScope.applyDexSize(mod, SpeciesScope.MODE_NATIONAL)

@@ -81,4 +81,181 @@ function Host.saveSet(bucket, key, value)
   bucket:set(Host.saveKey(key), value)
 end
 
+-- Options that rewrite host-specific world content. Manager still shows one
+-- row per boot; the stored key is g1:/g2: so Red and Gold stay independent.
+-- Battle-feel toggles (XP Share, AI, …) stay shared / unprefixed.
+Host.SCOPED_OPTIONS = {
+  species_scope = true,
+  full_spawn_random = true,
+  pure_spawn_random = true,
+  legends_in_mix = true,
+}
+
+function Host.optionKey(logical)
+  if Host.SCOPED_OPTIONS[logical] then
+    return Host.saveKey(logical)
+  end
+  return logical
+end
+
+function Host.optionEventIs(key, logical)
+  return key == Host.optionKey(logical)
+end
+
+-- Loader that owns modOptions for this facade (needed during entry, before
+-- game.mods is assigned). Prefer an explicit stash, then the options.get
+-- upvalue, then game.mods.
+function Host.modLoader(mod)
+  if mod and mod._loader then return mod._loader end
+  local get = mod and mod.options and mod.options.get
+  if type(get) == "function" and debug and debug.getupvalue then
+    local i = 1
+    while true do
+      local name, val = debug.getupvalue(get, i)
+      if not name then break end
+      if name == "loader" then
+        if mod then mod._loader = val end
+        return val
+      end
+      i = i + 1
+    end
+  end
+  local game = (mod and mod.game) or rawget(_G, "Game")
+  return game and game.mods
+end
+
+-- Flush this mod's option bucket to top-level options.modOptions (what
+-- Loader reads on every boot). Safe on Red and Gold.
+function Host.persistModOptions(mod)
+  if not mod then return end
+  local SaveData = require("src.core.SaveData")
+  local game = (mod.game) or rawget(_G, "Game")
+  local loader = Host.modLoader(mod) or (game and game.mods)
+  local live = loader and loader.modOptions and loader.modOptions[mod.id]
+  if type(live) ~= "table" then return end
+
+  if game and game.save and game.save.options then
+    game.save.options.modOptions = game.save.options.modOptions or {}
+    game.save.options.modOptions[mod.id] = live
+  end
+  if game and game.options then
+    game.options.modOptions = game.options.modOptions or {}
+    game.options.modOptions[mod.id] = live
+  end
+
+  local file = SaveData.loadOptions()
+  file.modOptions = file.modOptions or {}
+  file.modOptions[mod.id] = live
+  SaveData.saveOptions(file)
+
+  if game and type(game.writeOptions) == "function" then
+    pcall(function() game:writeOptions() end)
+  elseif game and type(game.persistOptions) == "function" then
+    pcall(function() game:persistOptions() end)
+  end
+end
+
+-- Engine gaps KR fills without shipping engine patches:
+--   * Game2 has persistOptions but Manager calls writeOptions (Gen1 API)
+--   * Game:writeOptions can persist a stale save.options.modOptions copy
+--   * Gold Save.saveOptions stashes under options.gold; Loader reads
+--     top-level options.modOptions
+function Host.installEngineShims(mod)
+  if Host._engineShims then return end
+  Host._engineShims = true
+  local Gen1Patch = require("mods.Kanto-Reforged.gen1_patch")
+
+  pcall(function()
+    local Game2 = require("src.core.Game2")
+    if type(Game2) == "table" and type(Game2.writeOptions) ~= "function"
+        and type(Game2.persistOptions) == "function" then
+      function Game2:writeOptions()
+        return self:persistOptions()
+      end
+    end
+  end)
+
+  pcall(function()
+    Gen1Patch.apply(require("src.core.Game"), function(Game)
+      if Game._krWriteOpts then return end
+      local orig = Game.writeOptions
+      if type(orig) ~= "function" then return end
+      function Game:writeOptions()
+        if self.mods and self.mods.modOptions and self.save
+            and self.save.options then
+          self.save.options.modOptions = self.mods.modOptions
+        end
+        return orig(self)
+      end
+      Game._krWriteOpts = true
+    end)
+  end)
+
+  pcall(function()
+    Gen1Patch.apply(require("src.core.gen2.Save"), function(Save)
+      if Save._krModOptsLift then return end
+      local orig = Save.saveOptions
+      if type(orig) ~= "function" then return end
+      Save.saveOptions = function(options, fs)
+        if type(options) ~= "table" then return orig(options, fs) end
+        local ok, SaveData = pcall(require, "src.core.SaveData")
+        if not ok then return orig(options, fs) end
+        local file = SaveData.loadOptions(fs) or {}
+        local block = {}
+        for key, value in pairs(options) do block[key] = value end
+        file[Save.OPTIONS_KEY] = block
+        if type(options.modOptions) == "table" then
+          file.modOptions = file.modOptions or {}
+          for modId, bucket in pairs(options.modOptions) do
+            if type(bucket) == "table" then
+              file.modOptions[modId] = file.modOptions[modId] or {}
+              for k, v in pairs(bucket) do
+                file.modOptions[modId][k] = v
+              end
+            end
+          end
+        end
+        SaveData.saveOptions(file, fs)
+        return true
+      end
+      Save._krModOptsLift = true
+    end)
+  end)
+
+  if mod and mod.log then
+    mod.log:info("Host: installed option-persistence engine shims")
+  end
+end
+
+-- One-time copy from unprefixed legacy keys into the current host bucket.
+function Host.migrateScopedOptions(mod)
+  if not mod then return end
+  local loader = Host.modLoader(mod)
+  local bucket = loader and loader.modOptions and loader.modOptions[mod.id]
+  if not bucket then
+    if not loader then return end
+    loader.modOptions = loader.modOptions or {}
+    loader.modOptions[mod.id] = loader.modOptions[mod.id] or {}
+    bucket = loader.modOptions[mod.id]
+  end
+  local game = (mod.game) or rawget(_G, "Game")
+  local saveBucket = game and game.save and game.save.options
+    and game.save.options.modOptions and game.save.options.modOptions[mod.id]
+  local migrated = false
+  for logical in pairs(Host.SCOPED_OPTIONS) do
+    local hk = Host.optionKey(logical)
+    if bucket[hk] == nil and bucket[logical] ~= nil then
+      bucket[hk] = bucket[logical]
+      migrated = true
+    end
+    if saveBucket and saveBucket[hk] == nil and saveBucket[logical] ~= nil then
+      saveBucket[hk] = saveBucket[logical]
+      migrated = true
+    end
+  end
+  if migrated then
+    Host.persistModOptions(mod)
+  end
+end
+
 return Host
