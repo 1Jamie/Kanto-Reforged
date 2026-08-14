@@ -339,15 +339,31 @@ function LocationSignpost.draw(mod, game, viewport)
     yOffset = -32 * progress
   end
 
-  -- Scale and position relative to game screen canvas
-  local scale = (viewport and viewport.scale) or (game and game.fitScale and game:fitScale()) or 1
+  -- DPI-aware scaling & viewport translation across all platforms (Desktop, Mobile, Steam Deck, Retina/High-DPI)
+  local dpiX = (viewport and viewport.dpiX) or (love and love.window and love.window.getDPIScale and love.window.getDPIScale()) or 1
+  local dpiY = (viewport and viewport.dpiY) or dpiX
+
   local gameX = (viewport and viewport.gameX) or 0
   local gameY = (viewport and viewport.gameY) or 0
+
+  local scaleX = 1
+  local scaleY = 1
+  if viewport and viewport.gameWidth and viewport.gameHeight and viewport.gameWidth > 0 and viewport.gameHeight > 0 then
+    scaleX = viewport.gameWidth / 160
+    scaleY = viewport.gameHeight / 144
+  elseif viewport and viewport.scale and viewport.scale > 0 then
+    scaleX = viewport.scale / dpiX
+    scaleY = viewport.scale / dpiY
+  elseif game and type(game.fitScale) == "function" then
+    local fit = game:fitScale()
+    scaleX = fit / dpiX
+    scaleY = fit / dpiY
+  end
 
   local title = LocationSignpost._displayTitle or ""
   local accent = LocationSignpost._accentColor or { 0.92, 0.70, 0.16 }
 
-  -- Format lines & word-wrap if text exceeds 124px width
+  -- Format lines & word-wrap if text exceeds 124px width in 160x144 space
   local lines, maxLineW = LocationSignpost.formatTitleLines(title, 124)
   local lineCount = #lines
 
@@ -358,7 +374,7 @@ function LocationSignpost.draw(mod, game, viewport)
 
   G.push("all")
   G.translate(gameX, gameY)
-  G.scale(scale, scale)
+  G.scale(scaleX, scaleY)
 
   -- 1. Outer Drop Shadow
   G.setColor(0, 0, 0, 0.40 * alpha)
