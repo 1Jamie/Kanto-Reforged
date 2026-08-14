@@ -1,9 +1,9 @@
 -- BAG GIVE option: holdables get USE/GIVE/TOSS from the bag menu.
 return function(T, Data, run)
-  local HeldItems = require("mods.Kanto-Reforged.held_items")
+  local HeldItems = require("mods.Kanto-Reforged.items.held_items")
   local Pokemon = require("src.pokemon.Pokemon")
   local Menu = require("src.ui.Menu")
-  local BagPockets = require("mods.Kanto-Reforged.bag_pockets")
+  local BagPockets = require("mods.Kanto-Reforged.items.bag_pockets")
   local Strings = require("src.core.Strings")
 
   local schema = run.loader.optionSchemas["Kanto-Reforged"]

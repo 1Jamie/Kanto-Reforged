@@ -1,6 +1,6 @@
 -- Gen1 Modern UI adapter: no-op without that mod; registers when stubbed.
 return function(T, Data, run)
-  local install = require("mods.Kanto-Reforged.gen1_modern_ui_adapter")
+  local install = require("mods.Kanto-Reforged.ui.gen1_modern_ui_adapter")
 
   local bare = { id = "Kanto-Reforged", exports = {}, find = function() return nil end }
   local ok, err = install(bare)

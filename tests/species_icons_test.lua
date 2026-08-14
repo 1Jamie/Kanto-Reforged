@@ -1,6 +1,6 @@
 -- Gen 1 menu-icon class mapping for Kanto Reforged species.
 return function(T, Data, run)
-  local SpeciesIcons = require("mods.Kanto-Reforged.species_icons")
+  local SpeciesIcons = require("mods.Kanto-Reforged.pokemon.species_icons")
 
   T.eq(SpeciesIcons.pickClass({ id = "HERACROSS", types = { "BUG", "FIGHTING" } }),
     "BUG", "Heracross → BUG")
@@ -26,7 +26,7 @@ return function(T, Data, run)
   T.eq(Data.icons.bySpecies.STEELIX, "SNAKE", "Steelix registered in bySpecies")
 
   -- Every Kanto Reforged species got a known class name
-  local pd = require("mods.Kanto-Reforged.pokemon_data")
+  local pd = require("mods.Kanto-Reforged.pokemon.pokemon_data")
   local valid = {
     GRASS = true, MON = true, WATER = true, BUG = true, BIRD = true,
     QUADRUPED = true, SNAKE = true, FAIRY = true, BALL = true, HELIX = true,

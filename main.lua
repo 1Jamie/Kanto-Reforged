@@ -1,27 +1,27 @@
-local Abilities = require("mods.Kanto-Reforged.abilities")
-local ExpMoveEffects = require("mods.Kanto-Reforged.move_effects")
-local HeldItems = require("mods.Kanto-Reforged.held_items")
-local Gender = require("mods.Kanto-Reforged.gender")
-local ModernXpShare = require("mods.Kanto-Reforged.modern_xp_share")
-local SplitSpecial = require("mods.Kanto-Reforged.split_special")
-local TrainerAi = require("mods.Kanto-Reforged.trainer_ai")
-local ExpTrainers = require("mods.Kanto-Reforged.trainers")
-local SpeciesScope = require("mods.Kanto-Reforged.species_scope")
+local Abilities = require("mods.Kanto-Reforged.battle.abilities")
+local ExpMoveEffects = require("mods.Kanto-Reforged.battle.move_effects")
+local HeldItems = require("mods.Kanto-Reforged.items.held_items")
+local Gender = require("mods.Kanto-Reforged.pokemon.gender")
+local ModernXpShare = require("mods.Kanto-Reforged.ui.modern_xp_share")
+local SplitSpecial = require("mods.Kanto-Reforged.battle.split_special")
+local TrainerAi = require("mods.Kanto-Reforged.battle.trainer_ai")
+local ExpTrainers = require("mods.Kanto-Reforged.battle.trainers")
+local SpeciesScope = require("mods.Kanto-Reforged.pokemon.species_scope")
 local Strings = require("src.core.Strings")
 
 local function battlerHasType(battler, typeId)
-  local BattleCompat = require("mods.Kanto-Reforged.battle_compat")
+  local BattleCompat = require("mods.Kanto-Reforged.battle.battle_compat")
   for _, t in ipairs(BattleCompat.types(battler)) do
     if t == typeId then return true end
   end
   return false
 end
 
-local mixEncounters = require("mods.Kanto-Reforged.encounters").mix
-local ExpEncounters = require("mods.Kanto-Reforged.encounters")
+local mixEncounters = require("mods.Kanto-Reforged.world.encounters").mix
+local ExpEncounters = require("mods.Kanto-Reforged.world.encounters")
 
 local function spawnModeFromOptions(mod)
-  local Host = require("mods.Kanto-Reforged.host")
+  local Host = require("mods.Kanto-Reforged.core.host")
   -- PURE RANDOM overrides the gated FULL SPAWN MIX when both are on.
   if mod.options and mod.options:get(Host.optionKey("pure_spawn_random")) then
     return "pure_random"
@@ -33,7 +33,7 @@ local function spawnModeFromOptions(mod)
 end
 
 local function spawnOptsFromOptions(mod)
-  local Host = require("mods.Kanto-Reforged.host")
+  local Host = require("mods.Kanto-Reforged.core.host")
   return {
     legendsInMix = mod.options
       and mod.options:get(Host.optionKey("legends_in_mix")) and true or false,
@@ -46,7 +46,7 @@ local function applySpawnTables(mod, pokemon_data, flags)
   flags = flags or {}
   local mode = spawnModeFromOptions(mod)
   local opts = spawnOptsFromOptions(mod)
-  local Host = require("mods.Kanto-Reforged.host")
+  local Host = require("mods.Kanto-Reforged.core.host")
   if flags.clearPureSeed and mod.save then
     Host.saveSet(mod.save, ExpEncounters.PURE_SEED_KEY, nil)
   end
@@ -63,9 +63,9 @@ local function applySpawnTables(mod, pokemon_data, flags)
     opts.seed = seed
   end
   if Host.isGen2() then
-    local EncountersGen2 = require("mods.Kanto-Reforged.encounters_gen2")
+    local EncountersGen2 = require("mods.Kanto-Reforged.world.encounters_gen2")
     EncountersGen2.apply(mod, pokemon_data, mode, opts)
-    local JohtoDex = require("mods.Kanto-Reforged.johto_dex")
+    local JohtoDex = require("mods.Kanto-Reforged.pokemon.johto_dex")
     pcall(function()
       local n = JohtoDex.rebuildOrders(mod)
       mod.log:info("Johto Pokédex NEW order rebuilt (%d species)", n or 0)
@@ -80,12 +80,21 @@ local function applySpawnTables(mod, pokemon_data, flags)
   mod.log:info("Wild encounters applied (%s)", tag)
 end
 
+local _cachedPokemonData = nil
+
 local function refreshScopeContent(mod, game, scopeMode)
-  local pokemon_data = package.loaded["mods.Kanto-Reforged.pokemon_data"]
+  local pokemon_data = _cachedPokemonData
+  if not pokemon_data then
+    local okPack, data = pcall(require, "mods.Kanto-Reforged.pokemon_data")
+    if okPack and data then
+      pokemon_data = data
+      _cachedPokemonData = data
+    end
+  end
   -- Content registries freeze after load; live Data writes still apply for
   -- mid-session toggles (and headless tests).
   pcall(function() applySpawnTables(mod, pokemon_data) end)
-  local Host = require("mods.Kanto-Reforged.host")
+  local Host = require("mods.Kanto-Reforged.core.host")
   if Host.isGen1() then
     pcall(function() ExpTrainers.apply(mod) end)
   end
@@ -104,14 +113,16 @@ local function refreshScopeContent(mod, game, scopeMode)
 end
 
 return function(mod)
-  local Host = require("mods.Kanto-Reforged.host")
-  local PokemonGen2 = require("mods.Kanto-Reforged.pokemon_gen2")
+  local Host = require("mods.Kanto-Reforged.core.host")
+  local PokemonGen2 = require("mods.Kanto-Reforged.pokemon.pokemon_gen2")
 
   -- Accept trainer party heldItem/moves before any trainers:patch (ace berries).
   ExpTrainers.extendSchemas()
   if Host.isGen1() then
     ExpTrainers.install(mod)
   end
+
+  local LocationSignpost = require("mods.Kanto-Reforged.ui.location_signpost")
 
   -- Manager / card options (host-aware labels / visibility).
   -- Spawn + dex-scope keys are g1:/g2: so Red and Gold keep separate state.
@@ -139,12 +150,13 @@ return function(mod)
     TrainerAi.OPTION,
     TrainerAi.switchLockOptionForHost(),
     HeldItems.BAG_GIVE_OPTION,
+    LocationSignpost.OPTION,
   }
   -- SpA/SpD split is a Gen1 single-Special concern; Gold already has both.
   if Host.isGen1() then
     optionDefs[#optionDefs + 1] = SplitSpecial.OPTION
     -- DexNav label/off is only for the start-menu entry; Gold uses Pokegear.
-    optionDefs[#optionDefs + 1] = require("mods.Kanto-Reforged.dexnav").OPTION
+    optionDefs[#optionDefs + 1] = require("mods.Kanto-Reforged.ui.dexnav").OPTION
   end
   mod.options:define(optionDefs)
   Host.installEngineShims(mod)
@@ -152,6 +164,9 @@ return function(mod)
 
   SpeciesScope._refreshContent = refreshScopeContent
   SpeciesScope.install(mod)
+
+  local BattleCompat = require("mods.Kanto-Reforged.battle.battle_compat")
+  BattleCompat.install(mod)
 
   ExpMoveEffects.register(mod)
   ExpMoveEffects.install(mod)
@@ -166,7 +181,7 @@ return function(mod)
   if Host.isGen1() then
     Gender.register(mod)
     Gender.install(mod)
-    local Breeding = require("mods.Kanto-Reforged.breeding")
+    local Breeding = require("mods.Kanto-Reforged.pokemon.breeding")
     Breeding.register(mod)
     Breeding.install(mod)
     local Daycare = require("mods.Kanto-Reforged.daycare")
@@ -174,71 +189,73 @@ return function(mod)
     Daycare.install(mod)
   end
 
-  local BerryFarm = require("mods.Kanto-Reforged.berry_farm")
+  local BerryFarm = require("mods.Kanto-Reforged.world.berry_farm")
   BerryFarm.register(mod)
   BerryFarm.install(mod)
 
-  local HouseNpcs = require("mods.Kanto-Reforged.house_npcs")
+  LocationSignpost.install(mod)
+
+  local HouseNpcs = require("mods.Kanto-Reforged.world.house_npcs")
   HouseNpcs.resetClaims()
   if Host.isGen2() then
     HouseNpcs.installTalkDispatch(mod)
   end
 
   if Host.isGen1() then
-    local LevelCaps = require("mods.Kanto-Reforged.level_caps")
+    local LevelCaps = require("mods.Kanto-Reforged.ui.level_caps")
     LevelCaps.register(mod)
     LevelCaps.install(mod)
-    local OverworldLoot = require("mods.Kanto-Reforged.overworld_loot")
+    local OverworldLoot = require("mods.Kanto-Reforged.world.overworld_loot")
     OverworldLoot.register(mod)
-    local Competitive = require("mods.Kanto-Reforged.competitive_items")
+    local Competitive = require("mods.Kanto-Reforged.items.competitive_items")
     Competitive.register(mod)
     Competitive.install(mod)
-    local BattleClubs = require("mods.Kanto-Reforged.battle_clubs")
+    local BattleClubs = require("mods.Kanto-Reforged.battle.battle_clubs")
     BattleClubs.register(mod)
-    local JudgeNpc = require("mods.Kanto-Reforged.judge_npc")
+    local JudgeNpc = require("mods.Kanto-Reforged.world.judge_npc")
     JudgeNpc.register(mod)
-    local TradesExtra = require("mods.Kanto-Reforged.trades_extra")
+    local TradesExtra = require("mods.Kanto-Reforged.world.trades_extra")
     TradesExtra.register(mod)
-    local BerryQuests = require("mods.Kanto-Reforged.berry_quests")
+    local BerryQuests = require("mods.Kanto-Reforged.world.berry_quests")
     BerryQuests.register(mod)
-    local MoveHub = require("mods.Kanto-Reforged.move_hub")
+    local MoveHub = require("mods.Kanto-Reforged.world.move_hub")
     MoveHub.register(mod)
-    local ItemSmith = require("mods.Kanto-Reforged.item_smith")
+    local ItemSmith = require("mods.Kanto-Reforged.world.item_smith")
     ItemSmith.register(mod)
-    local Roamers = require("mods.Kanto-Reforged.roamers")
+    local Roamers = require("mods.Kanto-Reforged.world.roamers")
     Roamers.register(mod)
     Roamers.install(mod)
-    local RoamingRadar = require("mods.Kanto-Reforged.roaming_radar")
+    local RoamingRadar = require("mods.Kanto-Reforged.world.roaming_radar")
     RoamingRadar.register(mod)
-    local RoamerDex = require("mods.Kanto-Reforged.roamer_dex")
+    local RoamerDex = require("mods.Kanto-Reforged.world.roamer_dex")
     RoamerDex.install(mod)
-    local LegendShrines = require("mods.Kanto-Reforged.legend_shrines")
+    local LegendShrines = require("mods.Kanto-Reforged.world.legend_shrines")
     LegendShrines.register(mod)
-    local LegendRegis = require("mods.Kanto-Reforged.legend_regis")
+    local LegendRegis = require("mods.Kanto-Reforged.world.legend_regis")
     LegendRegis.register(mod)
-    local LegendMythicals = require("mods.Kanto-Reforged.legend_mythicals")
+    local LegendMythicals = require("mods.Kanto-Reforged.world.legend_mythicals")
     LegendMythicals.register(mod)
     LegendMythicals.install(mod)
-    local FossilsGen3 = require("mods.Kanto-Reforged.fossils_gen3")
+    local FossilsGen3 = require("mods.Kanto-Reforged.world.fossils_gen3")
     FossilsGen3.register(mod)
     ModernXpShare.install(mod)
-    local QuarantineRecover = require("mods.Kanto-Reforged.quarantine_recover")
+    local QuarantineRecover = require("mods.Kanto-Reforged.core.quarantine_recover")
     QuarantineRecover.install(mod)
   else
     -- Gold Kanto parity: farm quests + Celadon/Vermilion clubs (Kanto maps).
     -- Utility NPCs stay on Kanto maps (not Johto remaps).
-    local Competitive = require("mods.Kanto-Reforged.competitive_items")
+    local Competitive = require("mods.Kanto-Reforged.items.competitive_items")
     Competitive.register(mod)
     Competitive.install(mod)
-    local BattleClubs = require("mods.Kanto-Reforged.battle_clubs")
+    local BattleClubs = require("mods.Kanto-Reforged.battle.battle_clubs")
     BattleClubs.register(mod)
-    local BerryQuests = require("mods.Kanto-Reforged.berry_quests")
+    local BerryQuests = require("mods.Kanto-Reforged.world.berry_quests")
     BerryQuests.register(mod)
-    local JudgeNpc = require("mods.Kanto-Reforged.judge_npc")
+    local JudgeNpc = require("mods.Kanto-Reforged.world.judge_npc")
     JudgeNpc.register(mod)
-    local MoveHub = require("mods.Kanto-Reforged.move_hub")
+    local MoveHub = require("mods.Kanto-Reforged.world.move_hub")
     MoveHub.register(mod)
-    local ItemSmith = require("mods.Kanto-Reforged.item_smith")
+    local ItemSmith = require("mods.Kanto-Reforged.world.item_smith")
     ItemSmith.register(mod)
   end
 
@@ -361,11 +378,14 @@ return function(mod)
   -- 1. Load generated databases
   local has_types, types_data = pcall(require, "mods.Kanto-Reforged.types_data")
   local has_pokemon, pokemon_data = pcall(require, "mods.Kanto-Reforged.pokemon_data")
+  if has_pokemon and pokemon_data then
+    _cachedPokemonData = pokemon_data
+  end
   
   -- 2. Register Custom Types and Type Matchups
   -- Same Dark/Steel/Fairy table on Red and Gold (upsert on Gold so ROM + KR agree).
   if has_types then
-    local TypeChartPatches = require("mods.Kanto-Reforged.type_chart_patches")
+    local TypeChartPatches = require("mods.Kanto-Reforged.battle.type_chart_patches")
 
     for id, record in pairs(types_data.types) do
       if not mod.content.type_chart:get(id) then
@@ -399,7 +419,7 @@ return function(mod)
   
   -- 3. Register Custom Moves and Pokémon Species
   if has_pokemon then
-    local Gen2Compat = require("mods.Kanto-Reforged.gen2_compat")
+    local Gen2Compat = require("mods.Kanto-Reforged.core.gen2_compat")
     local goldDataReady = false
     if Host.isGen2() then
       -- Seed growth rates, EVOLVE_* aliases, and move-effect stubs so Gen3
@@ -431,7 +451,7 @@ return function(mod)
       end
       mod.log:info("Registered %d custom moves", moves_registered)
 
-      local MoveAnims = require("mods.Kanto-Reforged.move_anims")
+      local MoveAnims = require("mods.Kanto-Reforged.battle.move_anims")
       MoveAnims.register(mod, pokemon_data.moves)
       MoveAnims.install(mod)
     else
@@ -461,12 +481,12 @@ return function(mod)
       MoveTypePatches.apply(mod)
     end
     
-    local DexEntries = require("mods.Kanto-Reforged.dex_entries")
+    local DexEntries = require("mods.Kanto-Reforged.pokemon.dex_entries")
     local dexTexts = DexEntries.bindAll(mod, pokemon_data.species)
     DexEntries.installInlineTextFallback(mod)
 
     local okPals, species_palettes = pcall(require, "mods.Kanto-Reforged.species_palettes")
-    local PaletteGen2 = require("mods.Kanto-Reforged.palette_gen2")
+    local PaletteGen2 = require("mods.Kanto-Reforged.pokemon.palette_gen2")
     if okPals and type(species_palettes) == "table" then
       if Host.isGen2() then
         -- Gold: middle-two-color rows under gen2Palettes.pokemon[species].
@@ -487,16 +507,16 @@ return function(mod)
       -- Gold dex UI reads gen2Pokedex.entries (not Data.text). Fill Hoenn rows.
       DexEntries.bindGen2Pokedex(mod, pokemon_data.species)
       applySpawnTables(mod, pokemon_data)
-      local JohtoDex = require("mods.Kanto-Reforged.johto_dex")
+      local JohtoDex = require("mods.Kanto-Reforged.pokemon.johto_dex")
       JohtoDex.installNests(mod)
       JohtoDex.installArea(mod)
-      local TrainersGen2 = require("mods.Kanto-Reforged.trainers_gen2")
+      local TrainersGen2 = require("mods.Kanto-Reforged.battle.trainers_gen2")
       TrainersGen2.install(mod)
       mod.events:on("mod.options_changed", function(ev)
         if not (ev and ev.mod == mod.id) then return end
         Host.persistModOptions(mod)
         if Host.optionEventIs(ev.key, "species_scope") then
-          SpeciesScope.onOptionsChanged(mod, rawget(_G, "Game"), ev)
+          SpeciesScope.onOptionsChanged(mod, Host.liveGame(mod), ev)
           return
         end
         if Host.optionEventIs(ev.key, "pure_spawn_random") then
@@ -531,7 +551,7 @@ return function(mod)
       mod.content.constants:patch("dexDigits", math.max(3, #tostring(highestDex)))
       mod.log:info("Pokédex extended to %d", highestDex)
 
-      local SpeciesIcons = require("mods.Kanto-Reforged.species_icons")
+      local SpeciesIcons = require("mods.Kanto-Reforged.pokemon.species_icons")
       SpeciesIcons.register(mod, pokemon_data.species)
 
       applySpawnTables(mod, pokemon_data)
@@ -541,7 +561,7 @@ return function(mod)
         if not (ev and ev.mod == mod.id) then return end
         Host.persistModOptions(mod)
         if Host.optionEventIs(ev.key, "species_scope") then
-          SpeciesScope.onOptionsChanged(mod, rawget(_G, "Game"), ev)
+          SpeciesScope.onOptionsChanged(mod, Host.liveGame(mod), ev)
           return
         end
         if Host.optionEventIs(ev.key, "pure_spawn_random") then
@@ -644,7 +664,7 @@ return function(mod)
             local target = evoTarget(evo)
             local method = evo.method
             if useInto then
-              local Gen2Compat = require("mods.Kanto-Reforged.gen2_compat")
+              local Gen2Compat = require("mods.Kanto-Reforged.core.gen2_compat")
               method = Gen2Compat.remapEvoMethod(method)
               return {
                 method = method,
@@ -855,7 +875,7 @@ return function(mod)
       local nGender = 0
       local field = Host.isGen2() and "genderRatio" or "genderRate"
       for speciesId, rate in pairs(gender_patches.rates) do
-        if type(rate) == "number" then
+        if speciesId ~= "DEOXYS" and type(rate) == "number" then
           -- Gen2 genderRatio is 0–255; KR genderRate is female eighths (-1 genderless).
           local value = rate
           if Host.isGen2() then
@@ -886,11 +906,14 @@ return function(mod)
     -- Breeding: egg groups, hatch counters, baby species, egg moves
     local okBreed, breeding_patches = pcall(require, "mods.Kanto-Reforged.breeding_patches")
     if okBreed and breeding_patches then
-      local Breeding = require("mods.Kanto-Reforged.breeding")
+      local Breeding = require("mods.Kanto-Reforged.pokemon.breeding")
       local nBreed = 0
       if Host.isGen2() then
         -- Gen2 schema uses eggSteps (not hatchCounter) and rejects KR-only fields.
         for speciesId, row in pairs(breeding_patches.species or {}) do
+          if speciesId == "DEOXYS" then
+            speciesId = "DEOXYS_NORMAL"
+          end
           local patch = {}
           if row.eggGroups then patch.eggGroups = row.eggGroups end
           if row.hatchCounter then patch.eggSteps = row.hatchCounter end
@@ -919,17 +942,17 @@ return function(mod)
     mod.log:warn("pokemon_data.lua not found or failed to load: " .. tostring(pokemon_data))
   end
 
-  local SummaryUi = require("mods.Kanto-Reforged.summary_ui")
+  local SummaryUi = require("mods.Kanto-Reforged.ui.summary_ui")
   SummaryUi.register(mod)
 
-  local DexNav = require("mods.Kanto-Reforged.dexnav")
+  local DexNav = require("mods.Kanto-Reforged.ui.dexnav")
   DexNav.register(mod)
 
-  local BagPockets = require("mods.Kanto-Reforged.bag_pockets")
+  local BagPockets = require("mods.Kanto-Reforged.items.bag_pockets")
   BagPockets.register(mod)
 
   -- Optional Gen1 Modern UI adapter (no-op when that mod is absent).
-  if require("mods.Kanto-Reforged.gen1_modern_ui_adapter")(mod) then
+  if require("mods.Kanto-Reforged.ui.gen1_modern_ui_adapter")(mod) then
     mod.log:info("Gen1 Modern UI adapter registered")
   end
   -- Party/PC detail SPC→SAT/SDF patch may need a late bind if Modern UI
@@ -938,7 +961,7 @@ return function(mod)
 
   -- 4. Hook into battle damage pipeline (SpA/SpD + abilities +
   --    variable-power Gen 2/3 moves)
-  local BattleCompat = require("mods.Kanto-Reforged.battle_compat")
+  local BattleCompat = require("mods.Kanto-Reforged.battle.battle_compat")
   mod.hooks:wrap("battle.damage", function(next, ctx)
     local move = ctx.move
     local user = ctx.user
@@ -1303,7 +1326,7 @@ return function(mod)
     if Encounter._expIlluminate then return end
     local original = Encounter.roll
     Encounter.roll = function(encounterDef, rng)
-      local Game = package.loaded["src.core.Game"]
+      local Game = Host.liveGame(mod)
       local mult = Game and Abilities.illuminateRateMult(Game) or 1
       if mult == 1 or not encounterDef or not encounterDef.grass then
         return original(encounterDef, rng)
@@ -1372,7 +1395,7 @@ return function(mod)
       end
     end
     -- Gold battlers are party tables; wipe AI facade fields before SAVE.
-    local BattleCompat = require("mods.Kanto-Reforged.battle_compat")
+    local BattleCompat = require("mods.Kanto-Reforged.battle.battle_compat")
     BattleCompat.scrubBattle(ev.battle)
     mod.activeBattle = nil
   end)
@@ -1380,7 +1403,7 @@ return function(mod)
   -- Belt-and-suspenders: scrub again at write time in case a battle left
   -- party[i].mon == party[i] (serialize cycle / former stack overflow).
   mod.events:on("save.writing", function(ev)
-    local BattleCompat = require("mods.Kanto-Reforged.battle_compat")
+    local BattleCompat = require("mods.Kanto-Reforged.battle.battle_compat")
     if ev and ev.save then
       BattleCompat.scrubPartyMons(ev.save.party)
     end

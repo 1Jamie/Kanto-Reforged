@@ -2,7 +2,7 @@
 -- eggs. Custom HOUSE interior + Day-Care Lady; overrides talk scripts;
 -- monkey-patches overworld steps. Route 5 outdoors is unchanged.
 
-local Breeding = require("mods.Kanto-Reforged.breeding")
+local Breeding = require("mods.Kanto-Reforged.pokemon.breeding")
 local Strings = require("src.core.Strings")
 
 local Daycare = {}
@@ -210,8 +210,8 @@ end
 
 local function depositMon(game, done)
   local TextBox = require("src.render.TextBox")
-  local Host = require("mods.Kanto-Reforged.host")
-  local Gender = require("mods.Kanto-Reforged.gender")
+  local Host = require("mods.Kanto-Reforged.core.host")
+  local Gender = require("mods.Kanto-Reforged.pokemon.gender")
   local t = game.data.text
   local dc = ensureDaycare(game.save)
   local playerName = game.save.player and game.save.player.name or "RED"

@@ -1,6 +1,6 @@
 -- Viridian candy NPC + optional badge level caps.
 return function(T, Data, run)
-  local LevelCaps = require("mods.Kanto-Reforged.level_caps")
+  local LevelCaps = require("mods.Kanto-Reforged.ui.level_caps")
   local Experience = require("src.battle.Experience")
   local Pokemon = require("src.pokemon.Pokemon")
   local ItemEffects = require("src.inventory.ItemEffects")

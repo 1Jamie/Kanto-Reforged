@@ -1,6 +1,6 @@
 -- SP.ATK / SP.DEF toggle: default off; battle + UI when on.
 return function(T, Data, run)
-  local SplitSpecial = require("mods.Kanto-Reforged.split_special")
+  local SplitSpecial = require("mods.Kanto-Reforged.battle.split_special")
   local Runtime = require("src.mods.Runtime")
 
   local schema = run.loader.optionSchemas["Kanto-Reforged"]

@@ -3,7 +3,7 @@
 return function(T, Data, run)
   local Pokemon = require("src.pokemon.Pokemon")
   local BattleState = require("src.battle.BattleState")
-  local TrainerAi = require("mods.Kanto-Reforged.trainer_ai")
+  local TrainerAi = require("mods.Kanto-Reforged.battle.trainer_ai")
   require("src.battle.TypeChart").load(Data)
 
   T.check(BattleState._krGen3SwitchLock,

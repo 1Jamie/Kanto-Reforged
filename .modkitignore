@@ -31,6 +31,10 @@ tests/overworld_loot_test.lua
 tests/quarantine_recover_test.lua
 tests/rollout_test.lua
 tests/species_icons_test.lua
+tests/spawn_matrix_test.lua
+tests/species_scope_test.lua
+tests/battle_sprite_scale_test.lua
 tests/split_special_test.lua
 tests/summary_ui_test.lua
 tests/trainer_ai_test.lua
+tests/location_signpost_test.lua

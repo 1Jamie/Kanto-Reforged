@@ -4,7 +4,7 @@ package.path = "./?.lua;./?/init.lua;" .. package.path
 local T = require("tests.modkit")
 local Data = require("src.core.Data")
 local GameVersion = require("src.core.GameVersion")
-local Host = require("mods.Kanto-Reforged.host")
+local Host = require("mods.Kanto-Reforged.core.host")
 
 -- Loader generation=2 alone does not flip GameVersion; Host (and real Gold
 -- boots) key off GameVersion / Host.force. Keep this in-mod — no engine edits.
@@ -89,8 +89,8 @@ local farm = (Data.gen2Maps and Data.gen2Maps.BERRY_FARM)
 T.check(farm ~= nil, "BERRY_FARM map registered on Gold")
 
 -- Farm access: Johto stairs corner + Kanto exit-mat pads
-local BerryFarm = require("mods.Kanto-Reforged.berry_farm")
-local HouseNpcs = require("mods.Kanto-Reforged.house_npcs")
+local BerryFarm = require("mods.Kanto-Reforged.world.berry_farm")
+local HouseNpcs = require("mods.Kanto-Reforged.world.house_npcs")
 T.eq(BerryFarm.PC_DOOR_GEN2_STAIRS.x, 8, "Johto farm stairs at warp-tile x=8")
 T.eq(BerryFarm.PC_DOOR_GEN2_PAD.x, 7, "Kanto farm pad left warp-tile")
 T.eq(BerryFarm.PC_DOOR_GEN2_INDIGO.x, 16, "Indigo farm stairs warp at BL x=16")
@@ -174,7 +174,7 @@ end
 -- Berry vendor: Gen1 ShopMenu crashes on Gold (save.money is nil). Buy via
 -- Gen2MartMenu against player.money instead.
 do
-  local BerryQuests = require("mods.Kanto-Reforged.berry_quests")
+  local BerryQuests = require("mods.Kanto-Reforged.world.berry_quests")
   local Save = require("src.core.gen2.Save")
   local input = {
     pressed = {},
@@ -270,13 +270,13 @@ T.check(Data.items and Data.items.CHERI_BERRY, "CHERI_BERRY item registered on G
 T.check(Data.items and Data.items.CHOICE_BAND, "CHOICE_BAND item registered on Gold")
 
 -- DexNav lives on the Pokegear on Gold (not the start menu), via pokegear_cards.
-local DexNav = require("mods.Kanto-Reforged.dexnav")
+local DexNav = require("mods.Kanto-Reforged.ui.dexnav")
 local Pokegear = require("src.ui.gen2.Pokegear")
 T.check(Pokegear._pokegearCards == true, "pokegear_cards patch installed on Gold")
 local cardsApi = run.loader.exports.pokegear_cards
 T.check(cardsApi and cardsApi.get("dexnav"), "DexNav registered on pokegear_cards")
 do
-  local Host = require("mods.Kanto-Reforged.host")
+  local Host = require("mods.Kanto-Reforged.core.host")
   local schema = run.loader.optionSchemas["Kanto-Reforged"] or {}
   local byKey = {}
   for _, opt in ipairs(schema) do byKey[opt.key] = opt end
@@ -347,10 +347,10 @@ end
 
 -- NEW (Johto) order follows live Johto availability, not every Gen3 species.
 do
-  local JohtoDex = require("mods.Kanto-Reforged.johto_dex")
-  local EncountersGen2 = require("mods.Kanto-Reforged.encounters_gen2")
-  local Host = require("mods.Kanto-Reforged.host")
-  local pack = require("mods.Kanto-Reforged.pokemon_data")
+  local JohtoDex = require("mods.Kanto-Reforged.pokemon.johto_dex")
+  local EncountersGen2 = require("mods.Kanto-Reforged.world.encounters_gen2")
+  local Host = require("mods.Kanto-Reforged.core.host")
+  local pack = require("mods.Kanto-Reforged.pokemon.pokemon_data")
   local dex = Data.gen2Pokedex
   local newOrder = dex and dex.newOrder
   T.check(newOrder ~= nil and #newOrder > 0, "Johto NEW order present after boot")
@@ -451,7 +451,7 @@ do
   local guestInNew = false
   local grass = Data.gen2Encounters and Data.gen2Encounters.grass
   if grass then
-    local SpeciesScope = require("mods.Kanto-Reforged.species_scope")
+    local SpeciesScope = require("mods.Kanto-Reforged.pokemon.species_scope")
     for mapId, block in pairs(grass) do
       if not SpeciesScope.isKantoMap(mapId) then
         for _, slot in ipairs((block.slots and block.slots.DAY) or {}) do
@@ -481,7 +481,7 @@ do
       log = { info = function() end, warn = function() end },
       options = {
         get = function(_, k)
-          local Host = require("mods.Kanto-Reforged.host")
+          local Host = require("mods.Kanto-Reforged.core.host")
           if k == Host.optionKey("species_scope") then return "johto_native" end
         end,
       },
@@ -523,7 +523,7 @@ do
     })
     -- Force national scope for availability collect
     modApi.options.get = function(_, k)
-      local Host = require("mods.Kanto-Reforged.host")
+      local Host = require("mods.Kanto-Reforged.core.host")
       if k == Host.optionKey("species_scope") then return "national" end
     end
     JohtoDex.rebuildOrders(modApi)
@@ -557,7 +557,7 @@ do
       },
       options = {
         get = function(_, k)
-          local Host = require("mods.Kanto-Reforged.host")
+          local Host = require("mods.Kanto-Reforged.core.host")
           if k == Host.optionKey("species_scope") then return "national" end
         end,
       },
@@ -631,13 +631,13 @@ end
 
 -- FULL SPAWN MIX helpers on Gold
 do
-  local EncountersGen2 = require("mods.Kanto-Reforged.encounters_gen2")
+  local EncountersGen2 = require("mods.Kanto-Reforged.world.encounters_gen2")
   T.check(EncountersGen2._isKantoMap("ROUTE_1"), "ROUTE_1 is Kanto")
   T.check(EncountersGen2._isKantoMap("ROUTE_28"), "ROUTE_28 is Kanto")
   T.check(not EncountersGen2._isKantoMap("ROUTE_29"), "ROUTE_29 is Johto")
   T.check(EncountersGen2._isKantoMap("VIRIDIAN_FOREST"), "Viridian Forest is Kanto")
 
-  local pack = require("mods.Kanto-Reforged.pokemon_data")
+  local pack = require("mods.Kanto-Reforged.pokemon.pokemon_data")
   local index = EncountersGen2._buildGoldIndex(run.loader.mods[1] and run.loader.mods[1].api or {
     content = {
       pokemon = {
@@ -838,7 +838,7 @@ do
     T.check(not listsDiffer(r30Day, todSpecies("ROUTE_30", "NITE")),
       "full_random+legends ROUTE_30 NITE matches DAY species")
     do
-      local DexNav = require("mods.Kanto-Reforged.dexnav")
+      local DexNav = require("mods.Kanto-Reforged.ui.dexnav")
       local items = DexNav.buildItems(Data, "ROUTE_30", { seen = {}, caught = {} }, nil, nil)
       local n = items and #items or 0
       local waterN = #(Data.gen2Encounters.water.ROUTE_30
@@ -923,6 +923,24 @@ do
     T.check(true, "Game.data reshuffle skip")
     T.check(true, "orphan Data skip")
   end
+end
+
+-- Gen 2 trainer.party guests: ensure Gen 3 guest mons are full Mon instances with moves & stats
+do
+  local Mon = require("src.battle.gen2.Mon")
+  local Runtime = require("src.mods.Runtime")
+  local baseBrock = {
+    Mon.new(Data, "GEODUDE", 12, { dvs = { attack = 9, defense = 8, speed = 8, special = 8 } }),
+  }
+  local partyWithGuest = Runtime.call("trainer.party", function(_, _, p) return p end, "BROCK", 1, baseBrock)
+  T.eq(#partyWithGuest, 2, "Brock party has 1 vanilla + 1 guest mon")
+  local guest = partyWithGuest[2]
+  T.eq(guest.species, "ARON", "Brock guest is Aron")
+  T.eq(guest.level, 12, "Aron matches last mon level")
+  T.check(guest.moves ~= nil and #guest.moves > 0, "Aron has valid moveset")
+  T.check(guest.hp ~= nil and guest.hp > 0, "Aron has valid HP")
+  T.check(guest.maxHp ~= nil and guest.maxHp > 0, "Aron has valid maxHp")
+  T.check(guest.stats ~= nil and guest.stats.attack > 0, "Aron has calculated stats")
 end
 
 require("mods.Kanto-Reforged.tests.spawn_matrix_test")(T, Data, run, { skipGen1 = true })

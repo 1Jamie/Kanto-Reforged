@@ -1,6 +1,6 @@
 -- Gen 1 stock anim reuse + custom compositions for Gen 2+ moves.
 return function(T, Data, run)
-  local MoveAnims = require("mods.Kanto-Reforged.move_anims")
+  local MoveAnims = require("mods.Kanto-Reforged.battle.move_anims")
 
   -- Custom compositions take priority over whole-clip aliases
   T.eq(MoveAnims.pickAlias({ id = "SHADOW_BALL", type = "GHOST", power = 80 }),
@@ -47,7 +47,7 @@ return function(T, Data, run)
     "SUPER_FANG", "strong Dark defaults to Super Fang (not Night Shade)")
 
   -- Every Gen 2+ damaging move with power 0/nil gets a non-status alias
-  local pd = require("mods.Kanto-Reforged.pokemon_data")
+  local pd = require("mods.Kanto-Reforged.pokemon.pokemon_data")
   local statusAnims = {
     GROWL = true, SMOKESCREEN = true, WITHDRAW = true, GROWTH = true,
     THUNDER_WAVE = true, MIST = true, FOCUS_ENERGY = true, POISONPOWDER = true,

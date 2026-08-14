@@ -1,12 +1,12 @@
 -- Object-index hygiene + overworld NPC / legendary content smoke tests.
 return function(T, Data, run)
-  local HouseNpcs = require("mods.Kanto-Reforged.house_npcs")
+  local HouseNpcs = require("mods.Kanto-Reforged.world.house_npcs")
   local MapScripts = require("src.script.MapScripts")
-  local Competitive = require("mods.Kanto-Reforged.competitive_items")
-  local BerryQuests = require("mods.Kanto-Reforged.berry_quests")
-  local Roamers = require("mods.Kanto-Reforged.roamers")
-  local DexNav = require("mods.Kanto-Reforged.dexnav")
-  local LegendMythicals = require("mods.Kanto-Reforged.legend_mythicals")
+  local Competitive = require("mods.Kanto-Reforged.items.competitive_items")
+  local BerryQuests = require("mods.Kanto-Reforged.world.berry_quests")
+  local Roamers = require("mods.Kanto-Reforged.world.roamers")
+  local DexNav = require("mods.Kanto-Reforged.ui.dexnav")
+  local LegendMythicals = require("mods.Kanto-Reforged.world.legend_mythicals")
   local Warp = require("src.world.Warp")
 
   -- Claim registry must include baseline + every appendNpc from this milestone.
@@ -50,7 +50,7 @@ return function(T, Data, run)
   T.check(findObj("CELADON_MANSION_ROOF", "CELADONMANSIONROOF_HO_OH") ~= nil,
     "Ho-Oh on roof")
   do
-    local LegendShrines = require("mods.Kanto-Reforged.legend_shrines")
+    local LegendShrines = require("mods.Kanto-Reforged.world.legend_shrines")
     local hoOh = findObj("CELADON_MANSION_ROOF", "CELADONMANSIONROOF_HO_OH")
     T.eq(hoOh.x, LegendShrines.HO_OH_X, "Ho-Oh on patio x")
     T.eq(hoOh.y, LegendShrines.HO_OH_Y, "Ho-Oh on patio y")
@@ -191,7 +191,7 @@ return function(T, Data, run)
       "underleveled party keeps softCap floor when caps off")
 
     -- Caps on: stay on the story bracket even if party somehow reads higher.
-    local LevelCaps = require("mods.Kanto-Reforged.level_caps")
+    local LevelCaps = require("mods.Kanto-Reforged.ui.level_caps")
     local fakeMod = {
       save = {
         get = function(_, key, default)
@@ -262,7 +262,7 @@ return function(T, Data, run)
   T.eq(retY, 20, "Sky Pillar exit y")
 
   -- Roamers + DexNav ROAM row
-  local mod = Roamers._mod or require("mods.Kanto-Reforged.level_caps")._mod
+  local mod = Roamers._mod or require("mods.Kanto-Reforged.ui.level_caps")._mod
   T.check(mod ~= nil and mod.save ~= nil, "roamers installed with mod API")
   Roamers.activateBeasts(mod)
   local loc = Roamers.getLocation(mod, "RAIKOU")
@@ -329,7 +329,7 @@ return function(T, Data, run)
   T.check(findObj("ROCK_TUNNEL_B1F", "ROCKTUNNELB1F_REGIROCK") == nil,
     "Regirock no longer on B1F main path")
   do
-    local LegendRegis = require("mods.Kanto-Reforged.legend_regis")
+    local LegendRegis = require("mods.Kanto-Reforged.world.legend_regis")
     local Map = require("src.world.Map")
     local def = Data.maps.ROCK_TUNNEL_B1F
     local ts = Data.tilesets.CAVERN

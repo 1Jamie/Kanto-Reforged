@@ -1,6 +1,6 @@
 -- Quarantine recovery: party/bag before PC dump.
 return function(T, Data, run)
-  local QR = require("mods.Kanto-Reforged.quarantine_recover")
+  local QR = require("mods.Kanto-Reforged.core.quarantine_recover")
 
   -- Orphaned Gen 3 mon + berry return to party/bag when Data knows them.
   local save = {

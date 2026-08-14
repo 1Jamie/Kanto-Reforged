@@ -1,7 +1,7 @@
 -- Breeding compatibility, inheritance, hatch, two-slot daycare save shape.
 return function(T, Data, run)
-  local Breeding = require("mods.Kanto-Reforged.breeding")
-  local Gender = require("mods.Kanto-Reforged.gender")
+  local Breeding = require("mods.Kanto-Reforged.pokemon.breeding")
+  local Gender = require("mods.Kanto-Reforged.pokemon.gender")
   local Party = require("src.pokemon.Party")
 
   local function slotCount(dc)

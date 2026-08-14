@@ -142,6 +142,38 @@ return function(T, Data, HeldItems)
     "Persim does nothing when not confused")
   T.eq(confMiss.mon.heldItem, "PERSIM_BERRY", "Persim kept when not confused")
 
+  -- Ability payloads use "poison"; a nil battler name must not throw (that
+  -- used to eat the berry inside a pcall'd event with no dialog).
+  local aliasTgt = {
+    mon = { heldItem = "PECHA_BERRY", status = "PSN", hp = 30, stats = { hp = 50 } },
+    isPlayer = false,
+  }
+  local okAlias, aliasLines = HeldItems.tryStatusBerry(
+    { sayNext = function() end }, aliasTgt, "poison", { collect = true })
+  T.check(okAlias, "Pecha matches poison alias")
+  T.eq(aliasTgt.mon.status, nil, "poison alias clears PSN")
+  T.eq(aliasTgt.mon.heldItem, nil, "poison alias consumes Pecha")
+  T.check(type(aliasLines) == "table" and aliasLines[1]
+      and aliasLines[1]:find("PECHA BERRY", 1, true),
+    "collect returns ate-its-berry line")
+
+  -- Gen 3: eat when the status lands, after "was poisoned!", not on the
+  -- residual poison tick.
+  HeldItems.installStatusBerryOnInflict()
+  local StatusRegistry = require("src.battle.StatusRegistry")
+  local landTgt = {
+    name = "Rat", isPlayer = true,
+    mon = { heldItem = "PECHA_BERRY", hp = 30, stats = { hp = 50 }, status = nil },
+  }
+  local landMsgs = StatusRegistry.inflict({ data = Data }, landTgt, "PSN", {})
+  T.eq(landTgt.mon.status, nil, "Pecha cures poison as it is inflicted")
+  T.eq(landTgt.mon.heldItem, nil, "Pecha is consumed on inflict")
+  T.check(type(landMsgs) == "table" and #landMsgs >= 2, "inflict then berry pages")
+  T.check(landMsgs[1] and landMsgs[1]:find("poisoned", 1, true),
+    "first page is was-poisoned")
+  T.check(landMsgs[#landMsgs] and landMsgs[#landMsgs]:find("PECHA BERRY", 1, true),
+    "last page is ate its PECHA BERRY")
+
   -- Bestow a Cheri onto an already-paralyzed foe → immediate cure.
   local bestowUser = {
     mon = { heldItem = "CHERI_BERRY" }, name = "User", isPlayer = true,

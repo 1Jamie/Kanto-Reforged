@@ -15,8 +15,8 @@ local function eq(a, b, msg)
   end
 end
 
-local Scale = require("Kanto-Reforged.battle_sprite_scale")
-local PokemonGen2 = require("Kanto-Reforged.pokemon_gen2")
+local Scale = require("mods.Kanto-Reforged.battle.battle_sprite_scale")
+local PokemonGen2 = require("mods.Kanto-Reforged.pokemon.pokemon_gen2")
 
 local f, b = Scale.gen1FromFraction(1, 1)
 eq(f, 1, "gen1 normal front"); eq(b, 2, "gen1 normal back")

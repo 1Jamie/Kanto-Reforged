@@ -2,10 +2,10 @@
 -- Also covers frozen-registry mid-session toggles and PURE RANDOM SPAWN.
 return function(T, Data, run, opts)
   opts = opts or {}
-  local Host = require("mods.Kanto-Reforged.host")
+  local Host = require("mods.Kanto-Reforged.core.host")
   local Merge = require("src.mods.Merge")
-  local pack = require("mods.Kanto-Reforged.pokemon_data")
-  local Encounters = require("mods.Kanto-Reforged.encounters")
+  local pack = require("mods.Kanto-Reforged.pokemon.pokemon_data")
+  local Encounters = require("mods.Kanto-Reforged.world.encounters")
 
   local LEG = {
     ARTICUNO = true, ZAPDOS = true, MOLTRES = true, MEWTWO = true, MEW = true,
@@ -127,7 +127,7 @@ return function(T, Data, run, opts)
   end
 
   if Host.isGen2() and not opts.skipGen2 then
-    local EG2 = require("mods.Kanto-Reforged.encounters_gen2")
+    local EG2 = require("mods.Kanto-Reforged.world.encounters_gen2")
     -- Headless Gold boots may lack the ROM encounter cache; pull it if present.
     if not (Data.gen2Encounters and Data.gen2Encounters.grass
         and Data.gen2Encounters.grass.ROUTE_29) then
@@ -162,7 +162,7 @@ return function(T, Data, run, opts)
       EG2.clearBaselines()
     end
     local function frozenApi(scope)
-      local Host = require("mods.Kanto-Reforged.host")
+      local Host = require("mods.Kanto-Reforged.core.host")
       local scopeKey = Host.optionKey("species_scope")
       return {
         id = "Kanto-Reforged",

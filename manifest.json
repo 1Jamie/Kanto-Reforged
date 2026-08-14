@@ -1,21 +1,33 @@
 {
   "id": "Kanto-Reforged",
   "name": "Kanto Reforged",
-  "version": "1.1.5",
+  "version": "1.1.6",
   "api": 2,
   "entry": "main.lua",
   "profile": "content",
   "category": "CONTENT",
-  "game_version": ">=0.0.0-dev <1.0.0",
+  "game_version": ">=0.1.84 <1.0.0",
   "priority": 50,
-  "games": ["gen1", "gen2"],
+  "games": [
+    "gen1",
+    "gen2"
+  ],
   "assets_transforms": "transforms.lua",
   "permissions": [
-    "engine_internals"
+    "engine_internals",
+    "network"
   ],
-  "dependencies": [],
+  "dependencies": [
+    {
+      "id": "pokegear_cards",
+      "games": [
+        "gen2"
+      ],
+      "range": "^1.1.0",
+      "github": "1jamie/pokegear_cards"
+    }
+  ],
   "optional_dependencies": [
-    "pokegear_cards",
     "gen1_modern_ui"
   ],
   "conflicts": [],

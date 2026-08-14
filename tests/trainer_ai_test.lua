@@ -1,7 +1,7 @@
 -- Smarter AI scoring + curated trainer Gen 2/3 mixes.
 return function(T, Data, run)
-  local TrainerAi = require("mods.Kanto-Reforged.trainer_ai")
-  local ExpTrainers = require("mods.Kanto-Reforged.trainers")
+  local TrainerAi = require("mods.Kanto-Reforged.battle.trainer_ai")
+  local ExpTrainers = require("mods.Kanto-Reforged.battle.trainers")
   local TrainerAI = require("src.battle.TrainerAI")
 
   local schema = run.loader.optionSchemas["Kanto-Reforged"]
@@ -611,7 +611,7 @@ return function(T, Data, run)
 
   -- Gen2 volatile / screen / lock awareness for scorers + chooseWithMargin.
   do
-    local BattleCompat = require("mods.Kanto-Reforged.battle_compat")
+    local BattleCompat = require("mods.Kanto-Reforged.battle.battle_compat")
     local confuseMove = Data.moves.CONFUSE_RAY or Data.moves.SUPERSONIC
     local seedMove = Data.moves.LEECH_SEED
     local reflectMove = Data.moves.REFLECT
@@ -1090,6 +1090,55 @@ return function(T, Data, run)
     local liteAct = TrainerAi.liteAction(bLite)
     T.check(liteAct == nil or liteAct.special ~= "aiSwitch",
       "liteAction does not introduce matchup pivots")
+
+    -- Faint replacement must send the matchup pick, not party-order first
+    -- healthy (which then gets switched away on the next turn).
+    local faintedLead = {
+      species = "PIDGEY", level = 25, hp = 0,
+      stats = { hp = 40, attack = 45, defense = 40, special = 35, speed = 56 },
+      moves = { { id = "GUST", pp = 35 }, { id = "QUICK_ATTACK", pp = 30 } },
+    }
+    local bFaint = fakeBattle({ class = "OPP_AGATHA", party = 1 })
+    bFaint.kind = "trainer"
+    bFaint.player = player
+    bFaint.enemyIndex = 1
+    bFaint.enemyParty = { faintedLead, weakMon, strongMon }
+    bFaint.enemy = battlerFromPartyMon(faintedLead)
+    bFaint.aiUses = 2
+    T.eq(TrainerAi.bestSendOutIndex(bFaint), 3,
+      "bestSendOutIndex skips fainted lead and Fire into Water")
+    T.eq(TrainerAi.faintSendOutIndex(bFaint), 3,
+      "elite faint send-out uses matchup pick, not first healthy")
+    local firstHealthy
+    for i, mon in ipairs(bFaint.enemyParty) do
+      if mon.hp > 0 then firstHealthy = i break end
+    end
+    T.eq(firstHealthy, 2, "vanilla first-healthy would send the Fire mon")
+    local seen
+    TrainerAi.withForcedSendOut(bFaint, function()
+      for i, mon in ipairs(bFaint.enemyParty) do
+        if mon.hp > 0 then seen = i break end
+      end
+    end)
+    T.eq(seen, 3, "withForcedSendOut makes first-healthy land on the matchup pick")
+    T.eq(bFaint.enemyParty[2].hp, 40, "forced send-out restores hidden HP")
+    T.eq(bFaint.enemyParty[3].hp, 45, "chosen send-out HP untouched")
+
+    bFaint.enemyIndex = 3
+    bFaint.enemy = battlerFromPartyMon(strongMon)
+    bFaint.expAiSwitches = 0
+    bFaint.expAiSwitchMon = 3
+    local afterSend = TrainerAi.eliteAction(bFaint)
+    T.check(not (afterSend and afterSend.special == "aiSwitch"),
+      "after matchup faint send-out, elite does not immediately switch again")
+
+    local bLiteFaint = fakeBattle({ class = "OPP_COOLTRAINER_M", party = 1 })
+    bLiteFaint.kind = "trainer"
+    bLiteFaint.player = player
+    bLiteFaint.enemyIndex = 1
+    bLiteFaint.enemyParty = { faintedLead, weakMon, strongMon }
+    T.eq(TrainerAi.faintSendOutIndex(bLiteFaint), nil,
+      "lite faint send-out stays vanilla first-healthy")
   end
 
   -- chooseMove injects the right tactical layer by tier.
@@ -1596,7 +1645,7 @@ return function(T, Data, run)
     T.check(bBerry.expBattleItemsUsed == 1, "bag heal increments budget")
     -- Berries are held-item only; HEAL_ITEMS / X_ITEMS never include them, so
     -- recordItemUsed ignores berry ids if somehow invoked.
-    local HeldItems = require("mods.Kanto-Reforged.held_items")
+    local HeldItems = require("mods.Kanto-Reforged.items.held_items")
     T.check(HeldItems.isBerry("BERRY"), "BERRY is a held berry")
     T.check(HeldItems.isBerry("LUM_BERRY"), "LUM_BERRY is a held berry")
     T.check(not HeldItems.isBerry("SUPER_POTION"), "SUPER_POTION is not a berry")

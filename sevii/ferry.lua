@@ -2,7 +2,7 @@
 -- Same sailor who blocks the dock after the S.S. Anne leaves; a RAINBOW PASS
 -- lets him send you to the Sevii Islands instead.
 
-local HouseNpcs = require("mods.Kanto-Reforged.house_npcs")
+local HouseNpcs = require("mods.Kanto-Reforged.world.house_npcs")
 local Strings = require("src.core.Strings")
 
 local Ferry = {}

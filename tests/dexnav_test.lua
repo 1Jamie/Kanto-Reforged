@@ -1,6 +1,6 @@
 -- Route DexNav: aggregation, progressive rows, fishing note, start-menu gate.
 return function(T, Data, run)
-  local DexNav = require("mods.Kanto-Reforged.dexnav")
+  local DexNav = require("mods.Kanto-Reforged.ui.dexnav")
   local Runtime = require("src.mods.Runtime")
 
   -- Different grass vs fish ranges must not merge into one fake span

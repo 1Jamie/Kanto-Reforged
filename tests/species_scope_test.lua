@@ -1,7 +1,7 @@
 -- Species scope toggle: schema, stash/restore, daycare, bag count, fossils.
 return function(T, Data, run)
-  local SpeciesScope = require("mods.Kanto-Reforged.species_scope")
-  local Host = require("mods.Kanto-Reforged.host")
+  local SpeciesScope = require("mods.Kanto-Reforged.pokemon.species_scope")
+  local Host = require("mods.Kanto-Reforged.core.host")
   local Pokemon = require("src.pokemon.Pokemon")
   local Boxes = require("src.pokemon.Boxes")
   local Merge = require("src.mods.Merge")
@@ -331,7 +331,7 @@ return function(T, Data, run)
   do
     setMode(SpeciesScope.MODE_KANTO)
     SpeciesScope._mod = mod
-    local BattleClubs = require("mods.Kanto-Reforged.battle_clubs")
+    local BattleClubs = require("mods.Kanto-Reforged.battle.battle_clubs")
     BattleClubs.refreshScope(mod, SpeciesScope.MODE_KANTO)
     local club = (mod.content.trainers:get("OPP_EXP_BATTLE_CLUB"))
       or (Data.trainers and Data.trainers.OPP_EXP_BATTLE_CLUB)
@@ -465,8 +465,8 @@ return function(T, Data, run)
   -- Gen1 kanto wild pool excludes Gen3
   do
     setMode(SpeciesScope.MODE_KANTO)
-    local Encounters = require("mods.Kanto-Reforged.encounters")
-    local pokemon_data = require("mods.Kanto-Reforged.pokemon_data")
+    local Encounters = require("mods.Kanto-Reforged.world.encounters")
+    local pokemon_data = require("mods.Kanto-Reforged.pokemon.pokemon_data")
     local index = Encounters.apply(mod, pokemon_data, "curated", {
       speciesScope = "kanto",
     })
@@ -506,7 +506,7 @@ return function(T, Data, run)
   do
     setMode(SpeciesScope.MODE_KANTO)
     SpeciesScope._mod = mod
-    local Breeding = require("mods.Kanto-Reforged.breeding")
+    local Breeding = require("mods.Kanto-Reforged.pokemon.breeding")
     Breeding._mod = mod
     local function mon(species, gender)
       return {

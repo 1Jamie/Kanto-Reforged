@@ -1,6 +1,6 @@
 -- Bag pockets + raised capacity.
 return function(T, Data, run)
-  local BagPockets = require("mods.Kanto-Reforged.bag_pockets")
+  local BagPockets = require("mods.Kanto-Reforged.items.bag_pockets")
   local Bag = require("src.inventory.Bag")
   local ItemEffects = require("src.inventory.ItemEffects")
 

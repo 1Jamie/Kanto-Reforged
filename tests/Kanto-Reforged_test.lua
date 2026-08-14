@@ -8,7 +8,7 @@ Data:load()
 
 -- Stub missing moves in the test dataset to allow validation against mock fixtures
 -- (kept as a safety net; generator remaps Gen 1 ids so this should be empty)
-local pokemon_data = require("mods.Kanto-Reforged.pokemon_data")
+local pokemon_data = require("mods.Kanto-Reforged.pokemon.pokemon_data")
 for id, species in pairs(pokemon_data.species) do
   for _, entry in ipairs(species.learnset) do
     if not Data.moves[entry.move] and not pokemon_data.moves[entry.move] then
@@ -104,7 +104,7 @@ end
 
 -- Pokédex flavor text must be a Data.text key (vanilla pattern), not raw prose.
 do
-  local DexEntries = require("mods.Kanto-Reforged.dex_entries")
+  local DexEntries = require("mods.Kanto-Reforged.pokemon.dex_entries")
   local chiki = Data.pokemon.CHIKORITA
   local entry = chiki and chiki.dexEntry
   T.check(entry ~= nil, "Chikorita has dexEntry")
@@ -266,8 +266,8 @@ T.eq(damageAllowed, 100, "Wonder Guard allows super-effective attacks")
 T.eq(infoAllowed.typeMult, 20, "Wonder Guard preserves super-effective multiplier")
 
 -- 7. Verify Wild Spawn Distributions Mapping
-local ExpEncounters = require("mods.Kanto-Reforged.encounters")
-local packData = require("mods.Kanto-Reforged.pokemon_data")
+local ExpEncounters = require("mods.Kanto-Reforged.world.encounters")
+local packData = require("mods.Kanto-Reforged.pokemon.pokemon_data")
 local encIndex = ExpEncounters.buildIndex(packData)
 
 local route1 = Data.encounters.ROUTE_1
@@ -303,7 +303,7 @@ T.check(type(card.summary) == "string" and #card.summary > 0, "mod.card has a su
 T.check(card.author ~= nil and card.author ~= "", "mod.card names an author")
 local schema = run.loader.optionSchemas["Kanto-Reforged"]
 T.check(schema ~= nil and #schema >= 6, "Kanto-Reforged option schema registered")
-local Host = require("mods.Kanto-Reforged.host")
+local Host = require("mods.Kanto-Reforged.core.host")
 T.eq(schema[1].key, Host.optionKey("species_scope"), "species scope choice key")
 T.eq(schema[1].type, "choice", "species scope is a choice")
 T.eq(schema[1].default, "national", "DEX SCOPE defaults national")
@@ -361,7 +361,7 @@ end
 -- Host-scoped spawn keys must round-trip through top-level options.modOptions
 -- (Loader reads that on boot; Gold used to stash only under options.gold).
 do
-  local Host = require("mods.Kanto-Reforged.host")
+  local Host = require("mods.Kanto-Reforged.core.host")
   local SaveData = require("src.core.SaveData")
   local Save = require("src.core.gen2.Save")
   local disk = { textSpeed = 3, modOptions = {} }
@@ -695,7 +695,7 @@ T.eq(encIndex.meta.CHIKORITA.stage, 0, "Chikorita is base-stage")
 
 -- 8. Verify Truant
 local slaking = { mon = { species = "SLAKING" }, name = "Slaking", isPlayer = true }
-local Abilities = require("mods.Kanto-Reforged.abilities")
+local Abilities = require("mods.Kanto-Reforged.battle.abilities")
 Abilities.onTurnStart({ data = Data }, slaking)
 T.check(slaking.loafing == true, "Truant toggle goes active")
 T.check(slaking.skipMove == nil, "Truant does not skip move on first turn")
@@ -1046,7 +1046,7 @@ T.eq(pushedDuringSplit, 0,
 do
   local Evolution = require("src.pokemon.Evolution")
   local Pokemon = require("src.pokemon.Pokemon")
-  local Gender = require("mods.Kanto-Reforged.gender")
+  local Gender = require("mods.Kanto-Reforged.pokemon.gender")
   local mod = Gender._mod
   local nincada = Pokemon.new(Data, "NINCADA", 20)
   local pushed = {}
@@ -1345,7 +1345,7 @@ T.eq(drumUser.mon.hp, 50, "Belly Drum spends half HP")
 T.eq(drumUser.stages.attack, 6, "Belly Drum maxes Attack")
 
 -- 19. Hidden Power / Weather Ball / hazards / Encore / Wish
-local ExpME = require("mods.Kanto-Reforged.move_effects")
+local ExpME = require("mods.Kanto-Reforged.battle.move_effects")
 
 -- All-15 DVs → Dark type, power 70 (Gen 3 formula)
 local hpType, hpPower = ExpME.hiddenPower({
@@ -1662,7 +1662,7 @@ do
   T.eq(sleeper.mon.status, nil, "wake clears SLP")
   T.check(msgs and msgs[1] and msgs[1]:find("woke up", 1, true),
     "wake announces woke up")
-  local ExpMoveEffects = require("mods.Kanto-Reforged.move_effects")
+  local ExpMoveEffects = require("mods.Kanto-Reforged.battle.move_effects")
   T.check(Data.statuses.SLP.beforeMove == ExpMoveEffects.sleepBeforeMove,
     "live Data.statuses.SLP uses wake-and-attack handler")
 
@@ -2124,7 +2124,7 @@ T.eq(followUser.stages.evasion, 2, "Follow Me stand-in raises evasion")
 
 -- ------- Held items
 
-local HeldItems = require("mods.Kanto-Reforged.held_items")
+local HeldItems = require("mods.Kanto-Reforged.items.held_items")
 T.check(Data.items.LEFTOVERS ~= nil, "Leftovers item registered")
 T.check(Data.items.FOCUS_BAND ~= nil, "Focus Band item registered")
 T.check(Data.items.MIRACLE_SEED ~= nil, "Miracle Seed item registered")
