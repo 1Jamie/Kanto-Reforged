@@ -1214,6 +1214,30 @@ for _, evo in ipairs(Data.pokemon.FEEBAS.evolutions) do
 end
 T.check(hasMilotic, "Milotic evolves from Feebas via Water Stone")
 
+;(function()
+  local scyther = Data.pokemon.SCYTHER
+  T.check(scyther and scyther.evolutions, "Scyther evolutions table exists")
+  local hasScizor = false
+  for _, evo in ipairs(scyther.evolutions or {}) do
+    local target = evo.species or evo.into
+    local method = evo.method
+    if target == "SCIZOR" and evo.item == "MOON_STONE"
+        and (method == "ITEM" or method == "EVOLVE_ITEM") then
+      hasScizor = true
+    end
+  end
+  T.check(hasScizor, "Scizor evolves from Scyther via Moon Stone")
+  if Data.items.MOON_STONE and scyther then
+    local ItemEffects = require("src.inventory.ItemEffects")
+    local mon = { species = "SCYTHER", level = 30, hp = 50,
+      stats = { hp = 50 }, moves = {} }
+    local result, _, extra = ItemEffects.use(Data, { player = { name = "RED" } },
+      "MOON_STONE", mon, nil, nil, nil)
+    T.eq(result, "consumed", "Moon Stone is consumed on Scyther")
+    T.eq(extra and extra.evolveTo, "SCIZOR", "Moon Stone evolves Scyther into Scizor")
+  end
+end)()
+
 -- 16b. Kanto species receive Gen 2/3 move backports (learnset + tmhm).
 -- Wild/trainer/gym parties build moves via Pokemon.movesAtLevel, so these
 -- patches are what make Charmander know Metal Claw and mid-level Pikachu
@@ -1683,6 +1707,55 @@ do
     mon = { status = nil, hp = 40, stats = { hp = 40 } },
   }
   T.eq(foe.mon.status, nil, "asleep skip does not touch the other battler")
+end
+
+-- Gen 3 freeze: 20% thaw (and act), Flame Wheel thaws the user, Fire hits thaw.
+do
+  local Status = require("src.battle.Status")
+  local ExpMoveEffects = require("mods.Kanto-Reforged.battle.move_effects")
+  T.check(Data.statuses.FRZ.beforeMove == ExpMoveEffects.freezeBeforeMove,
+    "live Data.statuses.FRZ uses Gen 3 thaw handler")
+  T.eq(ExpMoveEffects.FREEZE_THAW_SIDES, 5, "Gen 3 freeze thaws 1 in 5 turns")
+
+  local frozen = {
+    name = "Frozen", isPlayer = true,
+    mon = { status = "FRZ", hp = 30, stats = { hp = 30 } },
+  }
+  local canStay, stayMsgs = Status.beforeMove(frozen, function() return 1 end, { data = Data })
+  T.eq(canStay, false, "failed thaw roll keeps the mon frozen")
+  T.eq(frozen.mon.status, "FRZ", "failed thaw keeps FRZ")
+  T.check(stayMsgs and stayMsgs[1] and stayMsgs[1]:find("frozen solid", 1, true),
+    "failed thaw announces frozen solid")
+
+  frozen.mon.status = "FRZ"
+  local canThaw, thawMsgs = Status.beforeMove(frozen, function() return 0 end, { data = Data })
+  T.eq(canThaw, true, "thaw roll lets the mon act this turn")
+  T.eq(frozen.mon.status, nil, "thaw roll clears FRZ")
+  T.check(thawMsgs and thawMsgs[1] and thawMsgs[1]:find("thawed out", 1, true),
+    "thaw announces thawed out")
+
+  frozen.mon.status = "FRZ"
+  frozen.expPendingMove = "FLAME_WHEEL"
+  local canWheel, wheelMsgs = Status.beforeMove(frozen, function() return 1 end, { data = Data })
+  T.eq(canWheel, true, "Flame Wheel thaws the user")
+  T.eq(frozen.mon.status, nil, "Flame Wheel clears FRZ")
+  T.check(wheelMsgs and wheelMsgs[1] and wheelMsgs[1]:find("thawed out", 1, true),
+    "Flame Wheel announces thawed out")
+
+  local foe = {
+    name = "Foe", isPlayer = false,
+    mon = { status = "FRZ", hp = 40, stats = { hp = 40 } },
+  }
+  local fireMove = { type = "FIRE", power = 40 }
+  T.check(ExpMoveEffects.thawTargetFromFire(
+      { sayNext = function() end }, foe, fireMove),
+    "damaging Fire move thaws the target")
+  T.eq(foe.mon.status, nil, "Fire hit clears FRZ")
+  foe.mon.status = "FRZ"
+  T.check(not ExpMoveEffects.thawTargetFromFire(
+      { sayNext = function() end }, foe, { type = "FIRE", power = 0 }),
+    "status Fire move does not thaw")
+  T.eq(foe.mon.status, "FRZ", "Will-O-Wisp-style Fire leaves FRZ")
 end
 
 -- Clear Body blocks Attack drop
@@ -2270,6 +2343,7 @@ pcall(function()
 end)
 require("mods.Kanto-Reforged.tests.species_icons_test")(T, Data, run)
 require("mods.Kanto-Reforged.tests.modern_xp_share_test")(T, Data, run)
+require("mods.Kanto-Reforged.tests.battle_exp_bar_test")(T, Data, run)
 require("mods.Kanto-Reforged.tests.split_special_test")(T, Data, run)
 require("mods.Kanto-Reforged.tests.trainer_ai_test")(T, Data, run)
 require("mods.Kanto-Reforged.tests.level_caps_test")(T, Data, run)

@@ -22,6 +22,7 @@ return {
       "smarter wild/trainer AI (prefers damage, skips moves that would fail)",
       "curated Gen 2–3 mixes into gyms, Elite Four, rival, and some trainers",
       "mod option: FULL SPAWN MIX (randomize whole tables from Gen 1–3)",
+      "Gen 2-style EXP bar under the Gen 1 player HP bar (latched fill, crawls on gain)",
       "mod option: XP SHARE (SLOT 2) (default on; 70% pool to fighters, ≤30% to party slot 2)",
       "mod option: SMARTER AI (default on)",
       "Viridian Rare Candy NPC; taking candy permanently enables story level caps",

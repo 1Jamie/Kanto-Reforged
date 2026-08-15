@@ -1788,8 +1788,10 @@ function MoveEffectsGen2.install(mod)
       end
 
       -- False Swipe clamp also honors EXP effect id if remap missed.
+      -- Damaging Fire hits thaw a frozen target (Gen 3 CheckDefrost).
       if not B._krFalseSwipeWrap then
         local originalDeal = B.dealDamage
+        local ME = require("mods.Kanto-Reforged.battle.move_effects")
         B.dealDamage = function(self, attacker, defender, damage, opts)
           local def = opts and opts.move
           if def and def.effect == "EXP_FALSE_SWIPE_EFFECT"
@@ -1797,11 +1799,32 @@ function MoveEffectsGen2.install(mod)
               and damage >= (defender.hp or 0) then
             damage = math.max(0, (defender.hp or 0) - 1)
           end
-          return originalDeal(self, attacker, defender, damage, opts)
+          local before = defender and defender.hp
+          local dealt = originalDeal(self, attacker, defender, damage, opts)
+          if dealt and dealt > 0 and defender and before and defender.hp < before then
+            local move = def
+            if type(move) == "string" then
+              move = self.data and self.data.moves and self.data.moves[move]
+            end
+            if not move and opts and opts.moveId and self.data and self.data.moves then
+              move = self.data.moves[opts.moveId]
+            end
+            ME.thawTargetFromFire(self, defender, move)
+          end
+          return dealt
         end
         B._krFalseSwipeWrap = true
       end
     end)
+  end)
+
+  -- Gen 3 freeze: 20% thaw + act, Flame Wheel / Sacred Fire thaw the user.
+  pcall(function()
+    local ME = require("mods.Kanto-Reforged.battle.move_effects")
+    mod.content.statuses:patch("freeze", {
+      beforeMovePriority = 30,
+      beforeMove = ME.freezeBeforeMoveGen2,
+    })
   end)
 
   -- Sleep Talk / Snore while asleep (Gen2 content statuses; Gen1 keeps its own).

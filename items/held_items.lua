@@ -974,33 +974,28 @@ function HeldItems.install(mod)
   -- Damage drains pin stopAt so multi-hit bars step correctly.  HP Berry
   -- heals the model immediately (before the queue runs), which made
   -- stopAt < mon.hp and skipped the damage dip — the following heal drain
-  -- then looked like a no-op.  Honor stopAt while shownHP is still above it.
+  -- then looked like a no-op.
+  --
+  -- Do NOT replace stepHPDrain (GH #3): the engine walks shownPx / drainHold
+  -- one pixel at a time.  Temporarily pin mon.hp to drainFloor so that
+  -- machinery still runs, then restore the real model HP.
   if not BattleState._expansionBerryDrainFloor then
+    local original_stepHPDrain = BattleState.stepHPDrain
     BattleState.stepHPDrain = function(self)
-      local busy = false
+      local saved = {}
       for _, b in ipairs({ self.player, self.enemy }) do
-        if b and b.shownHP then
-          local goal = b.mon.hp
-          if b.drainFloor ~= nil then
-            if b.shownHP > b.drainFloor then
-              -- Still draining down to this hit's pin (berry may already
-              -- have raised mon.hp above the floor).
-              goal = b.drainFloor
-            elseif b.drainFloor > goal and b.shownHP >= b.drainFloor then
-              -- Multi-hit: later hits already lowered mon.hp below this floor.
-              goal = b.drainFloor
-            end
-          end
-          if b.shownHP ~= goal then
-            local step = math.max(1, b.mon.stats.hp) / 96
-            if b.shownHP > goal then
-              b.shownHP = math.max(goal, b.shownHP - step)
-            else
-              b.shownHP = math.min(goal, b.shownHP + step)
-            end
-            busy = busy or b.shownHP ~= goal
+        if b and b.shownHP and b.drainFloor ~= nil and b.mon then
+          local pin = b.drainFloor
+          local hp = b.mon.hp
+          if b.shownHP > pin or (b.shownHP == pin and pin ~= hp) then
+            saved[b] = hp
+            b.mon.hp = pin
           end
         end
+      end
+      local busy = original_stepHPDrain(self)
+      for b, hp in pairs(saved) do
+        b.mon.hp = hp
       end
       return busy
     end

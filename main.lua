@@ -195,6 +195,10 @@ return function(mod)
 
   LocationSignpost.install(mod)
 
+  if Host.isGen1() then
+    require("mods.Kanto-Reforged.ui.battle_exp_bar").install(mod)
+  end
+
   local HouseNpcs = require("mods.Kanto-Reforged.world.house_npcs")
   HouseNpcs.resetClaims()
   if Host.isGen2() then
@@ -675,6 +679,7 @@ return function(mod)
                 comparison = evo.comparison,
               }
             end
+            -- Nested evo recs are schema-strict on Gen1: species + item only.
             return {
               method = method,
               level = evo.level,

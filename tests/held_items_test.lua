@@ -59,6 +59,8 @@ return function(T, Data, HeldItems)
     end
     T.eq(math.floor(b.player.shownHP + 0.5), damaged,
       "bar drains to post-hit HP before heal rise")
+    T.check(type(b.player.shownPx) == "number",
+      "pixel-step HP bar length is tracked")
     T.eq(mon.hp, damaged + 10, "model stays healed while bar shows the dip")
   end
 

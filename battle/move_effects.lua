@@ -106,6 +106,106 @@ function MoveEffects.sleepBeforeMove(battler, rng, battle)
   return false, { Strings("%s\nis fast asleep!", battler.name) }
 end
 
+-- Gen 3 freeze: 20% thaw before the move (and act that turn). Flame Wheel /
+-- Sacred Fire thaw the user. Damaging Fire hits thaw the target.
+-- Gen 1 otherwise never thaws, which softlocks under Shadow Tag (GH #2).
+MoveEffects.FREEZE_THAW_SIDES = 5
+
+MoveEffects.USER_THAW_MOVES = {
+  FLAME_WHEEL = true,
+  SACRED_FIRE = true,
+}
+
+function MoveEffects.isDamagingFireMove(move)
+  if not move then return false end
+  if move.type ~= "FIRE" then return false end
+  return (move.power or 0) > 0
+end
+
+function MoveEffects.pendingMoveOf(battler)
+  if not battler then return nil end
+  return battler.expPendingMove
+    or (battler.mon and battler.mon.expPendingMove)
+end
+
+local function rollThaw(rng, battle)
+  rng = rng or (battle and battle.rng) or math.random
+  local ok, n = pcall(rng, 0, MoveEffects.FREEZE_THAW_SIDES - 1)
+  if ok and type(n) == "number" then
+    return n == 0
+  end
+  ok, n = pcall(rng, MoveEffects.FREEZE_THAW_SIDES)
+  if ok and type(n) == "number" then
+    -- 0..n-1 (Gold BattleRandom) or 1..n (love.math.random(n))
+    return n == 0 or n == 1
+  end
+  ok, n = pcall(rng)
+  if ok and type(n) == "number" then
+    return (n % MoveEffects.FREEZE_THAW_SIDES) == 0
+  end
+  return false
+end
+
+function MoveEffects.freezeBeforeMove(battler, rng, battle)
+  local pending = MoveEffects.pendingMoveOf(battler)
+  if pending and MoveEffects.USER_THAW_MOVES[pending] then
+    battler.mon.status = nil
+    return true, { Strings("%s\nthawed out!", battler.name) }
+  end
+  if rollThaw(rng, battle) then
+    battler.mon.status = nil
+    return true, { Strings("%s\nthawed out!", battler.name) }
+  end
+  return false, { Strings("%s\nis frozen solid!", battler.name) }
+end
+
+-- Gold status records: beforeMove(battle, mon, name) -> canAct
+function MoveEffects.freezeBeforeMoveGen2(battle, mon, name)
+  local pending = mon and mon.expPendingMove
+  if pending and MoveEffects.USER_THAW_MOVES[pending] then
+    mon.status = nil
+    battle:emit({ kind = "message", text = name .. " thawed out!" })
+    return true
+  end
+  local roll
+  if battle and type(battle.random) == "function" then
+    roll = battle.random(MoveEffects.FREEZE_THAW_SIDES)
+  else
+    roll = math.random(0, MoveEffects.FREEZE_THAW_SIDES - 1)
+  end
+  if roll == 0 then
+    mon.status = nil
+    battle:emit({ kind = "message", text = name .. " thawed out!" })
+    return true
+  end
+  battle:emit({ kind = "message", text = name .. " is frozen solid!" })
+  return false
+end
+
+function MoveEffects.thawTargetFromFire(battle, target, move)
+  if not MoveEffects.isDamagingFireMove(move) then return false end
+  local mon = (target and target.mon) or target
+  if not mon then return false end
+  local st = mon.status
+  if st ~= "FRZ" and st ~= "freeze" then return false end
+  mon.status = nil
+  local name
+  if target and target.mon then
+    name = target.isPlayer and target.name or ("Enemy " .. target.name)
+  elseif battle and type(battle.monName) == "function" then
+    name = battle:monName(target)
+  else
+    name = (target and target.name) or "POKéMON"
+  end
+  local msg = Strings("Fire defrosted\n%s!", name)
+  if battle and battle.sayNext then
+    battle:sayNext(msg)
+  elseif battle and battle.emit then
+    battle:emit({ kind = "message", text = msg })
+  end
+  return true
+end
+
 -- Gen 3 Magnitude: power + strength number
 function MoveEffects.magnitudePower(rng)
   local r = (rng or math.random)(0, 99)
@@ -265,6 +365,9 @@ function MoveEffects.register(mod)
   -- merge writes it into Data.statuses (install-time edits of Data are wiped).
   mod.content.statuses:patch("SLP", {
     beforeMove = MoveEffects.sleepBeforeMove,
+  })
+  mod.content.statuses:patch("FRZ", {
+    beforeMove = MoveEffects.freezeBeforeMove,
   })
 
   -- Gen 2+: Steel (and Poison) cannot be poisoned / badly poisoned.
@@ -1936,6 +2039,9 @@ function MoveEffects.install(mod)
       Status.RECORDS.SLP._expSleepModern = true
       Status.RECORDS.SLP._expSleepTalk = true
     end
+    if Status.RECORDS and Status.RECORDS.FRZ then
+      Status.RECORDS.FRZ.beforeMove = MoveEffects.freezeBeforeMove
+    end
     if Status.RECORDS and Status.RECORDS.PSN then
       Status.RECORDS.PSN.canInflict = function(target)
         if not target then return false end
@@ -1958,6 +2064,12 @@ function MoveEffects.install(mod)
       end
       if Status.RECORDS and Status.RECORDS.SLP then
         Status.RECORDS.SLP.beforeMove = MoveEffects.sleepBeforeMove
+      end
+      if Data.statuses and Data.statuses.FRZ then
+        Data.statuses.FRZ.beforeMove = MoveEffects.freezeBeforeMove
+      end
+      if Status.RECORDS and Status.RECORDS.FRZ then
+        Status.RECORDS.FRZ.beforeMove = MoveEffects.freezeBeforeMove
       end
       local function canPoison(target)
         if not target then return false end
@@ -1991,6 +2103,17 @@ function MoveEffects.install(mod)
         end
         self:statusOnomatopoeia(user, "sleep")
         return true -- still asleep: only this mon's beat is spent
+      end
+      if mon and mon.status == "FRZ" then
+        local canMove, msgs = MoveEffects.freezeBeforeMove(user, self.rng, self)
+        for _, m in ipairs(msgs or {}) do
+          if self.sayStatusMsg then
+            self:sayStatusMsg(user, m)
+          else
+            self:sayNext(m)
+          end
+        end
+        return not canMove
       end
       return original_preRecharge(self, user, target)
     end
@@ -2107,7 +2230,9 @@ function MoveEffects.install(mod)
     -- Rollout / Ice Ball: PP only on the first hit of a set (like Thrash).
     local rolloutCont = user and moveInst and user.expRolloutMove == moveInst
         and (user.expRollout or 0) > 0
+    self.expCurrentMoveDef = move
     original_perform(self, user, target, moveInst, isCalled)
+    self.expCurrentMoveDef = nil
     if rolloutCont and moveInst and ppBefore and moveInst.pp and moveInst.pp < ppBefore then
       moveInst.pp = ppBefore
     end
@@ -2198,9 +2323,13 @@ function MoveEffects.install(mod)
           target.isPlayer and target.name or ("Enemy " .. target.name)))
       end
     end
+    local beforeHp = target and target.mon and target.mon.hp
     local dealt = original_applyDamage(self, target, dmg)
     if dealt and dealt > 0 and target then
       target.expTookDamageThisTurn = true
+      if beforeHp and target.mon and target.mon.hp < beforeHp then
+        MoveEffects.thawTargetFromFire(self, target, self.expCurrentMoveDef)
+      end
     end
     return dealt
   end
