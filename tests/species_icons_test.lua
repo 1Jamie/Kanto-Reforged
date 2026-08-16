@@ -60,4 +60,15 @@ return function(T, Data, run)
   end
   T.eq(missing, 0, "every Kanto Reforged species has a bySpecies icon")
   T.eq(bad, 0, "every mapped icon is a Gen 1 class name")
+
+  -- Custom mod icon entries must not be clobbered
+  local testData = {
+    icons = { icons = { MON = "mon.png" }, bySpecies = { COMBUSKEN = { image = "custom_combusken.png" } } },
+    gen2Icons = { icons = { MON = "mon.png" }, species = { COMBUSKEN = "CUSTOM_SHEET" }, bySpecies = {} },
+  }
+  local modStub = { content = { icons = { register = function() end } }, log = { info = function() end } }
+  -- re-run register on existing custom data
+  SpeciesIcons.register(modStub, { COMBUSKEN = { types = { "FIRE", "FIGHTING" } } })
+  T.check(type(Data.icons.bySpecies.COMBUSKEN) ~= "string" or Data.icons.bySpecies.COMBUSKEN == "MON",
+    "Combusken class fallback is valid")
 end

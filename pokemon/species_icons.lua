@@ -162,6 +162,19 @@ local function applyTargetTableFixes(target, speciesTable, isGen2)
         target.icons[iconName] = target.icons[targetClass]
       end
     end
+
+    for id, def in pairs(speciesTable or {}) do
+      local className = SpeciesIcons.pickClass({
+        id = id,
+        types = def.types,
+      })
+      if not target.species[id] then
+        target.species[id] = className
+      end
+      if not target.bySpecies[id] then
+        target.bySpecies[id] = className
+      end
+    end
   else
     -- For Gen 1 (Data.icons), keep icons[k] as string filepaths to prevent
     -- string concatenation errors in Gen 1 PartyMenu.drawIcon.
@@ -170,16 +183,17 @@ local function applyTargetTableFixes(target, speciesTable, isGen2)
         target.icons[k] = v.image
       end
     end
-  end
 
-  -- Map every species to its icon class
-  for id, def in pairs(speciesTable or {}) do
-    local className = SpeciesIcons.pickClass({
-      id = id,
-      types = def.types,
-    })
-    target.bySpecies[id] = className
-    target.species[id] = className
+    for id, def in pairs(speciesTable or {}) do
+      local className = SpeciesIcons.pickClass({
+        id = id,
+        types = def.types,
+      })
+      -- Only set fallback if no custom entry or override exists
+      if target.bySpecies[id] == nil then
+        target.bySpecies[id] = className
+      end
+    end
   end
 end
 
@@ -190,7 +204,9 @@ function SpeciesIcons.register(mod, speciesTable)
       id = id,
       types = def.types,
     })
-    mod.content.icons:register(id, className)
+    pcall(function()
+      mod.content.icons:register(id, className)
+    end)
     n = n + 1
   end
 
@@ -199,21 +215,75 @@ function SpeciesIcons.register(mod, speciesTable)
   applyTargetTableFixes(Data.icons, speciesTable, false)
   applyTargetTableFixes(Data.gen2Icons, speciesTable, true)
 
-  -- Defensive safety patch for Gen 1 PartyMenu.drawIcon
+  -- Defensive safety patch for Gen 1 PartyMenu.drawIcon:
+  -- When a custom icon is provided by another mod (via pokemon.icon hook, def.icon, or custom path),
+  -- ensure it is drawn whole in full color without DMG OBP0 greyscale baking,
+  -- without left-half mirroring, and with proper 2-frame animation.
   local Host = require("mods.Kanto-Reforged.core.host")
   if Host.isGen1() then
-    local Gen1Patch = require("mods.Kanto-Reforged.gen1_patch")
     local ok, PartyMenu = pcall(require, "src.ui.PartyMenu")
     if ok and PartyMenu and PartyMenu.drawIcon and not PartyMenu._krTableIconPatch then
       local origDrawIcon = PartyMenu.drawIcon
+      local customIconCache = {}
       PartyMenu.drawIcon = function(game, mon, x, y, selected, counter, forceAlt)
         local icons = game and game.data and game.data.icons
-        if icons and icons.icons and mon and mon.species then
-          local entry = (icons.bySpecies and icons.bySpecies[mon.species])
-          if type(entry) == "string" and type(icons.icons[entry]) == "table" then
-            icons.icons[entry] = icons.icons[entry].image or icons.icons[entry]
+        if not (icons and mon and mon.species) then
+          return origDrawIcon(game, mon, x, y, selected, counter, forceAlt)
+        end
+
+        local def = game.data.pokemon and game.data.pokemon[mon.species]
+        local entry = (icons.bySpecies and icons.bySpecies[mon.species])
+                   or (def and def.icon)
+        local name, path
+        if type(entry) == "string" then
+          name = entry
+          path = icons.icons and icons.icons[entry]
+          if type(path) == "table" then
+            path = path.image
+            icons.icons[entry] = path
+          end
+        elseif type(entry) == "table" then
+          path = entry.image
+        end
+        if not path then
+          name = def and def.dex and icons.byDex and icons.byDex[def.dex]
+          path = name and icons.icons and icons.icons[name]
+          if type(path) == "table" then path = path.image end
+        end
+
+        local Sprites = require("src.pokemon.Sprites")
+        local resolvedPath = Sprites.iconPath(game.data, mon, path, { name = name })
+
+        -- Check if resolvedPath is a custom mod icon (i.e. not the built-in monochrome icon sheet for name)
+        local isBuiltIn = name and icons.icons and (resolvedPath == icons.icons[name])
+        if resolvedPath and not isBuiltIn then
+          local Assets = require("src.core.Assets")
+          if customIconCache[resolvedPath] == nil then
+            local okImg, img = pcall(love.graphics.newImage, Assets.resolve(resolvedPath))
+            customIconCache[resolvedPath] = okImg and img or false
+          end
+          local img = customIconCache[resolvedPath]
+          if img then
+            local alt = forceAlt or false
+            if selected then
+              local px = math.floor((mon.hp or 0) * 48 / math.max(1, (mon.stats and mon.stats.hp) or 1))
+              local speed = px >= 27 and 5 or px >= 10 and 16 or 32
+              alt = math.floor((counter or 0) / speed) % 2 == 1
+            end
+            local iw, ih = img:getDimensions()
+            local frame = 0
+            if ih > 16 then
+              frame = alt and ((ih >= 64 and 3) or 1) or 0
+            end
+            if ih > 16 then
+              love.graphics.draw(img, love.graphics.newQuad(0, frame * 16, 16, 16, iw, ih), x, y)
+            else
+              love.graphics.draw(img, x, y)
+            end
+            return true
           end
         end
+
         return origDrawIcon(game, mon, x, y, selected, counter, forceAlt)
       end
       PartyMenu._krTableIconPatch = true

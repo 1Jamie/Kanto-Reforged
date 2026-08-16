@@ -11,31 +11,32 @@ Mod id: `Kanto-Reforged`. Enable it in the launcher Mods tab or the F10 manager.
 1. [Design philosophy](#design-philosophy)
 2. [Options](#options)
 3. [Species, types, and moves](#species-types-and-moves)
-4. [Abilities](#abilities)
-5. [Wild encounters and trainers](#wild-encounters-and-trainers)
-6. [Gender](#gender)
-7. [Day Care and breeding](#day-care-and-breeding)
-8. [Held items](#held-items)
-9. [Berry Farm and berry economy](#berry-farm-and-berry-economy)
-10. [Bag and party QoL](#bag-and-party-qol)
-11. [Level caps](#level-caps)
-12. [XP Share (slot 2)](#xp-share-slot-2)
-13. [Smarter AI](#smarter-ai)
-14. [House NPCs and utility](#house-npcs-and-utility)
-15. [Move Hub](#move-hub)
-16. [Blacksmith](#blacksmith)
-17. [Gen 3 fossils](#gen-3-fossils)
-18. [Roaming legendaries](#roaming-legendaries)
-19. [Static legendaries and mythicals](#static-legendaries-and-mythicals)
-20. [Custom maps](#custom-maps)
-21. [Caveats and save notes](#caveats-and-save-notes)
-22. [Module map (for modders)](#module-map-for-modders)
+4. [Trade Evolution Bypasses (Moon Stone)](#trade-evolution-bypasses-moon-stone)
+5. [Abilities and Battle Mechanics](#abilities-and-battle-mechanics)
+6. [Wild encounters and trainers](#wild-encounters-and-trainers)
+7. [Gender](#gender)
+8. [Day Care and breeding](#day-care-and-breeding)
+9. [Held items](#held-items)
+10. [Berry Farm and berry economy](#berry-farm-and-berry-economy)
+11. [Bag and party QoL](#bag-and-party-qol)
+12. [Level caps](#level-caps)
+13. [XP Share (slot 2)](#xp-share-slot-2)
+14. [Smarter AI](#smarter-ai)
+15. [House NPCs and utility](#house-npcs-and-utility)
+16. [Move Hub](#move-hub)
+17. [Blacksmith](#blacksmith)
+18. [Gen 3 fossils](#gen-3-fossils)
+19. [Roaming legendaries](#roaming-legendaries)
+20. [Static legendaries and mythicals](#static-legendaries-and-mythicals)
+21. [Custom maps](#custom-maps)
+22. [Caveats and save notes](#caveats-and-save-notes)
+23. [Module map (for modders)](#module-map-for-modders)
 
 ---
 
 ## Design philosophy
 
-Same idea as the README: if Game Freak had bolted gen2-3 pieces onto Red/Blue, how would that feel? Story stays Kanto. Stats stay DVs and `statExp` (no natures/IVs). New overworld art reuses gen1 sheets where it makes sense (legendaries use `SPRITE_BIRD` / `SPRITE_MONSTER` / `SPRITE_FAIRY` on purpose). Move anims and party icons borrow gen1 stock. House NPCs are short TextBox / ChoiceBox chats, not quest logs.
+Same idea as the README: if Game Freak had bolted gen2-3 pieces onto Red/Blue and Gold, how would that feel? Stories stay authentic to the originals. Stats stay DVs and `statExp` (no natures/IVs). New overworld art reuses classic sheets where it makes sense (legendaries use `SPRITE_BIRD` / `SPRITE_MONSTER` / `SPRITE_FAIRY` on purpose). Move anims and party icons borrow classic stock. House NPCs are short TextBox / ChoiceBox chats, not bloated quest logs.
 
 ---
 
@@ -45,8 +46,8 @@ Configured in the mod manager / F10 options:
 
 | Option | Default | Effect |
 |---|---|---|
-| **DEX SCOPE** (Gen1) / **JOHTO SCOPE** (Gen2) | NATIONAL / FULL | Restricts wilds, trainers, and legends. Gen1 **KANTO** locks to the original 151 (out-of-scope party/PC mons are stored and restored when you switch back). Gen2 **JOHTO 251** caps Johto spawns at dex 251 while Kanto maps keep Gen3 guests. |
-| **FULL SPAWN MIX** | Off | Rebuilds wild tables from the full Gen 1–3 pool instead of curated mixes (habitat / level gated, deterministic). On **Gold**, reshuffles Johto and Kanto grass/water. Mid-session toggles apply live. |
+| **DEX SCOPE** (Gen1) / **JOHTO SCOPE** (Gen2) | NATIONAL / FULL | Restricts wilds, trainers, and legends. Gen1 **KANTO** locks to the original 151 (out-of-scope party/PC mons are safely stored and restored when switched back). Gen2 **JOHTO 251** caps Johto spawns at dex 251 while Kanto postgame maps keep Gen3 guests. |
+| **FULL SPAWN MIX** | Off | Rebuilds wild tables from the full Gen 1–3 pool instead of curated mixes (habitat / level gated, deterministic). On **Gold**, reshuffles Johto and Kanto grass/water (with a density pass so Kanto stays full). Mid-session toggles apply live. |
 | **PURE RANDOM SPAWN** | Off | Chaos mode: seeded pick from the whole allowed dex (respects DEX/JOHTO SCOPE). No habitat, stage, or BST gates. Overrides FULL SPAWN MIX when both are on. Rolls once when toggled on and persists across loads; toggle off/on for a new mix. |
 | **LEGENDS IN MIX** | Off | When FULL SPAWN MIX or PURE RANDOM SPAWN is on, allow legendaries/mythicals into the wild pool. Curated mode ignores this. |
 | **XP SHARE (SLOT 2)** | On | Splits the Gen 1 XP pool: ~70% to fighters, up to ~30% to party slot 2 (never more than a solo share total). Replaces EXP.ALL while enabled. |
@@ -65,19 +66,18 @@ Configured in the mod manager / F10 options:
 - Original 151 also receive Gen 3 ability assignments and selected Gen 2/3 learnset / TM backports.
 - Pokédex size extended to **386**.
 - Special evolution methods for branching lines (e.g. Tyrogue ATK/DEF/BAL, Wurmple A/B).
-- Friendship / time / location evolutions are approximated to fit Gen 1 triggers.
+- Friendship / time / location evolutions are approximated to fit classic triggers.
 
 ![Party menu with Gen 3 species and Gen 1 icon classes](screen-shots/party-menu.png)
 
 ### Types
 
 Custom types registered with matchups:
-
 - **Dark**
 - **Steel**
 - **Fairy**
 
-Gen1 type-chart quirks are patched to Gen2/Gen3 values on **both** Red and Gold (`type_chart_patches.lua`): Ghost hits Psychic, Bug/Poison are no longer mutual SE, Ice is weak into Fire. Dark/Steel/Fairy matchups are upserted on Gold so they match Red’s table.
+Type-chart quirks are patched to Gen2/Gen3 values on **both** Red and Gold (`type_chart_patches.lua`): Ghost hits Psychic, Bug/Poison are no longer mutual SE, Ice is weak into Fire. Dark/Steel/Fairy matchups are upserted on Gold so they match Red’s table.
 
 ### Moves
 
@@ -89,31 +89,68 @@ Shedinja’s max HP is clamped to **1** at runtime.
 
 ---
 
-## Abilities
+## Trade Evolution Bypasses (Moon Stone)
 
-Gen 3 abilities on new and Kanto species. Battle hooks cover common cases (e.g. Wonder Guard, type immunities, status prevention). Some abilities / move stubs are still unfinished; see `mod.card` known notes.
+To eliminate the need for link trading to evolve certain species, several trade and item-trade evolutions can be triggered directly by using a **Moon Stone** on the Pokémon:
 
-Cute Charm / Attract / Captivate interact with the gender system (below).
+| Base Pokémon | Evolution | Method |
+|---|---|---|
+| Onix | Steelix | Use Moon Stone |
+| Scyther | Scizor | Use Moon Stone |
+| Poliwhirl | Politoed | Use Moon Stone |
+| Slowpoke | Slowking | Use Moon Stone |
+| Porygon | Porygon2 | Use Moon Stone |
+| Gloom | Bellossom | Use Moon Stone |
+| Eevee | Umbreon | Use Moon Stone |
+| Sunkern | Sunflora | Use Moon Stone |
+| Clamperl | Huntail | Use Moon Stone |
+| Clamperl | Gorebyss | Use Water Stone |
+
+---
+
+## Abilities and Battle Mechanics
+
+### Abilities
+
+- Gen 3 abilities on new, Johto, and Kanto species. Battle hooks cover common cases (e.g. Wonder Guard, type immunities, status prevention, Intimidate, speed boosts, etc.).
+- Cute Charm / Attract / Captivate interact with the gender system.
 
 ![Summary page showing ability name + text (and gender glyph)](screen-shots/summary-ability.png)
+
+### Battle Mechanics
+
+- **Gen 3 Freeze Parity:** Frozen Pokémon have a 20% (1-in-5) chance to thaw naturally each turn. Furthermore, any damaging fire-type move used against a frozen target immediately unfreezes them.
+- **XP Bar:** A smooth blue EXP bar displays below the player Pokémon's HP bar in battle across Gen 1 (matching Gen 2 style) with widescreen support.
 
 ---
 
 ## Wild encounters and trainers
 
-### Wilds
+### Wild Encounters
 
-Default mode is **curated**: habitats and levels mix Gen 2–3 species into Kanto routes without replacing the whole table. A coverage pass then ensures every non-legendary **line** is obtainable (catch the base — or a gift/rod root — then evolve / breed); mid and final forms do not all need their own grass slots. On Gold, curated keeps Johto mostly native with a few Gen3 guests and rebuilds Kanto grass for postgame. Optional **FULL SPAWN MIX** randomizes from Gen 1–3 (Gold: all Johto + Kanto maps).
-
-Wilds can hold berries (~**5%** chance). The berry is rolled only from types you have already **unlocked** for the farm. Catching the mon keeps `heldItem`; use party **TAKE** to move it to the bag.
+- **Gen 1 (Red / Blue):** Curated mixes: habitats and levels mix Gen 2–3 species into Kanto routes without replacing the whole table. A coverage pass ensures every non-legendary **line** is obtainable.
+- **Gen 2 (Gold) Johto:** Native Johto tables are preserved with curated Gen 3 guests in rare slots across grasslands, forests, caves, and mountains.
+- **Gen 2 (Gold) Kanto:** Fully rebuilt postgame grass tables featuring Gen 3 lines scaled from **Lv 28 to Lv 40+**.
+- **Full Spawn Mix (Option):** Reshuffles all wild grass/water tables across the entire game from the Gen 1–3 pool.
+- Wilds have a ~**5%** chance to hold a berry (rolled only from types you have already unlocked at the farm). Catching the mon keeps `heldItem`; use party **TAKE** to move it to the bag.
 
 ![Wild Azurill encounter in a Gen 1 battle UI](screen-shots/wild-azurill.png)
 
 ### Trainers
 
-Gym leaders and Elite Four get a curated **Gen 2 swap + Gen 3 add** (Blaine is Gen 3 lead-only so Growlithe→Arcanine and Ponyta→Rapidash stay intact). Ace mons hold a **berry ramp** (plain `BERRY` on Brock → status berries mid-game → Lum on Agatha/Lance). Rival mixes follow **continuity**: mid fights foreshadow a line; League fights are where finals debut (no champ-only surprises).
-
-**Tier 2** set pieces get heavier cherry-picks so Gen 2–3 show up on trainers, not only in grass: early gym trainers, Mt Moon Rockets, Fighting Dojo, Tower (including 7F), late gyms (Saffron/Fuchsia/Cinnabar/Viridian), SS Anne, Rock Tunnel, Cycling Road, Silph, and Victory Road. **Nugget Bridge** stays mostly Gen 1 (Bug Catcher + Mankey Jr Trainer fully vanilla) with one Gen 2–3 spice on the other fights. Other trash classes keep small one-slot mixes. See `trainers.lua` / `trainer_ai.lua`.
+- **Gen 1 (Red / Blue):** Gym leaders and Elite Four get a curated **Gen 2 swap + Gen 3 add**. Ace mons hold a **berry ramp** (plain `BERRY` on Brock → status berries mid-game → Lum on Agatha/Lance). Rival mixes follow **continuity** (mid fights foreshadow a line; League fights debut finals). Tier 2 set pieces (Nugget Bridge, gym trainers, Mt. Moon, Fighting Dojo, Tower, Silph, Victory Road) get heavier mixes.
+- **Gen 2 (Gold) Kanto Overhaul:** The entire Kanto postgame circuit is overhauled with competitive 6-Pokémon rosters, Gen 2/3 additions, held berries, and higher level targets:
+  - **Lt. Surge (Vermilion):** Levels 52–55 (Ace Raichu holding Chesto Berry).
+  - **Janine (Fuchsia):** Levels 52–56 (Ace Venomoth holding Persim Berry).
+  - **Erika (Celadon):** Levels 53–57 (Ace Bellossom holding Rawst Berry).
+  - **Misty (Cerulean):** Levels 57–61 (Ace Starmie holding Pecha Berry).
+  - **Sabrina (Saffron):** Levels 58–62 (Ace Alakazam holding Cheri Berry).
+  - **Brock (Pewter):** Levels 58–62 (Ace Steelix holding Berry).
+  - **Blaine (Cinnabar / Seafoam):** Levels 59–63 (Ace Magmar holding Persim Berry).
+  - **Blue (Viridian):** Levels 70–72 (Ace Arcanine holding Cheri Berry).
+  - **Fighting Dojo (Saffron):** Levels 60–64 Blackbelts (Hariyama, Breloom, Medicham, Primeape, Hitmons).
+  - **Nugget Bridge Circuit (Route 24/25):** Levels 56–60.
+  - **Mt. Moon Rival Rematch:** Levels 75–78 (Ace Tyranitar holding Lum Berry).
 
 ---
 
@@ -126,13 +163,12 @@ Every mon gets a gender from Gen 2 rules: Attack DV vs species `genderRate` (fem
 - Attract and Cute Charm use opposite-gender infatuation (Cute Charm at Gen 3’s 1/3 rate).
 - Captivate only hits the opposite gender.
 - Cute Charm lead biases wild genders (~2/3 opposite), Emerald-style.
-- Changing the values in save file will not swap the geneder, these are set on spawn time so we are not redoing the same math 3000x redundantly.
 
 ---
 
 ## Day Care and breeding
 
-Route 5 Day Care house (same building as vanilla) becomes Gen 3-style with this mod. Outdoors Route 5 is unchanged.
+Route 5 Day Care house (same building as vanilla) becomes Gen 3-style in Gen 1. (Gen 2 uses its native Route 34 Day Care).
 
 ![Route 5 Day Care](screen-shots/daycare.png)
 
@@ -155,16 +191,6 @@ Route 5 Day Care house (same building as vanilla) becomes Gen 3-style with this 
 - DVs: Crystal-style mix (Defense / Special tend to come from one parent).
 - Egg moves can come from the father when the baby can learn them.
 - **No** Everstone, Natures, or IVs.
-
-### Line quirks
-
-- Nidoran♀ / Illumise eggs: 50/50 species flip.
-- Incense-only babies are not fully supported yet → breed Marill / Wobbuffet instead of Azurill / Wynaut, etc.
-- Gen 4 babies clamp to the Gen 1–3 form this pack ships.
-
-### Saves
-
-Prefer Lua save slots. Exporting to a Gen 1 `.sav` and importing back **drops** Johto/Hoenn mons and Eggs.
 
 ---
 
@@ -206,10 +232,6 @@ Party menu **GIVE** / **TAKE** (field only).
 | Pokémon Tower 7F | Blackglasses |
 | Power Plant (Poké Ball while exploring) | Metal Coat |
 
-**NPCs:** gramps near Celadon Mansion (Item Finder hint for Leftovers); channeler in Lavender (Spell Tag / berries flavor); Black Belt outside Fighting Dojo (one-time Black Belt gift).
-
-City marts sell type boosters (Viridian/Pewter starters shelf; Celadon 5F). They do **not** sell status berries or Leftovers / Focus Band.
-
 ---
 
 ## Berry Farm and berry economy
@@ -220,7 +242,11 @@ There are no separate "seeds." You plant a berry, it grows, you harvest more ber
 
 ### Access
 
-Every Pokémon Center has an extra carpet on the **right side** of the floor. Step on it to warp in; the shed door returns you to that same Center. Map id `BERRY_FARM` (index **1100**). Lake is surfable scenery with **no** wilds / fishing.
+- **Gen 1 Centers:** Extra carpet on the **right side** of any Pokémon Center.
+- **Gen 2 Johto Centers:** Stairs tile in the **bottom-right corner** of any Johto Pokémon Center.
+- **Gen 2 Kanto Centers:** Red door mat pair on the **south row** of any Kanto Pokémon Center.
+- **Gen 2 Indigo Plateau:** SE stairs tile.
+- Shed door on the farm returns you to that exact same Center.
 
 ### NPCs on the farm
 
@@ -235,7 +261,7 @@ Every Pokémon Center has an extra carpet on the **right side** of the floor. St
 ### Obtaining berries
 
 1. **First farm visit:** 3× `BERRY` gifted once.
-2. **Badge unlocks** (talk to Soil Expert or merchant with `gift`): unlock that plant type + **3×** of that berry once per type.
+2. **Badge unlocks:** unlock that plant type + **3×** of that berry once per type.
 3. **Farm merchant:** buy unlocked berries anytime:
    - `BERRY` ¥300
    - Status berries ¥600
@@ -245,9 +271,9 @@ Every Pokémon Center has an extra carpet on the **right side** of the floor. St
 6. **Blacksmith:** Leaf Stone → 5 berries (repeatable mix).
 7. **Battle rematches:** Snack Scout gifts Cheri + Pecha + Rawst; Circuit rematches can drop a Heart Scale (30%).
 
-Growing on plots is cheaper than buying when you need bulk (blender vitamins, etc.).
+### Badge → Plant Unlock Tables
 
-### Badge → plant unlock
+**Gen 1 (Kanto Badges):**
 
 | Badge | Unlocks |
 |---|---|
@@ -259,16 +285,27 @@ Growing on plots is cheaper than buying when you need bulk (blender vitamins, et
 | Marsh or Volcano | Lum |
 | Earth | *(no new berry)* |
 
+**Gen 2 (Johto Badges):**
+
+| Badge | Unlocks |
+|---|---|
+| Zephyr | Cheri |
+| Hive | Pecha |
+| Plain | Rawst |
+| Fog | Aspear + Chesto |
+| Storm | Persim |
+| Mineral or Glacier | Lum |
+| Rising | *(no new berry)* |
+
 ### Growth
 
 - **9** plots. Face a bed + A to plant (spends 1 berry).
-- Growth uses the global `farmSteps` counter (any overworld tile step, not farm-only).
-- Base **320** steps per plant.
+- Growth uses the global `farmSteps` counter (any overworld tile step). Base **320** steps per plant.
 - Soil ranks: 0→320, 1→280, 2→240, 3→192 steps.
 - Rank gates:
   - Rank 1: ≥ **5** Pokédex owned
   - Rank 2: Grass-type in party at **Lv ≥ 20**
-  - Rank 3: ≥ **3** berry types in the bag (plain `BERRY` counts; starter BERRY + Cheri + Pecha is enough)
+  - Rank 3: ≥ **3** berry types in the bag (starter BERRY + Cheri + Pecha is enough)
 
 ### Berry effects (Scholar)
 
@@ -285,9 +322,7 @@ Growing on plots is cheaper than buying when you need bulk (blender vitamins, et
 
 ### Blender (Celadon Mansion 3F)
 
-Gate: Rainbow Badge **or** Soil Rank ≥ 1.
-
-Pick a recipe → see the berry cost → confirm YES/NO before anything is taken. Unaffordable recipes are marked with `×` in the list.
+Gate: Rainbow Badge (Gen 1) / Fog Badge (Gen 2) **or** Soil Rank ≥ 1.
 
 ![Juice Club blender on Celadon Mansion 3F](screen-shots/juice-blender.png)
 
@@ -300,33 +335,33 @@ Pick a recipe → see the berry cost → confirm YES/NO before anything is taken
 | Calcium | 10× Chesto | 1× Calcium |
 | Lum craft | 1 each Cheri/Pecha/Rawst/Aspear/Chesto + 3× BERRY | 1× Lum |
 
-Step cool-down between crafts: **640** farm steps (480 at soil rank 3). No berry-printing recipes except that single Lum craft.
+Step cool-down between crafts: **640** farm steps (480 at soil rank 3).
 
 ---
 
 ## Bag and party QoL
 
-- **Pockets:** Items, Balls, Key Items, TMs & HMs, Berries.
-- Bag capacity **60**.
-- **DexNav** on the start menu (Red) / Pokegear (Gold, via optional `pokegear_cards` lib) after you have the Pokédex: current map species (more detail once seen/caught). Footer notes Super Rod on fishable maps. If a roamer is on this map, an optional **ROAM** row appears. On Red, mod setting **DEXNAV**: `DEXNAV` (default), `DEXNAV-KR` (rename), or `OFF`. On Gold there is no rename toggle — it is always the Pokegear card.
-- **Summary** page shows ability, held item, and gender glyph.
-- **Optional [Gen1 Modern UI](https://github.com/ArmstrongThomas/gen1-modern-ui):** when that mod is installed, bag pockets and the summary ability page use its presenters; DexNav and party Give/Take keep working through the existing start-menu / party submenu hooks. With Modern UI absent, all of this still draws and plays as stock Gen 1 UI.
+- **Pockets (Gen 1):** Items, Balls, Key Items, TMs & HMs, Berries. Bag capacity **60**.
+- **DexNav:** On the start menu (Red) / Pokegear Card (Gold, via `pokegear_cards` mod) after getting the Pokédex: shows current map species (more detail once seen/caught). Optional **ROAM** row when a roamer is present.
+- **Summary Menu:**
+  - **Gen 1:** Page 3 displays ability, held item, and gender glyph.
+  - **Gen 2:** Page 4 displays ability, held item, gender glyph, and ability description text.
+- **Optional [Gen1 Modern UI](https://github.com/ArmstrongThomas/gen1-modern-ui):** Supported on Red.
 
 ![DexNav (Cerulean City)](screen-shots/dexnav.png)
-
 ![Berries pocket](screen-shots/bag-berries.png)
-
 ![TMs & HMs pocket](screen-shots/bag-tms.png)
 
 ---
 
 ## Level caps
 
-**Opt-in only.** Viridian youngster east of the Poké Mart on the path. Taking **any** amount permanently enables soft caps:
+**Opt-in only.** Talk to the Rare Candy youngster outside the Viridian Poké Mart (Gen 1) or in Cherrygrove City (Gen 2). Taking **any** amount permanently enables soft caps:
 
-- Tops your Rare Candies toward **99** (`99 − owned`).
+- Tops your Rare Candies toward **99**.
 - At the current cap, battle XP becomes +1-style soft stop and Rare Candy cannot push past it.
-- Caps rise with story milestones (not only gym badges):
+
+### Gen 1 Milestones (Kanto)
 
 | Cap | Milestone |
 |---|---|
@@ -344,33 +379,48 @@ Step cool-down between crafts: **640** farm steps (480 at soil rank 3). No berry
 | 65 | Pre-Champion (Route 22 rival 2nd / E4 started / Lance) |
 | 100 | Post-game (Champion rival) |
 
-Never taking candy = vanilla leveling.
+### Gen 2 Milestones (Johto + Kanto)
 
-House battle clubs: with **level caps on**, opponents use the story soft-cap only (on-bracket competitive). With caps **off**, scale is **max(soft-cap, highest non-egg party level)** so overleveled teams still get a hard Circuit.
+| Cap | Milestone |
+|---|---|
+| 14 | Pre-Falkner |
+| 16 | Pre-Bugsy (Zephyr Badge) |
+| 20 | Pre-Whitney (Hive Badge) |
+| 25 | Pre-Morty (Plain Badge) |
+| 30 | Pre-Chuck (Fog Badge) |
+| 32 | Pre-Pryce / Rocket Hideout (Storm Badge) |
+| 35 | Pre-Jasmine (Glacier Badge / Cleared Hideout) |
+| 38 | Pre-Radio Tower (Mineral Badge) |
+| 40 | Pre-Clair (Cleared Radio Tower) |
+| 44 | Pre-Victory Road Rival (Rising Badge) |
+| 50 | Pre-Champion Lance (Beat Victory Road Rival) |
+| 58 | Kanto Arrival (0–2 Kanto Badges) |
+| 64 | 3–6 Kanto Badges |
+| 72 | 7 Kanto Badges |
+| 85 | 8 Kanto Badges / Beat Mt. Moon Rival |
+| 100 | Post-Red (Mt. Silver) |
 
 ---
 
 ## XP Share (slot 2)
 
-When the option is on, the Gen 1 XP pool is split so active fighters get most of it and party **slot 2** can receive a share without inflating past roughly a solo-kill total. Details in `modern_xp_share.lua`.
+When the option is on, the Gen 1 XP pool is split so active fighters get ~70% of it and party **slot 2** can receive up to ~30% without inflating past roughly a solo-kill total. Replaces EXP.ALL while enabled.
 
 ---
 
 ## Smarter AI
 
-Four rungs: **natural** (common wilds — dump useless plays, otherwise messy), **soft** (route trash + threat wilds), **lite** (gyms / serious classes), **elite** (leaders / E4 / rivals). Soft/lite react to HP, speed, and existing status with small nudges—not a fixed opener script. Soft KO reads stay conservative (very low foe HP only) so trash fights do not dump status for a guessed KO. Threat wilds use soft via scary maps (non-fodder), rare maps, roamers, or a **tight** iconic species list (Snorlax/Gyarados/etc.—not every Golbat); legendaries fold into that threat set rather than being listed twice. Mt Moon Zubats stay natural. Decaying weights cool status/setup after use (full on soft, lighter on lite/elite); near-best mixing avoids locking one attack. Trainer bag items share a battle budget; held berries do not count against it. Toggleable in options.
+Four rungs: **natural** (common wilds), **soft** (route trash + threat wilds), **lite** (gyms / serious classes), **elite** (leaders / E4 / rivals). Soft/lite react to HP, speed, and existing status with small nudges. Soft KO reads stay conservative so trash fights do not dump status for a guessed KO. Threat wilds use soft via scary maps, roamers, or iconic species. Decaying weights cool status/setup after use; near-best mixing avoids locking one attack. Trainer bag items share a battle budget.
 
 ---
 
 ## House NPCs and utility
 
-All short Gen 1-style dialogues. No Natures/IV judge, only DVs / Hidden Power / statExp. Club levels: soft-cap when Viridian caps are on; otherwise **max(soft-cap, highest party level)**.
+All short classic-style dialogues. The judge reads DVs / Hidden Power / statExp.
 
 ### Celadon Circuit (Celadon Mansion 2F)
 
-Rematchable battle club. 4 rotating teams by streak. First win → **Choice Band**. Rematches → money (`ace × 40`) and a flat **30%** chance at a Heart Scale.
-
-Same floor: **Beast Tracker** (roamers / Radar after Silph).
+Rematchable battle club. 4 rotating teams by streak. First win → **Choice Band**. Rematches → money (`ace × 40`) and a flat **30%** chance at a Heart Scale. Same floor: **Beast Tracker** (roamers / Radar after Silph).
 
 ### Night Eyes (Vermilion Pidgey House)
 
@@ -380,11 +430,13 @@ Requires a **Dark**-type in the party. First clear → Blackglasses (or ¥5000 i
 
 Lead must **hold a berry**. First clear → **Focus Sash**. Rematches → 1× Cheri + Pecha + Rawst.
 
-### Judge (Underground Path, Route 5 entrance)
+### Judge (Underground Path)
 
-Pick a party mon → DV words, Hidden Power type, and which statExp is highest.
+- **Gen 1:** Underground Path (Route 5 side).
+- **Gen 2:** Underground Path (Route 5/6 tunnel).
+- Reads DV words, Hidden Power type, and highest statExp.
 
-### Extra trades
+### Extra trades (Gen 1)
 
 | Location | Give → Get | Held on received |
 |---|---|---|
@@ -395,21 +447,21 @@ Pick a party mon → DV words, Hidden Power type, and which statExp is highest.
 
 ## Move Hub
 
-**Saffron Pidgey House.** RELEARN / TUTOR / DELETE.
+- **Gen 1:** Saffron Pidgey House.
+- **Gen 2:** Saffron City (Mr. Psychic's House).
 
 | Service | Cost | Notes |
 |---|---|---|
 | Relearn | 1 Heart Scale | Level-up learnset ∪ egg moves; sets PP to max |
-| Tutor | 2 Heart Scales | Curated list (punches, Body Slam, Mega Punch/Kick, Rock Slide, Softboiled, Double-Edge, Substitute, …) |
+| Tutor | 2 Heart Scales | Curated list (punches, Body Slam, Rock Slide, Softboiled, Double-Edge, Substitute, …) |
 | Delete | Free | Cannot delete the last move; packs slots left |
-
-**Heart Scale finds:** Route 12 beach, Route 19, Seafoam B1F (plus Circuit rematch 30%).
 
 ---
 
 ## Blacksmith
 
-**Cinnabar Lab Metronome Room.**
+- **Gen 1:** Cinnabar Lab Metronome Room.
+- **Gen 2:** Cinnabar Pokémon Center 1F.
 
 | Exchange | Notes |
 |---|---|
@@ -419,68 +471,44 @@ Pick a party mon → DV words, Hidden Power type, and which statExp is highest.
 
 ---
 
-## Gen 3 fossils
+## Gen 3 fossils (Gen 1)
 
 | Fossil | Where | Revives to |
 |---|---|---|
 | Root Fossil | Mt Moon B2F hidden | Lileep Lv 30 |
 | Claw Fossil | Seafoam 1F hidden | Anorith Lv 30 |
 
-Extra scientist in **Cinnabar Lab Fossil Room** handles Gen 3 revive (vanilla Dome/Helix flow stays for Gen 1 fossils). Hand the fossil in, **leave Cinnabar Island**, then return to pick up the mon.
+Extra scientist in **Cinnabar Lab Fossil Room** handles Gen 3 revive. Hand the fossil in, **leave Cinnabar Island**, then return to pick up the mon.
 
 ---
 
-## Roaming legendaries
+## Roaming legendaries (Gen 1)
 
 ### Beasts (Raikou / Entei / Suicune)
-
-- After Silph progress, talk to **Beast Tracker** (Celadon Mansion 2F).
-- Receive **Roaming Radar** key item; beasts activate on grass routes.
+- After Silph progress, talk to **Beast Tracker** (Celadon Mansion 2F) for **Roaming Radar**.
 
 ### Eon duo (Latias / Latios)
-
 - After Champion, talk to watcher in **Indigo Plateau Lobby**.
-
-### Behavior
-
-- Foot travel between outdoor maps → migrate to an **adjacent** route.
-- Fly / Teleport / blackout → **full** reroll.
-- Flee → hop to a neighbor.
-- Catch or KO → that species stops roaming.
-- Cry plays on map enter when one is here.
-- On a map with a roamer: each wild encounter has a flat **15%** chance to be replaced by that beast (not table composition). Level is `max(50, softCap − 2)`, so Repel does not block the hunt.
-
-### Tracking UI
-
-- **Radar** (bag USE or start menu after you have it): species, route name, HERE / NEXT DOOR / FAR.
-- **DexNav**: ROAM row only if the beast is on the *current* map.
-- **Pokédex**: after first `seen`, entry can show live **AREA** route while still roaming.
 
 ---
 
-## Static legendaries and mythicals
+## Static legendaries and mythicals (Gen 1)
 
-One-shot statics. **Win, catch, or flee** all set the beat flag and hide the object, so fleeing despawns them permanently. Overworld sprites are Gen 1 bird/monster/fairy sheets on purpose.
+One-shot statics. **Win, catch, or flee** all count as completed, so fleeing despawns them permanently.
 
 | Species | Location | Gate / key | Level |
 |---|---|---|---|
 | Ho-Oh | Celadon Mansion roof | Rainbow Wing (Route 16 Fly House: 60 owned) | 50 (sun) |
 | Lugia | Seafoam B1F | Silver Wing (Route 12 Gate upstairs: Water ≥Lv30) | 50 (rain) |
-| Kyogre | Seafoam B3F | Blue Orb (Cinnabar Lab scientist, post-Champion, first talk) | 60 (rain) |
+| Kyogre | Seafoam B3F | Blue Orb (Cinnabar Lab scientist, post-Champion) | 60 (rain) |
 | Groudon | Pokémon Mansion B1F | Red Orb (same scientist, second talk) | 60 (sun) |
 | Regirock | Rock Tunnel B1F hidden ladder → `REGIROCK_CHAMBER` | Pewter scholar notes + **3 Rock-types** in party | 50 |
 | Regice | Seafoam B2F | Notes + **1 Ice-type** | 50 |
 | Registeel | Power Plant | Notes + **1 Steel-type** | 50 |
 | Rayquaza | Sky Pillar (custom) | Beat Kyogre **and** Groudon; hiker gate on Route 23 | 70 |
 | Celebi | Ilex Shrine (custom) | Champion; channeler gate in Viridian Forest | 30 |
-| Deoxys | Birth Island (custom) | Champion + DNA Key (Vermilion Dock sailor) | 70 |
+| Deoxys | Birth Island (custom) | Champion + DNA Key (Vermilion Dock sailor; requires **3 caught legendaries** from: Raikou, Entei, Suicune, Lugia, Ho-Oh, Kyogre, Groudon, Articuno, Zapdos, Moltres, Mewtwo) | 70 |
 | Jirachi | Mt Moon B1F | Champion + spend **5 Heart Scales** to start | 30 |
-
-**Regi notes:** Pewter Speech House scholar. Show a fossil mon (Omanyte / Kabuto / Aerodactyl / Lileep / Anorith / Cradily / Armaldo) **or** have Boulder Badge.
-
-**DNA Key:** sailor at Vermilion Dock. Need Champion + own **3** from: Raikou, Entei, Suicune, Lugia, Ho-Oh, Kyogre, Groudon, Articuno, Zapdos, Moltres, Mewtwo.
-
-**Jirachi early poke:** before Champion it only says a wish is sleeping. No fight, no Heart Scale spend. Scales are only consumed when the fight actually starts after Champion.
 
 ---
 
@@ -493,33 +521,16 @@ One-shot statics. **Win, catch, or flee** all set the beat flag and hide the obj
 | `ILEX_SHRINE_KANT` | 1102 | Celebi |
 | `BIRTH_ISLAND_KANT` | 1103 | Deoxys |
 | `REGIROCK_CHAMBER` | 1104 | Regirock (ladder from Rock Tunnel B1F) |
-| `SEVII_ONE_ISLAND` | 1200 | Sevii One Island town |
-| `SEVII_ONE_ISLAND_HARBOR` | 1201 | Ferry landing |
-| `SEVII_ONE_ISLAND_POKECENTER` | 1202 | Island PC |
-| `SEVII_ONE_ISLAND_MART` | 1203 | Island Mart |
-| `SEVII_ONE_ISLAND_KINDLE_ROAD` | 1204 | East route (imported wilds) |
-| `SEVII_ONE_ISLAND_TREASURE_BEACH` | 1205 | South beach (imported wilds) |
-
-Legendary custom maps save return coordinates on enter and exit via warp hooks so you cannot soft-lock. They are not remembered as `lastOutdoor` (same class of fix as the Berry Farm PC door).
-
-Sevii map ids 1200+ are reserved but **not loaded** while Sevii is parked.
-
-### Sevii Islands (parked)
-
-**Disabled.** Sevii maps/ferry/tooling live under `sevii/` but `SEVII_ENABLED` is false in `main.lua`. Indices **1200–1399** stay reserved. Tooling (run from that folder):
-
-- `python3 sevii/sevii_import.py --pokefirered /path/to/pokefirered`
-- `python3 sevii/sevii_semantic_remap.py` (writes `sevii/layout_data.lua`)
 
 ---
 
 ## Caveats and save notes
 
 - Friendship / time / location evolutions are fudged for Gen 1.
-- Move anims and menu icons are reused Gen 1 art on purpose.
-- DexNav Super Rod note: Old/Good Rod are global pools.
+- Move anims and menu icons are reused classic art on purpose.
+- DexNav Super Rod note: Super Rod respects the DEX SCOPE habitat filter. Old Rod and Good Rod draw from global pools regardless of scope, so they can surface out-of-scope species.
 - FULL SPAWN MIX rewrites tables. Set it before a long save.
-- Level caps stay off until you accept Viridian candies.
+- Level caps stay off until you accept Rare Candies.
 - Static legendaries despawn on flee as well as catch/KO.
 - Link play needs matching mods on both sides.
 - Gen 1 `.sav` export/import will drop post-151 mons and Eggs.
@@ -528,29 +539,25 @@ Sevii map ids 1200+ are reserved but **not loaded** while Sevii is parked.
 
 ## Module map (for modders)
 
-| File | Responsibility |
+The codebase is organized into domain-specific subdirectories:
+
+| Subdirectory / File | Responsibility |
 |---|---|
-| `main.lua` | Boot order, types/moves/species registration, options |
-| `pokemon_data.lua` / patches | Generated species, abilities, learnsets, gender, breeding |
-| `types_data.lua` | Dark / Steel / Fairy |
-| `type_chart_patches.lua` | Gen1→Gen3 matchup fixes (Ghost/Psychic, Bug/Poison, Ice/Fire) |
-| `move_type_patches.lua` | Gen1/Gen2 move types → Gen3 |
-| `palette_gen2.lua` | KR species palettes → Gold `gen2Palettes.pokemon` rows |
-| `move_effects.lua` / `move_anims.lua` | Effects + anim aliases |
-| `encounters.lua` / `trainers.lua` / `trainer_ai.lua` | Wilds + trainer mixes + AI |
-| `held_items.lua` / `competitive_items.lua` / `overworld_loot.lua` | Items + finds |
-| `berry_farm.lua` / `berry_quests.lua` | Farm map, merchant, blender, soil |
-| `gender.lua` / `breeding.lua` / `daycare.lua` | Gender + eggs |
-| `level_caps.lua` / `modern_xp_share.lua` / `split_special.lua` | Caps + slot-2 XP + optional SpA/SpD |
-| `special_stat_patches.lua` | Generated Kanto SpA/SpD for the split toggle |
-| `bag_pockets.lua` / `dexnav.lua` / `summary_ui.lua` / `gen1_modern_ui_adapter.lua` | QoL UI (+ optional Modern UI) |
-| `house_npcs.lua` | Object-index claims + shared NPC helpers |
-| `battle_clubs.lua` / `judge_npc.lua` / `trades_extra.lua` | Clubs, judge, trades |
-| `move_hub.lua` / `item_smith.lua` / `fossils_gen3.lua` | Tutor hub, smith, fossils |
-| `roamers.lua` / `roaming_radar.lua` / `roamer_dex.lua` / `kanto_graph.lua` | Roamers |
-| `legend_shrines.lua` / `legend_regis.lua` / `legend_mythicals.lua` | Statics + custom maps |
+| `core/host.lua` / `core/gen2_compat.lua` / `core/options.lua` | Host generation shims, Gen 2 infrastructure seeding, mod options |
+| `pokemon/pokemon_data.lua` / `pokemon/pokemon_gen2.lua` | Species definitions, Hoenn Gen 2 record converters, base stats |
+| `pokemon/learnset_patches.lua` / `pokemon/gender.lua` / `pokemon/breeding.lua` | Learnsets, Gen 2 DV gender calculations, Day Care breeding logic |
+| `pokemon/species_scope.lua` / `pokemon/species_palettes.lua` | Dex scope filters (Kanto / Johto 251 / National), Gen 2 palette hooks |
+| `battle/trainer_ai.lua` / `battle/trainers.lua` | Smarter AI system, Gen 1 & Gen 2 Gym / Trainer mix overhauls |
+| `battle/abilities.lua` / `battle/move_effects.lua` / `battle/move_type_patches.lua` | Gen 3 ability runners, custom move effects, type alignment |
+| `world/encounters.lua` / `world/encounters_gen2.lua` | Wild encounter tables for Gen 1 Kanto, Gen 2 Johto, and Gen 2 Kanto postgame |
+| `world/berry_farm.lua` / `world/berry_quests.lua` | Berry Farm map, Pokecenter warps, Soil Expert badge unlocks, Blender |
+| `world/house_npcs.lua` / `world/move_hub.lua` / `world/item_smith.lua` | House NPCs, Move Relearner/Tutor hub, Cinnabar Blacksmith |
+| `world/roamers.lua` / `world/roaming_radar.lua` | Roaming beasts / Eon duo mechanics, radar item |
+| `world/legend_shrines.lua` / `world/legend_regis.lua` / `world/legend_mythicals.lua` | Custom static encounters (Ho-Oh, Lugia, Regis, Rayquaza, Deoxys, etc.) |
+| `items/held_items.lua` / `items/competitive_items.lua` / `items/bag_pockets.lua` | Held item effects, battle items (Choice Band/Life Orb/Focus Sash), bag pockets |
+| `ui/summary_ui.lua` / `ui/dexnav.lua` / `ui/level_caps.lua` / `ui/xp_bar.lua` | Extra summary page (Page 3/4), DexNav start menu / Pokegear, level caps, XP bar |
+| `tools/generate_pokemon_mod.py` | Data generator pipeline from PokeAPI |
 | `sevii/` (parked) | Sevii ferry/maps/tooling — disabled until `SEVII_ENABLED` |
 
 Tests live under `tests/` and are pulled in by `tests/Kanto-Reforged_test.lua`.
 
-Map PNG previews (optional QA): `map_previews/` via `render_map_previews.py`.

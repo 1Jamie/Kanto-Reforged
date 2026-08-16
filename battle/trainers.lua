@@ -206,6 +206,9 @@ local MIX = {
   { "OPP_COOLTRAINER_M", 5, 1, "BAYLEEF" },
   { "OPP_COOLTRAINER_M", 5, 2, "CROCONAW" },
   { "OPP_COOLTRAINER_M", 5, 3, "QUILAVA" },
+
+  -- Route 23 / Victory Road Cooltrainer M #9: swap Dugtrio to Flygon (Ground/Dragon alternative)
+  { "OPP_COOLTRAINER_M", 9, 2, "FLYGON" },
 }
 
 -- Gen 2 Gym Leaders & Gym Trainers Mix Overhaul
@@ -422,6 +425,32 @@ end
 function Trainers.applySlotExtras(game, battle, oppClass, partyIndex)
   if not battle or type(battle.enemyParty) ~= "table" then return end
   local partyDef = partyDefFor(game, oppClass, partyIndex)
+  
+  -- Scan all enemy party mons to ensure none are left with ONLY Dig or charge moves as offensive option
+  for i, mon in ipairs(battle.enemyParty) do
+    if type(mon) == "table" and mon.moves then
+      local hasDig = false
+      local hasOtherAttackingMove = false
+      for _, mv in ipairs(mon.moves) do
+        local mId = type(mv) == "table" and mv.id or mv
+        local mdef = game.data and game.data.moves and game.data.moves[mId]
+        if mId == "DIG" then
+          hasDig = true
+        elseif mdef and (mdef.power or 0) > 0 and mdef.id ~= "DIG" and mdef.effect ~= "CHARGE_EFFECT" and mdef.effect ~= "FLY_EFFECT" then
+          hasOtherAttackingMove = true
+        end
+      end
+
+      -- If mon only has DIG as its single offensive move (e.g. Diglett with [DIG, GROWL]),
+      -- inject a valid alternative direct attack (SCRATCH / FURY_SWIPES) into its movepool.
+      if hasDig and not hasOtherAttackingMove then
+        local altMove = (mon.level or 1) >= 15 and "FURY_SWIPES" or "SCRATCH"
+        local mdef = game.data and game.data.moves and game.data.moves[altMove]
+        table.insert(mon.moves, 1, { id = altMove, pp = mdef and mdef.pp or 15 })
+      end
+    end
+  end
+
   if not partyDef then return end
   for i, slot in ipairs(partyDef) do
     local mon = battle.enemyParty[i]

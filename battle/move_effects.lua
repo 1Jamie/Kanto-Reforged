@@ -2012,9 +2012,20 @@ function MoveEffects.install(mod)
   end
 
   -- Clear Rollout lock on paralysis / confusion self-hit (same as Thrash).
+  -- Also clear invulnerable alongside charging: the engine intentionally
+  -- skips the invulnerable clear on full-paralysis interrupts (the famous
+  -- Gen 1 Fly/Dig glitch), but that causes a permanent-underground softlock
+  -- in this mod.  We always clear both together here so the mon can be hit
+  -- normally after the charge is interrupted.
   local original_clearVolatiles = BattleState.clearVolatiles
   BattleState.clearVolatiles = function(self, user, selfHit)
+    local wasCharging = user and user.charging
     original_clearVolatiles(self, user, selfHit)
+    -- If charging was cleared (i.e. user had it before and lost it), also
+    -- clear invulnerable regardless of selfHit so no ghost-underground state.
+    if user and wasCharging and not user.charging then
+      user.invulnerable = nil
+    end
     if user then
       user.expRollout = nil
       user.expRolloutMove = nil

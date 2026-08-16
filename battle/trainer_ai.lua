@@ -532,6 +532,22 @@ local PRIORITY_MOVES = {
   FIRST_IMPRESSION = true, ACCELROCK = true,
 }
 
+-- Two-turn semi-invulnerable moves (Dig, Fly, Bounce, Dive) and other charge
+-- moves (Skull Bash, Sky Attack, Razor Wind, Solar Beam) get a turn-economy
+-- penalty so the AI doesn't spam them every single turn.  Both Gen 1 and Gen
+-- 2 effect ids are listed so the penalty applies to both engines.
+local CHARGE_EFFECTS = {
+  -- Gen 1 effect ids
+  CHARGE_EFFECT = true,   -- Dig, Skull Bash, Sky Attack, Razor Wind, Solar Beam
+  FLY_EFFECT    = true,   -- Fly, Bounce, Dive
+  -- Gen 2 / Gold effect ids (numeric ids stored as strings by the engine)
+  EFFECT_FLY    = true,
+  EFFECT_SOLARBEAM = true,
+  EFFECT_SKULL_BASH = true,
+  EFFECT_RAZOR_WIND = true,
+  EFFECT_SKY_ATTACK = true,
+}
+
 local function hasType(types, id)
   for _, t in ipairs(types or {}) do
     if t == id then return true end
@@ -954,6 +970,15 @@ function TrainerAi.scoreNatural(view, def, score)
     if hasType(user.curTypes, def.type) then
       score = score - 1
     end
+    -- Two-turn moves: base turn-economy cost.  Heavy anti-repeat when the AI
+    -- used this same charge move last turn (just surfaced → going back under
+    -- immediately is exactly the softlock players complain about).
+    if CHARGE_EFFECTS[effect] then
+      score = score + 2
+      if def.id and user.expAiLastMoveId == def.id then
+        score = score + 4
+      end
+    end
     return score
   end
 
@@ -1105,6 +1130,14 @@ function TrainerAi.score(view, def, score)
     if def.id and user.expAiLastMoveId == def.id then
       score = score + 1
     end
+    -- Two-turn moves: base turn-economy cost + strong anti-repeat so the AI
+    -- doesn't immediately re-use Dig/Fly/etc. right after surfacing.
+    if CHARGE_EFFECTS[effect] then
+      score = score + 2
+      if def.id and user.expAiLastMoveId == def.id then
+        score = score + 4
+      end
+    end
     return applySoftSituation(view, def, score, power)
   end
 
@@ -1239,6 +1272,16 @@ local function scoreTactical(view, def, score, mode)
     if mode == "lite" and def.id and user.expAiLastMoveId == def.id then
       if not (mid and targetHp > 0 and mid >= targetHp) then
         score = score + 1
+      end
+    end
+
+    -- Two-turn moves: turn-economy cost + strong anti-repeat (both tiers).
+    -- Even elite AI shouldn't spam Dig/Fly every single turn; the lost
+    -- attacking turn outweighs the invulnerability benefit when repeated.
+    if CHARGE_EFFECTS[effect] then
+      score = score + 2
+      if def.id and user.expAiLastMoveId == def.id then
+        score = score + (mode == "elite" and 3 or 4)
       end
     end
 
