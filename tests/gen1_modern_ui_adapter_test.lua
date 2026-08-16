@@ -30,6 +30,18 @@ return function(T, Data, run)
     },
     find = function(id)
       if id == "gen1_modern_ui" then return fakeUi end
+      if id == "hidden_stats" then
+        return {
+          exports = {
+            summaryPageModel = function(mon)
+              return {
+                title = "IV / EV",
+                rows = { { label = "HP", value = "IV 15 / EV  16", enabled = false } },
+              }
+            end,
+          },
+        }
+      end
       return nil
     end,
   }
@@ -71,7 +83,7 @@ return function(T, Data, run)
   for page = 1, 3 do
     T.check(sumScreen.match({
       screenId = "SummaryMenu",
-      _expMaxPage = 3,
+      _expMaxPage = 4,
       page = page,
       mon = mon,
     }), "summary adapter matches page " .. page)
@@ -127,4 +139,27 @@ return function(T, Data, run)
     "effect text is joined into one value")
   T.check(not effectRow.value:find("\n", 1, true),
     "effect value has no hard line breaks")
+
+  local page4 = sumScreen.model(fakeGame, {
+    screenId = "SummaryMenu", _expMaxPage = 4, page = 4, mon = mon,
+  })
+  T.eq(page4.title, "IV / EV", "page 4 title comes from HiddenStats")
+  T.eq(#page4.rows, 1, "page 4 rows come from HiddenStats")
+  T.eq(page4.rows[1].label, "HP", "page 4 row delegates to HiddenStats")
+
+  local withoutHiddenStats = {
+    id = "Kanto-Reforged",
+    exports = {},
+    options = withUi.options,
+    find = function(id)
+      if id == "gen1_modern_ui" then return fakeUi end
+      return nil
+    end,
+  }
+  install(withoutHiddenStats)
+  local sumScreenNoPlugin = withoutHiddenStats.exports.gen1ModernUi.screens.KantoSummary
+  local page4NoPlugin = sumScreenNoPlugin.model(fakeGame, {
+    screenId = "SummaryMenu", _expMaxPage = 3, page = 3, mon = mon,
+  })
+  T.eq(page4NoPlugin.title, "ABILITY", "without HiddenStats, page 3 stays the last page")
 end
