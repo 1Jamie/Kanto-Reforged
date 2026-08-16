@@ -152,11 +152,12 @@ function SpeciesScope.allowsSpeciesId(mod, speciesId, mapId)
   return SpeciesScope.allowsDex(mod, dex, mapId)
 end
 
-function SpeciesScope.isOutOfScopeMon(mod, mon, game)
+function SpeciesScope.isOutOfScopeMon(mod, mon, game, targetMode)
   if not mon then return false end
+  targetMode = targetMode or SpeciesScope.mode(mod)
   -- Eggs: gate on species id when present (hatch target)
   if mon.species then
-    if Host.isGen1() and SpeciesScope.mode(mod) == SpeciesScope.MODE_KANTO then
+    if Host.isGen1() and targetMode == SpeciesScope.MODE_KANTO then
       local dex = SpeciesScope.dexOf(game or SpeciesScope._game, mon.species)
       if dex == nil then
         local def = game and game.data and game.data.pokemon and game.data.pokemon[mon.species]
@@ -468,21 +469,46 @@ function SpeciesScope.snapshotDexFlags(mod, save)
   mod.save:set(SpeciesScope.DEX_FLAGS_KEY, snap)
 end
 
-function SpeciesScope.restoreDexFlags(mod, save)
+local function pruneOutOfScopeDex(game, save)
+  local dex = save and save.pokedex
+  if type(dex) ~= "table" then return end
+  for _, key in ipairs({ "seen", "owned", "caught" }) do
+    local bucket = dex[key]
+    if type(bucket) == "table" then
+      for id in pairs(bucket) do
+        local d = SpeciesScope.dexOf(game, id)
+        if d and d > SpeciesScope.KANTO_MAX_DEX then
+          bucket[id] = nil
+        end
+      end
+    end
+  end
+end
+
+function SpeciesScope.restoreDexFlags(mod, save, targetMode)
   if not (mod and mod.save and save) then return 0 end
+  targetMode = targetMode or SpeciesScope.mode(mod)
   local snap = mod.save:get(SpeciesScope.DEX_FLAGS_KEY, nil)
   if type(snap) ~= "table" then return 0 end
   save.pokedex = save.pokedex or {}
   local dex = save.pokedex
+  local isKanto = (Host.isGen1() and targetMode == SpeciesScope.MODE_KANTO)
   local n = 0
   for _, key in ipairs(DEX_FLAG_KEYS) do
     dex[key] = dex[key] or {}
     for id, on in pairs(snap[key] or {}) do
-      if on and not dex[key][id] then
-        dex[key][id] = true
-        n = n + 1
-      elseif on then
-        dex[key][id] = true
+      if on then
+        local d = SpeciesScope.dexOf(SpeciesScope._game, id)
+        if isKanto and d and d > SpeciesScope.KANTO_MAX_DEX then
+          dex[key][id] = nil
+        else
+          if not dex[key][id] then
+            dex[key][id] = true
+            n = n + 1
+          else
+            dex[key][id] = true
+          end
+        end
       end
     end
   end
@@ -496,7 +522,11 @@ function SpeciesScope.restoreDexFlags(mod, save)
   for id, on in pairs(dex.caught) do
     if on then dex.owned[id] = true end
   end
-  SpeciesScope.backfillDexFromCollection(mod, save)
+  if isKanto then
+    pruneOutOfScopeDex(SpeciesScope._game, save)
+  else
+    SpeciesScope.backfillDexFromCollection(mod, save)
+  end
   return n
 end
 
@@ -523,6 +553,7 @@ local function snapshotOutOfScopeDex(mod, game, stash)
     end
   end
   SpeciesScope.snapshotDexFlags(mod, save)
+  pruneOutOfScopeDex(game, save)
 end
 
 local function restoreStashedDex(game, stash)
@@ -660,11 +691,12 @@ end
 -- Daycare evacuate + stash dry-run / apply
 --------------------------------------------------------------------------
 
-local function collectOutOfScopeFromPartyBoxes(game, mod)
+local function collectOutOfScopeFromPartyBoxes(game, mod, targetMode)
+  targetMode = targetMode or "kanto"
   local list = {}
   local save = game.save
   for i, mon in ipairs(save.party or {}) do
-    if mon and SpeciesScope.isOutOfScopeMon(mod, mon, game) then
+    if mon and SpeciesScope.isOutOfScopeMon(mod, mon, game, targetMode) then
       list[#list + 1] = { mon = mon, from = "party", slot = i }
     end
   end
@@ -673,7 +705,7 @@ local function collectOutOfScopeFromPartyBoxes(game, mod)
   for bi = 1, Boxes.COUNT do
     local box = boxes[bi] or {}
     for si, mon in ipairs(box) do
-      if mon and SpeciesScope.isOutOfScopeMon(mod, mon, game) then
+      if mon and SpeciesScope.isOutOfScopeMon(mod, mon, game, targetMode) then
         list[#list + 1] = {
           mon = mon, from = "box", boxIndex = bi, slot = si,
         }
@@ -706,7 +738,7 @@ local function dryRunEnterKanto(mod, game)
     if item and not breedingIsEgg(copy) then
       itemsToBag[#itemsToBag + 1] = item
     end
-    if SpeciesScope.isOutOfScopeMon(mod, copy, game) then
+    if SpeciesScope.isOutOfScopeMon(mod, copy, game, "kanto") then
       -- stash — no PC
     else
       pcNeeded = pcNeeded + 1
@@ -720,7 +752,7 @@ local function dryRunEnterKanto(mod, game)
     end
   end
 
-  local partyBox = collectOutOfScopeFromPartyBoxes(game, mod)
+  local partyBox = collectOutOfScopeFromPartyBoxes(game, mod, "kanto")
   for _, row in ipairs(partyBox) do
     local item = heldItemId(row.mon)
     if item and not breedingIsEgg(row.mon) then
@@ -747,7 +779,7 @@ local function dryRunEnterKanto(mod, game)
   -- Empty party check: surviving in-scope party + in-scope PC + daycare→PC
   local inScopeParty = 0
   for _, mon in ipairs(save.party or {}) do
-    if mon and not SpeciesScope.isOutOfScopeMon(mod, mon, game) then
+    if mon and not SpeciesScope.isOutOfScopeMon(mod, mon, game, "kanto") then
       inScopeParty = inScopeParty + 1
     end
   end
@@ -756,7 +788,7 @@ local function dryRunEnterKanto(mod, game)
   local boxes = Boxes.ensure(save)
   for bi = 1, Boxes.COUNT do
     for _, mon in ipairs(boxes[bi] or {}) do
-      if mon and not SpeciesScope.isOutOfScopeMon(mod, mon, game) then
+      if mon and not SpeciesScope.isOutOfScopeMon(mod, mon, game, "kanto") then
         inScopePc = inScopePc + 1
       end
     end
@@ -805,7 +837,7 @@ local function applyEnterKanto(mod, game, plan)
         Bag.add(save, item, 1, game.data)
         clearHeldItem(copy)
       end
-      if SpeciesScope.isOutOfScopeMon(mod, copy, game) then
+      if SpeciesScope.isOutOfScopeMon(mod, copy, game, "kanto") then
         stash.entries[#stash.entries + 1] = {
           mon = copy, from = from,
         }
@@ -828,7 +860,7 @@ local function applyEnterKanto(mod, game, plan)
     local box = boxes[bi] or {}
     for si = #box, 1, -1 do
       local mon = box[si]
-      if mon and SpeciesScope.isOutOfScopeMon(mod, mon, game) then
+      if mon and SpeciesScope.isOutOfScopeMon(mod, mon, game, "kanto") then
         local copy = Merge.deepCopy(mon)
         local item = heldItemId(copy)
         if item and not breedingIsEgg(copy) then
@@ -845,7 +877,7 @@ local function applyEnterKanto(mod, game, plan)
 
   for i = #(save.party or {}), 1, -1 do
     local mon = save.party[i]
-    if mon and SpeciesScope.isOutOfScopeMon(mod, mon, game) then
+    if mon and SpeciesScope.isOutOfScopeMon(mod, mon, game, "kanto") then
       local copy = Merge.deepCopy(mon)
       local item = heldItemId(copy)
       if item and not breedingIsEgg(copy) then
@@ -866,7 +898,7 @@ local function applyEnterKanto(mod, game, plan)
     for bi = 1, Boxes.COUNT do
       local box = boxes[bi]
       for si, mon in ipairs(box or {}) do
-        if mon and not SpeciesScope.isOutOfScopeMon(mod, mon, game) then
+        if mon and not SpeciesScope.isOutOfScopeMon(mod, mon, game, "kanto") then
           table.insert(save.party, mon)
           table.remove(box, si)
           moved = true
@@ -968,7 +1000,7 @@ local function applyRestoreNational(mod, game)
   -- Put Johto/Hoenn dex flags back, then ensure every mon you still hold
   -- (party / PC / leftover stash) is marked owned again.
   restoreStashedDex(game, stash)
-  SpeciesScope.restoreDexFlags(mod, game.save)
+  SpeciesScope.restoreDexFlags(mod, game.save, "national")
   SpeciesScope.markDexDirty(game.save)
   resyncDexFromCollection(mod, game, stash)
   SpeciesScope.snapshotDexFlags(mod, game.save)
@@ -1210,6 +1242,105 @@ function SpeciesScope.applyTransition(mod, game, toMode)
   return true
 end
 
+function SpeciesScope.reconcileStrandedKantoMons(mod, game)
+  if not (Host.isGen1() and game and game.save) then return false end
+  if SpeciesScope.mode(mod) ~= SpeciesScope.MODE_KANTO then return false end
+
+  local save = game.save
+  local Bag = require("src.inventory.Bag")
+  local Boxes = require("src.pokemon.Boxes")
+  local stash = getStash(mod)
+  stash.mode = "kanto"
+  stash.entries = stash.entries or {}
+  snapshotOutOfScopeDex(mod, game, stash)
+  local cleaned = false
+
+  -- Daycare evacuate
+  local dc = save.daycare
+  if type(dc) == "table" then
+    local function evacuate(mon, depositLevel, from)
+      if not mon then return end
+      if SpeciesScope.isOutOfScopeMon(mod, mon, game, "kanto") then
+        local copy = Merge.deepCopy(mon)
+        rewindToDeposit(game, copy, depositLevel)
+        local item = heldItemId(copy)
+        if item and not breedingIsEgg(copy) then
+          pcall(function() Bag.add(save, item, 1, game.data) end)
+          clearHeldItem(copy)
+        end
+        stash.entries[#stash.entries + 1] = { mon = copy, from = from }
+        cleaned = true
+      end
+    end
+    evacuate(dc.mon, dc.depositLevel, "daycare")
+    evacuate(dc.mon2, dc.depositLevel2, "daycare-mon2")
+    if dc.egg then evacuate(dc.egg, nil, "daycare-egg") end
+  end
+
+  -- PC Boxes
+  local boxes = Boxes.ensure(save)
+  for bi = Boxes.COUNT, 1, -1 do
+    local box = boxes[bi] or {}
+    for si = #box, 1, -1 do
+      local mon = box[si]
+      if mon and SpeciesScope.isOutOfScopeMon(mod, mon, game, "kanto") then
+        local copy = Merge.deepCopy(mon)
+        local item = heldItemId(copy)
+        if item and not breedingIsEgg(copy) then
+          pcall(function() Bag.add(save, item, 1, game.data) end)
+          clearHeldItem(copy)
+        end
+        stash.entries[#stash.entries + 1] = {
+          mon = copy, from = "box", boxIndex = bi, slot = si,
+        }
+        table.remove(box, si)
+        cleaned = true
+      end
+    end
+  end
+
+  -- Party
+  for i = #(save.party or {}), 1, -1 do
+    local mon = save.party[i]
+    if mon and SpeciesScope.isOutOfScopeMon(mod, mon, game, "kanto") then
+      local copy = Merge.deepCopy(mon)
+      local item = heldItemId(copy)
+      if item and not breedingIsEgg(copy) then
+        pcall(function() Bag.add(save, item, 1, game.data) end)
+        clearHeldItem(copy)
+      end
+      stash.entries[#stash.entries + 1] = {
+        mon = copy, from = "party", slot = i,
+      }
+      table.remove(save.party, i)
+      cleaned = true
+    end
+  end
+
+  -- If party became empty, pull an in-scope mon from PC
+  if #(save.party or {}) == 0 then
+    boxes = Boxes.ensure(save)
+    local moved = false
+    for bi = 1, Boxes.COUNT do
+      local box = boxes[bi]
+      for si, mon in ipairs(box or {}) do
+        if mon and not SpeciesScope.isOutOfScopeMon(mod, mon, game, "kanto") then
+          table.insert(save.party, mon)
+          table.remove(box, si)
+          moved = true
+          break
+        end
+      end
+      if moved then break end
+    end
+  end
+
+  if cleaned then
+    setStash(mod, stash)
+  end
+  return cleaned
+end
+
 function SpeciesScope.ensureBoot(mod, game)
   SpeciesScope._game = game
   local mode = SpeciesScope.mode(mod)
@@ -1229,6 +1360,9 @@ function SpeciesScope.ensureBoot(mod, game)
         return false, err, msg
       end
       return true
+    else
+      -- Self-healing recovery for saves already marked KANTO but containing stranded mons
+      SpeciesScope.reconcileStrandedKantoMons(mod, game)
     end
   elseif Host.isGen1() and mode == SpeciesScope.MODE_NATIONAL
       and applied == SpeciesScope.MODE_KANTO then
@@ -1408,10 +1542,19 @@ function SpeciesScope.install(mod)
         if type(dex) == "table" then
           dex.seen = dex.seen or {}
           dex.owned = dex.owned or {}
+          local isKanto = (Host.isGen1() and SpeciesScope.mode(mod) == SpeciesScope.MODE_KANTO)
           for _, key in ipairs({ "seen", "owned" }) do
             for id, on in pairs(preserved[key]) do
-              if on then dex[key][id] = true end
+              if on then
+                local d = SpeciesScope.dexOf(SpeciesScope._game, id)
+                if not (isKanto and d and d > SpeciesScope.KANTO_MAX_DEX) then
+                  dex[key][id] = true
+                end
+              end
             end
+          end
+          if isKanto then
+            pruneOutOfScopeDex(SpeciesScope._game, save)
           end
         end
         return report
@@ -1462,6 +1605,14 @@ function SpeciesScope.install(mod)
       local origNew = PM.new
       if type(origNew) ~= "function" then return end
       PM.new = function(game, opts)
+        if Host.isGen1() then
+          if SpeciesScope.mode(mod) == SpeciesScope.MODE_KANTO then
+            pruneOutOfScopeDex(game, game and game.save)
+          else
+            restoreStashedDex(game, getStash(mod))
+            SpeciesScope.restoreDexFlags(mod, game and game.save)
+          end
+        end
         local menu = origNew(game, opts)
         if Host.isGen1()
             and SpeciesScope.mode(mod) == SpeciesScope.MODE_KANTO

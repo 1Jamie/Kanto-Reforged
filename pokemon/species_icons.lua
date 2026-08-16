@@ -141,24 +141,34 @@ function SpeciesIcons.pickClass(species)
   return CLASS.MON
 end
 
-local function applyTargetTableFixes(target, speciesTable)
+local function applyTargetTableFixes(target, speciesTable, isGen2)
   if not target then return end
   target.icons = target.icons or {}
   target.bySpecies = target.bySpecies or {}
   target.species = target.species or {}
 
-  -- Wrap string entries into { image = path } tables so Gen 2 PartyMenu:iconFor
-  -- (which accesses entry.image) correctly resolves the image path.
-  for k, v in pairs(target.icons) do
-    if type(v) == "string" then
-      target.icons[k] = { image = v }
+  if isGen2 then
+    -- Wrap string entries into { image = path } tables so Gen 2 PartyMenu:iconFor
+    -- (which accesses entry.image) correctly resolves the image path.
+    for k, v in pairs(target.icons) do
+      if type(v) == "string" then
+        target.icons[k] = { image = v }
+      end
     end
-  end
 
-  -- Register GEN2_ALIASES so ICON_* sheet lookups in Gold menus resolve to the valid icon
-  for iconName, targetClass in pairs(GEN2_ALIASES) do
-    if target.icons[targetClass] then
-      target.icons[iconName] = target.icons[targetClass]
+    -- Register GEN2_ALIASES so ICON_* sheet lookups in Gold menus resolve to the valid icon
+    for iconName, targetClass in pairs(GEN2_ALIASES) do
+      if target.icons[targetClass] then
+        target.icons[iconName] = target.icons[targetClass]
+      end
+    end
+  else
+    -- For Gen 1 (Data.icons), keep icons[k] as string filepaths to prevent
+    -- string concatenation errors in Gen 1 PartyMenu.drawIcon.
+    for k, v in pairs(target.icons) do
+      if type(v) == "table" and v.image then
+        target.icons[k] = v.image
+      end
     end
   end
 
@@ -186,8 +196,29 @@ function SpeciesIcons.register(mod, speciesTable)
 
   -- Directly fix runtime Data.icons and Data.gen2Icons data structures
   local Data = require("src.core.Data")
-  applyTargetTableFixes(Data.icons, speciesTable)
-  applyTargetTableFixes(Data.gen2Icons, speciesTable)
+  applyTargetTableFixes(Data.icons, speciesTable, false)
+  applyTargetTableFixes(Data.gen2Icons, speciesTable, true)
+
+  -- Defensive safety patch for Gen 1 PartyMenu.drawIcon
+  local Host = require("mods.Kanto-Reforged.core.host")
+  if Host.isGen1() then
+    local Gen1Patch = require("mods.Kanto-Reforged.gen1_patch")
+    local ok, PartyMenu = pcall(require, "src.ui.PartyMenu")
+    if ok and PartyMenu and PartyMenu.drawIcon and not PartyMenu._krTableIconPatch then
+      local origDrawIcon = PartyMenu.drawIcon
+      PartyMenu.drawIcon = function(game, mon, x, y, selected, counter, forceAlt)
+        local icons = game and game.data and game.data.icons
+        if icons and icons.icons and mon and mon.species then
+          local entry = (icons.bySpecies and icons.bySpecies[mon.species])
+          if type(entry) == "string" and type(icons.icons[entry]) == "table" then
+            icons.icons[entry] = icons.icons[entry].image or icons.icons[entry]
+          end
+        end
+        return origDrawIcon(game, mon, x, y, selected, counter, forceAlt)
+      end
+      PartyMenu._krTableIconPatch = true
+    end
+  end
 
   mod.log:info("Mapped %d species onto menu icon classes", n)
   return n

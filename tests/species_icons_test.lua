@@ -33,11 +33,15 @@ return function(T, Data, run)
   T.eq(Data.icons.bySpecies.TREECKO, "MON", "Treecko registered in bySpecies")
   T.eq(Data.icons.bySpecies.MUDKIP, "WATER", "Mudkip registered in bySpecies")
 
-  -- Gen 2 menu icons require table format { image = ... }
-  T.check(type(Data.icons.icons.MON) == "table" and Data.icons.icons.MON.image ~= nil,
-    "MON icon entry is table with .image for Gen 2 PartyMenu")
-  T.check(type(Data.icons.icons.ICON_MONSTER) == "table" and Data.icons.icons.ICON_MONSTER.image ~= nil,
-    "ICON_MONSTER alias registered for Gen 2 menus")
+  -- Gen 1 menu icons require string format; Gen 2 requires table format { image = ... }
+  T.check(type(Data.icons.icons.MON) == "string",
+    "Gen 1 MON icon entry is a string path for PartyMenu.drawIcon")
+  if Data.gen2Icons then
+    T.check(type(Data.gen2Icons.icons.MON) == "table" and Data.gen2Icons.icons.MON.image ~= nil,
+      "MON icon entry is table with .image for Gen 2 PartyMenu")
+    T.check(type(Data.gen2Icons.icons.ICON_MONSTER) == "table" and Data.gen2Icons.icons.ICON_MONSTER.image ~= nil,
+      "ICON_MONSTER alias registered for Gen 2 menus")
+  end
 
   -- Every Kanto Reforged species got a known class name
   local pd = require("mods.Kanto-Reforged.pokemon.pokemon_data")

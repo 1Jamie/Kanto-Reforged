@@ -245,6 +245,41 @@ return function(T, Data, run)
     T.eq(save.pokedex.caught.CHIKORITA, true, "national restore catches boxed CHIKORITA")
   end
 
+  -- Self-healing recovery test for pre-existing broken saves
+  do
+    setMode(SpeciesScope.MODE_KANTO)
+    mod.save:set(SpeciesScope.APPLIED_KEY, SpeciesScope.MODE_KANTO)
+    mod.save:set(SpeciesScope.STASH_KEY, nil)
+    local save = freshSave()
+    save.party = {
+      Pokemon.new(Data, "PIKACHU", 10),
+      Pokemon.new(Data, "TREECKO", 12),
+    }
+    save.pokedex.seen.CHIKORITA = true
+    save.pokedex.seen.PIKACHU = true
+    save.pokedex.seen.TREECKO = true
+    save.pokedex.owned.TREECKO = true
+    Boxes.ensure(save)
+    local game = makeGame(save)
+    SpeciesScope._game = game
+    T.eq(#save.party, 2, "broken save initially has 2 mons in party")
+    T.eq(SpeciesScope.reconcileStrandedKantoMons(mod, game), true,
+      "reconcileStrandedKantoMons returns true when self-healing")
+    T.eq(#save.party, 1, "party cleaned to 1 mon after self-healing")
+    T.eq(save.party[1].species, "PIKACHU", "PIKACHU remains in party")
+    T.eq(save.pokedex.seen.TREECKO, nil, "TREECKO pruned from seen in Kanto mode")
+    T.eq(save.pokedex.seen.CHIKORITA, nil, "CHIKORITA pruned from seen in Kanto mode")
+    T.eq(save.pokedex.seen.PIKACHU, true, "PIKACHU remains seen in Kanto mode")
+    local stash = mod.save:get(SpeciesScope.STASH_KEY)
+    T.check(stash and stash.entries and #stash.entries == 1, "TREECKO safely stashed into sidecar")
+    T.eq(stash.entries[1].mon.species, "TREECKO", "stashed mon is TREECKO")
+
+    -- Restore to National
+    SpeciesScope.applyTransition(mod, game, SpeciesScope.MODE_NATIONAL)
+    T.eq(save.pokedex.seen.TREECKO, true, "TREECKO seen restored in National mode")
+    T.eq(save.pokedex.seen.CHIKORITA, true, "CHIKORITA seen restored in National mode")
+  end
+
   -- Refuse empty party (only Gen3, empty PC)
   do
     setMode(SpeciesScope.MODE_NATIONAL)
