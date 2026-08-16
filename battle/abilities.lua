@@ -97,8 +97,8 @@ function Abilities.blocksStatus(battle, battler, status, opts)
       or g2 == "poison" or g2 == "toxic" or g1 == "PSN" or g1 == "TOX"
       or g2 == "burn" or g1 == "BRN" or g2 == "paralyze" or g1 == "PAR"
       or g2 == "freeze" or g1 == "FRZ") then
-    local weather = BattleCompat.getWeather(battle)
-    if weather == "SUNNY" then return true end
+    local Weather = require("mods.Kanto-Reforged.battle.weather")
+    if Weather.current(battle) == "SUNNY" then return true end
   end
   if opts.secondary and not opts.fromAbility and ability == "SHIELD_DUST" then
     return true
@@ -114,8 +114,9 @@ function Abilities.blocksStatus(battle, battler, status, opts)
   return false
 end
 
-local function setWeather(battle, weather, message)
-  BattleCompat.setWeather(battle, weather, message and Strings(message) or nil)
+local function setWeather(battle, weather, message, opts)
+  BattleCompat.setWeather(battle, weather, message and Strings(message) or nil,
+    nil, opts)
   Abilities.updateForecast(battle, battle.player)
   Abilities.updateForecast(battle, battle.enemy)
 end
@@ -142,7 +143,8 @@ function Abilities.updateForecast(battle, battler)
   if not BattleCompat.mon(battler) then return end
   if abilityOf(battle, battler) ~= "FORECAST" then return end
 
-  local weather = BattleCompat.getWeather(battle)
+  local Weather = require("mods.Kanto-Reforged.battle.weather")
+  local weather = Weather.current(battle)
   local types = BattleCompat.types(battler)
   local oldType = types[1]
   local newType = "NORMAL"
@@ -158,13 +160,16 @@ function Abilities.updateForecast(battle, battler)
     BattleCompat.setTypes(battler, { newType })
     BattleCompat.say(battle, Strings("%s transformed\ninto its weather form!",
       displayName(battle, battler)))
+    local Weather = require("mods.Kanto-Reforged.battle.weather")
+    Weather.refreshSprite(battle, battler)
   end
 end
 
 -- Chlorophyll / Swift Swim / Tailwind effective-speed multiplier
 function Abilities.speedMult(battle, battler)
   local ability = abilityOf(battle, battler)
-  local weather = BattleCompat.getWeather(battle)
+  local Weather = require("mods.Kanto-Reforged.battle.weather")
+  local weather = Weather.current(battle)
   local mult = 1
   if ability == "CHLOROPHYLL" and weather == "SUNNY" then mult = mult * 2 end
   if ability == "SWIFT_SWIM" and weather == "RAINY" then mult = mult * 2 end
@@ -200,13 +205,21 @@ function Abilities.onEntry(battle, battler)
   elseif ability == "FORECAST" then
     Abilities.updateForecast(battle, battler)
   elseif ability == "DROUGHT" then
-    setWeather(battle, "SUNNY", name .. "'s\nDROUGHT intensified\nthe sun!")
+    setWeather(battle, "SUNNY", name .. "'s\nDROUGHT intensified\nthe sun!",
+      { fromAbility = true })
   elseif ability == "DRIZZLE" then
-    setWeather(battle, "RAINY", name .. "'s\nDRIZZLE made it\nrain!")
+    setWeather(battle, "RAINY", name .. "'s\nDRIZZLE made it\nrain!",
+      { fromAbility = true })
   elseif ability == "SAND_STREAM" then
-    setWeather(battle, "SANDSTORM", name .. "'s\nSAND STREAM whipped\nup a sandstorm!")
+    setWeather(battle, "SANDSTORM", name .. "'s\nSAND STREAM whipped\nup a sandstorm!",
+      { fromAbility = true })
   elseif ability == "AIR_LOCK" then
-    setWeather(battle, nil, name .. "'s\nAIR LOCK cleared\nthe weather!")
+    -- Gen 3: suppress weather effects; do not delete the weather.
+    BattleCompat.say(battle, Strings("%s's\nAIR LOCK suppresses\nthe weather!", name))
+    local Weather = require("mods.Kanto-Reforged.battle.weather")
+    Weather.refreshSprite(battle, battler)
+    Abilities.updateForecast(battle, battle.player)
+    Abilities.updateForecast(battle, battle.enemy)
   elseif ability == "TRACE" then
     local foe = (battler == battle.player or battler.isPlayer) and battle.enemy or battle.player
     local foeAbility = abilityOf(battle, foe)
@@ -218,11 +231,14 @@ function Abilities.onEntry(battle, battler)
       elseif foeAbility == "FORECAST" then
         Abilities.updateForecast(battle, battler)
       elseif foeAbility == "DROUGHT" then
-        setWeather(battle, "SUNNY", name .. "'s\nDROUGHT intensified\nthe sun!")
+        setWeather(battle, "SUNNY", name .. "'s\nDROUGHT intensified\nthe sun!",
+          { fromAbility = true })
       elseif foeAbility == "DRIZZLE" then
-        setWeather(battle, "RAINY", name .. "'s\nDRIZZLE made it\nrain!")
+        setWeather(battle, "RAINY", name .. "'s\nDRIZZLE made it\nrain!",
+          { fromAbility = true })
       elseif foeAbility == "SAND_STREAM" then
-        setWeather(battle, "SANDSTORM", name .. "'s\nSAND STREAM whipped\nup a sandstorm!")
+        setWeather(battle, "SANDSTORM", name .. "'s\nSAND STREAM whipped\nup a sandstorm!",
+          { fromAbility = true })
       end
     end
   end
@@ -233,7 +249,15 @@ function Abilities.onMoveUsed(battle, user, move)
   if not battle or not move then return end
   local weather = WEATHER_MOVES[move.id]
   if weather then
-    setWeather(battle, weather)
+    -- Gold emits move_used before StartSandstorm/StartSun/StartRain.
+    -- Pre-setting weather makes those effects see the storm already up
+    -- and fail ("But it failed!"), so the first residual never runs.
+    local okH, Host = pcall(require, "mods.Kanto-Reforged.core.host")
+    local goldNative = weather == "SANDSTORM" or weather == "SUNNY"
+      or weather == "RAINY"
+    if not (okH and Host and Host.isGen2 and Host.isGen2() and goldNative) then
+      setWeather(battle, weather)
+    end
   end
   -- Also sync when Gold native weather moves already wrote battle.weather.
   Abilities.updateForecast(battle, battle.player)

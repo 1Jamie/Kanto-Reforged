@@ -2346,6 +2346,7 @@ require("mods.Kanto-Reforged.tests.modern_xp_share_test")(T, Data, run)
 require("mods.Kanto-Reforged.tests.battle_exp_bar_test")(T, Data, run)
 require("mods.Kanto-Reforged.tests.split_special_test")(T, Data, run)
 require("mods.Kanto-Reforged.tests.trainer_ai_test")(T, Data, run)
+require("mods.Kanto-Reforged.tests.weather_test")(T, Data, run)
 require("mods.Kanto-Reforged.tests.level_caps_test")(T, Data, run)
 
 run.release()

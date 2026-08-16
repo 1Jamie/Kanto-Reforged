@@ -23,6 +23,7 @@ HouseNpcs._trainerDefs = {}
 -- New modules MUST register via claim() and never collide.
 HouseNpcs.BASELINE_CLAIMS = {
   { map = "VIRIDIAN_CITY", index = 8, owner = "level_caps" },
+  { map = "CHERRYGROVE_CITY", index = 8, owner = "level_caps" },
   { map = "CELADON_CITY", index = 10, owner = "overworld_loot" },
   { map = "LAVENDER_TOWN", index = 4, owner = "overworld_loot" },
   { map = "SAFFRON_CITY", index = 16, owner = "overworld_loot" },

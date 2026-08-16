@@ -1,6 +1,7 @@
--- Viridian candy NPC + optional badge level caps.
+-- Viridian / Cherrygrove candy NPC + optional badge level caps.
 return function(T, Data, run)
   local LevelCaps = require("mods.Kanto-Reforged.ui.level_caps")
+  local Host = require("mods.Kanto-Reforged.core.host")
   local Experience = require("src.battle.Experience")
   local Pokemon = require("src.pokemon.Pokemon")
   local ItemEffects = require("src.inventory.ItemEffects")
@@ -11,7 +12,7 @@ return function(T, Data, run)
   local mod = LevelCaps._mod
   T.check(mod ~= nil and mod.save ~= nil, "level caps installed with mod API")
 
-  -- NPC patched onto Viridian City.
+  -- Viridian City NPC presence.
   local city = Data.maps.VIRIDIAN_CITY
   local found
   for _, obj in ipairs(city.objects or {}) do
@@ -35,40 +36,106 @@ return function(T, Data, run)
   T.eq(LevelCaps.cap(mod, Data, { inventory = {} }), nil,
     "cap() nil while disabled")
 
-  -- Story milestones (Radical Red–style), not gym-only jumps.
+  -- =========================================================
+  -- Gen 1 Story milestones (Kanto)
+  -- =========================================================
+  Host.force(1)
   local save0 = { inventory = {}, flags = {} }
-  T.eq(LevelCaps.capFor(Data, save0), 14, "start -> Pre-Brock 14")
+  T.eq(LevelCaps.capFor(Data, save0), 14, "Gen 1: start -> Pre-Brock 14")
   save0.flags.EVENT_BEAT_BROCK = true
-  T.eq(LevelCaps.capFor(Data, save0), 16, "after Brock -> Pre-Mt. Moon 16")
+  T.eq(LevelCaps.capFor(Data, save0), 16, "Gen 1: after Brock -> Pre-Mt. Moon 16")
   save0.flags.EVENT_GOT_HELIX_FOSSIL = true
-  T.eq(LevelCaps.capFor(Data, save0), 18, "after Mt. Moon -> Pre-Nugget Bridge 18")
+  T.eq(LevelCaps.capFor(Data, save0), 18, "Gen 1: after Mt. Moon -> Pre-Nugget Bridge 18")
   save0.flags.EVENT_GOT_NUGGET = true
-  T.eq(LevelCaps.capFor(Data, save0), 21, "after Nugget Bridge -> Pre-Misty 21")
+  T.eq(LevelCaps.capFor(Data, save0), 21, "Gen 1: after Nugget Bridge -> Pre-Misty 21")
   save0.flags.EVENT_BEAT_MISTY = true
-  T.eq(LevelCaps.capFor(Data, save0), 24, "after Misty -> Pre-Surge 24")
+  T.eq(LevelCaps.capFor(Data, save0), 24, "Gen 1: after Misty -> Pre-Surge 24")
   save0.flags.EVENT_BEAT_LT_SURGE = true
-  T.eq(LevelCaps.capFor(Data, save0), 29, "after Surge -> Pre-Erika/Hideout 29")
+  T.eq(LevelCaps.capFor(Data, save0), 29, "Gen 1: after Surge -> Pre-Erika/Hideout 29")
   save0.flags.EVENT_BEAT_ERIKA = true
-  T.eq(LevelCaps.capFor(Data, save0), 29,
-    "Erika alone does not unlock Silph cap")
+  T.eq(LevelCaps.capFor(Data, save0), 29, "Gen 1: Erika alone does not unlock Silph cap")
   save0.flags.EVENT_BEAT_ROCKET_HIDEOUT_GIOVANNI = true
-  T.eq(LevelCaps.capFor(Data, save0), 41, "Erika+Hideout -> Pre-Silph 41")
+  T.eq(LevelCaps.capFor(Data, save0), 41, "Gen 1: Erika+Hideout -> Pre-Silph 41")
   save0.flags.EVENT_BEAT_SILPH_CO_GIOVANNI = true
-  T.eq(LevelCaps.capFor(Data, save0), 43, "after Silph -> Pre-Koga/Sabrina 43")
+  T.eq(LevelCaps.capFor(Data, save0), 43, "Gen 1: after Silph -> Pre-Koga/Sabrina 43")
   save0.flags.EVENT_BEAT_KOGA = true
-  T.eq(LevelCaps.capFor(Data, save0), 47, "after Koga -> Pre-Blaine 47")
+  T.eq(LevelCaps.capFor(Data, save0), 47, "Gen 1: after Koga -> Pre-Blaine 47")
   save0.flags.EVENT_BEAT_BLAINE = true
-  T.eq(LevelCaps.capFor(Data, save0), 50, "after Blaine -> Pre-Giovanni 50")
+  T.eq(LevelCaps.capFor(Data, save0), 50, "Gen 1: after Blaine -> Pre-Giovanni 50")
   save0.flags.EVENT_BEAT_GIOVANNI = true
-  T.eq(LevelCaps.capFor(Data, save0), 53, "after Giovanni -> Pre-Victory Road 53")
+  T.eq(LevelCaps.capFor(Data, save0), 53, "Gen 1: after Giovanni -> Pre-Victory Road 53")
   save0.flags.EVENT_STARTED_ELITE_4 = true
-  T.eq(LevelCaps.capFor(Data, save0), 65, "E4 started -> Pre-Champion 65")
+  T.eq(LevelCaps.capFor(Data, save0), 65, "Gen 1: E4 started -> Pre-Champion 65")
   save0.flags.EVENT_BEAT_CHAMPION_RIVAL = true
-  T.eq(LevelCaps.capFor(Data, save0), 100, "champion beaten -> cap 100")
+  T.eq(LevelCaps.capFor(Data, save0), 100, "Gen 1: champion beaten -> cap 100")
 
-  -- Badge inventory is enough for gym milestones (no EVENT_BEAT_* needed).
+  -- Badge inventory is enough for Gen 1 gym milestones.
   local badgeSave = { inventory = { BOULDERBADGE = 1 }, flags = {} }
-  T.eq(LevelCaps.capFor(Data, badgeSave), 16, "Boulder Badge alone -> 16")
+  T.eq(LevelCaps.capFor(Data, badgeSave), 16, "Gen 1: Boulder Badge alone -> 16")
+
+  -- =========================================================
+  -- Gen 2 Story milestones (Johto & Kanto Arcs)
+  -- =========================================================
+  Host.force(2)
+  local saveG2 = { inventory = {}, flags = {}, engineFlags = {}, events = {} }
+  T.eq(LevelCaps.capFor(Data, saveG2), 14, "Gen 2: start -> Pre-Falkner 14")
+
+  saveG2.flags.EVENT_BEAT_FALKNER = true
+  T.eq(LevelCaps.capFor(Data, saveG2), 16, "Gen 2: after Falkner -> Pre-Bugsy 16")
+
+  saveG2.flags.EVENT_BEAT_BUGSY = true
+  T.eq(LevelCaps.capFor(Data, saveG2), 20, "Gen 2: after Bugsy -> Pre-Whitney 20")
+
+  saveG2.flags.EVENT_BEAT_WHITNEY = true
+  T.eq(LevelCaps.capFor(Data, saveG2), 25, "Gen 2: after Whitney -> Pre-Morty 25")
+
+  saveG2.flags.EVENT_BEAT_MORTY = true
+  T.eq(LevelCaps.capFor(Data, saveG2), 30, "Gen 2: after Morty -> Pre-Chuck 30")
+
+  saveG2.flags.EVENT_BEAT_CHUCK = true
+  T.eq(LevelCaps.capFor(Data, saveG2), 32, "Gen 2: after Chuck -> Pre-Pryce 32")
+
+  saveG2.flags.EVENT_BEAT_PRYCE = true
+  T.eq(LevelCaps.capFor(Data, saveG2), 35, "Gen 2: after Pryce -> Pre-Jasmine 35")
+
+  saveG2.flags.EVENT_BEAT_JASMINE = true
+  T.eq(LevelCaps.capFor(Data, saveG2), 38, "Gen 2: after Jasmine -> Pre-Radio Tower 38")
+
+  saveG2.flags.EVENT_CLEARED_RADIO_TOWER = true
+  T.eq(LevelCaps.capFor(Data, saveG2), 40, "Gen 2: after Radio Tower -> Pre-Clair 40")
+
+  saveG2.flags.EVENT_BEAT_CLAIR = true
+  T.eq(LevelCaps.capFor(Data, saveG2), 44, "Gen 2: after Clair -> Pre-Victory Road Rival 44")
+
+  saveG2.flags.EVENT_RIVAL_VICTORY_ROAD = true
+  T.eq(LevelCaps.capFor(Data, saveG2), 50, "Gen 2: after Victory Road Rival -> Pre-Lance 50")
+
+  -- Kanto Arc progression in Gen 2
+  saveG2.flags.EVENT_BEAT_CHAMPION_LANCE = true
+  T.eq(LevelCaps.capFor(Data, saveG2), 58, "Gen 2: after Lance (0-2 Kanto badges) -> 58")
+
+  saveG2.engineFlags.ENGINE_BOULDERBADGE = true
+  saveG2.engineFlags.ENGINE_CASCADEBADGE = true
+  saveG2.engineFlags.ENGINE_THUNDERBADGE = true
+  T.eq(LevelCaps.kantoBadgeCount(saveG2), 3, "Gen 2: 3 Kanto badges counted")
+  T.eq(LevelCaps.capFor(Data, saveG2), 64, "Gen 2: 3-6 Kanto badges -> cap 64")
+
+  saveG2.engineFlags.ENGINE_RAINBOWBADGE = true
+  saveG2.engineFlags.ENGINE_SOULBADGE = true
+  saveG2.engineFlags.ENGINE_MARSHBADGE = true
+  saveG2.engineFlags.ENGINE_VOLCANOBADGE = true
+  T.eq(LevelCaps.kantoBadgeCount(saveG2), 7, "Gen 2: 7 Kanto badges counted")
+  T.eq(LevelCaps.capFor(Data, saveG2), 72, "Gen 2: 7 Kanto badges -> Pre-Blue 72")
+
+  saveG2.engineFlags.ENGINE_EARTHBADGE = true
+  T.eq(LevelCaps.kantoBadgeCount(saveG2), 8, "Gen 2: 8 Kanto badges counted")
+  T.eq(LevelCaps.capFor(Data, saveG2), 85, "Gen 2: 8 Kanto badges -> Pre-Red 85")
+
+  saveG2.flags.EVENT_RED_IN_MT_SILVER = true
+  T.eq(LevelCaps.capFor(Data, saveG2), 100, "Gen 2: Red defeated -> cap 100")
+
+  -- Reset host state
+  Host.clearForce()
 
   -- Giving a stack tops up toward 99 and is how caps get enabled.
   local bag = { inventory = {}, bagOrder = {} }

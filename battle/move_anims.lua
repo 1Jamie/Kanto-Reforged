@@ -908,8 +908,8 @@ local CUSTOM = {
     se("SE_DARK_SCREEN_FLASH"),
   }),
   HAIL = custom("custom:hail", {
-    sub(56, 0, 4, "BLIZZARD"),
-    se("SE_WATER_DROPLETS_EVERYWHERE", "SURF"),
+    se("SE_WATER_DROPLETS_EVERYWHERE"),
+    se("SE_DARK_SCREEN_FLASH"),
   }),
   AURORA_VEIL = custom("custom:aurora_veil", {
     se("SE_LIGHT_SCREEN_PALETTE", "AURORA_BEAM"),
@@ -979,8 +979,7 @@ local CUSTOM = {
     se("SE_DARK_SCREEN_FLASH"),
   }),
   SANDSTORM = custom("custom:sandstorm", {
-    sub(40, 0, 4, "SAND_ATTACK"),
-    se("SE_WATER_DROPLETS_EVERYWHERE", "SURF"),
+    se("SE_WATER_DROPLETS_EVERYWHERE"),
     se("SE_SHAKE_SCREEN"),
   }),
   ROCK_POLISH = custom("custom:rock_polish", {
@@ -1684,6 +1683,9 @@ function MoveAnims.register(mod, moves)
   mod.log:info(
     "Registered %d move anims (%d composed, %d aliased; %d already present)",
     n, composed, n - composed, skipped)
+  pcall(function()
+    require("mods.Kanto-Reforged.battle.weather").registerAnims(mod)
+  end)
   return n
 end
 

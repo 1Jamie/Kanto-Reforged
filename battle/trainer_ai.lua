@@ -2236,11 +2236,10 @@ function TrainerAi.install(mod)
 
     -- Dig/Fly second turn, Rollout/Thrash, Encore — must run before scoring
     -- or Fake Out preference (vanilla Gen2 AI returns chargeMove first).
-    local forcedId = BattleCompat.forcedMoveId(battle, battle.enemy)
-    if forcedId then
-      if gen2 then return forcedId end
-      return { id = forcedId, pp = 1 }
-    end
+    -- Gen1 must return the charging move *instance*; a new {id=DIG} table
+    -- never matches `user.charging == moveInst` and the foe stays underground.
+    local forced = BattleCompat.forcedAction(battle, battle.enemy)
+    if forced then return forced end
 
     local okForced, forced = pcall(preferSharedSetup, battle, nil)
     if okForced and forced then return forced end

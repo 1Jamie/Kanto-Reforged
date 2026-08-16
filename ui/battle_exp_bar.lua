@@ -17,12 +17,21 @@ BattleExpBar.CAP_PX = 4
 -- PlacePlayerHUDTiles: $76 run at (10,11)..(17,11), triangle $6F at (9,11).
 BattleExpBar.CLASSIC_TX = 10
 BattleExpBar.CLASSIC_TY = 11
-BattleExpBar.WIDE_PX = 192
-BattleExpBar.WIDE_PY = 89
+BattleExpBar.WIDE_PX = 208
+BattleExpBar.WIDE_PY = 90
+BattleExpBar.WIDE_LENGTH_PX = 64
+
+BattleExpBar.OPTION_KEY = "battle_exp_bar"
+BattleExpBar.OPTION = {
+  key = BattleExpBar.OPTION_KEY,
+  label = "EXP BAR",
+  type = "toggle",
+  default = true,
+}
 
 local MAX_LEVEL = 100
 local SOUND_DELAY = 10
--- DMG shade 2 (r≈0.33 → shader c2).  Colorized battles recolor this strip
+-- DMG shade 2 (r≈0.33 → shader c2). Colorized battles recolor this strip
 -- to exp-blue after the HUD zone pass; DMG battles use the literal blue.
 local SHADE2 = { 85 / 255, 85 / 255, 85 / 255, 1 }
 local BLUE = { 0.22, 0.48, 0.95, 1 }
@@ -30,12 +39,21 @@ local EXP_PAL = {
   { 255, 255, 255 }, { 140, 190, 255 }, { 50, 110, 220 }, { 0, 0, 0 },
 }
 
+function BattleExpBar.enabled(mod)
+  mod = mod or BattleExpBar._mod
+  if not mod or not mod.options then return true end
+  local val = mod.options:get(BattleExpBar.OPTION_KEY)
+  if val == nil then return true end
+  return val == true
+end
+
 local function monExp(mon)
   if not mon then return 0 end
   return mon.exp or mon.experience or 0
 end
 
-function BattleExpBar.expPixels(data, mon, level, exp)
+function BattleExpBar.expPixels(data, mon, level, exp, maxPx)
+  maxPx = maxPx or BattleExpBar.LENGTH_PX
   if not (data and mon) then return 0 end
   local def = data.pokemon and data.pokemon[mon.species]
   if not def then return 0 end
@@ -46,11 +64,14 @@ function BattleExpBar.expPixels(data, mon, level, exp)
   local next_ = Growth.expForLevel(def.growthRate, level + 1, rates)
   if not base or not next_ or next_ <= base then return 0 end
   local into = math.max(0, math.min(next_ - base, (exp or monExp(mon)) - base))
-  return math.floor(into * BattleExpBar.LENGTH_PX / (next_ - base))
+  return math.floor(into * maxPx / (next_ - base))
 end
 
 function BattleExpBar.latch(battle)
   if not battle then return end
+  if not BattleExpBar.enabled(BattleExpBar._mod) then return end
+  local isWide = battle and battle.wideLayout and battle:wideLayout()
+  local maxLen = isWide and BattleExpBar.WIDE_LENGTH_PX or BattleExpBar.LENGTH_PX
   local mon = battle.player and battle.player.mon
   if not mon then
     battle.krShownExp, battle.krShownLevel, battle.krExpAnim = 0, 1, nil
@@ -58,7 +79,7 @@ function BattleExpBar.latch(battle)
   end
   battle.krShownLevel = mon.level or 1
   battle.krShownExp = BattleExpBar.expPixels(battle.data, mon, battle.krShownLevel,
-                                             monExp(mon))
+                                             monExp(mon), maxLen)
   battle.krExpAnim = nil
 end
 
@@ -78,6 +99,7 @@ end
 
 function BattleExpBar.queueDrain(battle)
   if not battle then return end
+  if not BattleExpBar.enabled(BattleExpBar._mod) then return end
   battle.queue = battle.queue or {}
   battle.nextInsert = (battle.nextInsert or 0) + 1
   -- wait=1 is a fallback: if vanilla dequeues this row, it holds a frame
@@ -85,25 +107,28 @@ function BattleExpBar.queueDrain(battle)
   table.insert(battle.queue, battle.nextInsert, { krExpDrain = true, wait = 1 })
 end
 
--- One tick toward the live battler's exp.  Returns true while crawling.
+-- One tick toward the live battler's exp. Returns true while crawling.
 function BattleExpBar.step(battle)
   if not battle then return false end
+  if not BattleExpBar.enabled(BattleExpBar._mod) then return false end
   local mon = battle.player and battle.player.mon
   if not mon then return false end
   if battle.krShownExp == nil or battle.krShownLevel == nil then
     BattleExpBar.latch(battle)
     return false
   end
+  local isWide = battle and battle.wideLayout and battle:wideLayout()
+  local maxLen = isWide and BattleExpBar.WIDE_LENGTH_PX or BattleExpBar.LENGTH_PX
   local toLevel = math.min(MAX_LEVEL, mon.level or 1)
   if (battle.krShownLevel or 1) >= MAX_LEVEL then
     battle.krShownExp = 0
     battle.krExpAnim = nil
     return false
   end
-  local target = BattleExpBar.LENGTH_PX
+  local target = maxLen
   if (battle.krShownLevel or 1) >= toLevel then
     target = BattleExpBar.expPixels(battle.data, mon, battle.krShownLevel,
-                                    monExp(mon))
+                                    monExp(mon), maxLen)
   end
   local shown = battle.krShownExp or 0
   if shown == target and (battle.krShownLevel or 1) >= toLevel then
@@ -145,13 +170,16 @@ function BattleExpBar.step(battle)
 end
 
 function BattleExpBar.needsCrawl(battle)
+  if not BattleExpBar.enabled(BattleExpBar._mod) then return false end
   local mon = battle and battle.player and battle.player.mon
   if not mon or battle.krShownExp == nil then return false end
+  local isWide = battle and battle.wideLayout and battle:wideLayout()
+  local maxLen = isWide and BattleExpBar.WIDE_LENGTH_PX or BattleExpBar.LENGTH_PX
   local toLevel = math.min(MAX_LEVEL, mon.level or 1)
   if (battle.krShownLevel or 1) < toLevel then return true end
   if (battle.krShownLevel or 1) >= MAX_LEVEL then return false end
   return (battle.krShownExp or 0) ~= BattleExpBar.expPixels(
-    battle.data, mon, battle.krShownLevel, monExp(mon))
+    battle.data, mon, battle.krShownLevel, monExp(mon), maxLen)
 end
 
 local function playerHudHidden(battle)
@@ -164,7 +192,7 @@ local function playerHudHidden(battle)
 end
 
 local function fillOrigin(battle)
-  if battle.wideLayout and battle:wideLayout() then
+  if battle and battle.wideLayout and battle:wideLayout() then
     return BattleExpBar.WIDE_PX, BattleExpBar.WIDE_PY
   end
   -- Flush with the $76 underline / $77 corner, not 4px below the bracket.
@@ -173,14 +201,16 @@ end
 
 -- Gen 2 FillInExpBar grows from the right end-cap toward the triangle.
 local function fillRect(battle, sx, sy)
-  local pixels = math.max(0, math.min(BattleExpBar.LENGTH_PX, battle.krShownExp or 0))
+  local isWide = battle and battle.wideLayout and battle:wideLayout()
+  local maxLen = isWide and BattleExpBar.WIDE_LENGTH_PX or BattleExpBar.LENGTH_PX
+  local pixels = math.max(0, math.min(maxLen, battle.krShownExp or 0))
   if pixels <= 0 then return nil end
   sx, sy = sx or 0, sy or 0
   local ox, oy = fillOrigin(battle)
-  local px = ox + sx + BattleExpBar.LENGTH_PX - pixels
+  local px = ox + sx + maxLen - pixels
   local py = oy + sy
   local w, h = pixels, BattleExpBar.CHANNEL_PX
-  if battle.phase == "moveSelect" then
+  if not isWide and battle.phase == "moveSelect" then
     local clipL = 88 + sx
     if px + w <= clipL then return nil end
     if px < clipL then
@@ -188,8 +218,9 @@ local function fillRect(battle, sx, sy)
       px = clipL
     end
   end
-  if py >= 96 + sy then return nil end
-  if py + h > 96 + sy then h = 96 + sy - py end
+  local maxPy = (isWide and 144 or 96) + sy
+  if py >= maxPy then return nil end
+  if py + h > maxPy then h = maxPy - py end
   if w <= 0 or h <= 0 then return nil end
   return px, py, w, h
 end
@@ -197,14 +228,53 @@ end
 -- Transparent empty track; blue fill from the right; black nub from the
 -- bar's start to the HUD frame (Gold's end-cap, not a full black track).
 function BattleExpBar.drawFill(battle, color)
+  if not BattleExpBar.enabled(BattleExpBar._mod) then return end
   if playerHudHidden(battle) then return end
   if battle.krShownExp == nil then BattleExpBar.latch(battle) end
   local G = love and love.graphics
   if not G or not G.rectangle then return end
+  local isWide = battle and battle.wideLayout and battle:wideLayout()
+  local fx = battle and battle.fx
+  local sx = (fx and fx.shakeX) or 0
+  local sy = (fx and fx.shakeY) or 0
+  if sx == 0 and sy == 0 and fx and fx.shake and fx.shake > 0 then
+    sx = (battle.frame or 0) % 4 < 2 and 2 or -2
+  end
+
+  if isWide then
+    -- Right-aligned 64px capsule under numeric HP 54/ 54 (x=208..272, y=90)
+    local ox = BattleExpBar.WIDE_PX + sx
+    local oy = BattleExpBar.WIDE_PY + sy
+    local trackW = BattleExpBar.WIDE_LENGTH_PX
+    local trackH = 4
+
+    -- 1px Black capsule outline
+    G.setColor(0, 0, 0, 1)
+    G.rectangle("fill", ox, oy, trackW, trackH)
+
+    -- Subtle inner empty track background
+    G.setColor(1, 1, 1, 0.85)
+    G.rectangle("fill", ox + 1, oy + 1, trackW - 2, trackH - 2)
+
+    -- Sleek 2px blue EXP fill inside capsule (right-aligned, fills Right -> Left)
+    local fraction = math.max(0, math.min(1, (battle.krShownExp or 0) / trackW))
+    local maxFill = trackW - 2
+    local fillW = math.floor(fraction * maxFill)
+    if fillW > 0 then
+      local fillX = ox + trackW - 1 - fillW
+      G.setColor(BLUE)
+      G.rectangle("fill", fillX, oy + 1, fillW, trackH - 2)
+    end
+    G.setColor(1, 1, 1, 1)
+    return
+  end
+
   local ox, oy = fillOrigin(battle)
-  G.setColor(0, 0, 0, 1)
-  G.rectangle("fill", ox + BattleExpBar.LENGTH_PX, oy,
-              BattleExpBar.CAP_PX, BattleExpBar.CHANNEL_PX)
+  local maxLen = BattleExpBar.LENGTH_PX
+  if BattleExpBar.CAP_PX > 0 then
+    G.setColor(0, 0, 0, 1)
+    G.rectangle("fill", ox + maxLen, oy, BattleExpBar.CAP_PX, BattleExpBar.CHANNEL_PX)
+  end
   local px, py, w, h = fillRect(battle, 0, 0)
   if px then
     G.setColor(color or BLUE)
@@ -217,7 +287,10 @@ end
 -- Clipped so the TYPE/PP box (0,8) 11x5 and the command box at row 12
 -- are not painted over.
 function BattleExpBar.recolorFill(battle, src, sx, sy)
+  if not BattleExpBar.enabled(BattleExpBar._mod) then return end
   if playerHudHidden(battle) then return end
+  local isWide = battle and battle.wideLayout and battle:wideLayout()
+  if isWide then return end
   local G = love and love.graphics
   if not (G and src and G.setScissor) then return end
   local px, py, w, h = fillRect(battle, sx, sy)
@@ -235,8 +308,21 @@ function BattleExpBar.recolorFill(battle, src, sx, sy)
 end
 
 function BattleExpBar.install(mod)
+  BattleExpBar._mod = mod
   local Host = require("mods.Kanto-Reforged.core.host")
   if not Host.isGen1() then return end
+
+  local Font = require("src.render.Font")
+  if not Font._krExpBarBox then
+    Font._krExpBarBox = true
+    local originalDrawBox = Font.drawBox
+    Font.drawBox = function(tx, ty, tw, th, ...)
+      if tx == 23 and ty == 7 and tw == 15 and th == 5 and BattleExpBar.enabled(BattleExpBar._mod) then
+        th = 6
+      end
+      return originalDrawBox(tx, ty, tw, th, ...)
+    end
+  end
 
   local Gen1Patch = require("mods.Kanto-Reforged.gen1_patch")
   Gen1Patch.apply(require("src.battle.BattleState"), function(BattleState)
@@ -246,33 +332,42 @@ function BattleExpBar.install(mod)
     local originalDrawHUDs = BattleState.drawHUDs
     BattleState.drawHUDs = function(self, slide)
       originalDrawHUDs(self, slide)
-      local colorized = self.colorMode and self:colorMode()
-      BattleExpBar.drawFill(self, colorized and SHADE2 or BLUE)
+      if not BattleExpBar.enabled(BattleExpBar._mod) then return end
+      if not (self.wideLayout and self:wideLayout()) then
+        local colorized = self.colorMode and self:colorMode()
+        BattleExpBar.drawFill(self, colorized and SHADE2 or BLUE)
+      end
     end
 
     local originalZone = BattleState.drawZonePass
     BattleState.drawZonePass = function(self, src, sx, sy)
       originalZone(self, src, sx, sy)
-      BattleExpBar.recolorFill(self, src, sx or 0, sy or 0)
+      if not BattleExpBar.enabled(BattleExpBar._mod) then return end
+      if not (self.wideLayout and self:wideLayout()) then
+        BattleExpBar.recolorFill(self, src, sx or 0, sy or 0)
+      end
     end
 
     local originalUpdate = BattleState.update
     BattleState.update = function(self, dt)
-      -- Always chase live exp so vanilla awardExp (XP Share off) still
-      -- crawls even if the drain row was not queued.
-      BattleExpBar.step(self)
+      if BattleExpBar.enabled(BattleExpBar._mod) then
+        BattleExpBar.step(self)
+      end
       return originalUpdate(self, dt)
     end
 
     local originalQueue = BattleState.updateQueue
     BattleState.updateQueue = function(self)
+      if not BattleExpBar.enabled(BattleExpBar._mod) then
+        return originalQueue(self)
+      end
       if self.krExpHold then
         if BattleExpBar.needsCrawl(self) then return true end
         self.krExpHold = nil
       end
       -- Vanilla finishes HP drain then falls through and dequeues the next
-      -- row in the same call.  If that row is {krExpDrain}, startMessage
-      -- opens a blank prompt.  Finish the drain here first, then steal.
+      -- row in the same call. If that row is {krExpDrain}, startMessage
+      -- opens a blank prompt. Finish the drain here first, then steal.
       local next = self.queue and self.queue[1]
       if self.draining and next and next.krExpDrain and not self.current then
         if self:stepHPDrain() then return true end
@@ -297,6 +392,7 @@ function BattleExpBar.install(mod)
     if type(originalAward) == "function" then
       BattleState.awardExp = function(self)
         originalAward(self)
+        if not BattleExpBar.enabled(BattleExpBar._mod) then return end
         if BattleExpBar.needsCrawl(self) and not self.krExpHold then
           local queued = false
           for _, it in ipairs(self.queue or {}) do
@@ -310,6 +406,7 @@ function BattleExpBar.install(mod)
     local originalSayNext = BattleState.sayNext
     BattleState.sayNext = function(self, ...)
       originalSayNext(self, ...)
+      if not BattleExpBar.enabled(BattleExpBar._mod) then return end
       if (self.krExpPending or 0) > 0 then
         self.krExpPending = self.krExpPending - 1
         BattleExpBar.queueDrain(self)
@@ -319,26 +416,41 @@ function BattleExpBar.install(mod)
     local originalNewWild = BattleState.newWild
     BattleState.newWild = function(...)
       local battle = originalNewWild(...)
-      if battle then BattleExpBar.latch(battle) end
+      if battle and BattleExpBar.enabled(BattleExpBar._mod) then
+        BattleExpBar.latch(battle)
+      end
       return battle
     end
     local originalNewTrainer = BattleState.newTrainer
     BattleState.newTrainer = function(...)
       local battle = originalNewTrainer(...)
-      if battle then BattleExpBar.latch(battle) end
+      if battle and BattleExpBar.enabled(BattleExpBar._mod) then
+        BattleExpBar.latch(battle)
+      end
       return battle
     end
   end)
 
+  mod.hooks:wrap("battle.overlay", function(next, battle)
+    next(battle)
+    if not BattleExpBar.enabled(mod) then return end
+    if battle and battle.wideLayout and battle:wideLayout() then
+      BattleExpBar.drawFill(battle, BLUE)
+    end
+  end)
+
   mod.events:on("battle.started", function(ev)
+    if not BattleExpBar.enabled(mod) then return end
     if ev and ev.battle then BattleExpBar.latch(ev.battle) end
   end)
   mod.events:on("battle.battler_switched", function(ev)
+    if not BattleExpBar.enabled(mod) then return end
     if ev and ev.battle and ev.battler and ev.battler.isPlayer then
       BattleExpBar.latch(ev.battle)
     end
   end)
   mod.events:on("battle.exp_gained", function(ev)
+    if not BattleExpBar.enabled(mod) then return end
     local battle = ev and ev.battle
     if not battle then return end
     local active = battle.player and battle.player.mon

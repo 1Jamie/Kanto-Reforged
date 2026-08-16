@@ -155,6 +155,7 @@ return function(mod)
   -- SpA/SpD split is a Gen1 single-Special concern; Gold already has both.
   if Host.isGen1() then
     optionDefs[#optionDefs + 1] = SplitSpecial.OPTION
+    optionDefs[#optionDefs + 1] = require("mods.Kanto-Reforged.ui.battle_exp_bar").OPTION
     -- DexNav label/off is only for the start-menu entry; Gold uses Pokegear.
     optionDefs[#optionDefs + 1] = require("mods.Kanto-Reforged.ui.dexnav").OPTION
   end
@@ -167,6 +168,9 @@ return function(mod)
 
   local BattleCompat = require("mods.Kanto-Reforged.battle.battle_compat")
   BattleCompat.install(mod)
+
+  local Weather = require("mods.Kanto-Reforged.battle.weather")
+  Weather.install(mod)
 
   ExpMoveEffects.register(mod)
   ExpMoveEffects.install(mod)
@@ -205,10 +209,11 @@ return function(mod)
     HouseNpcs.installTalkDispatch(mod)
   end
 
+  local LevelCaps = require("mods.Kanto-Reforged.ui.level_caps")
+  LevelCaps.register(mod)
+  LevelCaps.install(mod)
+
   if Host.isGen1() then
-    local LevelCaps = require("mods.Kanto-Reforged.ui.level_caps")
-    LevelCaps.register(mod)
-    LevelCaps.install(mod)
     local OverworldLoot = require("mods.Kanto-Reforged.world.overworld_loot")
     OverworldLoot.register(mod)
     local Competitive = require("mods.Kanto-Reforged.items.competitive_items")
@@ -664,6 +669,17 @@ return function(mod)
           local function evoTarget(evo)
             return evo.into or evo.species
           end
+          -- Same-into is not a duplicate: Gold Scyther already has
+          -- trade+Metal Coat → Scizor, and the Moon Stone remap is a
+          -- second method to that form. Key on method+item too.
+          local function evoKey(evo)
+            return table.concat({
+              tostring(evoTarget(evo) or ""),
+              tostring(evo.method or ""),
+              tostring(evo.item or ""),
+              tostring(evo.level or ""),
+            }, "\0")
+          end
           local function copyEvo(evo)
             local target = evoTarget(evo)
             local method = evo.method
@@ -694,15 +710,16 @@ return function(mod)
           end
           local seen = {}
           for _, evo in ipairs(evos) do
-            seen[evoTarget(evo)] = true
+            seen[evoKey(evo)] = true
           end
           for _, evo in ipairs(new_evos) do
-            local target = evoTarget(evo)
+            local row = copyEvo(evo)
+            local target = evoTarget(row)
             -- Skip into-targets that are not in this boot's pokemon table
             -- (headless Gold without a Gold cache has no Espeon/etc.).
-            if target and not seen[target] and mod.content.pokemon:get(target) then
-              table.insert(evos, copyEvo(evo))
-              seen[target] = true
+            if target and not seen[evoKey(row)] and mod.content.pokemon:get(target) then
+              table.insert(evos, row)
+              seen[evoKey(row)] = true
             end
           end
           local ok = pcall(function()
@@ -1092,6 +1109,13 @@ return function(mod)
         local ok, out = pcall(HeldItems.modifyDamage, damage, ctx)
         if ok then damage = out end
       end
+      if damage and damage > 0 and not BattleCompat.isGen2(ctx.battle) then
+        local Weather = require("mods.Kanto-Reforged.battle.weather")
+        local wmod = Weather.typeModifier(ctx.battle, move and move.type)
+        if wmod ~= 1 then
+          damage = math.max(1, math.floor(damage * wmod))
+        end
+      end
       if oldPower ~= nil then
         move.type, move.power, move.category = oldType, oldPower, oldCategory
       end
@@ -1137,6 +1161,10 @@ return function(mod)
   mod.hooks:wrap("battle.accuracy", function(next, ctx)
     if ctx.target and ctx.target.expProtected then
       return false
+    end
+    local Weather = require("mods.Kanto-Reforged.battle.weather")
+    if Weather.neverMiss(ctx.battle, ctx.move) then
+      return true
     end
     -- Lock-On / Mind Reader: next move against the marked target never misses
     if ctx.target and ctx.target.expLockedOn then
@@ -1189,7 +1217,7 @@ return function(mod)
       end
     end
     if targetAbility == "SAND_VEIL"
-        and BattleCompat.getWeather(ctx.battle) == "SANDSTORM" then
+        and Weather.current(ctx.battle) == "SANDSTORM" then
       if (ctx.battle.rng or love.math.random)(0, 99) < 20 then
         return false
       end
@@ -1431,15 +1459,6 @@ return function(mod)
       ev.battle.enemy.expProtected = nil
       ev.battle.enemy.expEnduring = nil
     end
-    -- Tick weather duration
-    local field = ev.battle.field
-    if field and field.weather and field.weatherTurns then
-      field.weatherTurns = field.weatherTurns - 1
-      if field.weatherTurns <= 0 then
-        field.weather = nil
-        field.weatherTurns = nil
-      end
-    end
     Abilities.onTurnStart(ev.battle, ev.battle.player)
     Abilities.onTurnStart(ev.battle, ev.battle.enemy)
   end)
@@ -1464,6 +1483,8 @@ return function(mod)
 
   mod.events:on("battle.turn_ended", function(ev)
     if not ev.battle then return end
+    -- Gen 1 residual; Gold HandleWeather already ran inside takeTurn.
+    require("mods.Kanto-Reforged.battle.weather").tick(ev.battle)
     Abilities.onTurnEnded(ev.battle, ev.battle.player)
     Abilities.onTurnEnded(ev.battle, ev.battle.enemy)
   end)

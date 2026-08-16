@@ -347,17 +347,29 @@ return function(T, Data, run)
     T.check(allOk, "club parties dex≤151 under kanto")
   end
 
-  -- Evo strip: Onix has no STEELIX under kanto
+  -- Evo strip: level-up into post-Kanto forms go away; stone remaps stay
+  -- (Moon Stone is the trade/Metal Coat stand-in).
   do
     setMode(SpeciesScope.MODE_KANTO)
     SpeciesScope.applyEvoScope(mod, SpeciesScope.MODE_KANTO)
     local onix = mod.content.pokemon:get("ONIX")
-    local hasSteelix = false
+    local hasSteelixStone = false
     for _, evo in ipairs((onix and onix.evolutions) or {}) do
       local target = evo.species or evo.into
-      if target == "STEELIX" then hasSteelix = true end
+      if target == "STEELIX" and evo.item == "MOON_STONE" then
+        hasSteelixStone = true
+      end
     end
-    T.check(not hasSteelix, "Onix has no STEELIX edge under kanto")
+    T.check(hasSteelixStone, "Onix keeps Moon Stone → Steelix under kanto")
+    local scyther = mod.content.pokemon:get("SCYTHER")
+    local hasScizorStone = false
+    for _, evo in ipairs((scyther and scyther.evolutions) or {}) do
+      local target = evo.species or evo.into
+      if target == "SCIZOR" and evo.item == "MOON_STONE" then
+        hasScizorStone = true
+      end
+    end
+    T.check(hasScizorStone, "Scyther keeps Moon Stone → Scizor under kanto")
     setMode(SpeciesScope.MODE_NATIONAL)
     SpeciesScope.applyEvoScope(mod, SpeciesScope.MODE_NATIONAL)
   end

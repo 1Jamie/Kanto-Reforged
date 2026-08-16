@@ -1,8 +1,7 @@
--- Viridian Rare Candy NPC + optional level-cap system.
+-- Viridian / Cherrygrove Rare Candy NPC + optional level-cap system.
 -- Taking candies from him once permanently enables soft level caps
 -- (Radical Red style): at the current story cap, battle XP becomes +1 and
--- you cannot Rare-Candy past it.  Caps rise at major fights (Mt. Moon,
--- Nugget Bridge, gyms, Rocket Hideout, Silph, …), not only gym badges.
+-- you cannot Rare-Candy past it. Caps rise at major fights.
 -- Never taking candy leaves vanilla leveling alone.
 
 local Strings = require("src.core.Strings")
@@ -13,9 +12,8 @@ LevelCaps.SAVE_KEY = "level_caps_on"
 LevelCaps.CANDY_STACK = 99
 LevelCaps.NPC_NAME = "VIRIDIANCITY_CANDY_GUY"
 LevelCaps.TEXT_ID = "TEXT_VIRIDIANCITY_CANDY_GUY"
--- Path in front of the Poké Mart (warp 29,19), east of the door — more
--- room than the cramped strip outside the Pokémon Center.
-LevelCaps.NPC = {
+
+LevelCaps.NPC_VIRIDIAN = {
   index = 8,
   name = LevelCaps.NPC_NAME,
   sprite = "SPRITE_YOUNGSTER",
@@ -26,34 +24,35 @@ LevelCaps.NPC = {
   y = 20,
 }
 
--- Radical Red–style milestones, scaled to vanilla Gen 1 ace levels.
--- Cap = max among unlocked rows.  `any` / `all` keys are EVENT_* flags or
--- badge inventory ids (e.g. BOULDERBADGE).
---
--- RR reference (v4.1): Pre-Brock 16, Pre-Mt.Moon Archer 23, Pre-Misty 28,
--- Pre-Surge 36, Pre-Erika 44, Pre-Game Corner Giovanni 47, Pre-Silph 56–57,
--- Pre-Sabrina 59, Pre-Koga 68, … Pre-E4 85, Post 100.
-LevelCaps.MILESTONES = {
+LevelCaps.NPC_CHERRYGROVE = {
+  index = 8,
+  name = LevelCaps.NPC_NAME,
+  sprite = "SPRITE_YOUNGSTER",
+  movement = "STAY",
+  range = "DOWN",
+  text = LevelCaps.TEXT_ID,
+  x = 25,
+  y = 3,
+}
+
+LevelCaps.NPC = LevelCaps.NPC_VIRIDIAN
+
+-- Gen 1 milestones (Kanto)
+LevelCaps.MILESTONES_GEN1 = {
   { cap = 14, name = "Pre-Brock" },
-  -- After Brock: Mt. Moon rockets top out at 16 (not Misty's 21).
   { cap = 16, name = "Pre-Mt. Moon",
     any = { "EVENT_BEAT_BROCK", "BOULDERBADGE" } },
-  -- Fossil claim finishes Mt. Moon; Nugget Bridge tops out at 18.
   { cap = 18, name = "Pre-Nugget Bridge",
     any = { "EVENT_GOT_DOME_FOSSIL", "EVENT_GOT_HELIX_FOSSIL" } },
-  -- After the bridge recruiter: Misty (21).
   { cap = 21, name = "Pre-Misty",
     any = { "EVENT_GOT_NUGGET" } },
   { cap = 24, name = "Pre-Surge",
     any = { "EVENT_BEAT_MISTY", "CASCADEBADGE" } },
-  -- After Surge: Erika / Hideout Giovanni / Tower stretch (aces 25–29).
   { cap = 29, name = "Pre-Erika / Hideout",
     any = { "EVENT_BEAT_LT_SURGE", "THUNDERBADGE" } },
-  -- Silph Giovanni (41) once Erika and Hideout are both cleared.
   { cap = 41, name = "Pre-Silph Giovanni", erikaAndHideout = true },
   { cap = 43, name = "Pre-Koga / Sabrina",
     any = { "EVENT_BEAT_SILPH_CO_GIOVANNI" } },
-  -- First of Koga/Sabrina unlocks Blaine's bracket.
   { cap = 47, name = "Pre-Blaine",
     any = {
       "EVENT_BEAT_KOGA", "SOULBADGE",
@@ -61,7 +60,6 @@ LevelCaps.MILESTONES = {
     } },
   { cap = 50, name = "Pre-Giovanni",
     any = { "EVENT_BEAT_BLAINE", "VOLCANOBADGE" } },
-  -- Victory Road rival tops out at 53.
   { cap = 53, name = "Pre-Victory Road",
     any = { "EVENT_BEAT_GIOVANNI", "EARTHBADGE" } },
   { cap = 65, name = "Pre-Champion",
@@ -74,12 +72,92 @@ LevelCaps.MILESTONES = {
     any = { "EVENT_BEAT_CHAMPION_RIVAL" } },
 }
 
+LevelCaps.MILESTONES = LevelCaps.MILESTONES_GEN1
+
+-- Gen 2 milestones (Johto Arc)
+LevelCaps.MILESTONES_GEN2 = {
+  { cap = 14, name = "Pre-Falkner" },
+  { cap = 16, name = "Pre-Bugsy",
+    any = { "EVENT_BEAT_FALKNER", "ENGINE_ZEPHYRBADGE" } },
+  { cap = 20, name = "Pre-Whitney",
+    any = { "EVENT_BEAT_BUGSY", "ENGINE_HIVEBADGE" } },
+  { cap = 25, name = "Pre-Morty",
+    any = { "EVENT_BEAT_WHITNEY", "ENGINE_PLAINBADGE" } },
+  { cap = 30, name = "Pre-Chuck",
+    any = { "EVENT_BEAT_MORTY", "ENGINE_FOGBADGE" } },
+  { cap = 32, name = "Pre-Pryce / Hideout",
+    any = { "EVENT_BEAT_CHUCK", "ENGINE_STORMBADGE" } },
+  { cap = 35, name = "Pre-Jasmine",
+    any = { "EVENT_BEAT_PRYCE", "ENGINE_GLACIERBADGE", "EVENT_CLEARED_ROCKET_HIDEOUT" } },
+  { cap = 38, name = "Pre-Radio Tower",
+    any = { "EVENT_BEAT_JASMINE", "ENGINE_MINERALBADGE" } },
+  { cap = 40, name = "Pre-Clair",
+    any = { "EVENT_CLEARED_RADIO_TOWER" } },
+  { cap = 44, name = "Pre-Victory Road Rival",
+    any = { "EVENT_BEAT_CLAIR", "ENGINE_RISINGBADGE" } },
+  { cap = 50, name = "Pre-Champion Lance",
+    any = { "EVENT_RIVAL_VICTORY_ROAD" } },
+}
+
+LevelCaps.KANTO_BADGES_GEN2 = {
+  "ENGINE_BOULDERBADGE",
+  "ENGINE_CASCADEBADGE",
+  "ENGINE_THUNDERBADGE",
+  "ENGINE_RAINBOWBADGE",
+  "ENGINE_SOULBADGE",
+  "ENGINE_MARSHBADGE",
+  "ENGINE_VOLCANOBADGE",
+  "ENGINE_EARTHBADGE",
+}
+
 local function hasKey(save, key)
   if not save or not key then return false end
+
+  -- 1. Direct save.flags lookup
+  if save.flags and save.flags[key] then return true end
+
+  -- 2. Item/Badge lookup in save.inventory or save.player
   if key:find("BADGE", 1, true) then
-    return save.inventory and save.inventory[key] and true or false
+    if save.inventory and save.inventory[key] then return true end
+    if save.player and save.player.kantoBadges and save.player.kantoBadges[key] then return true end
+    if save.player and save.player.badges and save.player.badges[key] then return true end
   end
-  return save.flags and save.flags[key] and true or false
+
+  -- 3. Gen 2 Engine flags (ENGINE_*)
+  if save.engineFlags then
+    if save.engineFlags[key] then return true end
+    local FlagNames = package.loaded["src.core.gen2.FlagNames"]
+    if FlagNames and FlagNames.engine and FlagNames.engine[key] then
+      local id = FlagNames.engine[key]
+      if save.engineFlags[id] then return true end
+    end
+  end
+
+  -- 4. Gen 2 Event flags (EVENT_*)
+  if save.events then
+    local FlagNames = package.loaded["src.core.gen2.FlagNames"]
+    if FlagNames and FlagNames.events and FlagNames.events[key] then
+      local id = FlagNames.events[key]
+      if type(save.events.get) == "function" then
+        if save.events:get(id) then return true end
+      elseif type(save.events) == "table" and save.events[id] then
+        return true
+      end
+    end
+  end
+
+  return false
+end
+
+function LevelCaps.kantoBadgeCount(save)
+  if not save then return 0 end
+  local count = 0
+  for _, flagKey in ipairs(LevelCaps.KANTO_BADGES_GEN2) do
+    if hasKey(save, flagKey) then
+      count = count + 1
+    end
+  end
+  return count
 end
 
 local function erikaAndHideoutDone(save)
@@ -114,14 +192,52 @@ function LevelCaps.enable(mod)
   mod.save:set(LevelCaps.SAVE_KEY, true)
 end
 
-function LevelCaps.capFor(data, save)
+function LevelCaps.capForGen1(data, save)
   local cap = 14
-  for _, entry in ipairs(LevelCaps.MILESTONES) do
+  for _, entry in ipairs(LevelCaps.MILESTONES_GEN1) do
     if milestoneUnlocked(save, entry) and entry.cap > cap then
       cap = entry.cap
     end
   end
   return cap
+end
+
+function LevelCaps.capForGen2(data, save)
+  local e4Done = hasKey(save, "EVENT_BEAT_ELITE_FOUR")
+    or hasKey(save, "EVENT_BEAT_CHAMPION_LANCE")
+    or (save and save.engineFlags and save.engineFlags[15])
+
+  local kCount = LevelCaps.kantoBadgeCount(save)
+
+  if e4Done or kCount > 0 then
+    if hasKey(save, "EVENT_RED_IN_MT_SILVER") then
+      return 100
+    elseif hasKey(save, "EVENT_BEAT_RIVAL_IN_MT_MOON") or hasKey(save, "ENGINE_EARTHBADGE") or kCount >= 8 then
+      return 85
+    elseif kCount >= 7 then
+      return 72
+    elseif kCount >= 3 then
+      return 64
+    else
+      return 58
+    end
+  end
+
+  local cap = 14
+  for _, entry in ipairs(LevelCaps.MILESTONES_GEN2) do
+    if milestoneUnlocked(save, entry) and entry.cap > cap then
+      cap = entry.cap
+    end
+  end
+  return cap
+end
+
+function LevelCaps.capFor(data, save)
+  local Host = require("mods.Kanto-Reforged.core.host")
+  if Host.isGen2() then
+    return LevelCaps.capForGen2(data, save)
+  end
+  return LevelCaps.capForGen1(data, save)
 end
 
 function LevelCaps.cap(mod, data, save)
@@ -145,7 +261,6 @@ local function pushText(game, msg, done)
 end
 
 local function ask(game, msg, cb)
-  -- Same pattern as HouseNpcs.ask: YES/NO on the still-open text box.
   local TextBox = require("src.render.TextBox")
   game.stack:push(TextBox.new(game, msg, nil, { choice = cb }))
 end
@@ -160,7 +275,7 @@ local function pinExpAtLevel(data, mon, level)
   end
 end
 
--- Top up RARE_CANDY toward a full stack.  Returns qty given (0 if none).
+-- Top up RARE_CANDY toward a full stack. Returns qty given (0 if none).
 function LevelCaps.giveCandyStack(save)
   local Bag = require("src.inventory.Bag")
   local have = (save.inventory and save.inventory.RARE_CANDY) or 0
@@ -220,7 +335,6 @@ local function talkHandler(mod)
           .. "Without the candy,\nleveling stays\vnormal."), done)
         return
       end
-      -- Caps turn on only after at least one candy is taken.
       giveCandies(game, mod, done, true)
     end)
   end
@@ -228,18 +342,31 @@ end
 
 function LevelCaps.register(mod)
   LevelCaps._mod = mod
-  mod.content.maps:patch("VIRIDIAN_CITY", {
-    objects = {
-      __append = {
-        LevelCaps.NPC,
-      },
-    },
-  })
-  mod.content.map_scripts:register("VIRIDIAN_CITY", {
-    talk = {
+  local Host = require("mods.Kanto-Reforged.core.host")
+  local HouseNpcs = require("mods.Kanto-Reforged.world.house_npcs")
+  if Host.isGen2() then
+    HouseNpcs.appendNpc(mod, "CHERRYGROVE_CITY", LevelCaps.NPC_CHERRYGROVE, "level_caps")
+    HouseNpcs.appendNpc(mod, "VIRIDIAN_CITY", LevelCaps.NPC_VIRIDIAN, "level_caps")
+    HouseNpcs.bindTalk(mod, "CHERRYGROVE_CITY", {
       [LevelCaps.TEXT_ID] = talkHandler(mod),
-    },
-  })
+    })
+    HouseNpcs.bindTalk(mod, "VIRIDIAN_CITY", {
+      [LevelCaps.TEXT_ID] = talkHandler(mod),
+    })
+  else
+    mod.content.maps:patch("VIRIDIAN_CITY", {
+      objects = {
+        __append = {
+          LevelCaps.NPC_VIRIDIAN,
+        },
+      },
+    })
+    mod.content.map_scripts:register("VIRIDIAN_CITY", {
+      talk = {
+        [LevelCaps.TEXT_ID] = talkHandler(mod),
+      },
+    })
+  end
 end
 
 -- Soft-cap battle XP and pin EXP so +1 never accumulates into a level-up.
@@ -264,7 +391,7 @@ function LevelCaps.install(mod)
     local Growth = require("src.pokemon.Growth")
     local original = Experience.apply
     Experience.apply = function(data, mon, defeatedDef, level, isTrainer,
-                                 numParticipants, traded)
+                                  numParticipants, traded)
       local preLevel = mon and mon.level or 0
       local levels, gained = original(data, mon, defeatedDef, level, isTrainer,
                                       numParticipants, traded)
@@ -279,8 +406,6 @@ function LevelCaps.install(mod)
       if not speciesDef then return levels, gained end
 
       if preLevel > cap then
-        -- Already overleveled when caps turned on: don't delevel, just
-        -- block further level-ups from the +1 EXP trickle.
         mon.level = preLevel
         pinExpAtLevel(data, mon, preLevel)
         return {}, gained

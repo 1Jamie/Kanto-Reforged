@@ -691,6 +691,41 @@ return function(T, Data, run)
     }, digger), "DIG", "forcedMoveId returns chargeMove before scoring")
   end
 
+  -- Gen1 Dig/Fly release compares charging == moveInst. Smarter AI used to
+  -- return a fresh {id="DIG"} on the second turn, so the foe never surfaced.
+  do
+    local BattleCompat = require("mods.Kanto-Reforged.battle.battle_compat")
+    local Runtime = require("src.mods.Runtime")
+    local dig = { id = "DIG", pp = 10 }
+    local enemy = {
+      curMoves = { dig, { id = "SCRATCH", pp = 35 } },
+      charging = dig,
+      chargeReady = true,
+      mon = { hp = 24, stats = { hp = 24, attack = 40, defense = 30,
+        special = 30, speed = 50 }, species = "DIGLETT", level = 19 },
+    }
+    local b = fakeBattle({
+      class = "OPP_JR_TRAINER_M", party = 1, map = "ROUTE_9",
+    })
+    b.enemy = enemy
+    b.player = {
+      mon = { hp = 50, stats = { hp = 50 }, species = "PIDGEY", level = 16 },
+    }
+    function b:lockedAction(battler)
+      if battler.charging then return battler.charging end
+      return nil
+    end
+    T.check(BattleCompat.forcedAction(b, enemy) == dig,
+      "Gen1 Dig charge forcedAction is the charging instance")
+    local act = Runtime.call("battle.enemy_action", function()
+      return { id = "SCRATCH", pp = 35 }
+    end, b)
+    T.check(act == dig,
+      "enemy_action returns the Dig instance on the charge-release turn")
+    T.check(act ~= nil and act.id == "DIG" and act.pp == 10,
+      "charge-release Dig keeps the original PP slot")
+  end
+
   -- Wild natural vs soft threat rules.
   T.eq(TrainerAi.tier(fakeBattle({
     kind = "wild", map = "MT_MOON_1F", species = "ZUBAT",

@@ -1,3 +1,4 @@
+
 -- tier-2 set pieces (Nugget Bridge light spice, gym trainers, Mt Moon, …), and
 -- light trash mixes. Gym/E4: Gen2 swap + Gen3 add (Blaine: Gen3 front only).
 -- Rival: continuity (League finals debut at RIVAL3 only). Ace berries on
@@ -207,6 +208,100 @@ local MIX = {
   { "OPP_COOLTRAINER_M", 5, 3, "QUILAVA" },
 }
 
+-- Gen 2 Gym Leaders & Gym Trainers Mix Overhaul
+local MIX_GEN2 = {
+  -- Lt. Surge (Vermilion Gym - target 55)
+  { "OPP_LT_SURGE", 1, 1, "ELECTRIKE", 52 },
+  { "OPP_LT_SURGE", 1, 2, "AMPHAROS", 53 },
+  { "OPP_LT_SURGE", 1, 3, "MAGNETON", 53 },
+  { "OPP_LT_SURGE", 1, "add", "ELECTRODE", 54 },
+  { "OPP_LT_SURGE", 1, "add", "MANECTRIC", 54 },
+  { "OPP_LT_SURGE", 1, "add", "RAICHU", 55 },
+
+  -- Janine (Fuchsia Gym - target 56)
+  { "OPP_KOGA", 1, 1, "ARIADOS", 52 },
+  { "OPP_KOGA", 1, 2, "SWALOT", 53 },
+  { "OPP_KOGA", 1, 3, "WEEZING", 54 },
+  { "OPP_KOGA", 1, "add", "SEVIPER", 54 },
+  { "OPP_KOGA", 1, "add", "CROBAT", 55 },
+  { "OPP_KOGA", 1, "add", "VENOMOTH", 56 },
+
+  -- Erika (Celadon Gym - target 57)
+  { "OPP_ERIKA", 1, 1, "ROSELIA", 53 },
+  { "OPP_ERIKA", 1, 2, "JUMPLUFF", 54 },
+  { "OPP_ERIKA", 1, 3, "TANGELA", 54 },
+  { "OPP_ERIKA", 1, "add", "BRELOOM", 55 },
+  { "OPP_ERIKA", 1, "add", "VICTREEBEL", 56 },
+  { "OPP_ERIKA", 1, "add", "BELLOSSOM", 57 },
+
+  -- Misty (Cerulean Gym - target 61)
+  { "OPP_MISTY", 1, 1, "LANTURN", 57 },
+  { "OPP_MISTY", 1, 2, "GOLDUCK", 58 },
+  { "OPP_MISTY", 1, "add", "CRAWDAUNT", 59 },
+  { "OPP_MISTY", 1, "add", "QUAGSIRE", 59 },
+  { "OPP_MISTY", 1, "add", "LAPRAS", 60 },
+  { "OPP_MISTY", 1, "add", "STARMIE", 61 },
+
+  -- Sabrina (Saffron Gym - target 62)
+  { "OPP_SABRINA", 1, 1, "GIRAFARIG", 58 },
+  { "OPP_SABRINA", 1, 2, "MR_MIME", 59 },
+  { "OPP_SABRINA", 1, 3, "XATU", 59 },
+  { "OPP_SABRINA", 1, "add", "ESPEON", 60 },
+  { "OPP_SABRINA", 1, "add", "GARDEVOIR", 61 },
+  { "OPP_SABRINA", 1, "add", "ALAKAZAM", 62 },
+
+  -- Brock (Pewter Gym - target 62)
+  { "OPP_BROCK", 1, 1, "SUDOWOODO", 58 },
+  { "OPP_BROCK", 1, 2, "OMASTAR", 59 },
+  { "OPP_BROCK", 1, "add", "KABUTOPS", 59 },
+  { "OPP_BROCK", 1, "add", "RHYDON", 60 },
+  { "OPP_BROCK", 1, "add", "AGGRON", 61 },
+  { "OPP_BROCK", 1, "add", "STEELIX", 62 },
+
+  -- Blaine (Cinnabar Gym - target 63)
+  { "OPP_BLAINE", 1, 1, "TORKOAL", 59 },
+  { "OPP_BLAINE", 1, 2, "CAMERUPT", 60 },
+  { "OPP_BLAINE", 1, 3, "MAGCARGO", 60 },
+  { "OPP_BLAINE", 1, "add", "RAPIDASH", 61 },
+  { "OPP_BLAINE", 1, "add", "HOUNDOOM", 62 },
+  { "OPP_BLAINE", 1, "add", "MAGMAR", 63 },
+
+  -- Blue (Viridian Gym - target 72)
+  { "OPP_GIOVANNI", 3, 1, "PIDGEOT", 70 },
+  { "OPP_GIOVANNI", 3, 2, "ALAKAZAM", 70 },
+  { "OPP_GIOVANNI", 3, 3, "TYRANITAR", 70 },
+  { "OPP_GIOVANNI", 3, "add", "GYARADOS", 70 },
+  { "OPP_GIOVANNI", 3, "add", "EXEGGUTOR", 71 },
+  { "OPP_GIOVANNI", 3, "add", "ARCANINE", 72 },
+
+  -- Kanto Gym Trainers (Levels 50-60 matching gym tiers)
+  { "OPP_JR_TRAINER_M", 1, 1, "PHANPY", 56 },
+  { "OPP_JR_TRAINER_M", 1, 2, "ARON", 57 },
+  { "OPP_JR_TRAINER_F", 1, 1, "LOMBRE", 55 },
+  { "OPP_SWIMMER", 1, 1, "CORPHISH", 56 },
+  { "OPP_SWIMMER", 1, 2, "CLAMPERL", 57 },
+  { "OPP_ROCKER", 1, 1, "MANECTRIC", 50 },
+  { "OPP_ROCKER", 1, 2, "FLAAFFY", 51 },
+  { "OPP_ROCKER", 1, 3, "PLUSLE", 52 },
+  { "OPP_SAILOR", 8, 1, "LANTURN", 51 },
+  { "OPP_SAILOR", 8, 2, "ELECTRIKE", 52 },
+  { "OPP_BEAUTY", 1, 1, "ROSELIA", 51 },
+  { "OPP_BEAUTY", 1, 2, "BRELOOM", 52 },
+  { "OPP_BEAUTY", 1, 3, "LOMBRE", 53 },
+  { "OPP_PSYCHIC_TR", 1, 1, "KIRLIA", 56 },
+  { "OPP_PSYCHIC_TR", 1, 2, "SPOINK", 57 },
+  { "OPP_PSYCHIC_TR", 1, 3, "GIRAFARIG", 58 },
+  { "OPP_JUGGLER", 3, 1, "SPOINK", 56 },
+  { "OPP_JUGGLER", 3, 2, "WOBBUFFET", 57 },
+  { "OPP_TAMER", 2, 1, "SEVIPER", 51 },
+  { "OPP_TAMER", 2, 2, "DONPHAN", 52 },
+  { "OPP_SUPER_NERD", 10, 1, "NUMEL", 57 },
+  { "OPP_SUPER_NERD", 10, 2, "CAMERUPT", 58 },
+  { "OPP_SUPER_NERD", 10, 3, "TORKOAL", 59 },
+  { "OPP_BURGLAR", 4, 1, "HOUNDOOM", 58 },
+  { "OPP_BURGLAR", 4, 2, "MAGCARGO", 59 },
+}
+
 -- Ace berries (last slot after MIX adds). Gym + E4 only.
 local ACE_BERRIES = {
   { "OPP_BROCK", 1, "BERRY" },
@@ -223,8 +318,21 @@ local ACE_BERRIES = {
   { "OPP_LANCE", 1, "LUM_BERRY" },
 }
 
+local ACE_BERRIES_GEN2 = {
+  { "OPP_LT_SURGE", 1, "CHESTO_BERRY" },
+  { "OPP_KOGA", 1, "PERSIM_BERRY" },
+  { "OPP_ERIKA", 1, "RAWST_BERRY" },
+  { "OPP_MISTY", 1, "PECHA_BERRY" },
+  { "OPP_SABRINA", 1, "CHERI_BERRY" },
+  { "OPP_BROCK", 1, "BERRY" },
+  { "OPP_BLAINE", 1, "PERSIM_BERRY" },
+  { "OPP_GIOVANNI", 3, "CHERI_BERRY" },
+}
+
 Trainers.MIX = MIX
+Trainers.MIX_GEN2 = MIX_GEN2
 Trainers.ACE_BERRIES = ACE_BERRIES
+Trainers.ACE_BERRIES_GEN2 = ACE_BERRIES_GEN2
 
 -- Stock engine schemas only allow { level, species } on trainer party slots.
 -- Ace berries (and optional custom moves) need heldItem/moves accepted at
@@ -335,6 +443,8 @@ local function classesToCapture()
   end
   for _, row in ipairs(MIX) do note(row[1]) end
   for _, row in ipairs(ACE_BERRIES) do note(row[1]) end
+  for _, row in ipairs(MIX_GEN2) do note(row[1]) end
+  for _, row in ipairs(ACE_BERRIES_GEN2) do note(row[1]) end
   return list
 end
 
@@ -361,44 +471,48 @@ local function ensurePatched(patched, snap, class)
   return patched[class]
 end
 
--- Apply curated swaps from the captured vanilla baselines.  Safe to call
+-- Apply curated swaps from the captured vanilla baselines. Safe to call
 -- more than once (rebuilds from snapshot rather than stacking patches).
 function Trainers.apply(mod)
+  local Host = require("mods.Kanto-Reforged.core.host")
+  local mixList = Host.isGen2() and MIX_GEN2 or MIX
+  local aceList = Host.isGen2() and ACE_BERRIES_GEN2 or ACE_BERRIES
+
   local snap = Trainers.captureBaselines(mod)
   local patched = {}
 
-  for _, row in ipairs(MIX) do
+  for _, row in ipairs(mixList) do
     local class, pi, action, species, level = row[1], row[2], row[3], row[4], row[5]
     local SpeciesScope = require("mods.Kanto-Reforged.pokemon.species_scope")
     if species and not SpeciesScope.allowsSpeciesId(mod, species, nil) then
       -- Skip out-of-scope MIX rows under Gen1 kanto (rebuild from baseline).
     else
-    local base = snap[class]
-    if base then
-      local parties = ensurePatched(patched, snap, class)
-      local party = parties[pi]
-      if party then
-        if action == "add" then
-          if species and level and #party > 0 then
-            table.insert(party, #party, { level = level, species = species })
-          end
-        elseif action == "add_front" then
-          if species and level then
-            table.insert(party, 1, { level = level, species = species })
-          end
-        else
-          local slot = party[action]
-          if slot then
-            slot.species = species
-            if level then slot.level = level end
+      local base = snap[class]
+      if base then
+        local parties = ensurePatched(patched, snap, class)
+        local party = parties[pi]
+        if party then
+          if action == "add" then
+            if species and level and #party > 0 then
+              table.insert(party, #party, { level = level, species = species })
+            end
+          elseif action == "add_front" then
+            if species and level then
+              table.insert(party, 1, { level = level, species = species })
+            end
+          else
+            local slot = party[action]
+            if slot then
+              slot.species = species
+              if level then slot.level = level end
+            end
           end
         end
       end
     end
-    end
   end
 
-  for _, row in ipairs(ACE_BERRIES) do
+  for _, row in ipairs(aceList) do
     local class, pi, item = row[1], row[2], row[3]
     if snap[class] then
       local parties = ensurePatched(patched, snap, class)

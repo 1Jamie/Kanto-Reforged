@@ -911,7 +911,11 @@ function SpeciesScope.applyEvoScope(mod, mode)
       local filtered = {}
       for _, evo in ipairs(evos) do
         local target = evo.species or evo.into
-        if SpeciesScope.allowsSpeciesId(mod, target, nil) then
+        local stone = evo.method == "ITEM" or evo.method == "EVOLVE_ITEM"
+        -- Stone remaps (Moon Stone Scyther→Scizor, Onix→Steelix, …) are
+        -- how KR replaces trade/held-item evos in a Kanto run. Stripping
+        -- them left the stone with no effect.
+        if stone or SpeciesScope.allowsSpeciesId(mod, target, nil) then
           filtered[#filtered + 1] = Merge.deepCopy(evo)
         end
       end

@@ -4,7 +4,15 @@ local BattleCompat = {}
 
 function BattleCompat.isGen2(battle)
   if not battle then return false end
-  -- Gold Battle has weather/stages on the instance and no Gen1 `player.mon`.
+  -- Live Gold boot.  KR AI may stamp player.mon on a Gold party table;
+  -- that must not flip the battle to the Gen 1 weather path (double chip
+  -- + clipped "buffeted" text).
+  local okH, Host = pcall(require, "mods.Kanto-Reforged.core.host")
+  if not okH then
+    okH, Host = pcall(require, "mods.Kanto-Reforged.host")
+  end
+  if okH and Host and Host.isGen2 and Host.isGen2() then return true end
+  -- Headless tests: Gold-shaped battles (weatherTurns, no Gen1 wrapper).
   if battle.weather ~= nil or battle.weatherTurns ~= nil then
     if battle.player and battle.player.mon then return false end
     return true
@@ -13,8 +21,6 @@ function BattleCompat.isGen2(battle)
       and battle.player and not battle.player.mon then
     return true
   end
-  local ok, Host = pcall(require, "mods.Kanto-Reforged.host")
-  if ok and Host and Host.isGen2 and Host.isGen2() then return true end
   return false
 end
 
@@ -247,15 +253,28 @@ local GEN2_WEATHER = {
   SANDSTORM = "sandstorm",
 }
 
-function BattleCompat.setWeather(battle, weather, message, turns)
+function BattleCompat.setWeather(battle, weather, message, turns, opts)
   if not battle then return end
+  if type(turns) == "table" then
+    opts = turns
+    turns = opts.turns
+  end
+  opts = opts or {}
   turns = turns or 5
   local prev = BattleCompat.getWeather(battle)
+  -- Same weather: Sand Stream still upgrades a 5-turn storm to ability
+  -- weather; a move recast does not.
   if prev == weather then
+    if opts.fromAbility and weather then
+      battle._krAbilityWeather = true
+    elseif not opts.fromAbility then
+      battle._krAbilityWeather = nil
+    end
     if message then BattleCompat.say(battle, message) end
     return
   end
 
+  battle._krAbilityWeather = (opts.fromAbility and weather) and true or nil
   battle.field = battle.field or { tokens = {}, sides = battle.sides }
   battle.field.weather = weather
   battle.field.weatherTurns = weather and turns or nil
@@ -572,6 +591,27 @@ function BattleCompat.forcedMoveId(battle, battler)
     end
   end
   return nil
+end
+
+-- The action object enemy_action must return.  Gen1 ChargeEffect releases
+-- only when `user.charging == moveInst` (identity).  A fresh `{id=DIG}`
+-- table re-charges forever and leaves Dig/Fly invulnerable (softlock).
+function BattleCompat.forcedAction(battle, battler)
+  if not battle or not battler then return nil end
+  if BattleCompat.isGen2(battle) then
+    return BattleCompat.forcedMoveId(battle, battler)
+  end
+  if type(battle.lockedAction) == "function" then
+    local ok, act = pcall(function() return battle:lockedAction(battler) end)
+    if ok and act then return act end
+  end
+  local id = BattleCompat.forcedMoveId(battle, battler)
+  if not id then return nil end
+  if type(id) == "table" then return id end
+  for _, mv in ipairs(battler.curMoves or battler.moves or {}) do
+    if mv.id == id then return mv end
+  end
+  return { id = id, pp = 1 }
 end
 
 --- Moves the AI may legally pick this turn.

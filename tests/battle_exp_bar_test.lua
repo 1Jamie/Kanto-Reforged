@@ -7,8 +7,12 @@ return function(T, Data, run)
   local Host = require("mods.Kanto-Reforged.core.host")
 
   T.eq(BattleExpBar.LENGTH_PX, 64, "EXP bar is 8 tiles / 64 px like Gen 2")
+  T.eq(BattleExpBar.WIDE_PX, 208, "Widescreen EXP bar starts at tile 26 (208px)")
+  T.eq(BattleExpBar.WIDE_LENGTH_PX, 64, "Widescreen EXP bar track length is 64px")
   T.check(Host.isGen1(), "suite is on Gen 1")
   T.check(BattleState._krExpBar, "EXP bar patched BattleState")
+  T.check(BattleExpBar.OPTION ~= nil and BattleExpBar.OPTION.key == "battle_exp_bar",
+          "EXP bar option schema registered")
 
   -- Engine surfaces KR wraps: HP drain still walks shownPx (GH #3).
   T.check(type(BattleState.stepHPDrain) == "function", "stepHPDrain still exists")
@@ -83,6 +87,11 @@ return function(T, Data, run)
        BattleExpBar.expPixels(Data, battle.player.mon, nextLv, nxt + 1),
        "remainder after the wrap matches the new level")
 
+  -- Option Toggle verification
+  local mockMod = { options = { get = function(_, k) if k == "battle_exp_bar" then return false end end } }
+  T.check(not BattleExpBar.enabled(mockMod), "option off: enabled() is false")
+  T.check(not BattleExpBar.needsCrawl(battle), "option off: needsCrawl() is false")
+
   -- Real constructor latches via battle.started (Runtime is live after load).
   local pmon = Pokemon.new(Data, "BULBASAUR", 10)
   local game = {
@@ -110,7 +119,7 @@ return function(T, Data, run)
   T.check(b.queue[2] and b.queue[2].krExpDrain, "crawl is queued after the EXP text")
 
   -- After an HP drain, vanilla updateQueue dequeues the next row in the
-  -- same call.  The crawl marker must not become a blank text prompt.
+  -- same call. The crawl marker must not become a blank text prompt.
   b.current, b.draining, b.krExpHold = nil, true, nil
   b.animPlaying, b.waitFrames, b.waitingSound, b.waitingUI = nil, nil, nil, nil
   b.queue, b.nextInsert = { { krExpDrain = true, wait = 1 } }, 0
