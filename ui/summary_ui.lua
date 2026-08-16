@@ -285,6 +285,10 @@ end
 -- Exposed for tests / Gold registration.
 SummaryUi.wrapGen2Summary = wrapGen2Summary
 
+-- Exposed so optional companion mods (e.g. HiddenStats) can draw extra
+-- native summary pages using the same header (pic / name / dex).
+SummaryUi.drawHeader = drawHeader
+
 function SummaryUi.register(mod)
   local Host = require("mods.Kanto-Reforged.core.host")
   if Host.isGen2() then
@@ -306,7 +310,12 @@ function SummaryUi.register(mod)
     mod.content.screens:register("SummaryMenu", {
       new = function(game, mon)
         local self = Builtin.new(game, mon)
-        self._expMaxPage = 3
+        -- HiddenStats (optional companion mod) supplies a 4th page; without
+        -- it the summary stays the stock 3 pages.
+        local hiddenStats = mod.find and mod.find("hidden_stats")
+        local hasExtraPage = hiddenStats and hiddenStats.exports
+          and type(hiddenStats.exports.drawSummaryPage) == "function"
+        self._expMaxPage = hasExtraPage and 4 or 3
 
         -- Same A/B page flow, callable from Gen1 Modern UI semantic actions.
         function self:advance()
@@ -332,8 +341,10 @@ function SummaryUi.register(mod)
             if self.page == 1 and SplitSpecial.enabled(mod) then
               redrawSplitSpecialStats(self)
             end
-          else
+          elseif self.page == 3 then
             drawAbilityPage(self)
+          else
+            hiddenStats.exports.drawSummaryPage(self, SummaryUi)
           end
         end
 
