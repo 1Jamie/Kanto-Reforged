@@ -73,8 +73,12 @@ function HouseNpcs.spriteFor(sprite)
   return sprite
 end
 
+-- Gold SPRITEMOVEDATA standing bytes (Npc.lua MOVE.STANDING_*).
+local GEN2_STAND = { UP = 7, DOWN = 6, LEFT = 8, RIGHT = 9 }
+
 function HouseNpcs.npcObject(row)
-  return {
+  local Host = require("mods.Kanto-Reforged.core.host")
+  local obj = {
     index = row.index,
     name = row.name,
     sprite = HouseNpcs.spriteFor(row.sprite),
@@ -89,6 +93,17 @@ function HouseNpcs.npcObject(row)
     level = row.level,
     item = row.item,
   }
+  if Host.isGen2() then
+    -- Gold rebuildPeople / pooledNpc: always-visible, standing, keep TEXT_*.
+    obj.eventFlag = row.eventFlag or 0xFFFF
+    obj.hours = row.hours or { -1, -1 }
+    obj.type = row.type or 0
+    obj.radius = row.radius or { x = 0, y = 0 }
+    if type(obj.movement) ~= "number" then
+      obj.movement = GEN2_STAND[obj.range] or GEN2_STAND.DOWN
+    end
+  end
+  return obj
 end
 
 function HouseNpcs.appendNpc(mod, mapId, row, owner)
@@ -127,8 +142,7 @@ function HouseNpcs.installTalkDispatch(mod)
     local key = d and (d.text or d.name)
     local fn = key and HouseNpcs._talks[key]
     if fn then
-      local game = (world and world.game)
-        or Host.liveGame(mod)
+      local game = (world and world.game) or Host.liveGame(mod)
       fn(game, world, npc, function() end)
       return true
     end
@@ -161,6 +175,10 @@ function HouseNpcs.hasBadge(save, badge)
 end
 
 function HouseNpcs.pushText(game, msg, done)
+  if not (game and game.stack and game.stack.push) then
+    if done then done() end
+    return
+  end
   local TextBox = require("src.render.TextBox")
   game.stack:push(TextBox.new(game, msg, done))
 end
@@ -170,8 +188,23 @@ function HouseNpcs.ask(game, msg, onChoice)
   -- Parameters). TextBox opts.choice pushes ChoiceBox correctly; the old
   -- ChoiceBox.new(game, {"YES","NO"}, fn) call used the wrong arity and
   -- crashed when confirming (onChoose was a table).
+  if not (game and game.stack and game.stack.push) then
+    if onChoice then onChoice(false) end
+    return
+  end
   local TextBox = require("src.render.TextBox")
   game.stack:push(TextBox.new(game, msg, nil, { choice = onChoice }))
+end
+
+-- Script commands (trade, show_text, …) yield on ctx.runner. Lua talk
+-- handlers are not a ScriptRunner tick, so call this instead of Commands.*.
+function HouseNpcs.runScript(ow, rows, extra)
+  extra = extra or {}
+  if ow and ow.runner and type(ow.runner.run) == "function" then
+    ow.runner:run(rows, extra)
+    return true
+  end
+  return false
 end
 
 -- Story soft-cap from milestone table (even when hard caps are off).

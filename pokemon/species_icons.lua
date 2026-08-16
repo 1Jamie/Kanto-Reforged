@@ -1,6 +1,6 @@
--- Map Kanto Reforged species onto Gen 1 party/menu icon classes.
+-- Map Kanto Reforged species onto Gen 1 and Gen 2 party/menu icon classes.
 -- Vanilla only ships ~10 shared icon sheets keyed by dex 1–151; anything
--- past that draws blank unless icons.bySpecies is filled.
+-- past that draws blank unless icons.bySpecies / icons.species is filled.
 
 local SpeciesIcons = {}
 
@@ -16,6 +16,24 @@ local CLASS = {
   FAIRY = "FAIRY",
   BALL = "BALL",
   HELIX = "HELIX",
+}
+
+-- Aliases mapping Gen 2 ICON_* sheet keys to standard icon classes.
+local GEN2_ALIASES = {
+  ICON_MONSTER = "MON",
+  ICON_PLANT = "GRASS",
+  ICON_BUG = "BUG",
+  ICON_BIRD = "BIRD",
+  ICON_FISH = "WATER",
+  ICON_SERPENT = "SNAKE",
+  ICON_EQUINE = "QUADRUPED",
+  ICON_CLEFAIRY = "FAIRY",
+  ICON_DONPHAN = "QUADRUPED",
+  ICON_GEODUDE = "MON",
+  ICON_SHELLEY = "HELIX",
+  ICON_SUDOWOODO = "MON",
+  ICON_STANTLER = "QUADRUPED",
+  ICON_UNOWN = "FAIRY",
 }
 
 -- Overrides where type heuristics would pick the wrong silhouette.
@@ -55,7 +73,7 @@ local EXPLICIT = {
   PINECO = "BUG",
   HERACROSS = "BUG",
   WURMPLE = "BUG", SILCOON = "BUG", CASCOON = "BUG",
-  BEAUTIFLY = "BUG", DUSTOX = "BUG",
+  BEAUTIFly = "BUG", DUSTOX = "BUG",
   SURSKIT = "BUG", MASQUERAIN = "BUG",
   NINCADA = "BUG", NINJASK = "BUG", SHEDINJA = "BUG",
   VOLBEAT = "BUG", ILLUMISE = "BUG",
@@ -123,6 +141,38 @@ function SpeciesIcons.pickClass(species)
   return CLASS.MON
 end
 
+local function applyTargetTableFixes(target, speciesTable)
+  if not target then return end
+  target.icons = target.icons or {}
+  target.bySpecies = target.bySpecies or {}
+  target.species = target.species or {}
+
+  -- Wrap string entries into { image = path } tables so Gen 2 PartyMenu:iconFor
+  -- (which accesses entry.image) correctly resolves the image path.
+  for k, v in pairs(target.icons) do
+    if type(v) == "string" then
+      target.icons[k] = { image = v }
+    end
+  end
+
+  -- Register GEN2_ALIASES so ICON_* sheet lookups in Gold menus resolve to the valid icon
+  for iconName, targetClass in pairs(GEN2_ALIASES) do
+    if target.icons[targetClass] then
+      target.icons[iconName] = target.icons[targetClass]
+    end
+  end
+
+  -- Map every species to its icon class
+  for id, def in pairs(speciesTable or {}) do
+    local className = SpeciesIcons.pickClass({
+      id = id,
+      types = def.types,
+    })
+    target.bySpecies[id] = className
+    target.species[id] = className
+  end
+end
+
 function SpeciesIcons.register(mod, speciesTable)
   local n = 0
   for id, def in pairs(speciesTable or {}) do
@@ -133,7 +183,13 @@ function SpeciesIcons.register(mod, speciesTable)
     mod.content.icons:register(id, className)
     n = n + 1
   end
-  mod.log:info("Mapped %d species onto Gen 1 menu icon classes", n)
+
+  -- Directly fix runtime Data.icons and Data.gen2Icons data structures
+  local Data = require("src.core.Data")
+  applyTargetTableFixes(Data.icons, speciesTable)
+  applyTargetTableFixes(Data.gen2Icons, speciesTable)
+
+  mod.log:info("Mapped %d species onto menu icon classes", n)
   return n
 end
 

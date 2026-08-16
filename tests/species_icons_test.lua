@@ -1,4 +1,4 @@
--- Gen 1 menu-icon class mapping for Kanto Reforged species.
+-- Gen 1 and Gen 2 menu-icon class mapping for Kanto Reforged species.
 return function(T, Data, run)
   local SpeciesIcons = require("mods.Kanto-Reforged.pokemon.species_icons")
 
@@ -17,13 +17,27 @@ return function(T, Data, run)
   -- Gen1 menu-icon class (not the Fairy typing); Ralts uses the fairy sheet
   T.eq(SpeciesIcons.pickClass({ id = "RALTS", types = { "PSYCHIC_TYPE" } }),
     "FAIRY", "Ralts → FAIRY icon class")
-  T.eq(SpeciesIcons.pickClass({ id = "GENERIC_PSY", types = { "PSYCHIC_TYPE" } }),
-    "MON", "generic Psychic → MON")
+  T.eq(SpeciesIcons.pickClass({ id = "TREECKO", types = { "GRASS" } }),
+    "MON", "Treecko → MON")
+  T.eq(SpeciesIcons.pickClass({ id = "TORCHIC", types = { "FIRE" } }),
+    "QUADRUPED", "Torchic → QUADRUPED")
+  T.eq(SpeciesIcons.pickClass({ id = "MUDKIP", types = { "WATER" } }),
+    "WATER", "Mudkip → WATER")
+  T.eq(SpeciesIcons.pickClass({ id = "RAYQUAZA", types = { "DRAGON", "FLYING" } }),
+    "BIRD", "Rayquaza → BIRD")
 
   T.check(Data.icons and Data.icons.bySpecies, "icons.bySpecies present")
   T.eq(Data.icons.bySpecies.CHIKORITA, "GRASS", "Chikorita registered in bySpecies")
   T.eq(Data.icons.bySpecies.HERACROSS, "BUG", "Heracross registered in bySpecies")
   T.eq(Data.icons.bySpecies.STEELIX, "SNAKE", "Steelix registered in bySpecies")
+  T.eq(Data.icons.bySpecies.TREECKO, "MON", "Treecko registered in bySpecies")
+  T.eq(Data.icons.bySpecies.MUDKIP, "WATER", "Mudkip registered in bySpecies")
+
+  -- Gen 2 menu icons require table format { image = ... }
+  T.check(type(Data.icons.icons.MON) == "table" and Data.icons.icons.MON.image ~= nil,
+    "MON icon entry is table with .image for Gen 2 PartyMenu")
+  T.check(type(Data.icons.icons.ICON_MONSTER) == "table" and Data.icons.icons.ICON_MONSTER.image ~= nil,
+    "ICON_MONSTER alias registered for Gen 2 menus")
 
   -- Every Kanto Reforged species got a known class name
   local pd = require("mods.Kanto-Reforged.pokemon.pokemon_data")

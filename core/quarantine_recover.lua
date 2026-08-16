@@ -80,6 +80,9 @@ function QuarantineRecover.install(mod)
     local data = (game and game.data) or require("src.core.Data")
     if not save or not data then return end
     local n = QuarantineRecover.restore(save, data)
+    local SpeciesScope = require("mods.Kanto-Reforged.pokemon.species_scope")
+    SpeciesScope.restoreDexFlags(SpeciesScope._mod or mod, save)
+    SpeciesScope.snapshotDexFlags(SpeciesScope._mod or mod, save)
     if n.mons > 0 or n.items > 0 then
       mod.log:info(
         "Restored %d quarantined mon(s) to party, %d item stack(s) to bag",

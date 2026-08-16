@@ -738,37 +738,34 @@ function BerryFarm.register(mod)
       },
     },
     objects = {
-      {
+      HouseNpcs.npcObject({
         index = 1,
         name = "BERRY_FARM_GIRL",
-        sprite = HouseNpcs.spriteFor("SPRITE_BRUNETTE_GIRL"),
-        movement = "STAY",
+        sprite = "SPRITE_BRUNETTE_GIRL",
         range = "DOWN",
         text = "TEXT_BERRY_FARM_GIRL",
         x = 12,
         y = 7,
-      },
-      {
+      }),
+      HouseNpcs.npcObject({
         index = 2,
         name = "BERRY_FARM_FISHER",
         sprite = "SPRITE_FISHER",
-        movement = "STAY",
         range = "RIGHT",
         text = "TEXT_BERRY_FARM_FISHER",
         x = 19,
         y = 13,
-      },
-      {
+      }),
+      HouseNpcs.npcObject({
         index = 4,
         name = "BERRY_FARM_SCHOLAR",
         sprite = "SPRITE_SUPER_NERD",
-        movement = "STAY",
         range = "RIGHT",
         text = "TEXT_BERRY_FARM_SCHOLAR",
         -- West strip by the plots (clear of girl / soil / fisher).
         x = 4,
         y = 8,
-      },
+      }),
     },
     signs = {},
   })

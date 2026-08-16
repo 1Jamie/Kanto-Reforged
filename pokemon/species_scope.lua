@@ -14,6 +14,8 @@ SpeciesScope.MODE_JOHTO_NATIVE = "johto_native"
 
 SpeciesScope.STASH_KEY = "species_scope_stash"
 SpeciesScope.APPLIED_KEY = "species_scope_applied"
+-- Survives SaveData.validate (and mod disable): KR seen/owned/caught flags.
+SpeciesScope.DEX_FLAGS_KEY = "pokedex_flags"
 
 SpeciesScope.KANTO_MAX_DEX = 151
 SpeciesScope.JOHTO_MAX_DEX = 251
@@ -420,6 +422,84 @@ local function setStash(mod, stash)
   end
 end
 
+local function krPackSpecies()
+  local ok, pack = pcall(require, "mods.Kanto-Reforged.pokemon_data")
+  if ok and pack and type(pack.species) == "table" then return pack.species end
+  ok, pack = pcall(require, "mods.Kanto-Reforged.pokemon.pokemon_data")
+  if ok and pack and type(pack.species) == "table" then return pack.species end
+  return {}
+end
+
+local DEX_FLAG_KEYS = { "seen", "owned", "caught" }
+
+local function emptyDexSnap()
+  return { seen = {}, owned = {}, caught = {} }
+end
+
+-- Union-only: never drop a previously stored KR flag because the live
+-- Pokédex was scrubbed (mod off, KANTO validate, etc.).
+function SpeciesScope.snapshotDexFlags(mod, save)
+  if not (mod and mod.save and save) then return end
+  local pack = krPackSpecies()
+  local snap = mod.save:get(SpeciesScope.DEX_FLAGS_KEY, nil)
+  if type(snap) ~= "table" then snap = emptyDexSnap() end
+  local dex = save.pokedex
+  for _, key in ipairs(DEX_FLAG_KEYS) do
+    snap[key] = snap[key] or {}
+    local bucket = dex and dex[key]
+    if type(bucket) == "table" then
+      for id, on in pairs(bucket) do
+        if on and pack[id] then
+          snap[key][id] = true
+        end
+      end
+    end
+  end
+  local stash = getStash(mod)
+  local stashDex = stash and stash.dex
+  if type(stashDex) == "table" then
+    for _, key in ipairs({ "seen", "owned" }) do
+      snap[key] = snap[key] or {}
+      for id, on in pairs(stashDex[key] or {}) do
+        if on then snap[key][id] = true end
+      end
+    end
+  end
+  mod.save:set(SpeciesScope.DEX_FLAGS_KEY, snap)
+end
+
+function SpeciesScope.restoreDexFlags(mod, save)
+  if not (mod and mod.save and save) then return 0 end
+  local snap = mod.save:get(SpeciesScope.DEX_FLAGS_KEY, nil)
+  if type(snap) ~= "table" then return 0 end
+  save.pokedex = save.pokedex or {}
+  local dex = save.pokedex
+  local n = 0
+  for _, key in ipairs(DEX_FLAG_KEYS) do
+    dex[key] = dex[key] or {}
+    for id, on in pairs(snap[key] or {}) do
+      if on and not dex[key][id] then
+        dex[key][id] = true
+        n = n + 1
+      elseif on then
+        dex[key][id] = true
+      end
+    end
+  end
+  -- Gen1 UI reads owned; Gold reads caught. Mirror whichever we restored.
+  dex.owned = dex.owned or {}
+  dex.caught = dex.caught or {}
+  dex.seen = dex.seen or {}
+  for id, on in pairs(dex.owned) do
+    if on then dex.caught[id] = true end
+  end
+  for id, on in pairs(dex.caught) do
+    if on then dex.owned[id] = true end
+  end
+  SpeciesScope.backfillDexFromCollection(mod, save)
+  return n
+end
+
 -- Remember Johto/Hoenn seen/owned flags while KANTO hides them from the
 -- list. SaveData.validate can also drop flags for species briefly missing
 -- from data.pokemon — the snapshot is the source of truth on restore.
@@ -442,6 +522,7 @@ local function snapshotOutOfScopeDex(mod, game, stash)
       end
     end
   end
+  SpeciesScope.snapshotDexFlags(mod, save)
 end
 
 local function restoreStashedDex(game, stash)
@@ -468,38 +549,83 @@ local function restoreStashedDex(game, stash)
 end
 
 local function markDexForMon(save, mon)
-  if not save or not mon or not mon.species then return end
-  if breedingIsEgg(mon) then return end
-  save.pokedex = save.pokedex or { seen = {}, owned = {} }
-  save.pokedex.seen = save.pokedex.seen or {}
-  save.pokedex.owned = save.pokedex.owned or {}
-  save.pokedex.seen[mon.species] = true
-  save.pokedex.owned[mon.species] = true
+  if not save or not mon or not mon.species then return false end
+  if breedingIsEgg(mon) then return false end
+  save.pokedex = save.pokedex or {}
+  local dex = save.pokedex
+  dex.seen = dex.seen or {}
+  dex.owned = dex.owned or {}
+  dex.caught = dex.caught or {}
+  local id = mon.species
+  local changed = not (dex.seen[id] and (dex.owned[id] or dex.caught[id]))
+  dex.seen[id] = true
+  dex.owned[id] = true
+  dex.caught[id] = true
+  return changed
 end
 
--- Any mon you still have must stay registered after a scope flip.
-local function resyncDexFromCollection(mod, game, stash)
-  local save = game and game.save
-  if not save then return end
+local function forEachOwnedMon(save, fn)
+  if type(save) ~= "table" then return end
   for _, mon in ipairs(save.party or {}) do
-    markDexForMon(save, mon)
+    fn(mon)
   end
-  local Boxes = require("src.pokemon.Boxes")
-  local boxes = Boxes.ensure(save)
-  for bi = 1, Boxes.COUNT do
-    for _, mon in ipairs(boxes[bi] or {}) do
-      markDexForMon(save, mon)
+  if type(save.boxes) == "table" then
+    for _, box in pairs(save.boxes) do
+      if type(box) == "table" then
+        for _, mon in ipairs(box) do
+          fn(mon)
+        end
+      end
+    end
+  end
+  -- Pre-12-box Gen1 field.
+  if type(save.box) == "table" then
+    for _, mon in ipairs(save.box) do
+      fn(mon)
     end
   end
   local dc = save.daycare
   if type(dc) == "table" then
-    markDexForMon(save, dc.mon)
-    markDexForMon(save, dc.mon2)
-    markDexForMon(save, dc.egg)
+    fn(dc.mon)
+    fn(dc.mon2)
+    fn(dc.egg)
   end
+end
+
+function SpeciesScope.markDexDirty(save)
+  if type(save) == "table" then
+    save.flags = save.flags or {}
+    save.flags.MOD_DEX_DIRTY = true
+  end
+end
+
+-- Party / PC / daycare mons must show as caught if the dex was wiped
+-- (mod toggle) or hidden by a KANTO→NATIONAL flip. Runs ONCE on boot/recovery,
+-- setting MOD_DEX_RECOVERED, and skips subsequent runs unless marked dirty or forced.
+function SpeciesScope.backfillDexFromCollection(mod, save, stash, force)
+  if type(save) ~= "table" then return 0 end
+  save.flags = save.flags or {}
+  if not force and save.flags.MOD_DEX_RECOVERED and not save.flags.MOD_DEX_DIRTY then
+    return 0
+  end
+
+  local n = 0
+  forEachOwnedMon(save, function(mon)
+    if markDexForMon(save, mon) then n = n + 1 end
+  end)
+  stash = stash or (mod and getStash(mod))
   for _, entry in ipairs((stash and stash.entries) or {}) do
-    markDexForMon(save, entry.mon)
+    if markDexForMon(save, entry.mon) then n = n + 1 end
   end
+
+  save.flags.MOD_DEX_RECOVERED = true
+  save.flags.MOD_DEX_DIRTY = nil
+  return n
+end
+
+-- Any mon you still have must stay registered after a scope flip.
+local function resyncDexFromCollection(mod, game, stash)
+  return SpeciesScope.backfillDexFromCollection(mod, game and game.save, stash)
 end
 
 --------------------------------------------------------------------------
@@ -842,7 +968,10 @@ local function applyRestoreNational(mod, game)
   -- Put Johto/Hoenn dex flags back, then ensure every mon you still hold
   -- (party / PC / leftover stash) is marked owned again.
   restoreStashedDex(game, stash)
+  SpeciesScope.restoreDexFlags(mod, game.save)
+  SpeciesScope.markDexDirty(game.save)
   resyncDexFromCollection(mod, game, stash)
+  SpeciesScope.snapshotDexFlags(mod, game.save)
   if stash.dex then stash.dex = nil end
   setStash(mod, stash)
 
@@ -1068,7 +1197,9 @@ function SpeciesScope.applyTransition(mod, game, toMode)
       return true, nil, msg
     end
   else
-    -- Gen2: no stash
+    -- Gen2: no stash; still mark party/PC as caught after FULL restore.
+    SpeciesScope.restoreDexFlags(mod, game and game.save)
+    SpeciesScope.backfillDexFromCollection(mod, game and game.save)
     SpeciesScope.refresh(mod, game, toMode)
     mod.save:set(SpeciesScope.APPLIED_KEY, toMode)
     return true
@@ -1094,6 +1225,7 @@ function SpeciesScope.ensureBoot(mod, game)
         notify(game, msg)
         SpeciesScope.refresh(mod, game, SpeciesScope.MODE_NATIONAL)
         mod.save:set(SpeciesScope.APPLIED_KEY, SpeciesScope.MODE_NATIONAL)
+        SpeciesScope.backfillDexFromCollection(mod, game and game.save)
         return false, err, msg
       end
       return true
@@ -1106,6 +1238,9 @@ function SpeciesScope.ensureBoot(mod, game)
   end
   SpeciesScope.refresh(mod, game, mode)
   mod.save:set(SpeciesScope.APPLIED_KEY, mode)
+  if mode ~= SpeciesScope.MODE_KANTO then
+    SpeciesScope.backfillDexFromCollection(mod, game and game.save)
+  end
   return true
 end
 
@@ -1252,6 +1387,7 @@ function SpeciesScope.install(mod)
     if not SaveData._krScopeDexPreserve then
       local origValidate = SaveData.validate
       SaveData.validate = function(save, data)
+        SpeciesScope.snapshotDexFlags(mod, save)
         local preserved = { seen = {}, owned = {} }
         local dex = save and save.pokedex
         local packOk, pack = pcall(require, "mods.Kanto-Reforged.pokemon_data")
@@ -1268,6 +1404,7 @@ function SpeciesScope.install(mod)
           end
         end
         local report = origValidate(save, data)
+        SpeciesScope.restoreDexFlags(mod, save)
         if type(dex) == "table" then
           dex.seen = dex.seen or {}
           dex.owned = dex.owned or {}
@@ -1365,9 +1502,28 @@ function SpeciesScope.install(mod)
     end
   end)
 
+  mod.events:on("save.writing", function(ev)
+    local save = ev and ev.save
+    if save then SpeciesScope.snapshotDexFlags(mod, save) end
+  end)
+
+  mod.events:on("save.loading", function(ev)
+    local save = ev and ev.raw
+    if not save then return end
+    SpeciesScope.restoreDexFlags(mod, save)
+    SpeciesScope.snapshotDexFlags(mod, save)
+  end)
+
+  mod.events:on("save.loaded", function(ev)
+    local save = ev and ev.save
+    if not save then return end
+    SpeciesScope.restoreDexFlags(mod, save)
+  end)
+
   mod.events:on("game.ready", function(ev)
     if ev and ev.game then
       SpeciesScope._game = ev.game
+      SpeciesScope.restoreDexFlags(mod, ev.game.save)
       SpeciesScope.ensureBoot(mod, ev.game)
     end
   end)

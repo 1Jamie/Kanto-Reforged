@@ -300,9 +300,58 @@ local MIX_GEN2 = {
   { "OPP_SUPER_NERD", 10, 3, "TORKOAL", 59 },
   { "OPP_BURGLAR", 4, 1, "HOUNDOOM", 58 },
   { "OPP_BURGLAR", 4, 2, "MAGCARGO", 59 },
+
+  -- Kanto Arrival Zone (Routes 5, 6, 7, 8, 11 — Levels 50-54)
+  { "OPP_YOUNGSTER", 1, 1, "LINOONE", 50 },
+  { "OPP_YOUNGSTER", 1, 2, "MANECTRIC", 51 },
+  { "OPP_PICSICK", 1, 1, "GRANBULL", 51 },
+  { "OPP_GAMBLER", 1, 1, "HOUNDOUR", 52 },
+  { "OPP_GAMBLER", 1, 2, "LANTURN", 53 },
+
+  -- Eastern Coast & Silence Bridge (Routes 9, 10, 12-15, Rock Tunnel — Levels 54-58)
+  { "OPP_BIRD_KEEPER", 1, 1, "PELIPPER", 54 },
+  { "OPP_BIRD_KEEPER", 1, 2, "SWELLOW", 55 },
+  { "OPP_FISHER", 1, 1, "LANTURN", 55 },
+  { "OPP_FISHER", 1, 2, "WHISCASH", 56 },
+  { "OPP_HIKER", 1, 1, "CAMERUPT", 56 },
+  { "OPP_HIKER", 1, 2, "LAIRON", 57 },
+  { "OPP_MANIAC", 1, 1, "ROSELIA", 57 },
+  { "OPP_MANIAC", 1, 2, "BRELOOM", 58 },
+
+  -- Western Routes & Cycling Road (Routes 1-4, 16-22, Seafoam — Levels 58-63)
+  { "OPP_CUE_BALL", 1, 1, "HARIYAMA", 58 },
+  { "OPP_CUE_BALL", 1, 2, "AGGRON", 59 },
+  { "OPP_BIKER", 1, 1, "WEEZING", 59 },
+  { "OPP_BIKER", 1, 2, "SWALOT", 60 },
+  { "OPP_GENTLEMAN", 1, 1, "DODRIO", 60 },
+  { "OPP_GENTLEMAN", 1, 2, "SHARPEDO", 61 },
+
+  -- Nugget Bridge Circuit (Route 24/25 — Levels 56-60)
+  { "OPP_BUG_CATCHER", 1, 1, "VOLBEAT", 56 },
+  { "OPP_BUG_CATCHER", 1, 2, "ILLUMISE", 57 },
+  { "OPP_LASS", 1, 1, "ZANGOOSE", 57 },
+  { "OPP_LASS", 1, 2, "SEVIPER", 58 },
+  { "OPP_ROCKET", 1, 1, "CORPHISH", 59 },
+  { "OPP_ROCKET", 1, 2, "GOLDUCK", 60 },
+
+  -- Saffron Fighting Dojo (Levels 60-64)
+  { "OPP_BLACKBELT", 1, 1, "HARIYAMA", 60 },
+  { "OPP_BLACKBELT", 1, 2, "BRELOOM", 61 },
+  { "OPP_BLACKBELT", 2, 1, "MEDICHAM", 62 },
+  { "OPP_BLACKBELT", 2, 2, "PRIMEAPE", 63 },
+  { "OPP_BLACKBELT", 3, 1, "HITMONLEE", 63 },
+  { "OPP_BLACKBELT", 3, 2, "HITMONCHAN", 64 },
+
+  -- Mt. Moon Rival Battle (Levels 75-78)
+  { "OPP_RIVAL2", 1, 1, "SNEASEL", 75 },
+  { "OPP_RIVAL2", 1, 2, "MAGNETON", 76 },
+  { "OPP_RIVAL2", 1, 3, "GENGAR", 76 },
+  { "OPP_RIVAL2", 1, 4, "ALAKAZAM", 77 },
+  { "OPP_RIVAL2", 1, 5, "GOLBAT", 77 },
+  { "OPP_RIVAL2", 1, "add", "TYRANITAR", 78 },
 }
 
--- Ace berries (last slot after MIX adds). Gym + E4 only.
+-- Ace berries (last slot after MIX adds). Gym + E4 + Rival.
 local ACE_BERRIES = {
   { "OPP_BROCK", 1, "BERRY" },
   { "OPP_MISTY", 1, "PECHA_BERRY" },
@@ -327,6 +376,7 @@ local ACE_BERRIES_GEN2 = {
   { "OPP_BROCK", 1, "BERRY" },
   { "OPP_BLAINE", 1, "PERSIM_BERRY" },
   { "OPP_GIOVANNI", 3, "CHERI_BERRY" },
+  { "OPP_RIVAL2", 1, "LUM_BERRY" },
 }
 
 Trainers.MIX = MIX

@@ -83,6 +83,29 @@ return function(T, Data, run)
   T.check(findObj("FUCHSIA_BILLS_GRANDPAS_HOUSE", "FUCHSIABILLSGRANDPASHOUSE_SEEDOT") ~= nil,
     "Seedot trade NPC")
 
+  -- Talk must start Commands.trade via ScriptRunner, not a bare call
+  -- (no ctx.runner → instant close).
+  do
+    local MapScripts = require("src.script.MapScripts")
+    local m = MapScripts.get("ROUTE_2_TRADE_HOUSE")
+    local talk = m and m.talk and m.talk.TEXT_ROUTE2TRADEHOUSE_TAILLOW
+    T.check(type(talk) == "function", "Taillow trader has a Lua talk handler")
+    local ran
+    local fakeOw = {
+      runner = {
+        run = function(_, script, extra)
+          ran = { script = script, extra = extra }
+        end,
+      },
+    }
+    local game = { data = Data, save = { party = {} }, stack = { push = function() end } }
+    talk(game, fakeOw, {}, function() end)
+    T.check(ran ~= nil, "Taillow talk starts the script runner")
+    T.eq(ran.script[1][1], "trade", "runner script is the trade command")
+    T.eq(ran.script[1][2], 11, "trade index 11 is Taillow")
+    T.eq(ran.script[1][3], "MOD_TRADE_TAILLOW_DONE", "trade completion flag")
+  end
+
   -- Talk handlers resolve through compose
   local function talkOk(map, text)
     local m = MapScripts.get(map)
@@ -96,6 +119,113 @@ return function(T, Data, run)
     "Judge talk")
   T.check(talkOk("SAFFRON_PIDGEY_HOUSE", "TEXT_SAFFRONPIDGEYHOUSE_MOVE_HUB"),
     "Move Hub talk")
+
+  -- Every KR-added overworld object with a TEXT_ id must have a Lua talk
+  -- handler (item balls use OverworldState:talkTo's item arm instead).
+  do
+    local expectTalk = {
+      { "VIRIDIAN_CITY", "TEXT_VIRIDIANCITY_CANDY_GUY" },
+      { "CELADON_CITY", "TEXT_CELADONCITY_ITEMFINDER_HINT" },
+      { "LAVENDER_TOWN", "TEXT_LAVENDERTOWN_HOLD_HINT" },
+      { "SAFFRON_CITY", "TEXT_SAFFRONCITY_BLACK_BELT_GIFT" },
+      { "CELADON_MANSION_2F", "TEXT_CELADONMANSION2F_BATTLE_CLUB" },
+      { "CELADON_MANSION_2F", "TEXT_CELADONMANSION2F_BEAST_TRACKER" },
+      { "VERMILION_PIDGEY_HOUSE", "TEXT_VERMILIONPIDGEYHOUSE_DARK_SPECIALIST" },
+      { "CELADON_HOTEL", "TEXT_CELADONHOTEL_BERRY_SPECIALIST" },
+      { "CELADON_MANSION_3F", "TEXT_CELADONMANSION3F_BLENDER" },
+      { "BERRY_FARM", "TEXT_BERRY_FARM_GIRL" },
+      { "BERRY_FARM", "TEXT_BERRY_FARM_FISHER" },
+      { "BERRY_FARM", "TEXT_BERRY_FARM_SCHOLAR" },
+      { "BERRY_FARM", "TEXT_BERRY_FARM_SOIL_EXPERT" },
+      { "BERRY_FARM", "TEXT_BERRY_FARM_MERCHANT" },
+      { "UNDERGROUND_PATH_ROUTE_5", "TEXT_UNDERGROUNDPATHROUTE5_JUDGE" },
+      { "SAFFRON_PIDGEY_HOUSE", "TEXT_SAFFRONPIDGEYHOUSE_MOVE_HUB" },
+      { "CINNABAR_LAB_METRONOME_ROOM", "TEXT_CINNABARLABMETRONOMEROOM_SMITH" },
+      { "ROUTE_2_TRADE_HOUSE", "TEXT_ROUTE2TRADEHOUSE_TAILLOW" },
+      { "FUCHSIA_BILLS_GRANDPAS_HOUSE", "TEXT_FUCHSIABILLSGRANDPASHOUSE_SEEDOT" },
+      { "DAYCARE", "TEXT_DAYCARE_GENTLEMAN" },
+      { "DAYCARE", "TEXT_DAYCARE_LADY" },
+      { "ROUTE_16_FLY_HOUSE", "TEXT_ROUTE16FLYHOUSE_WING_HUNTER" },
+      { "ROUTE_12_GATE_2F", "TEXT_ROUTE12GATE2F_WING_HUNTER" },
+      { "CINNABAR_LAB", "TEXT_CINNABARLAB_ORB_HUNTER" },
+      { "CELADON_MANSION_ROOF", "TEXT_CELADONMANSIONROOF_HO_OH" },
+      { "SEAFOAM_ISLANDS_B1F", "TEXT_SEAFOAMISLANDSB1F_LUGIA" },
+      { "SEAFOAM_ISLANDS_B3F", "TEXT_SEAFOAMISLANDSB3F_KYOGRE" },
+      { "POKEMON_MANSION_B1F", "TEXT_POKEMONMANSIONB1F_GROUDON" },
+      { "PEWTER_SPEECH_HOUSE", "TEXT_PEWTERSPEECHHOUSE_REGI_SCHOLAR" },
+      { "SEAFOAM_ISLANDS_B2F", "TEXT_SEAFOAMISLANDSB2F_REGICE" },
+      { "POWER_PLANT", "TEXT_POWERPLANT_REGISTEEL" },
+      { "REGIROCK_CHAMBER", "TEXT_REGIROCKCHAMBER_REGIROCK" },
+      { "ROUTE_23", "TEXT_ROUTE23_SKY_GATE" },
+      { "VIRIDIAN_FOREST", "TEXT_VIRIDIANFOREST_SHRINE_GATE" },
+      { "VERMILION_DOCK", "TEXT_VERMILIONDOCK_SAILOR" },
+      { "MT_MOON_B1F", "TEXT_MTMOONB1F_JIRACHI" },
+      { "SKY_PILLAR_KANT", "TEXT_SKYPILLARKANT_RAYQUAZA" },
+      { "ILEX_SHRINE_KANT", "TEXT_ILEXSHRINEKANT_CELEBI" },
+      { "BIRTH_ISLAND_KANT", "TEXT_BIRTHISLANDKANT_DEOXYS" },
+      { "CINNABAR_LAB_FOSSIL_ROOM", "TEXT_CINNABARLABFOSSILROOM_GEN3" },
+      { "INDIGO_PLATEAU_LOBBY", "TEXT_INDIGOPLATEAULOBBY_EON_WATCHER" },
+    }
+    local missing = {}
+    for _, row in ipairs(expectTalk) do
+      if not talkOk(row[1], row[2]) then
+        missing[#missing + 1] = row[1] .. "/" .. row[2]
+      end
+    end
+    T.eq(#missing, 0, "KR NPC TEXT_ ids have talk handlers"
+      .. (#missing > 0 and (": " .. table.concat(missing, ", ")) or ""))
+
+    local byText = {}
+    for _, row in ipairs(expectTalk) do byText[row[2]] = true end
+    for _, def in pairs(Data.maps) do
+      for _, o in ipairs(def.objects or {}) do
+        local text = o.text
+        if type(text) == "string" and text:find("^TEXT_") and byText[text] then
+          T.check(o.x ~= nil and o.y ~= nil, text .. " has coords")
+        end
+      end
+    end
+
+    -- Item balls must carry an item payload (talkTo pickup arm).
+    for _, name in ipairs({
+      "ROCKTUNNELB1F_FOCUS_BAND",
+      "POKEMONTOWER7F_BLACKGLASSES",
+      "POWERPLANT_METAL_COAT",
+    }) do
+      local found
+      for _, def in pairs(Data.maps) do
+        for _, o in ipairs(def.objects or {}) do
+          if o.name == name then found = o end
+        end
+      end
+      T.check(found and found.item and found.item ~= "0",
+        name .. " is an item ball")
+    end
+
+    local stubGame = {
+      data = Data,
+      save = {
+        party = {},
+        inventory = {},
+        money = 0,
+        flags = {},
+        daycare = {},
+        player = { name = "RED" },
+      },
+      stack = { push = function() end, pop = function() end, top = function() end },
+    }
+    local stubOw = { runner = nil, map = { id = "ROUTE_2_TRADE_HOUSE" } }
+    local crashed = {}
+    for _, row in ipairs(expectTalk) do
+      local fn = MapScripts.get(row[1]).talk[row[2]]
+      local ok, err = pcall(fn, stubGame, stubOw, { def = { text = row[2] } }, function() end)
+      if not ok then
+        crashed[#crashed + 1] = row[2] .. ": " .. tostring(err)
+      end
+    end
+    T.eq(#crashed, 0, "KR talk handlers do not crash without a script runner"
+      .. (#crashed > 0 and (": " .. crashed[1]) or ""))
+  end
 
   -- Competitive items + trainers
   T.check(Data.items.CHOICE_BAND ~= nil, "Choice Band registered")

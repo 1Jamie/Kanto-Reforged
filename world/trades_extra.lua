@@ -77,12 +77,18 @@ function TradesExtra.register(mod)
                 .. "Come back off KANTO\nscope."), done)
             return
           end
-          -- Fall through to scripted trade command list
-          local Commands = require("src.script.Commands")
-          if Commands and Commands.trade then
-            Commands.trade({ game = game, save = game.save }, tradeIndex, row.flag)
+          -- Commands.trade yields on the script runner (party pick, anim).
+          -- Lua talk handlers are invoked without a ctx.runner, so calling
+          -- trade() here used to nil-index :yield and close the game.
+          if not HouseNpcs.runScript(ow, { { "trade", tradeIndex, row.flag } }, {
+            npc = npc,
+            onDone = done,
+          }) then
+            local Strings = require("src.core.Strings")
+            HouseNpcs.pushText(game, Strings(
+              "I want to trade my\n%s for a\n%s!",
+              row.get, row.give), done)
           end
-          if done then done() end
         end,
       },
     })
@@ -106,8 +112,10 @@ function TradesExtra.register(mod)
       local party = ctx.save.party or {}
       for i = #party, 1, -1 do
         local mon = party[i]
-        if mon and mon.species == trade.get and mon.traded and not mon.heldItem then
-          mon.heldItem = held
+        if mon and mon.species == trade.get and mon.traded then
+          if held and not mon.heldItem then
+            mon.heldItem = held
+          end
           break
         end
       end

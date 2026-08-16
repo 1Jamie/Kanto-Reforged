@@ -55,6 +55,7 @@ return function(T, Data, run)
   local savedMode = opts[scopeKey]
   local savedApplied = mod.save:get(SpeciesScope.APPLIED_KEY, nil)
   local savedStash = mod.save:get(SpeciesScope.STASH_KEY, nil)
+  local savedDexFlags = mod.save:get(SpeciesScope.DEX_FLAGS_KEY, nil)
 
   SpeciesScope._mod = mod
   SpeciesScope._ignoreOptionEvent = true
@@ -152,6 +153,96 @@ return function(T, Data, run)
     T.eq(save.pokedex.owned.CHIKORITA, true, "CHIKORITA owned restored after NATIONAL")
     T.eq(save.pokedex.owned.PIKACHU, true, "PIKACHU owned still set")
     T.eq(Data.constants.dexSize >= 252, true, "dexSize restored past Johto")
+  end
+
+  -- Mod disable / SaveData.validate wipe: KR flags live in mod.save sidecar.
+  do
+    setMode(SpeciesScope.MODE_NATIONAL)
+    mod.save:set(SpeciesScope.APPLIED_KEY, SpeciesScope.MODE_NATIONAL)
+    mod.save:set(SpeciesScope.STASH_KEY, nil)
+    mod.save:set(SpeciesScope.DEX_FLAGS_KEY, nil)
+    local save = freshSave()
+    save.party = { Pokemon.new(Data, "PIKACHU", 10) }
+    save.pokedex.owned.PIKACHU = true
+    save.pokedex.seen.PIKACHU = true
+    save.pokedex.owned.TREECKO = true
+    save.pokedex.seen.TREECKO = true
+    save.pokedex.owned.CHIKORITA = true
+    save.pokedex.seen.CHIKORITA = true
+    SpeciesScope.snapshotDexFlags(mod, save)
+    local snap = mod.save:get(SpeciesScope.DEX_FLAGS_KEY, nil)
+    T.check(snap and snap.owned.TREECKO and snap.owned.CHIKORITA,
+      "sidecar stores Gen2/Gen3 owned flags")
+
+    -- Engine wipe while the mod is off (species missing from Data.pokemon).
+    save.pokedex.owned.TREECKO = nil
+    save.pokedex.seen.TREECKO = nil
+    save.pokedex.owned.CHIKORITA = nil
+    save.pokedex.seen.CHIKORITA = nil
+    -- Union snapshot must not forget flags when live dex is empty.
+    SpeciesScope.snapshotDexFlags(mod, save)
+    T.eq(SpeciesScope.restoreDexFlags(mod, save) >= 2, true,
+      "restore puts back wiped KR flags")
+    T.eq(save.pokedex.owned.TREECKO, true, "TREECKO owned survives mod toggle")
+    T.eq(save.pokedex.seen.TREECKO, true, "TREECKO seen survives mod toggle")
+    T.eq(save.pokedex.owned.CHIKORITA, true, "CHIKORITA owned survives mod toggle")
+    T.eq(save.pokedex.owned.PIKACHU, true, "vanilla owned untouched")
+    T.eq(save.pokedex.caught.TREECKO, true, "owned mirrors onto caught")
+  end
+
+  -- Wiped dex + mons still in party/PC: National restore marks them caught.
+  do
+    setMode(SpeciesScope.MODE_NATIONAL)
+    mod.save:set(SpeciesScope.APPLIED_KEY, SpeciesScope.MODE_NATIONAL)
+    mod.save:set(SpeciesScope.STASH_KEY, nil)
+    mod.save:set(SpeciesScope.DEX_FLAGS_KEY, nil)
+    local save = freshSave()
+    save.party = { Pokemon.new(Data, "TREECKO", 12) }
+    Boxes.ensure(save)
+    save.boxes[1][1] = Pokemon.new(Data, "CHIKORITA", 8)
+    save.pokedex.owned.TREECKO = nil
+    save.pokedex.seen.TREECKO = nil
+    save.pokedex.owned.CHIKORITA = nil
+    save.pokedex.seen.CHIKORITA = nil
+    local game = makeGame(save)
+    SpeciesScope._game = game
+    local n = SpeciesScope.backfillDexFromCollection(mod, save)
+    T.check(n >= 2, "backfill reports party + box")
+    T.eq(save.pokedex.owned.TREECKO, true, "party TREECKO marked owned")
+    T.eq(save.pokedex.caught.TREECKO, true, "party TREECKO marked caught")
+    T.eq(save.pokedex.seen.TREECKO, true, "party TREECKO marked seen")
+    T.eq(save.pokedex.owned.CHIKORITA, true, "boxed CHIKORITA marked owned")
+    T.eq(save.pokedex.caught.CHIKORITA, true, "boxed CHIKORITA marked caught")
+
+    -- Single-run recovery verification: second run skips when clean.
+    save.pokedex.owned.TREECKO = nil
+    local nSkip = SpeciesScope.backfillDexFromCollection(mod, save)
+    T.eq(nSkip, 0, "subsequent backfill skips when clean (MOD_DEX_RECOVERED = true)")
+    T.eq(save.pokedex.owned.TREECKO, nil, "TREECKO remains cleared while clean")
+
+    -- Marking dex dirty triggers single-run re-eval.
+    save.pokedex.owned.TREECKO = nil
+    save.pokedex.caught.TREECKO = nil
+    save.pokedex.seen.TREECKO = nil
+    SpeciesScope.markDexDirty(save)
+    T.eq(save.flags.MOD_DEX_DIRTY, true, "markDexDirty sets MOD_DEX_DIRTY flag")
+    local nDirty = SpeciesScope.backfillDexFromCollection(mod, save)
+    T.check(nDirty >= 1, "backfill re-runs when marked dirty")
+    T.eq(save.pokedex.owned.TREECKO, true, "TREECKO re-registered after dirty recovery")
+    T.eq(save.flags.MOD_DEX_DIRTY, nil, "MOD_DEX_DIRTY cleared after recovery")
+
+    -- Same path as KANTO → NATIONAL restore.
+    save.pokedex.owned.TREECKO = nil
+    save.pokedex.caught.TREECKO = nil
+    save.pokedex.seen.TREECKO = nil
+    save.pokedex.owned.CHIKORITA = nil
+    save.pokedex.caught.CHIKORITA = nil
+    save.pokedex.seen.CHIKORITA = nil
+    mod.save:set(SpeciesScope.APPLIED_KEY, SpeciesScope.MODE_KANTO)
+    T.eq(SpeciesScope.applyTransition(mod, game, SpeciesScope.MODE_NATIONAL), true,
+      "national restore backfills collection")
+    T.eq(save.pokedex.caught.TREECKO, true, "national restore catches party TREECKO")
+    T.eq(save.pokedex.caught.CHIKORITA, true, "national restore catches boxed CHIKORITA")
   end
 
   -- Refuse empty party (only Gen3, empty PC)
@@ -578,6 +669,7 @@ return function(T, Data, run)
   SpeciesScope.applyEvoScope(mod, SpeciesScope.MODE_NATIONAL)
   mod.save:set(SpeciesScope.APPLIED_KEY, savedApplied)
   mod.save:set(SpeciesScope.STASH_KEY, savedStash)
+  mod.save:set(SpeciesScope.DEX_FLAGS_KEY, savedDexFlags)
   SpeciesScope._ignoreOptionEvent = false
   SpeciesScope._game = nil
   Host.clearForce()

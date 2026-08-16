@@ -257,13 +257,90 @@ if viridian then
   end
 end
 
-local mansion = Data.gen2Maps and Data.gen2Maps.CELADON_MANSION_2F
-if mansion then
-  local club
-  for _, o in ipairs(mansion.objects or {}) do
-    if o.name == "CELADONMANSION2F_BATTLE_CLUB" then club = o end
+local function goldObj(mapId, name)
+  local def = Data.gen2Maps and Data.gen2Maps[mapId]
+  if not def then return nil, nil end
+  for _, o in ipairs(def.objects or {}) do
+    if o.name == name then return o, def end
   end
-  T.check(club ~= nil, "Celadon Circuit NPC on Kanto mansion 2F")
+  return nil, def
+end
+
+local function goldOnMap(obj, def)
+  if not (obj and def and def.width and def.height) then return true end
+  local maxX, maxY = def.width * 2 - 1, def.height * 2 - 1
+  return obj.x >= 0 and obj.y >= 0 and obj.x <= maxX and obj.y <= maxY
+end
+
+-- KR NPCs that register on Gold (Kanto houses + farm + candy).
+local goldNpcs = {
+  { "CELADON_MANSION_2F", "CELADONMANSION2F_BATTLE_CLUB",
+    "TEXT_CELADONMANSION2F_BATTLE_CLUB" },
+  { "VERMILION_FISHING_SPEECH_HOUSE", "VERMILIONPIDGEYHOUSE_DARK_SPECIALIST",
+    "TEXT_VERMILIONPIDGEYHOUSE_DARK_SPECIALIST" },
+  { "CELADON_CAFE", "CELADONHOTEL_BERRY_SPECIALIST",
+    "TEXT_CELADONHOTEL_BERRY_SPECIALIST" },
+  { "CELADON_MANSION_3F", "CELADONMANSION3F_BLENDER",
+    "TEXT_CELADONMANSION3F_BLENDER" },
+  { "BERRY_FARM", "BERRY_FARM_GIRL", "TEXT_BERRY_FARM_GIRL" },
+  { "BERRY_FARM", "BERRY_FARM_FISHER", "TEXT_BERRY_FARM_FISHER" },
+  { "BERRY_FARM", "BERRY_FARM_SCHOLAR", "TEXT_BERRY_FARM_SCHOLAR" },
+  { "BERRY_FARM", "BERRY_FARM_SOIL_EXPERT", "TEXT_BERRY_FARM_SOIL_EXPERT" },
+  { "BERRY_FARM", "BERRY_FARM_MERCHANT", "TEXT_BERRY_FARM_MERCHANT" },
+  { "UNDERGROUND_PATH", "UNDERGROUNDPATHROUTE5_JUDGE",
+    "TEXT_UNDERGROUNDPATHROUTE5_JUDGE" },
+  { "MR_PSYCHICS_HOUSE", "SAFFRONPIDGEYHOUSE_MOVE_HUB",
+    "TEXT_SAFFRONPIDGEYHOUSE_MOVE_HUB" },
+  { "CINNABAR_POKECENTER_1F", "CINNABARLABMETRONOMEROOM_SMITH",
+    "TEXT_CINNABARLABMETRONOMEROOM_SMITH" },
+  { "VIRIDIAN_CITY", "VIRIDIANCITY_CANDY_GUY", "TEXT_VIRIDIANCITY_CANDY_GUY" },
+  { "CHERRYGROVE_CITY", "VIRIDIANCITY_CANDY_GUY", "TEXT_VIRIDIANCITY_CANDY_GUY" },
+}
+
+local goldMapsMissing = 0
+for _, row in ipairs(goldNpcs) do
+  local mapId, name, text = row[1], row[2], row[3]
+  local def = Data.gen2Maps and Data.gen2Maps[mapId]
+  if not def then
+    goldMapsMissing = goldMapsMissing + 1
+  else
+    local obj = select(1, goldObj(mapId, name))
+    T.check(obj ~= nil, "Gold " .. mapId .. " has " .. name)
+    if obj then
+      T.eq(obj.text, text, name .. " TEXT_ id")
+      T.check(goldOnMap(obj, def), name .. " stands on the map")
+      T.check(type(obj.movement) == "number", name .. " uses Gold movement byte")
+      local spr = obj.sprite
+      T.check(spr and spr ~= "SPRITE_GIRL" and spr ~= "SPRITE_HIKER"
+          and spr ~= "SPRITE_BRUNETTE_GIRL" and spr ~= "SPRITE_CHANNELER",
+        name .. " sprite exists on Gold (" .. tostring(spr) .. ")")
+    end
+    T.check(HouseNpcs._talks[text] ~= nil, "Gold talkTo has " .. text)
+  end
+end
+if goldMapsMissing > 0 then
+  print("note: skipped " .. goldMapsMissing
+    .. " Gold KR NPC map checks (no gen2Maps cache)")
+end
+
+T.check(HouseNpcs._talkInstalled == true, "Gold talkTo dispatch installed")
+
+do
+  local OC = require("src.world.OverworldController")
+  T.check(type(OC.talkTo) == "function", "Gold OverworldController.talkTo is seamed")
+  local stubGame = {
+    stack = { push = function() end },
+    save = { party = {}, inventory = {}, money = 0, flags = {}, player = { name = "GOLD" } },
+    data = Data,
+  }
+  local handled
+  local world = { game = stubGame }
+  local npc = { def = { text = "TEXT_CELADONMANSION2F_BATTLE_CLUB", name = "x" } }
+  local ok, ret = pcall(OC.talkTo, world, npc)
+  T.check(ok, "Gold talkTo dispatch does not throw on Circuit NPC")
+  T.eq(ret, true, "Gold talkTo consumes KR Circuit NPC")
+  handled = ok and ret == true
+  T.check(handled, "Gold Circuit talk is wired through talkTo")
 end
 
 T.check(Data.items and Data.items.CHERI_BERRY, "CHERI_BERRY item registered on Gold")
@@ -384,6 +461,23 @@ do
 
   -- OLD / entries still have full Gen3 (national).
   T.check(dex.entries.TREECKO ~= nil, "OLD/national still has TREECKO entry")
+
+  do
+    local SpeciesScope = require("mods.Kanto-Reforged.pokemon.species_scope")
+    local save = {
+      pokedex = { seen = { TREECKO = true }, caught = { TREECKO = true } },
+    }
+    local mod = SpeciesScope._mod or run.api
+    T.check(mod ~= nil and mod.save ~= nil, "Gold species_scope has mod.save")
+    SpeciesScope.snapshotDexFlags(mod, save)
+    save.pokedex.seen.TREECKO = nil
+    save.pokedex.caught.TREECKO = nil
+    SpeciesScope.restoreDexFlags(mod, save)
+    T.eq(save.pokedex.caught.TREECKO, true,
+      "Gold Hoenn caught flag restores from sidecar")
+    T.eq(save.pokedex.seen.TREECKO, true,
+      "Gold Hoenn seen flag restores from sidecar")
+  end
 
   -- AREA nests resolve against gen2Encounters + gen2Maps. Dex AREA itself also
   -- needs pokegear.maps (pokedex.gfx has no town map). Load ROM cache sheets
