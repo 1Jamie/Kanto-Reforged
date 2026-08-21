@@ -2305,7 +2305,9 @@ function TrainerAi.install(mod)
         (tier == "elite") and TrainerAi.eliteAction or TrainerAi.liteAction,
         battle)
       -- Gen2 specials are consumed in enemyTrySwitchOrItem; ignore here.
-      if ok and act and not (gen2 and act.special) then return act end
+      if ok and act and not (gen2 and act.special) and not (act.id == "POISON_EFFECT" or act.id == "POISON_SIDE_EFFECT1"
+       or act.id == "POISON_SIDE_EFFECT2" or act.id == "EFFECT_POISON"
+       or act.id == "EFFECT_TOXIC" or act.id == "EFFECT_POISON_HIT") then return act end
     end
 
     local okPick, picked = pcall(TrainerAi.pickScoredMove, mod, battle)

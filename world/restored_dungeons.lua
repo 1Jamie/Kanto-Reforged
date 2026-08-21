@@ -968,12 +968,30 @@ local function rebuildWarpAt(map)
   end
 end
 
+-- Gen1 tileset sheets ship under overrides/tilesets/kr_*.png so Gold mobile
+-- (versioned gold/assets/generated only) can bake MT_MOON_*_KR without a Red
+-- import, and so we never shadow Gold's gate/house/pokecenter/forest sheets.
+local function bindGen1TilesetOverrideImages(Data)
+  if not (Data and Data.tilesets) then return end
+  for tsId, tsDef in pairs(Data.tilesets) do
+    if type(tsDef) == "table" and type(tsDef.image) == "string"
+        and not tostring(tsId):match("^TILESET_") then
+      local base = tsDef.image:match("tilesets/([^/]+)$")
+      if base and not base:match("^kr_") then
+        tsDef.image = "assets/generated/tilesets/kr_" .. base
+      end
+    end
+  end
+end
+
+RestoredDungeons.bindGen1TilesetOverrideImages = bindGen1TilesetOverrideImages
+
 local function normalizeDungeonData(Data)
   if not Data or not Data.maps then return end
   -- Do not short-circuit with a normalized guard: the eventFlag sync below
   -- must run on every apply() so it catches already-cached module data.
 
-
+  bindGen1TilesetOverrideImages(Data)
 
   if Data.maps.SEAFOAM_GYM then
     local gym = Data.maps.SEAFOAM_GYM
@@ -2335,12 +2353,18 @@ function RestoredDungeons.apply(mod)
     end
 
 
+    -- Force atlas re-resolve so kr_* override sheets win after registration.
     if Assets and Assets.flush then
       pcall(Assets.flush)
     end
     if game and game.world then
       if game.world.mapImages then game.world.mapImages = {} end
       if game.world.atlasCache then game.world.atlasCache = {} end
+      if game.world.tilesets and Data.tilesets then
+        for tsId, tsDef in pairs(Data.tilesets) do
+          game.world.tilesets[tsId] = tsDef
+        end
+      end
     end
 
 

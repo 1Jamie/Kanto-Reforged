@@ -14,6 +14,7 @@ import os
 import sys
 import json
 import subprocess
+import shutil
 
 TARGET_MAPS = [
     "VIRIDIAN_FOREST",
@@ -872,6 +873,55 @@ def main():
             record["collision"] = rec_coll
 
         restored_tilesets[ts_id] = record
+
+    # Point Gen1 tilesets at mod overrides (kr_*.png) so Gold-only mobile can bake
+    # without a Red asset mount, and without shadowing Gold gate/house/pokecenter.
+    def bind_kr_tileset_images(tilesets):
+        needed = set()
+        for ts_id, record in tilesets.items():
+            if str(ts_id).startswith("TILESET_"):
+                continue
+            image = record.get("image")
+            if not isinstance(image, str):
+                continue
+            base = image.rsplit("/", 1)[-1]
+            if not base.startswith("kr_"):
+                record["image"] = f"assets/generated/tilesets/kr_{base}"
+                base = "kr_" + base
+            needed.add(base)
+        return needed
+
+    def copy_kr_tileset_overrides(needed_bases):
+        mod_root = os.path.join("mods", "Kanto-Reforged")
+        dst_dir = os.path.join(mod_root, "overrides", "tilesets")
+        os.makedirs(dst_dir, exist_ok=True)
+        src_candidates = [
+            os.path.join("assets", "generated", "tilesets"),
+            os.path.expanduser("~/.local/share/love/pokemon-love2d/assets/generated/tilesets"),
+            os.path.expanduser("~/.local/share/love/pokemon-love2d/red/assets/generated/tilesets"),
+        ]
+        copied = 0
+        for base in sorted(needed_bases):
+            plain = base[3:] if base.startswith("kr_") else base
+            src = None
+            for folder in src_candidates:
+                cand = os.path.join(folder, plain)
+                if os.path.isfile(cand):
+                    src = cand
+                    break
+                cand_kr = os.path.join(folder, base)
+                if os.path.isfile(cand_kr):
+                    src = cand_kr
+                    break
+            if not src:
+                print(f"WARN: missing Gen1 tileset sheet for override: {plain}")
+                continue
+            shutil.copy2(src, os.path.join(dst_dir, base if base.startswith("kr_") else f"kr_{plain}"))
+            copied += 1
+        print(f"Copied {copied} Gen1 tileset overrides into {dst_dir}")
+
+    kr_needed = bind_kr_tileset_images(restored_tilesets)
+    copy_kr_tileset_overrides(kr_needed)
 
     gold_ts_path = os.path.expanduser("~/.local/share/love/pokemon-love2d/gold/data/generated/tilesets.lua")
     if os.path.exists(gold_ts_path):

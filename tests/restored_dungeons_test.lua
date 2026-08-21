@@ -408,6 +408,24 @@ local function runTests()
     "CAVERN cave wall block 0 must remain 100% solid wall {7, 7, 7, 7}")
   print("  CAVERN stair blocks walkability & cave wall solid boundaries verified.")
 
+  -- 11b. Gen1 dungeon sheets must resolve via mod overrides (Gold mobile has no Red cache).
+  RestoredDungeons.bindGen1TilesetOverrideImages(Data)
+  assert(Data.tilesets.CAVERN.image == "assets/generated/tilesets/kr_cavern.png",
+    "CAVERN must point at kr_cavern override sheet")
+  assert(Data.tilesets.POKECENTER.image == "assets/generated/tilesets/kr_pokecenter.png",
+    "POKECENTER must point at kr_pokecenter override sheet")
+  assert(Data.tilesets.TILESET_KANTO.image == "assets/generated/tilesets/kanto.png",
+    "TILESET_KANTO keeps stock/override kanto.png path")
+  local caveSheet = "mods/Kanto-Reforged/overrides/tilesets/kr_cavern.png"
+  local okInfo = love and love.filesystem and love.filesystem.getInfo and love.filesystem.getInfo(caveSheet)
+  if not okInfo then
+    -- Headless: fall back to plain file existence next to the repo.
+    local f = io.open(caveSheet, "rb")
+    assert(f, "overrides/tilesets/kr_cavern.png must be shipped with the mod")
+    f:close()
+  end
+  print("  Gen1 tileset override sheets (kr_*) verified.")
+
   -- 12. Verify Gen 1 safety isolation
   if Host.isGen1() then
     local res = RestoredDungeons.apply()

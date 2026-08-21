@@ -25,10 +25,10 @@ function Host.generation()
   if _G.game and (_G.game.generation == 2 or _G.game.isGold) then
     return 2
   end
-  local ok2, Game2 = pcall(require, "src.core.Game2")
-  if ok2 and Game2 and package.loaded["src.core.Game2"] then
-    return 2
-  end
+  -- NOTE: do NOT probe package.loaded["src.core.Game2"] here.
+  -- Game2 is cached by Lua's require system for the lifetime of the process;
+  -- if Gold was booted first in the launcher, this would falsely return 2
+  -- for Red.  GameVersion.generation() below is the authoritative check.
   if type(GameVersion.generation) == "function" and GameVersion.generation() == 2 then
     return 2
   end
