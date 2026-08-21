@@ -895,7 +895,7 @@ end
 
 function BerryFarm.install(mod)
   local Host = require("mods.Kanto-Reforged.core.host")
-  local Gen1Patch = require("mods.Kanto-Reforged.gen1_patch")
+  local Gen1Patch = require("mods.Kanto-Reforged.core.gen1_patch")
   BerryFarm._mod = mod
   ensureState(mod)
 

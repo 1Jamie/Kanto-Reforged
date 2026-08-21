@@ -574,7 +574,7 @@ function HeldItems.tryBagUse(data, save, itemId, target, battle)
       return noEffect()
     end
     do
-      local Gen1Patch = require("mods.Kanto-Reforged.gen1_patch")
+      local Gen1Patch = require("mods.Kanto-Reforged.core.gen1_patch")
       Gen1Patch.apply(require("src.world.PikachuFollower"), function(follower)
         if type(follower.modifyHappiness) == "function" then
           follower.modifyHappiness(save, "USEDITEM", target)
@@ -617,7 +617,7 @@ function HeldItems.tryBagUse(data, save, itemId, target, battle)
   end
 
     do
-      local Gen1Patch = require("mods.Kanto-Reforged.gen1_patch")
+      local Gen1Patch = require("mods.Kanto-Reforged.core.gen1_patch")
       Gen1Patch.apply(require("src.world.PikachuFollower"), function(follower)
         if type(follower.modifyHappiness) == "function" then
           follower.modifyHappiness(save, "USEDITEM", target)
@@ -1003,7 +1003,7 @@ function HeldItems.install(mod)
   end
 
   -- Wild berry holds
-  local Gen1Patch = require("mods.Kanto-Reforged.gen1_patch")
+  local Gen1Patch = require("mods.Kanto-Reforged.core.gen1_patch")
   Gen1Patch.apply(BattleState, function(bs)
     local original_newWild = bs.newWild
     if type(original_newWild) ~= "function" then return end

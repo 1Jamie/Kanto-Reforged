@@ -101,6 +101,54 @@ local function applyPocket(list, game, delta)
   list.__pocketIds = pocketIds()
 end
 
+local function getTmHmSortInfo(id, def)
+  local kind = nil
+  local number = nil
+
+  if def and def.machine then
+    kind = def.machine.kind or def.machine.type
+    if def.machine.number then
+      number = tonumber(def.machine.number)
+    elseif def.machine.num then
+      number = tonumber(def.machine.num)
+    elseif def.machine.id then
+      number = tonumber(def.machine.id)
+    end
+  end
+
+  if not kind and type(id) == "string" then
+    local k, numStr = id:match("^(T[M])_?(%d+)")
+    if not k then
+      k, numStr = id:match("^(H[M])_?(%d+)")
+    end
+    if k and numStr then
+      kind = k
+      number = tonumber(numStr)
+    end
+  end
+
+  if not kind and def and type(def.name) == "string" then
+    local k, numStr = def.name:match("^(T[M])%s*_?(%d+)")
+    if not k then
+      k, numStr = def.name:match("^(H[M])%s*_?(%d+)")
+    end
+    if k and numStr then
+      kind = k
+      number = tonumber(numStr)
+    end
+  end
+
+  if not number and type(id) == "string" then
+    number = tonumber(id:match("(%d+)"))
+  end
+
+  kind = (kind and tostring(kind):upper()) or "TM"
+  number = number or 999
+
+  local groupOrder = (kind == "TM") and 1 or 2
+  return groupOrder, number
+end
+
 function BagPockets.register(mod)
   Bag.CAPACITY = BagPockets.CAPACITY
   mod.content.constants:patch("bagSize", BagPockets.CAPACITY)
@@ -119,6 +167,23 @@ function BagPockets.register(mod)
           filtered[#filtered + 1] = id
         end
       end
+
+      if pocketId == "tmhm" then
+        table.sort(filtered, function(a, b)
+          local defA = data and data.items and data.items[a]
+          local defB = data and data.items and data.items[b]
+          local groupA, numA = getTmHmSortInfo(a, defA)
+          local groupB, numB = getTmHmSortInfo(b, defB)
+          if groupA ~= groupB then
+            return groupA < groupB
+          end
+          if numA ~= numB then
+            return numA < numB
+          end
+          return a < b
+        end)
+      end
+
       return filtered
     end
   end

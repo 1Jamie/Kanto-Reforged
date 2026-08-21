@@ -229,7 +229,7 @@ end
 -- Safety net: DexEntryMenu looks up game.data.text[e.text]. If a species
 -- still carries inline prose (not a _KEY), register it so the page is not blank.
 function DexEntries.installInlineTextFallback(mod)
-  local Gen1Patch = require("mods.Kanto-Reforged.gen1_patch")
+  local Gen1Patch = require("mods.Kanto-Reforged.core.gen1_patch")
   local ok, DEM = pcall(require, "src.ui.DexEntryMenu")
   if not ok or not DEM or DEM._krInlineText then return end
   Gen1Patch.apply(DEM, function(DexEntryMenu)

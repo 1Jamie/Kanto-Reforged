@@ -163,7 +163,7 @@ function Gender.install(mod)
   end
 
   -- Trainer battles replace DVs after Pokemon.new; re-derive gender.
-  local Gen1Patch = require("mods.Kanto-Reforged.gen1_patch")
+  local Gen1Patch = require("mods.Kanto-Reforged.core.gen1_patch")
   Gen1Patch.apply(require("src.battle.BattleState"), function(BattleState)
     local original_newTrainer = BattleState.newTrainer
     if type(original_newTrainer) == "function" then

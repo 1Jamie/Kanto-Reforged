@@ -341,7 +341,7 @@ function Weather.install(mod)
 
   local Host = require("mods.Kanto-Reforged.core.host")
   if Host.isGen1() then
-    local Gen1Patch = require("mods.Kanto-Reforged.gen1_patch")
+    local Gen1Patch = require("mods.Kanto-Reforged.core.gen1_patch")
     pcall(function()
       Gen1Patch.apply(require("src.battle.BattleState"), function(BattleState)
         if BattleState._krSunCharge then return end

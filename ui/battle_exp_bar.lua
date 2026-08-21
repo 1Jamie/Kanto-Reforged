@@ -324,10 +324,12 @@ function BattleExpBar.install(mod)
     end
   end
 
-  local Gen1Patch = require("mods.Kanto-Reforged.gen1_patch")
-  Gen1Patch.apply(require("src.battle.BattleState"), function(BattleState)
-    if BattleState._krExpBar then return end
-    BattleState._krExpBar = true
+  local Host = require("mods.Kanto-Reforged.core.host")
+  if Host.isGen1() then
+    local Gen1Patch = require("mods.Kanto-Reforged.core.gen1_patch")
+    Gen1Patch.apply(require("src.battle.BattleState"), function(BattleState)
+      if BattleState._krExpBar then return end
+      BattleState._krExpBar = true
 
     local originalDrawHUDs = BattleState.drawHUDs
     BattleState.drawHUDs = function(self, slide)
@@ -430,6 +432,7 @@ function BattleExpBar.install(mod)
       return battle
     end
   end)
+  end
 
   mod.hooks:wrap("battle.overlay", function(next, battle)
     next(battle)

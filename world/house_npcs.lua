@@ -353,7 +353,7 @@ function HouseNpcs.startTrainerBattle(game, ow, oppClass, partyIndex, onDone)
   if Host.isGen2() then
     return startTrainerBattleGen2(game, ow, oppClass, partyIndex, onDone)
   end
-  local Gen1Patch = require("mods.Kanto-Reforged.gen1_patch")
+  local Gen1Patch = require("mods.Kanto-Reforged.core.gen1_patch")
   -- trainer.party hooks cannot see `game`; stash for scaleCap during build.
   HouseNpcs._scaleGame = game
   local battle

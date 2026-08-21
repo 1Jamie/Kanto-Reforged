@@ -517,7 +517,7 @@ function Daycare.install(mod)
   local SaveData = require("src.core.SaveData")
 
   if not OverworldState._expDaycareBreedPatch then
-    local Gen1Patch = require("mods.Kanto-Reforged.gen1_patch")
+    local Gen1Patch = require("mods.Kanto-Reforged.core.gen1_patch")
     Gen1Patch.apply(OverworldState, function(ow)
       local origOnStep = ow.onStepComplete
       if type(origOnStep) ~= "function" then return end

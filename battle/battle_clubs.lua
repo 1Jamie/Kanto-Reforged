@@ -173,6 +173,7 @@ local function registerTrainers(mod)
         id = def.id,
         name = def.name,
         baseMoney = def.baseMoney or 0,
+        parties = def.parties,
         trainers = trainers,
       }
     end

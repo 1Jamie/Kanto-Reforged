@@ -59,3 +59,11 @@ Thumbs.db
 .*.swp
 .idea/
 .vscode/
+
+# Stray assets and intermediate tools data
+screen-shots/
+tools/blocksets/
+tools/*.png
+tools/*.session.json
+tools/safari_g1_to_g2.json
+tools/manual_collisions.json

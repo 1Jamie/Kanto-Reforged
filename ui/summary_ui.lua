@@ -301,7 +301,7 @@ function SummaryUi.register(mod)
     return
   end
 
-  local Gen1Patch = require("mods.Kanto-Reforged.gen1_patch")
+  local Gen1Patch = require("mods.Kanto-Reforged.core.gen1_patch")
   Gen1Patch.apply(require("src.ui.SummaryMenu"), function(Builtin)
     mod.content.screens:register("SummaryMenu", {
       new = function(game, mon)

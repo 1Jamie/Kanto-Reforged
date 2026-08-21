@@ -345,15 +345,13 @@ function LevelCaps.register(mod)
   local Host = require("mods.Kanto-Reforged.core.host")
   local HouseNpcs = require("mods.Kanto-Reforged.world.house_npcs")
   if Host.isGen2() then
-    HouseNpcs.appendNpc(mod, "CHERRYGROVE_CITY", LevelCaps.NPC_CHERRYGROVE, "level_caps")
+    -- In Gen 2, only place in Viridian City (Kanto), hiding from Cherrygrove City (Johto)
     HouseNpcs.appendNpc(mod, "VIRIDIAN_CITY", LevelCaps.NPC_VIRIDIAN, "level_caps")
-    HouseNpcs.bindTalk(mod, "CHERRYGROVE_CITY", {
-      [LevelCaps.TEXT_ID] = talkHandler(mod),
-    })
     HouseNpcs.bindTalk(mod, "VIRIDIAN_CITY", {
       [LevelCaps.TEXT_ID] = talkHandler(mod),
     })
   else
+
     mod.content.maps:patch("VIRIDIAN_CITY", {
       objects = {
         __append = {

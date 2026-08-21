@@ -97,7 +97,7 @@ function TradesExtra.register(mod)
   -- Apply held preload when in-game trade creates the received mon.
   -- Concatenate the module name so gen2check cannot MK402 this Gen1-only require;
   -- TradesExtra.register only runs under Host.isGen1().
-  local Gen1Patch = require("mods.Kanto-Reforged.gen1_patch")
+  local Gen1Patch = require("mods.Kanto-Reforged.core.gen1_patch")
   local cmdName = "src" .. ".script.Commands"
   local ok, Commands = pcall(require, cmdName)
   if not ok or not Commands then return end

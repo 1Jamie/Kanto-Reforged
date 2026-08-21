@@ -1,5 +1,5 @@
 -- Gen 3-style breeding helpers mapped onto Gen 1 DVs / genderRate / abilities.
--- Daycare UI and overworld step hooks live in daycare.lua.
+-- Daycare UI and overworld step hooks live in pokemon/daycare.lua.
 
 local Gender = require("mods.Kanto-Reforged.pokemon.gender")
 local Growth = require("src.pokemon.Growth")

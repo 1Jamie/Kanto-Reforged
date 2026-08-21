@@ -6,12 +6,23 @@ import requests
 import time
 from PIL import Image
 
-# This script lives in the mod folder.  The game loads assets via
+# Script lives in tools/; mod root is the parent. The game loads assets via
 # mods/<folder>/..., and the launcher installs zips to mods/<manifest.id>/,
 # so the folder name must match the mod id (Kanto-Reforged).
-MOD_ROOT = os.path.dirname(os.path.abspath(__file__))
+TOOLS_DIR = os.path.dirname(os.path.abspath(__file__))
+MOD_ROOT = os.path.dirname(TOOLS_DIR)
 MOD_ID = os.path.basename(MOD_ROOT)
 ASSET_PREFIX = f"mods/{MOD_ID}"
+
+# Domain output paths (post structure refactor — no root facades).
+PATH_POKEMON_DATA = os.path.join("pokemon", "pokemon_data.lua")
+PATH_TYPES_DATA = os.path.join("battle", "types_data.lua")
+PATH_SPECIES_PALETTES = os.path.join("pokemon", "species_palettes.lua")
+PATH_LEARNSET_PATCHES = os.path.join("pokemon", "learnset_patches.lua")
+PATH_ABILITY_PATCHES = os.path.join("battle", "ability_patches.lua")
+PATH_SPECIAL_STAT_PATCHES = os.path.join("battle", "special_stat_patches.lua")
+PATH_GENDER_PATCHES = os.path.join("pokemon", "gender_patches.lua")
+PATH_BREEDING_PATCHES = os.path.join("pokemon", "breeding_patches.lua")
 
 
 def game_rel_mod_dir(outdir):
@@ -21,6 +32,11 @@ def game_rel_mod_dir(outdir):
     """
     name = os.path.basename(os.path.abspath(outdir).rstrip(r"\/"))
     return f"mods/{name}"
+
+
+def mod_data_path(outdir, rel):
+    """Join --outdir with a domain-relative data file path."""
+    return os.path.join(outdir, rel)
 
 
 VANILLA_TYPES = {
@@ -669,7 +685,7 @@ def load_vanilla_moves(repo_root="."):
 
 def load_kanto_reforged_move_powers(outdir=None):
     """Parse power for each Kanto Reforged move from pokemon_data.lua (0 = status)."""
-    path = os.path.join(outdir or MOD_ROOT, "pokemon_data.lua")
+    path = mod_data_path(outdir or MOD_ROOT, PATH_POKEMON_DATA)
     powers = {}
     if not os.path.exists(path):
         return powers
@@ -802,7 +818,7 @@ def collect_kanto_move_patches(registered_moves, start=1, end=151, outdir=None):
 
 
 def write_learnset_patches_lua(path, learnset_patches, tmhm_patches):
-    """Write mods/Kanto-Reforged/learnset_patches.lua."""
+    """Write mods.Kanto-Reforged.pokemon.learnset_patches.lua."""
     print(f"Writing {path}...")
     with open(path, "w", encoding="utf-8") as f:
         f.write("-- Generated Gen 2/3 learnset/TM additions for Kanto species\n")
@@ -867,7 +883,7 @@ def collect_kanto_ability_patches(start=1, end=151):
 
 
 def write_ability_patches_lua(path, ability_patches):
-    """Write mods/Kanto-Reforged/ability_patches.lua."""
+    """Write mods.Kanto-Reforged.battle.ability_patches.lua."""
     print(f"Writing {path}...")
     with open(path, "w", encoding="utf-8") as f:
         f.write("-- Generated Gen 3 abilities for Kanto species (PokeAPI)\n")
@@ -908,7 +924,7 @@ def collect_special_stat_patches(start=1, end=151):
 
 
 def write_special_stat_patches_lua(path, patches):
-    """Write mods/Kanto-Reforged/special_stat_patches.lua."""
+    """Write mods.Kanto-Reforged.battle.special_stat_patches.lua."""
     print(f"Writing {path}...")
     with open(path, "w", encoding="utf-8") as f:
         f.write("-- Generated SpA/SpD for Kanto species (PokeAPI)\n")
@@ -956,7 +972,7 @@ def collect_gender_rate_patches(start=1, end=386):
 
 
 def write_gender_patches_lua(path, gender_patches):
-    """Write mods/Kanto-Reforged/gender_patches.lua."""
+    """Write mods.Kanto-Reforged.pokemon.gender_patches.lua."""
     print(f"Writing {path}...")
     with open(path, "w", encoding="utf-8") as f:
         f.write("-- Generated genderRate (PokéAPI female eighths; -1 = genderless)\n")
@@ -1074,7 +1090,7 @@ def collect_breeding_patches(start=1, end=386):
 
 
 def write_breeding_patches_lua(path, breeding_patches):
-    """Write mods/Kanto-Reforged/breeding_patches.lua."""
+    """Write mods.Kanto-Reforged.pokemon.breeding_patches.lua."""
     print(f"Writing {path}...")
     with open(path, "w", encoding="utf-8") as f:
         f.write("-- Generated breeding fields (PokéAPI egg groups / hatch / egg moves)\n")
@@ -6410,7 +6426,7 @@ def resprite_kanto_reforged(outdir, only=None, gen=None):
     """
     import re
 
-    lua_path = os.path.join(outdir, "pokemon_data.lua")
+    lua_path = mod_data_path(outdir, PATH_POKEMON_DATA)
     if not os.path.exists(lua_path):
         print(f"No pokemon_data.lua at {lua_path}")
         return
@@ -6421,7 +6437,7 @@ def resprite_kanto_reforged(outdir, only=None, gen=None):
     counts = {5: 0, 6: 0, 7: 0}
     missing = []
     cache_dir = sprite_cache_dir()
-    palette_path = os.path.join(outdir, "species_palettes.lua")
+    palette_path = mod_data_path(outdir, PATH_SPECIES_PALETTES)
     species_palettes = load_species_palettes_lua(palette_path)
     only_set = {s.upper() for s in only} if only else None
 
@@ -6836,7 +6852,7 @@ def main():
         print("Collecting Gen 3 abilities for Kanto species...")
         ability_patches = collect_kanto_ability_patches()
         write_ability_patches_lua(
-            os.path.join(args.outdir, "ability_patches.lua"),
+            mod_data_path(args.outdir, PATH_ABILITY_PATCHES),
             ability_patches,
         )
         print(f"Done: {len(ability_patches)} Kanto ability patches")
@@ -6846,7 +6862,7 @@ def main():
         print("Collecting SpA/SpD patches for Kanto species...")
         special_patches = collect_special_stat_patches(1, 151)
         write_special_stat_patches_lua(
-            os.path.join(args.outdir, "special_stat_patches.lua"),
+            mod_data_path(args.outdir, PATH_SPECIAL_STAT_PATCHES),
             special_patches,
         )
         print(f"Done: {len(special_patches)} Kanto SpA/SpD patches")
@@ -6856,7 +6872,7 @@ def main():
         print("Collecting genderRate patches for dex 1-386...")
         gender_patches = collect_gender_rate_patches(1, 386)
         write_gender_patches_lua(
-            os.path.join(args.outdir, "gender_patches.lua"),
+            mod_data_path(args.outdir, PATH_GENDER_PATCHES),
             gender_patches,
         )
         print(f"Done: {len(gender_patches)} genderRate patches")
@@ -6866,7 +6882,7 @@ def main():
         print("Collecting breeding patches for dex 1-386...")
         breeding_patches = collect_breeding_patches(1, 386)
         write_breeding_patches_lua(
-            os.path.join(args.outdir, "breeding_patches.lua"),
+            mod_data_path(args.outdir, PATH_BREEDING_PATCHES),
             breeding_patches,
         )
         print(f"Done: {len(breeding_patches)} breeding patches")
@@ -6877,7 +6893,7 @@ def main():
         registered_moves = {}
         # Seed with moves already emitted by a prior full generation so we
         # do not drop patches that reference them.
-        existing = os.path.join(args.outdir, "pokemon_data.lua")
+        existing = mod_data_path(args.outdir, PATH_POKEMON_DATA)
         if os.path.exists(existing):
             with open(existing, "r", encoding="utf-8") as f:
                 for line in f:
@@ -6903,7 +6919,7 @@ def main():
             registered_moves, outdir=args.outdir
         )
         write_learnset_patches_lua(
-            os.path.join(args.outdir, "learnset_patches.lua"),
+            mod_data_path(args.outdir, PATH_LEARNSET_PATCHES),
             learnset_patches,
             tmhm_patches,
         )
@@ -7328,8 +7344,10 @@ def main():
     for effect_id, count in sorted(effect_counts.items(), key=lambda kv: (-kv[1], kv[0])):
         print(f"  {effect_id}: {count}")
             
-    # 4. Generate Lua files
-    types_lua_path = os.path.join(args.outdir, "types_data.lua")
+    # 4. Generate Lua files (domain folders — match main.lua require paths)
+    os.makedirs(os.path.join(args.outdir, "battle"), exist_ok=True)
+    os.makedirs(os.path.join(args.outdir, "pokemon"), exist_ok=True)
+    types_lua_path = mod_data_path(args.outdir, PATH_TYPES_DATA)
     print(f"Writing {types_lua_path}...")
     with open(types_lua_path, "w", encoding="utf-8") as f:
         f.write("-- Generated custom types and matchups data\n")
@@ -7344,7 +7362,7 @@ def main():
         f.write("}\n\n")
         f.write("return T\n")
         
-    pokemon_lua_path = os.path.join(args.outdir, "pokemon_data.lua")
+    pokemon_lua_path = mod_data_path(args.outdir, PATH_POKEMON_DATA)
     print(f"Writing {pokemon_lua_path}...")
     with open(pokemon_lua_path, "w", encoding="utf-8") as f:
         f.write("-- Generated Pokémon species and custom moves data\n")
@@ -7464,7 +7482,7 @@ def main():
     }
     if pals:
         write_species_palettes_lua(
-            os.path.join(args.outdir, "species_palettes.lua"),
+            mod_data_path(args.outdir, PATH_SPECIES_PALETTES),
             pals,
         )
         print(f"Wrote {len(pals)} species palettes")
@@ -7477,7 +7495,7 @@ def main():
         registered_moves, outdir=args.outdir
     )
     write_learnset_patches_lua(
-        os.path.join(args.outdir, "learnset_patches.lua"),
+        mod_data_path(args.outdir, PATH_LEARNSET_PATCHES),
         learnset_patches,
         tmhm_patches,
     )
@@ -7485,21 +7503,21 @@ def main():
     print("Collecting Gen 3 abilities for Kanto species...")
     ability_patches = collect_kanto_ability_patches()
     write_ability_patches_lua(
-        os.path.join(args.outdir, "ability_patches.lua"),
+        mod_data_path(args.outdir, PATH_ABILITY_PATCHES),
         ability_patches,
     )
 
     print("Collecting genderRate patches for dex 1-386...")
     gender_patches = collect_gender_rate_patches(1, 386)
     write_gender_patches_lua(
-        os.path.join(args.outdir, "gender_patches.lua"),
+        mod_data_path(args.outdir, PATH_GENDER_PATCHES),
         gender_patches,
     )
 
     print("Collecting breeding patches for dex 1-386...")
     breeding_patches = collect_breeding_patches(1, 386)
     write_breeding_patches_lua(
-        os.path.join(args.outdir, "breeding_patches.lua"),
+        mod_data_path(args.outdir, PATH_BREEDING_PATCHES),
         breeding_patches,
     )
         

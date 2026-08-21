@@ -46,7 +46,25 @@ local KANTO_GRASS = {
   ROUTE_26 = { level = 38, habitats = { "grassland", "mountain" } },
   ROUTE_27 = { level = 38, habitats = { "grassland", "mountain" } },
   ROUTE_28 = { level = 40, habitats = { "mountain" } },
-  VIRIDIAN_FOREST = { level = 28, habitats = { "forest" } },
+  VIRIDIAN_FOREST = { level = 46, habitats = { "forest" } },
+  DIGLETTS_CAVE = { level = 48, habitats = { "cave" } },
+  MT_MOON_1F = { level = 48, habitats = { "cave", "mountain" } },
+  MT_MOON_B1F = { level = 49, habitats = { "cave", "mountain" } },
+  MT_MOON_B2F = { level = 50, habitats = { "cave", "mountain" } },
+  CERULEAN_CAVE_1F = { level = 58, habitats = { "cave", "mountain" } },
+  CERULEAN_CAVE_2F = { level = 60, habitats = { "cave", "mountain" } },
+  CERULEAN_CAVE_B1F = { level = 62, habitats = { "cave", "mountain" } },
+  SEAFOAM_ISLANDS_1F = { level = 52, habitats = { "cave", "sea" } },
+  SEAFOAM_ISLANDS_B1F = { level = 53, habitats = { "cave", "sea" } },
+  SEAFOAM_ISLANDS_B2F = { level = 54, habitats = { "cave", "sea" } },
+  SEAFOAM_ISLANDS_B3F = { level = 55, habitats = { "cave", "sea" } },
+  SEAFOAM_ISLANDS_B4F = { level = 56, habitats = { "cave", "sea" } },
+  SAFARI_ZONE_CENTER = { level = 50, habitats = { "grassland", "forest" } },
+  SAFARI_ZONE_EAST = { level = 50, habitats = { "grassland", "forest" } },
+  SAFARI_ZONE_WEST = { level = 50, habitats = { "grassland", "forest" } },
+  SAFARI_ZONE_NORTH = { level = 50, habitats = { "grassland", "forest" } },
+  ROCK_TUNNEL_1F = { level = 48, habitats = { "cave", "mountain" } },
+  ROCK_TUNNEL_B1F = { level = 50, habitats = { "cave", "mountain" } },
 }
 
 -- Johto: a few Gen3 guests per grass map (not a full Hoenn reload).
@@ -364,33 +382,13 @@ local function livePatchKind(mod, kind, mapId, block)
   end
   root[kind] = root[kind] or {}
   root[kind][mapId] = block
+  root[kind]["KR_" .. mapId] = block
   -- World normally aliases game.data.gen2Encounters; if it diverged, stamp it.
   local world = game and game.world
   if world and world.encounters and world.encounters ~= root then
     world.encounters[kind] = world.encounters[kind] or {}
     world.encounters[kind][mapId] = block
-  end
-  return true
-end
-
-local function patchMap(mod, mapId, info)
-  local pools = KANTO_HABITAT_POOL
-  local morn = slotsFor(mod, info.habitats, info.level, "MORN", pools)
-  local day = slotsFor(mod, info.habitats, info.level, "DAY", pools)
-  local nite = slotsFor(mod, info.habitats, info.level, "NITE", pools)
-  if not (morn and day and nite) then return false end
-
-  local block = {
-    rates = { MORN = 25, DAY = 25, NITE = 25 },
-    slots = {
-      MORN = morn,
-      DAY = day,
-      NITE = nite,
-    },
-  }
-  if not livePatchKind(mod, "grass", mapId, block) then
-    mod.log:warn("encounters_gen2 patch %s failed", mapId)
-    return false
+    world.encounters[kind]["KR_" .. mapId] = block
   end
   return true
 end
@@ -403,13 +401,13 @@ local function hashId(s)
   return h
 end
 
--- Stable pick of `count` Gen3 guests for a Johto map. Habitat + wild level
+-- Stable pick of `count` Gen3 guests. Habitat + wild level
 -- band only — no evolved lines, no out-of-place biomes.
-local function pickGuests(mod, mapId, info)
+local function pickGuests(mod, mapId, info, habitatPools)
   local count = info.count or 2
   local SpeciesScope = require("mods.Kanto-Reforged.pokemon.species_scope")
   local maxDex = SpeciesScope.maxDexForMap(mod, mapId)
-  local pool = filterRegistered(mod, poolFor(info.habitats, info.level))
+  local pool = filterRegistered(mod, poolFor(info.habitats, info.level, habitatPools))
   if maxDex then
     local clipped = {}
     local registry = mod and mod.content and mod.content.pokemon
@@ -448,7 +446,7 @@ local function copySlots(slots)
   return out
 end
 
--- Keep Gold commons; overwrite the rarest slots with Gen3 guests at a level
+-- Keep Gold / Restored commons; overwrite rarest slots with Gen3 guests at a level
 -- that fits both the slot and the species' wild band.
 local function injectGuests(slots, guests)
   local out = copySlots(slots)
@@ -462,6 +460,48 @@ local function injectGuests(slots, guests)
     out[idx].level = clampWildLevel(sp, baseLv)
   end
   return out
+end
+
+-- Snapshot vanilla Gen2 grass/water once so curated ↔ full_random can toggle.
+local baselines = { grass = {}, water = {} }
+
+local function patchMap(mod, mapId, info)
+  local base = baselines.grass[mapId] or (liveGrass(mod) and liveGrass(mod)[mapId])
+  if base and base.slots and base.slots.DAY and #base.slots.DAY > 0 then
+    local guests = pickGuests(mod, mapId, info, KANTO_HABITAT_POOL)
+    if #guests > 0 then
+      local block = {
+        rates = base.rates or { MORN = 25, DAY = 25, NITE = 25 },
+        slots = {
+          MORN = injectGuests(base.slots.MORN, guests),
+          DAY = injectGuests(base.slots.DAY, guests),
+          NITE = injectGuests(base.slots.NITE, guests),
+        },
+      }
+      return livePatchKind(mod, "grass", mapId, block)
+    end
+    return true
+  end
+
+  local pools = KANTO_HABITAT_POOL
+  local morn = slotsFor(mod, info.habitats, info.level, "MORN", pools)
+  local day = slotsFor(mod, info.habitats, info.level, "DAY", pools)
+  local nite = slotsFor(mod, info.habitats, info.level, "NITE", pools)
+  if not (morn and day and nite) then return false end
+
+  local block = {
+    rates = { MORN = 25, DAY = 25, NITE = 25 },
+    slots = {
+      MORN = morn,
+      DAY = day,
+      NITE = nite,
+    },
+  }
+  if not livePatchKind(mod, "grass", mapId, block) then
+    mod.log:warn("encounters_gen2 patch %s failed", mapId)
+    return false
+  end
+  return true
 end
 
 local function injectJohtoMap(mod, mapId, info)
@@ -486,9 +526,6 @@ local function injectJohtoMap(mod, mapId, info)
   return true
 end
 
--- Snapshot vanilla Gen2 grass/water once so curated ↔ full_random can toggle.
-local baselines = { grass = {}, water = {} }
-
 local function copyGrassBlock(block)
   if not block then return nil end
   local slots = {}
@@ -512,13 +549,13 @@ end
 local function captureBaselines(mod)
   local grass = liveGrass(mod)
   for mapId, block in pairs(grass or {}) do
-    if not baselines.grass[mapId] and block and block.slots then
+    if not mapId:match("^KR_") and not baselines.grass[mapId] and block and block.slots then
       baselines.grass[mapId] = copyGrassBlock(block)
     end
   end
   local water = liveWater(mod)
   for mapId, block in pairs(water or {}) do
-    if not baselines.water[mapId] and block and block.slots then
+    if not mapId:match("^KR_") and not baselines.water[mapId] and block and block.slots then
       baselines.water[mapId] = copyWaterBlock(block)
     end
   end
@@ -572,6 +609,8 @@ local KANTO_PREFIXES = {
 }
 
 local function isKantoMap(mapId)
+  if not mapId then return false end
+  mapId = mapId:gsub("^KR_", "")
   if KANTO_GRASS[mapId] then return true end
   local n = tonumber((mapId:match("^ROUTE_(%d+)")))
   if n then return n <= 28 end
@@ -591,6 +630,27 @@ local WATER_HABITAT = {
 local LAND_HABITAT = {
   grassland = true, forest = true, mountain = true, urban = true,
   cave = true, ["rough-terrain"] = true,
+}
+
+local WATER_ONLY_SPECIES = {
+  CLAMPERL = true, HUNTAIL = true, GOREBYSS = true,
+  CARVANHA = true, SHARPEDO = true,
+  BARBOACH = true, WHISCASH = true,
+  WAILMER = true, WAILORD = true,
+  CORPHISH = true, CRAWDAUNT = true,
+  HORSEA = true, SEADRA = true, KINGDRA = true,
+  SEEL = true, DEWGONG = true,
+  GOLDEEN = true, SEAKING = true,
+  MAGIKARP = true, GYARADOS = true,
+  TENTACOOL = true, TENTACRUEL = true,
+  CHINCHOU = true, LANTURN = true,
+  REMORAID = true, OCTILLERY = true,
+  QWILFISH = true, CORSOLA = true,
+  STARYU = true, STARMIE = true,
+  SHELLDER = true, CLOYSTER = true,
+  KRABBY = true, KINGLER = true,
+  RELICANTH = true, LUVDISC = true,
+  FEEBAS = true, MILOTIC = true,
 }
 
 local function habitatsForMap(mapId)
@@ -734,7 +794,13 @@ local function eligibleForSlot(index, habitats, slotLevel, avg, maxLv, allowLege
     if seen[id] then return end
     local m = index.meta[id]
     if not m then return end
-    if m.rare and not allowLegends then return end
+    -- Marine and pure fish species NEVER appear in dry land grass tables
+    if not waterPool and (WATER_ONLY_SPECIES[id] or m.habitat == "sea") then return end
+    if waterPool and not (WATER_HABITAT[m.habitat] or WATER_ONLY_SPECIES[id]) then return end
+    -- Legends stay out of grass unless allowLegends is on AND the slot is deep postgame (Lv 55+)
+    if m.rare then
+      if not allowLegends or (maxLv or 0) < 55 or (slotLevel or 0) < 55 then return end
+    end
     -- Legends ignore evo-stage caps but still need a high enough slot level.
     if not m.rare and m.stage > routeMaxStage then return end
     if slotLevel < (m.minLevel or 1) then return end
@@ -748,23 +814,23 @@ local function eligibleForSlot(index, habitats, slotLevel, avg, maxLv, allowLege
       consider(id, preferred)
     end
   end
-  if allowLegends then
+  if allowLegends and (maxLv or 0) >= 55 and (slotLevel or 0) >= 55 then
     for _, id in ipairs(index.byHabitat.rare or {}) do
       consider(id, preferred)
     end
   end
 
   -- Soft habitat miss for thin pools — land stays land, water stays water.
-  -- Never put Barboach / Carvanha on Route 30 grass.
+  -- Never put Barboach / Carvanha / Clamperl on Route 2 / Route 30 grass.
   for id, m in pairs(index.meta) do
     if not seen[id] and m
-        and (not m.rare or allowLegends)
+        and (not m.rare or (allowLegends and (maxLv or 0) >= 55 and (slotLevel or 0) >= 55))
         and (m.rare or m.stage <= routeMaxStage)
         and slotLevel >= (m.minLevel or 1)
         and (m.rare or m.bst <= ExpEncounters.bstCap(avg, m.stage)) then
       if waterPool then
-        if WATER_HABITAT[m.habitat] then consider(id, fallback) end
-      elseif not WATER_HABITAT[m.habitat] and LAND_HABITAT[m.habitat] then
+        if WATER_HABITAT[m.habitat] or WATER_ONLY_SPECIES[id] then consider(id, fallback) end
+      elseif not WATER_HABITAT[m.habitat] and not WATER_ONLY_SPECIES[id] and LAND_HABITAT[m.habitat] then
         consider(id, fallback)
       end
     end

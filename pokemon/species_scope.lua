@@ -104,7 +104,7 @@ function SpeciesScope.dexOf(gameOrData, speciesId)
   if data and data.data then data = data.data end
   local def = data and data.pokemon and data.pokemon[speciesId]
   if def and def.dex then return def.dex end
-  local ok, pokemon_data = pcall(require, "mods.Kanto-Reforged.pokemon_data")
+  local ok, pokemon_data = pcall(require, "mods.Kanto-Reforged.pokemon.pokemon_data")
   if ok and pokemon_data and pokemon_data.species and pokemon_data.species[speciesId] then
     return pokemon_data.species[speciesId].dex
   end
@@ -424,9 +424,7 @@ local function setStash(mod, stash)
 end
 
 local function krPackSpecies()
-  local ok, pack = pcall(require, "mods.Kanto-Reforged.pokemon_data")
-  if ok and pack and type(pack.species) == "table" then return pack.species end
-  ok, pack = pcall(require, "mods.Kanto-Reforged.pokemon.pokemon_data")
+  local ok, pack = pcall(require, "mods.Kanto-Reforged.pokemon.pokemon_data")
   if ok and pack and type(pack.species) == "table" then return pack.species end
   return {}
 end
@@ -1026,7 +1024,7 @@ end
 function SpeciesScope.captureEvoBaselines(mod, force)
   if SpeciesScope._evoBaselines and not force then return end
   SpeciesScope._evoBaselines = {}
-  local ok, pokemon_data = pcall(require, "mods.Kanto-Reforged.pokemon_data")
+  local ok, pokemon_data = pcall(require, "mods.Kanto-Reforged.pokemon.pokemon_data")
   if not ok or not pokemon_data or not pokemon_data.evolutions then return end
   for speciesId in pairs(pokemon_data.evolutions) do
     local existing = mod.content.pokemon:get(speciesId)
@@ -1420,7 +1418,7 @@ function SpeciesScope.installLink(mod)
     return tostring(fp) .. "|scope:" .. tostring(mode)
   end)
 
-  local Gen1Patch = require("mods.Kanto-Reforged.gen1_patch")
+  local Gen1Patch = require("mods.Kanto-Reforged.core.gen1_patch")
   Gen1Patch.apply(require("src.link.Fingerprint"), function(FP)
     local origRecords = FP.records
     if type(origRecords) ~= "function" then return end
@@ -1512,7 +1510,7 @@ end
 
 function SpeciesScope.install(mod)
   SpeciesScope._mod = mod
-  local Gen1Patch = require("mods.Kanto-Reforged.gen1_patch")
+  local Gen1Patch = require("mods.Kanto-Reforged.core.gen1_patch")
 
   if Host.isGen1() then
     -- Keep KR seen/owned flags across SaveData.validate even if a species is
@@ -1524,7 +1522,7 @@ function SpeciesScope.install(mod)
         SpeciesScope.snapshotDexFlags(mod, save)
         local preserved = { seen = {}, owned = {} }
         local dex = save and save.pokedex
-        local packOk, pack = pcall(require, "mods.Kanto-Reforged.pokemon_data")
+        local packOk, pack = pcall(require, "mods.Kanto-Reforged.pokemon.pokemon_data")
         local species = packOk and pack and pack.species
         if type(dex) == "table" and type(species) == "table" then
           for _, key in ipairs({ "seen", "owned" }) do

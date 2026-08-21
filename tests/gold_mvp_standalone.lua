@@ -1019,22 +1019,49 @@ do
   end
 end
 
--- Gen 2 trainer.party guests: ensure Gen 3 guest mons are full Mon instances with moves & stats
+-- Gen 2 trainer.party guests: Johto leaders still get a Gen3 guest.
+-- Kanto gym leaders use curated full parties (no guest overflow).
 do
   local Mon = require("src.battle.gen2.Mon")
   local Runtime = require("src.mods.Runtime")
+  local ExpTrainers = require("mods.Kanto-Reforged.battle.trainers")
+  T.check(ExpTrainers.hasGen2Override("BROCK"), "Brock has curated Gen2 override")
+  T.eq(ExpTrainers.GEN2_FULL_PARTIES.BROCK[1][1].species, "SUDOWOODO",
+    "Brock curated lead is Sudowoodo")
+
+  -- Delivery matches restored_dungeons: roster-by-key lookup, not Gen1 parties[][].
+  local keyed = ExpTrainers._gen2RosterByKey and ExpTrainers._gen2RosterByKey.BROCK_1
+  T.check(keyed and keyed.roster, "Brock roster indexed for Gen2 lookup")
+  T.eq(keyed.roster[1].species, "SUDOWOODO", "keyed Brock lead is Sudowoodo")
+  T.eq(keyed.roster[#keyed.roster].item, "BERRY", "keyed Brock ace uses item field")
+
+  local okLookup, G2Trainers = pcall(require, "src.world.gen2.Trainers")
+  if okLookup and G2Trainers and G2Trainers.lookup then
+    local rec = G2Trainers.lookup(Data.gen2Trainers or Data.trainers, "BROCK", 1)
+    T.check(rec and rec.roster, "Trainers.lookup returns Brock overlay roster")
+    T.eq(rec.roster[1].species, "SUDOWOODO", "lookup Brock lead is Sudowoodo")
+  else
+    T.check(false, "Gen2 Trainers.lookup available")
+  end
+
+  local baseFalkner = {
+    Mon.new(Data, "PIDGEY", 7, { dvs = { attack = 9, defense = 8, speed = 8, special = 8 } }),
+  }
+  local partyWithGuest = Runtime.call("trainer.party", function(_, _, p) return p end, "FALKNER", 1, baseFalkner)
+  T.eq(#partyWithGuest, 2, "Falkner party has 1 vanilla + 1 guest mon")
+  local guest = partyWithGuest[2]
+  T.eq(guest.species, "TAILLOW", "Falkner guest is Taillow")
+  T.eq(guest.level, 7, "Taillow matches last mon level")
+  T.check(guest.moves ~= nil and #guest.moves > 0, "Taillow has valid moveset")
+  T.check(guest.hp ~= nil and guest.hp > 0, "Taillow has valid HP")
+  T.check(guest.maxHp ~= nil and guest.maxHp > 0, "Taillow has valid maxHp")
+  T.check(guest.stats ~= nil and guest.stats.attack > 0, "Taillow has calculated stats")
+
   local baseBrock = {
     Mon.new(Data, "GEODUDE", 12, { dvs = { attack = 9, defense = 8, speed = 8, special = 8 } }),
   }
-  local partyWithGuest = Runtime.call("trainer.party", function(_, _, p) return p end, "BROCK", 1, baseBrock)
-  T.eq(#partyWithGuest, 2, "Brock party has 1 vanilla + 1 guest mon")
-  local guest = partyWithGuest[2]
-  T.eq(guest.species, "ARON", "Brock guest is Aron")
-  T.eq(guest.level, 12, "Aron matches last mon level")
-  T.check(guest.moves ~= nil and #guest.moves > 0, "Aron has valid moveset")
-  T.check(guest.hp ~= nil and guest.hp > 0, "Aron has valid HP")
-  T.check(guest.maxHp ~= nil and guest.maxHp > 0, "Aron has valid maxHp")
-  T.check(guest.stats ~= nil and guest.stats.attack > 0, "Aron has calculated stats")
+  local brockNoGuest = Runtime.call("trainer.party", function(_, _, p) return p end, "BROCK", 1, baseBrock)
+  T.eq(#brockNoGuest, 1, "Brock curated override skips Gen3 guest append")
 end
 
 require("mods.Kanto-Reforged.tests.spawn_matrix_test")(T, Data, run, { skipGen1 = true })

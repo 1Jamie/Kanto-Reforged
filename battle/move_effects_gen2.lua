@@ -1337,7 +1337,7 @@ local function applyDamageStats(battle, user, target, move, damage)
 end
 
 function MoveEffectsGen2.install(mod)
-  local Gen1Patch = require("mods.Kanto-Reforged.gen1_patch")
+  local Gen1Patch = require("mods.Kanto-Reforged.core.gen1_patch")
   local Abilities = require("mods.Kanto-Reforged.battle.abilities")
 
   mod.events:on("battle.started", function(ev)

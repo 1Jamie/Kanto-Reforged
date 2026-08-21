@@ -19,11 +19,17 @@ function Host.generation()
   if forced == 1 or forced == 2 then
     return forced
   end
-  -- Engines before Gold support (e.g. 0.1.75) have no GameVersion.generation.
-  if type(GameVersion.generation) == "function" then
-    return GameVersion.generation()
+  if GameVersion.get() == "gold" or (type(GameVersion.isGold) == "function" and GameVersion.isGold()) then
+    return 2
   end
-  if type(GameVersion.isGold) == "function" and GameVersion.isGold() then
+  if _G.game and (_G.game.generation == 2 or _G.game.isGold) then
+    return 2
+  end
+  local ok2, Game2 = pcall(require, "src.core.Game2")
+  if ok2 and Game2 and package.loaded["src.core.Game2"] then
+    return 2
+  end
+  if type(GameVersion.generation) == "function" and GameVersion.generation() == 2 then
     return 2
   end
   return 1
@@ -173,7 +179,7 @@ end
 function Host.installEngineShims(mod)
   if Host._engineShims then return end
   Host._engineShims = true
-  local Gen1Patch = require("mods.Kanto-Reforged.gen1_patch")
+  local Gen1Patch = require("mods.Kanto-Reforged.core.gen1_patch")
 
   pcall(function()
     local Game2 = require("src.core.Game2")
@@ -185,21 +191,23 @@ function Host.installEngineShims(mod)
     end
   end)
 
-  pcall(function()
-    Gen1Patch.apply(require("src.core.Game"), function(Game)
-      if Game._krWriteOpts then return end
-      local orig = Game.writeOptions
-      if type(orig) ~= "function" then return end
-      function Game:writeOptions()
-        if self.mods and self.mods.modOptions and self.save
-            and self.save.options then
-          self.save.options.modOptions = self.mods.modOptions
+  if Host.isGen1() then
+    pcall(function()
+      Gen1Patch.apply(require("src.core.Game"), function(Game)
+        if Game._krWriteOpts then return end
+        local orig = Game.writeOptions
+        if type(orig) ~= "function" then return end
+        function Game:writeOptions()
+          if self.mods and self.mods.modOptions and self.save
+              and self.save.options then
+            self.save.options.modOptions = self.mods.modOptions
+          end
+          return orig(self)
         end
-        return orig(self)
-      end
-      Game._krWriteOpts = true
+        Game._krWriteOpts = true
+      end)
     end)
-  end)
+  end
 
   pcall(function()
     Gen1Patch.apply(require("src.core.gen2.Save"), function(Save)

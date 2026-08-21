@@ -115,5 +115,15 @@ return function(T, Data, run)
     T.check(true, "BagMenu factory present (public fields skipped headless)")
   end
 
+  -- Test TM/HM pocket sorting (TMs first, HMs second, ordered by number)
+  local tmSave = {
+    inventory = { HM_01 = 1, TM_28 = 1, TM_01 = 1, HM_02 = 1, TM_05 = 1 },
+    bagOrder = { "HM_01", "TM_28", "TM_01", "HM_02", "TM_05" },
+  }
+  BagPockets.setIndex(4) -- tmhm pocket index is 4
+  local tmOrder = Bag.order(tmSave)
+  T.eq(table.concat(tmOrder, ","), "TM_01,TM_05,TM_28,HM_01,HM_02",
+    "tmhm pocket groups TMs then HMs, ordered by machine number")
+
   BagPockets._resetFilter()
 end

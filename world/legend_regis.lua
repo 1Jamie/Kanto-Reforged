@@ -86,7 +86,7 @@ local function sealTalk(species, level, flag, needType, needCount)
         "The seal wants\n%s-type POKéMON.", needType), done)
       return
     end
-    local Gen1Patch = require("mods.Kanto-Reforged.gen1_patch")
+    local Gen1Patch = require("mods.Kanto-Reforged.core.gen1_patch")
     local battle
     Gen1Patch.apply(require("src.battle.BattleState"), function(bs)
       battle = bs.newWild(game, species, level)

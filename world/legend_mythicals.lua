@@ -72,7 +72,7 @@ local function staticBattle(species, level, flag)
       HouseNpcs.pushText(game, Strings("..."), done)
       return
     end
-    local Gen1Patch = require("mods.Kanto-Reforged.gen1_patch")
+    local Gen1Patch = require("mods.Kanto-Reforged.core.gen1_patch")
     local battle
     Gen1Patch.apply(require("src.battle.BattleState"), function(bs)
       battle = bs.newWild(game, species, level)
@@ -356,7 +356,7 @@ function LegendMythicals.install(mod)
   if Host.isGen2() then return end
   local OverworldState = require("src.world.OverworldController")
   if not OverworldState._expansionLegendOutdoor then
-    local Gen1Patch = require("mods.Kanto-Reforged.gen1_patch")
+    local Gen1Patch = require("mods.Kanto-Reforged.core.gen1_patch")
     Gen1Patch.apply(OverworldState, function(ow)
       local origRemember = ow.rememberOutdoor
       if type(origRemember) ~= "function" then return end

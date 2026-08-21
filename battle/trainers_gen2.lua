@@ -44,6 +44,15 @@ function TrainersGen2.install(mod)
     if not guests or type(result) ~= "table" or #result == 0 then
       return result
     end
+    -- Full curated Kanto overworld teams already mix Gen2/3; do not overflow
+    -- past 6 or double-spice those classes.
+    local ExpTrainers = require("mods.Kanto-Reforged.battle.trainers")
+    if ExpTrainers.hasGen2Override and ExpTrainers.hasGen2Override(classId) then
+      return result
+    end
+    if #result >= 6 then
+      return result
+    end
     local SpeciesScope = require("mods.Kanto-Reforged.pokemon.species_scope")
     -- Rotate guest when a second option exists (still one mon max).
     local guestId = guests[1]

@@ -160,7 +160,7 @@ end
 
 local function pokemonLookup(mod)
   local data = liveData(mod)
-  local okPack, pack = pcall(require, "mods.Kanto-Reforged.pokemon_data")
+  local okPack, pack = pcall(require, "mods.Kanto-Reforged.pokemon.pokemon_data")
   if not okPack then pack = nil end
   local function get(id)
     if not id then return nil end
@@ -191,7 +191,7 @@ local function evoChildrenIndex(get)
     if data and data.pokemon then
       for id in pairs(data.pokemon) do queue[#queue + 1] = id end
     end
-    local okPack, pack = pcall(require, "mods.Kanto-Reforged.pokemon_data")
+    local okPack, pack = pcall(require, "mods.Kanto-Reforged.pokemon.pokemon_data")
     if okPack and pack and pack.species then
       for id in pairs(pack.species) do queue[#queue + 1] = id end
     end
@@ -414,7 +414,7 @@ end
 -- Engine Nests.find reads Gen1 keys (encounters / maps). Gold live wilds are
 -- gen2Encounters / gen2Maps — proxy those onto the keys the stock finder uses.
 function JohtoDex.installNests(mod)
-  local Gen1Patch = require("mods.Kanto-Reforged.gen1_patch")
+  local Gen1Patch = require("mods.Kanto-Reforged.core.gen1_patch")
   local ok, Nests = pcall(require, "src.core.gen2.Nests")
   if not ok or not Nests or Nests._krJohtoEnc then return end
   Gen1Patch.apply(Nests, function(N)
@@ -449,7 +449,7 @@ end
 -- chrome) and landmarks via data.landmarks. Gold keeps the town map on
 -- gen2MenuGfx.pokegear and landmarks under gen2Landmarks.
 function JohtoDex.installArea(mod)
-  local Gen1Patch = require("mods.Kanto-Reforged.gen1_patch")
+  local Gen1Patch = require("mods.Kanto-Reforged.core.gen1_patch")
   local ok, PM = pcall(require, "src.ui.gen2.PokedexMenu")
   if not ok or not PM or PM._krAreaMap then return end
   Gen1Patch.apply(PM, function(PokedexMenu)

@@ -212,7 +212,7 @@ return function(T, Data, run)
   T.eq(slotCount(legacy), 1, "one slot occupied")
 
   -- Interior + Day-Care Lady map patch
-  local Daycare = require("mods.Kanto-Reforged.daycare")
+  local Daycare = require("mods.Kanto-Reforged.pokemon.daycare")
   local MapScripts = require("src.script.MapScripts")
   local daycareMap = Data.maps.DAYCARE
   T.eq(#daycareMap.blocks, 16, "DAYCARE still 4×4 blocks")

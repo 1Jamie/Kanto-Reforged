@@ -87,6 +87,27 @@ local NEVER_WILD = {
   SHEDINJA = true, -- only via Nincada evolution (Nincada must stay wild)
 }
 
+local WATER_ONLY_SPECIES = {
+  CLAMPERL = true, HUNTAIL = true, GOREBYSS = true,
+  CARVANHA = true, SHARPEDO = true,
+  BARBOACH = true, WHISCASH = true,
+  WAILMER = true, WAILORD = true,
+  CORPHISH = true, CRAWDAUNT = true,
+  HORSEA = true, SEADRA = true, KINGDRA = true,
+  SEEL = true, DEWGONG = true,
+  GOLDEEN = true, SEAKING = true,
+  MAGIKARP = true, GYARADOS = true,
+  TENTACOOL = true, TENTACRUEL = true,
+  CHINCHOU = true, LANTURN = true,
+  REMORAID = true, OCTILLERY = true,
+  QWILFISH = true, CORSOLA = true,
+  STARYU = true, STARMIE = true,
+  SHELLDER = true, CLOYSTER = true,
+  KRABBY = true, KINGLER = true,
+  RELICANTH = true, LUVDISC = true,
+  FEEBAS = true, MILOTIC = true,
+}
+
 -- Gen 4+ baby stubs may appear in pokemon_data.evolutions without a species
 -- row. Counting them as parents wrongly marks Sudowoodo / Mantine / etc. as
 -- mid-stage so curated coverage never places the adult. Vanilla Gen 1 parents
@@ -217,7 +238,7 @@ function Encounters.eligible(index, habitats, slotLevel, avgLevel, maxLevel, opt
         seen[id] = true
         local m = index.meta[id]
         local ok = m ~= nil
-        if ok and m.rare and not allowRare then ok = false end
+        if ok and m.rare and (not allowRare or (maxLevel or 0) < 55 or (slotLevel or 0) < 55) then ok = false end
         if ok and rareOnly and not m.rare then ok = false end
         if ok and m.stage > routeMaxStage then ok = false end
         if ok and slotLevel < m.minLevel then ok = false end
@@ -475,10 +496,11 @@ local function ensureBaseCoverage(mod, index)
       -- Never steal Diglett's Cave slots for general cave coverage.
       if not mapDef.iconicLocals and habitatMatch(mapDef, meta.habitat) then
         for _, kind in ipairs(mapDef.kinds) do
-          local enc = mod.content.encounters:get(mapId)
-          local block = enc and enc[kind]
-          local slots = block and block.slots
-          if slots and #slots > 0 then
+          if not (kind == "grass" and (WATER_ONLY_SPECIES[speciesId] or meta.habitat == "sea")) then
+            local enc = mod.content.encounters:get(mapId)
+            local block = enc and enc[kind]
+            local slots = block and block.slots
+            if slots and #slots > 0 then
             local avg, maxLv = slotStats(slots)
             local candidates = {}
             local function consider(idx)
@@ -508,6 +530,7 @@ local function ensureBaseCoverage(mod, index)
                 livePatchEncounter(mod, mapId, { [kind] = { slots = slots } })
                 return true
               end
+            end
             end
           end
         end

@@ -2103,7 +2103,7 @@ end
 function TrainerAi.install(mod)
   if TrainerAI._expansionSmartAi then return end
   local Host = require("mods.Kanto-Reforged.core.host")
-  local Gen1Patch = require("mods.Kanto-Reforged.gen1_patch")
+  local Gen1Patch = require("mods.Kanto-Reforged.core.gen1_patch")
   local BattleCompat = require("mods.Kanto-Reforged.battle.battle_compat")
 
   -- Gen1 engine wiring (metadata, switch-lock, live retarget).

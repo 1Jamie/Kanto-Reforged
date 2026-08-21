@@ -9,6 +9,18 @@ local ExpTrainers = require("mods.Kanto-Reforged.battle.trainers")
 local SpeciesScope = require("mods.Kanto-Reforged.pokemon.species_scope")
 local Strings = require("src.core.Strings")
 
+local okSave, Save = pcall(require, "src.core.gen2.Save")
+if okSave and Save then
+  Save.EVENT_BYTES = math.max(Save.EVENT_BYTES or 256, 4096)
+end
+
+local okPerm, Permissions = pcall(require, "src.world.gen2.Permissions")
+if okPerm and Permissions then
+  function Permissions.doorForcedDirection(coll)
+    return nil
+  end
+end
+
 local function battlerHasType(battler, typeId)
   local BattleCompat = require("mods.Kanto-Reforged.battle.battle_compat")
   for _, t in ipairs(BattleCompat.types(battler)) do
@@ -63,6 +75,8 @@ local function applySpawnTables(mod, pokemon_data, flags)
     opts.seed = seed
   end
   if Host.isGen2() then
+    local RestoredDungeons = require("mods.Kanto-Reforged.world.restored_dungeons")
+    pcall(function() RestoredDungeons.apply(mod) end)
     local EncountersGen2 = require("mods.Kanto-Reforged.world.encounters_gen2")
     EncountersGen2.apply(mod, pokemon_data, mode, opts)
     local JohtoDex = require("mods.Kanto-Reforged.pokemon.johto_dex")
@@ -85,7 +99,7 @@ local _cachedPokemonData = nil
 local function refreshScopeContent(mod, game, scopeMode)
   local pokemon_data = _cachedPokemonData
   if not pokemon_data then
-    local okPack, data = pcall(require, "mods.Kanto-Reforged.pokemon_data")
+    local okPack, data = pcall(require, "mods.Kanto-Reforged.pokemon.pokemon_data")
     if okPack and data then
       pokemon_data = data
       _cachedPokemonData = data
@@ -94,19 +108,16 @@ local function refreshScopeContent(mod, game, scopeMode)
   -- Content registries freeze after load; live Data writes still apply for
   -- mid-session toggles (and headless tests).
   pcall(function() applySpawnTables(mod, pokemon_data) end)
-  local Host = require("mods.Kanto-Reforged.core.host")
-  if Host.isGen1() then
-    pcall(function() ExpTrainers.apply(mod) end)
-  end
-  local okClubs, BattleClubs = pcall(require, "mods.Kanto-Reforged.battle_clubs")
+  pcall(function() ExpTrainers.apply(mod) end)
+  local okClubs, BattleClubs = pcall(require, "mods.Kanto-Reforged.battle.battle_clubs")
   if okClubs and BattleClubs.refreshScope then
     pcall(function() BattleClubs.refreshScope(mod, scopeMode) end)
   end
-  local okFossils, FossilsGen3 = pcall(require, "mods.Kanto-Reforged.fossils_gen3")
+  local okFossils, FossilsGen3 = pcall(require, "mods.Kanto-Reforged.world.fossils_gen3")
   if okFossils and FossilsGen3.refreshScope then
     pcall(function() FossilsGen3.refreshScope(mod, scopeMode) end)
   end
-  local okTrades, TradesExtra = pcall(require, "mods.Kanto-Reforged.trades_extra")
+  local okTrades, TradesExtra = pcall(require, "mods.Kanto-Reforged.world.trades_extra")
   if okTrades and TradesExtra.refreshScope then
     pcall(function() TradesExtra.refreshScope(mod, scopeMode) end)
   end
@@ -116,13 +127,14 @@ return function(mod)
   local Host = require("mods.Kanto-Reforged.core.host")
   local PokemonGen2 = require("mods.Kanto-Reforged.pokemon.pokemon_gen2")
 
-  -- Accept trainer party heldItem/moves before any trainers:patch (ace berries).
   ExpTrainers.extendSchemas()
-  if Host.isGen1() then
-    ExpTrainers.install(mod)
-  end
+  ExpTrainers.install(mod)
+  pcall(function() ExpTrainers.apply(mod) end)
 
-  local LocationSignpost = require("mods.Kanto-Reforged.ui.location_signpost")
+  if Host.isGen2() then
+    local RestoredDungeons = require("mods.Kanto-Reforged.world.restored_dungeons")
+    RestoredDungeons.apply(mod)
+  end
 
   -- Manager / card options (host-aware labels / visibility).
   -- Spawn + dex-scope keys are g1:/g2: so Red and Gold keep separate state.
@@ -150,7 +162,6 @@ return function(mod)
     TrainerAi.OPTION,
     TrainerAi.switchLockOptionForHost(),
     HeldItems.BAG_GIVE_OPTION,
-    LocationSignpost.OPTION,
   }
   -- SpA/SpD split is a Gen1 single-Special concern; Gold already has both.
   if Host.isGen1() then
@@ -188,7 +199,7 @@ return function(mod)
     local Breeding = require("mods.Kanto-Reforged.pokemon.breeding")
     Breeding.register(mod)
     Breeding.install(mod)
-    local Daycare = require("mods.Kanto-Reforged.daycare")
+    local Daycare = require("mods.Kanto-Reforged.pokemon.daycare")
     Daycare.register(mod)
     Daycare.install(mod)
   end
@@ -196,8 +207,6 @@ return function(mod)
   local BerryFarm = require("mods.Kanto-Reforged.world.berry_farm")
   BerryFarm.register(mod)
   BerryFarm.install(mod)
-
-  LocationSignpost.install(mod)
 
   if Host.isGen1() then
     require("mods.Kanto-Reforged.ui.battle_exp_bar").install(mod)
@@ -357,7 +366,7 @@ return function(mod)
 
   -- Wrap openParty to implement Shadow Tag / Magnet Pull switch block (Gen1).
   if Host.isGen1() then
-    local Gen1Patch = require("mods.Kanto-Reforged.gen1_patch")
+    local Gen1Patch = require("mods.Kanto-Reforged.core.gen1_patch")
     Gen1Patch.apply(require("src.battle.BattleState"), function(BattleState)
       local original_openParty = BattleState.openParty
       if type(original_openParty) ~= "function" then return end
@@ -385,8 +394,8 @@ return function(mod)
   end
 
   -- 1. Load generated databases
-  local has_types, types_data = pcall(require, "mods.Kanto-Reforged.types_data")
-  local has_pokemon, pokemon_data = pcall(require, "mods.Kanto-Reforged.pokemon_data")
+  local has_types, types_data = pcall(require, "mods.Kanto-Reforged.battle.types_data")
+  local has_pokemon, pokemon_data = pcall(require, "mods.Kanto-Reforged.pokemon.pokemon_data")
   if has_pokemon and pokemon_data then
     _cachedPokemonData = pokemon_data
   end
@@ -485,7 +494,7 @@ return function(mod)
 
     -- Gen3 move types on Red and Gold (Bite→Dark, Charm→Normal, …).
     -- Does not touch sprites or generate_pokemon_mod.py.
-    local okMoves, MoveTypePatches = pcall(require, "mods.Kanto-Reforged.move_type_patches")
+    local okMoves, MoveTypePatches = pcall(require, "mods.Kanto-Reforged.battle.move_type_patches")
     if okMoves then
       MoveTypePatches.apply(mod)
     end
@@ -494,7 +503,7 @@ return function(mod)
     local dexTexts = DexEntries.bindAll(mod, pokemon_data.species)
     DexEntries.installInlineTextFallback(mod)
 
-    local okPals, species_palettes = pcall(require, "mods.Kanto-Reforged.species_palettes")
+    local okPals, species_palettes = pcall(require, "mods.Kanto-Reforged.pokemon.species_palettes")
     local PaletteGen2 = require("mods.Kanto-Reforged.pokemon.palette_gen2")
     if okPals and type(species_palettes) == "table" then
       if Host.isGen2() then
@@ -519,6 +528,13 @@ return function(mod)
       local JohtoDex = require("mods.Kanto-Reforged.pokemon.johto_dex")
       JohtoDex.installNests(mod)
       JohtoDex.installArea(mod)
+      -- Gold Kanto gym/route parties: write trainers[].party + lookup overlay
+      -- (same contract as restored_dungeons). Must run after Gold trainer data
+      -- exists, and installGen2 after RestoredDungeons so wraps compose.
+      ExpTrainers.clearBaselines()
+      local nTrainersG2 = ExpTrainers.apply(mod)
+      ExpTrainers.installGen2(mod)
+      mod.log:info("Gen2 overworld trainer parties mixed (%d classes)", nTrainersG2)
       local TrainersGen2 = require("mods.Kanto-Reforged.battle.trainers_gen2")
       TrainersGen2.install(mod)
       mod.events:on("mod.options_changed", function(ev)
@@ -736,7 +752,7 @@ return function(mod)
     -- Patch Gen 1 species with Gen 2/3 level-up + TM learnset additions.
     -- Wild/trainer/gym parties all build moves via Pokemon.movesAtLevel, so
     -- this is what makes Charmander know Metal Claw, etc.
-    local okPatches, learnset_patches = pcall(require, "mods.Kanto-Reforged.learnset_patches")
+    local okPatches, learnset_patches = pcall(require, "mods.Kanto-Reforged.pokemon.learnset_patches")
     if okPatches and learnset_patches then
       local function mergeLearnset(existing, additions)
         local byMove = {}
@@ -846,7 +862,7 @@ return function(mod)
     end
 
     -- Gen 3 abilities for vanilla Kanto species (Bulbasaur OVERGROW, etc.)
-    local okAbil, ability_patches = pcall(require, "mods.Kanto-Reforged.ability_patches")
+    local okAbil, ability_patches = pcall(require, "mods.Kanto-Reforged.battle.ability_patches")
     if okAbil and ability_patches and ability_patches.abilities then
       local nAbil = 0
       for speciesId, ability in pairs(ability_patches.abilities) do
@@ -863,7 +879,7 @@ return function(mod)
     end
 
     -- SpA/SpD bases for optional SP.ATK / SP.DEF toggle (vanilla Kanto)
-    local okSp, special_stat_patches = pcall(require, "mods.Kanto-Reforged.special_stat_patches")
+    local okSp, special_stat_patches = pcall(require, "mods.Kanto-Reforged.battle.special_stat_patches")
     if okSp and special_stat_patches and special_stat_patches.stats then
       local nSp = 0
       for speciesId, row in pairs(special_stat_patches.stats) do
@@ -892,7 +908,7 @@ return function(mod)
     end
 
     -- Gender rates (PokéAPI female eighths; -1 = genderless)
-    local okGender, gender_patches = pcall(require, "mods.Kanto-Reforged.gender_patches")
+    local okGender, gender_patches = pcall(require, "mods.Kanto-Reforged.pokemon.gender_patches")
     if okGender and gender_patches and gender_patches.rates then
       local nGender = 0
       local field = Host.isGen2() and "genderRatio" or "genderRate"
@@ -926,7 +942,7 @@ return function(mod)
     end
 
     -- Breeding: egg groups, hatch counters, baby species, egg moves
-    local okBreed, breeding_patches = pcall(require, "mods.Kanto-Reforged.breeding_patches")
+    local okBreed, breeding_patches = pcall(require, "mods.Kanto-Reforged.pokemon.breeding_patches")
     if okBreed and breeding_patches then
       local Breeding = require("mods.Kanto-Reforged.pokemon.breeding")
       local nBreed = 0
