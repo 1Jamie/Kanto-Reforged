@@ -311,6 +311,7 @@ function Abilities.onDamage(next, ctx)
 
   if targetAbility == "FLASH_FIRE" and move.type == "FIRE"
       and move.power and move.power > 0 then
+    target.expFlashFire = true
     BattleCompat.say(battle, Strings("%s's FLASH FIRE\nmade it immune!",
       displayName(battle, target)))
     return 0, { crit = false, typeMult = 0, effectiveness = 0 }
@@ -368,8 +369,12 @@ function Abilities.onDamage(next, ctx)
     pushRestore(BattleCompat.scaleOffense(ctx, user, true, 1.5))
   end
 
-  if (userAbility == "PLUS" or userAbility == "MINUS") and not isPhysical then
-    pushRestore(BattleCompat.scaleOffense(ctx, user, false, 1.5))
+  -- Plus / Minus only boost SpA with the opposite ally in doubles.
+  -- KR battles are singles — leave them as no-ops here.
+
+  if userAbility == "FLASH_FIRE" and user.expFlashFire
+      and move.type == "FIRE" and move.power and move.power > 0 then
+    pushRestore(BattleCompat.scaleOffense(ctx, user, isPhysical, 1.5))
   end
 
   if targetAbility == "MARVEL_SCALE" and BattleCompat.hasStatus(target,

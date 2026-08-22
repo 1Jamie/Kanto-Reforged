@@ -428,12 +428,22 @@ function MoveEffects.register(mod)
     end,
   })
 
-  -- ------- Protect / Detect
+  -- ------- Protect / Detect (Gen3 successive-use fail: 1/2, 1/4, 1/8…)
 
   mod.content.move_effects:register("EXP_PROTECT_EFFECT", {
     kind = "primary",
     run = function(ctx)
+      local streak = ctx.user.expProtectStreak or 0
+      if streak > 0 then
+        local denom = 2 ^ math.min(streak, 8)
+        local rng = (ctx.battle and ctx.battle.rng) or love.math.random
+        local roll = rng(0, denom - 1)
+        if roll ~= 0 then
+          return { Strings("But, it failed!") }
+        end
+      end
       ctx.user.expProtected = true
+      ctx.user.expProtectStreak = streak + 1
       return { Strings("%s\nprotected itself!", displayName(ctx.user)) }
     end,
   })
@@ -2494,8 +2504,9 @@ function MoveEffects.install(mod)
             return {}
           end
           local msgs = old(ctx)
-          -- Vanilla secondaries: approximate Serene Grace with a retry.
-          -- EXP_* secondaries handle Serene Grace themselves.
+          -- Vanilla secondaries: Serene Grace ≈ true 2× by retrying only when
+          -- the first roll produced no effect messages (chance miss).
+          -- EXP_* secondaries double their chance parameter themselves.
           if not isExp and (not msgs or #msgs == 0)
               and Abilities.abilityOf(ctx.battle, ctx.user) == "SERENE_GRACE" then
             msgs = old(ctx)

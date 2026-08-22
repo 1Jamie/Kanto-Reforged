@@ -652,6 +652,8 @@ local GEN2_GYM_TRAINER_PARTIES = {
 
 
 -- Auto-curated Gold Kanto overworld (non-gym) trainer parties.
+-- Scope: Routes 1–25 + Kanto cities/dungeons only. Do NOT include Routes
+-- 26/27/28 (Johto league approach / Mt. Silver approach) — those stay vanilla.
 -- Members taken from Kanto map trainer objects; levels follow postgame curve.
 local GEN2_KANTO_ROUTE_PARTIES = {
   BIKER = {
@@ -727,12 +729,6 @@ local GEN2_KANTO_ROUTE_PARTIES = {
       { species = "NOCTOWL", level = 57 },
       { species = "SKARMORY", level = 58 },
     },
-    -- JOSE (ROUTE_27)
-    [14] = {
-      { species = "SKARMORY", level = 58 },
-      { species = "FARFETCHD", level = 59 },
-      { species = "PELIPPER", level = 60 },
-    },
     -- PERRY (ROUTE_13)
     [15] = {
       { species = "XATU", level = 53 },
@@ -789,65 +785,11 @@ local GEN2_KANTO_ROUTE_PARTIES = {
     },
   },
   COOLTRAINERF = {
-    -- JOYCE (ROUTE_26)
-    [8] = {
-      { species = "MILOTIC", level = 58 },
-      { species = "RAICHU", level = 59 },
-      { species = "BLASTOISE", level = 60 },
-    },
-    -- BETH (ROUTE_26)
-    [9] = {
-      { species = "SALAMENCE", level = 58 },
-      { species = "RAPIDASH", level = 59 },
-      { species = "VENUSAUR", level = 60 },
-    },
-    -- REENA (ROUTE_27)
-    [10] = {
-      { species = "GARDEVOIR", level = 57 },
-      { species = "STARMIE", level = 58 },
-      { species = "NIDOQUEEN", level = 59 },
-      { species = "RAPIDASH", level = 60 },
-    },
-    -- MEGAN (ROUTE_27)
-    [11] = {
-      { species = "BLASTOISE", level = 57 },
-      { species = "VENUSAUR", level = 58 },
-      { species = "GARDEVOIR", level = 59 },
-      { species = "STARMIE", level = 60 },
-    },
     -- QUINN (ROUTE_1)
     [14] = {
       { species = "STARMIE", level = 56 },
       { species = "VENUSAUR", level = 57 },
       { species = "SALAMENCE", level = 58 },
-    },
-  },
-  COOLTRAINERM = {
-    -- JAKE (ROUTE_26)
-    [9] = {
-      { species = "AGGRON", level = 58 },
-      { species = "PARASECT", level = 59 },
-      { species = "SCIZOR", level = 60 },
-    },
-    -- GAVEN (ROUTE_26)
-    [10] = {
-      { species = "TYRANITAR", level = 57 },
-      { species = "VICTREEBEL", level = 58 },
-      { species = "KINGLER", level = 59 },
-      { species = "URSARING", level = 60 },
-    },
-    -- BLAKE (ROUTE_27)
-    [11] = {
-      { species = "KINGDRA", level = 57 },
-      { species = "MAGNETON", level = 58 },
-      { species = "QUAGSIRE", level = 59 },
-      { species = "ARCANINE", level = 60 },
-    },
-    -- BRIAN (ROUTE_27)
-    [12] = {
-      { species = "SCIZOR", level = 58 },
-      { species = "SANDSLASH", level = 59 },
-      { species = "SALAMENCE", level = 60 },
     },
   },
   FIREBREATHER = {
@@ -898,13 +840,6 @@ local GEN2_KANTO_ROUTE_PARTIES = {
       { species = "GYARADOS", level = 53 },
       { species = "OCTILLERY", level = 54 },
       { species = "LANTURN", level = 55 },
-    },
-    -- SCOTT (ROUTE_26)
-    [21] = {
-      { species = "GYARADOS", level = 57 },
-      { species = "QWILFISH", level = 58 },
-      { species = "QWILFISH", level = 59 },
-      { species = "QUAGSIRE", level = 60 },
     },
   },
   HIKER = {
@@ -1031,19 +966,6 @@ local GEN2_KANTO_ROUTE_PARTIES = {
       { species = "GARDEVOIR", level = 50 },
       { species = "XATU", level = 51 },
       { species = "GRUMPIG", level = 52 },
-    },
-    -- RICHARD (ROUTE_26)
-    [9] = {
-      { species = "XATU", level = 58 },
-      { species = "ESPEON", level = 59 },
-      { species = "GARDEVOIR", level = 60 },
-    },
-    -- GILBERT (ROUTE_27)
-    [10] = {
-      { species = "GIRAFARIG", level = 57 },
-      { species = "STARMIE", level = 58 },
-      { species = "EXEGGUTOR", level = 59 },
-      { species = "WOBBUFFET", level = 60 },
     },
   },
   SCHOOLBOY = {

@@ -1,7 +1,7 @@
 -- Optional Gen 2-style Sp.Atk / Sp.Def split on Gen 1 DVs / statExp.
--- Default OFF: battle and UI use the single Gen 1 SPECIAL stat.
--- When ON: special damage uses separate SpA/SpD bases from PokeAPI
+-- Default ON: special damage uses separate SpA/SpD bases from PokeAPI
 -- (species.sp_attack / sp_defense); summary UI shows both values.
+-- When OFF: battle and UI use the single Gen 1 SPECIAL stat.
 -- Stages, Calcium, and the Special DV stay Gen 1 (one shared special).
 
 local SplitSpecial = {}
@@ -11,7 +11,7 @@ SplitSpecial.OPTION = {
   key = SplitSpecial.OPTION_KEY,
   label = "SP.ATK / SP.DEF",
   type = "toggle",
-  default = false,
+  default = true,
 }
 
 function SplitSpecial.enabled(mod)

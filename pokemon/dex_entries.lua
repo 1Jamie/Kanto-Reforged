@@ -4,21 +4,44 @@
 -- embeds PokéAPI paragraphs inline, so a bare prose string → "Data unknown."
 -- We wrap to Gen1 length, register a `_EXP_*_DexEntry` key, and dual-write
 -- into Data.text (content registry alone can miss when routed / frozen).
+-- Render-time fallback also recovers when the key exists but game.data.text
+-- is missing the body (empty / partial text tables).
 --
 -- Gen2: Gold's PokedexMenu reads `Data.gen2Pokedex.entries[species]` with
 -- inline `text` / `text2` (`<NEXT>` line breaks). Hoenn species are absent
 -- from the ROM sheet — we fill those rows. NEW / A-Z orders are rebuilt from
--- Johto wild availability (see johto_dex.lua).
+-- Johto wild availability (see johto_dex.lua). Catch → NewPokedexEntry forces
+-- OLD when the species is off the current NEW/A–Z list.
+--
+-- Weights in pokemon_data are kilograms (PokéAPI). Both Gen1 and Gen2 UIs
+-- expect tenths of a pound (Pikachu = 130 → 13.0 lb).
 
 local DexEntries = {}
 
 local COLS = 18
 local MAX_LINES = 6
+-- 1 kg = 2.20462262185 lb; UI stores lb × 10.
+local KG_TO_TENTHS_LB = 22.0462262185
 
 local Overrides = require("mods.Kanto-Reforged.pokemon.dex_text_overrides")
 
 local function isTextKey(s)
   return type(s) == "string" and s:match("^_[%w_]+$") ~= nil
+end
+
+function DexEntries.kgToTenthsLb(kg)
+  if type(kg) ~= "number" then return 0 end
+  return math.max(0, math.floor(kg * KG_TO_TENTHS_LB + 0.5))
+end
+
+-- Idempotent: pack stores kg; after this, entry.weight is tenths-of-lb.
+-- Flag lives in a weak side table — dexEntry schema rejects unknown fields.
+local weightConverted = setmetatable({}, { __mode = "k" })
+local function ensureWeightTenths(entry)
+  if not entry or weightConverted[entry] then return end
+  if type(entry.weight) ~= "number" then return end
+  entry.weight = DexEntries.kgToTenthsLb(entry.weight)
+  weightConverted[entry] = true
 end
 
 local function softLines(text, cols, maxLines)
@@ -125,9 +148,11 @@ function DexEntries.bind(mod, speciesId, record)
   local entry = record and record.dexEntry
   if not entry then return false end
 
+  ensureWeightTenths(entry)
+
   local prose = DexEntries.sourceText(speciesId, entry)
   if not prose or prose == "" then
-    -- Already a key with no override; leave alone.
+    -- Already a key with no override; leave alone (weight still normalized).
     return false
   end
 
@@ -153,6 +178,50 @@ function DexEntries.bindAll(mod, speciesTable)
   return n
 end
 
+-- Ensure DexEntryMenu can resolve e.text → body on game.data.text.
+-- Handles inline prose, missing keys, and Data.text / Overrides recovery.
+function DexEntries.ensureDexText(game, def)
+  local e = def and def.dexEntry
+  if not (game and e) then return false end
+  -- Do not convert weight here: bindAll already wrote tenths onto pack rows
+  -- before register, and Data.pokemon holds copies. Re-converting would
+  -- treat tenths as kg.
+  game.data = game.data or {}
+  game.data.text = game.data.text or {}
+
+  local function publish(key, body)
+    if type(key) ~= "string" or type(body) ~= "string" or body == "" then
+      return false
+    end
+    game.data.text[key] = body
+    writeDataText(key, body)
+    e.text = key
+    return true
+  end
+
+  if type(e.text) == "string" and not isTextKey(e.text) then
+    local key = DexEntries.textKey((def and def.id) or "UNKNOWN")
+    return publish(key, DexEntries.wrap(e.text))
+  end
+
+  if isTextKey(e.text) and game.data.text[e.text] then
+    return true
+  end
+
+  local key = isTextKey(e.text) and e.text
+    or DexEntries.textKey((def and def.id) or "UNKNOWN")
+  local ok, Data = pcall(require, "src.core.Data")
+  local body = ok and Data and Data.text and Data.text[key]
+  if type(body) ~= "string" or body == "" then
+    local prose = DexEntries.sourceText(def and def.id, e)
+      or (def and def.id and Overrides[def.id])
+    if prose and prose ~= "" then
+      body = DexEntries.wrap(prose)
+    end
+  end
+  return publish(key, body)
+end
+
 local function gen2Kind(kind)
   if type(kind) ~= "string" then return "" end
   return (kind
@@ -175,6 +244,7 @@ function DexEntries.toGen2Entry(speciesId, record)
   local text, text2 = DexEntries.wrapGen2(prose)
   local ft = entry.heightFt or 0
   local inch = entry.heightIn or 0
+  ensureWeightTenths(entry)
   return {
     id = speciesId,
     dex = record.dex or 0,
@@ -226,8 +296,9 @@ function DexEntries.bindGen2Pokedex(mod, speciesTable)
   return n
 end
 
--- Safety net: DexEntryMenu looks up game.data.text[e.text]. If a species
--- still carries inline prose (not a _KEY), register it so the page is not blank.
+-- Safety net: DexEntryMenu looks up game.data.text[e.text]. Recover inline
+-- prose and missing key bodies so owned entries never fall through to
+-- "Data unknown."
 function DexEntries.installInlineTextFallback(mod)
   local Gen1Patch = require("mods.Kanto-Reforged.core.gen1_patch")
   local ok, DEM = pcall(require, "src.ui.DexEntryMenu")
@@ -237,23 +308,77 @@ function DexEntries.installInlineTextFallback(mod)
     local orig = DexEntryMenu.render
     if type(orig) ~= "function" then return end
     DexEntryMenu.render = function(game, def, sprite, forceOwned, trueColor)
-      local e = def and def.dexEntry
-      if game and e and type(e.text) == "string" and not isTextKey(e.text) then
-        local key = DexEntries.textKey(def.id or "UNKNOWN")
-        local body = DexEntries.wrap(e.text)
-        if game.data then
-          game.data.text = game.data.text or {}
-          game.data.text[key] = body
-        end
-        writeDataText(key, body)
-        e.text = key
-      end
+      DexEntries.ensureDexText(game, def)
       return orig(game, def, sprite, forceOwned, trueColor)
+    end
+    local origNew = DexEntryMenu.new
+    if type(origNew) == "function" then
+      DexEntryMenu.new = function(game, speciesOrOpts, onDone)
+        local species = speciesOrOpts
+        if type(speciesOrOpts) == "table" then
+          species = speciesOrOpts.species or speciesOrOpts.id
+        end
+        local def = game and game.data and game.data.pokemon
+          and species and game.data.pokemon[species]
+        DexEntries.ensureDexText(game, def)
+        return origNew(game, speciesOrOpts, onDone)
+      end
     end
     DexEntryMenu._krInlineText = true
   end)
   if mod and mod.log then
-    mod.log:info("Dex entries: inline text fallback for DexEntryMenu")
+    mod.log:info("Dex entries: Gen1 text resolve fallback for DexEntryMenu")
+  end
+end
+
+-- NewPokedexEntry opens on entrySpecies, but rebuild() only lists the current
+-- mode order. Hoenn (and other KR fills) are often absent from NEW/A–Z — land
+-- on OLD (national) so the catch popup still shows the entry.
+function DexEntries.installGen2CatchEntryFix(mod)
+  local Gen1Patch = require("mods.Kanto-Reforged.core.gen1_patch")
+  local ok, PM = pcall(require, "src.ui.gen2.PokedexMenu")
+  if not ok or not PM or PM._krCatchEntry then return end
+  Gen1Patch.apply(PM, function(PokedexMenu)
+    if PokedexMenu._krCatchEntry then return end
+    local origNew = PokedexMenu.new
+    if type(origNew) ~= "function" then return end
+    PokedexMenu.new = function(game, opts)
+      local self = origNew(game, opts)
+      opts = opts or {}
+      local species = opts.entrySpecies
+      if not species or self.view == "entry" then
+        return self
+      end
+      for i, name in ipairs(PokedexMenu.MODES or { "NEW", "OLD", "A-Z" }) do
+        if name == "OLD" then
+          self.modeIndex = i
+          break
+        end
+      end
+      self:rebuild()
+      for index, row in ipairs(self.rows or {}) do
+        if row.species == species then
+          self.index = index
+          self.view = "entry"
+          self.page = 1
+          if self.ensureVisible then self:ensureVisible() end
+          if opts.newEntry then
+            self.newEntry = true
+            if self.playCry then pcall(function() self:playCry(species) end) end
+          end
+          break
+        end
+      end
+      return self
+    end
+    PokedexMenu._krCatchEntry = true
+  end)
+  -- Re-bind dex sync AFTER this wrap so rebuild/totals still force party
+  -- backfill (this file's new() calls rebuild() after construction).
+  local SpeciesScope = require("mods.Kanto-Reforged.pokemon.species_scope")
+  SpeciesScope.ensureGen2PokedexSync(mod)
+  if mod and mod.log then
+    mod.log:info("Dex entries: Gen2 NewPokedexEntry OLD-mode fallback")
   end
 end
 

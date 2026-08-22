@@ -30,13 +30,28 @@ local function runTests()
     end
   end
 
+  -- Prefer Gold trainers so class-index collision checks are meaningful
+  -- (Gen1 OPP_HIKER=9 is Gold RIVAL1=9).
+  local goldTrainers = nil
+  for _, p in ipairs({
+    home .. "/.local/share/love/pokemon-love2d/gold/data/generated/trainers.lua",
+    "data/generated/trainers.lua",
+  }) do
+    local ok, val = pcall(dofile, p)
+    if ok and type(val) == "table" and (val.classes and val.classes.RIVAL1 or val.RIVAL1) then
+      goldTrainers = val
+      break
+    end
+  end
+  assert(goldTrainers, "Gold trainers.lua with RIVAL1 required for collision tests")
+
   local gen2Maps = dofile("data/generated/maps.lua")
   local fakeMod = {
     data = {
       gen2Tilesets = goldTilesets,
       gen2Palettes = {},
       gen2Maps = gen2Maps,
-      gen2Trainers = dofile("data/generated/trainers.lua"),
+      gen2Trainers = goldTrainers,
       gen2Text = {},
       text = {},
       items = dofile("data/generated/items.lua"),
@@ -284,20 +299,50 @@ local function runTests()
   end
   print(string.format("  Verified %d signs/bgEvents, %d NPCs, and %d itemballs with 100%% authentic dialogues.", verifiedSigns, verifiedNpcs, verifiedItems))
 
-  -- 8. Verify trainer battle intro displays enemy trainer sprite before sending out Pokemon
+  -- 8. Trainer identity: Gold class 9 is RIVAL1, not Gen1 Hiker Marcos.
+  -- Marcos lives at Gold HIKER (44) member 201+. Defeated flags use event ids.
   local BattleState = require("src.ui.gen2.BattleState")
   local Battle = require("src.battle.gen2.Battle")
   local Trainers = require("src.world.gen2.Trainers")
-  local record = Trainers.lookup(fakeMod.data.gen2Trainers, 9, 1)
-  assert(record ~= nil, "Trainer lookup failed for Hiker")
+
+  local rival1 = Trainers.lookup(fakeMod.data.gen2Trainers, 9, 1)
+  assert(rival1 ~= nil, "lookup(9,1) must resolve Gold RIVAL1")
+  assert(rival1.name ~= "MARCOS", "lookup(9,1) must not be Hiker Marcos")
+  local r1lead = rival1.roster and rival1.roster[1]
+  assert(r1lead and r1lead.level <= 10,
+    "lookup(9,1) must be early-game RIVAL1, not postgame Marcos")
+
+  local marcos = Trainers.lookup(fakeMod.data.gen2Trainers, "HIKER", 201)
+    or Trainers.lookup(fakeMod.data.gen2Trainers, 44, 201)
+  assert(marcos ~= nil and marcos.name == "MARCOS", "Marcos resolves via Gold HIKER member 201")
+  assert(marcos.roster and marcos.roster[1] and marcos.roster[1].level >= 45,
+    "Marcos keeps postgame dungeon levels")
+
+  -- Spot-check other former Gen1 classNum victims stay stock.
+  for _, probe in ipairs({ 1, 2, 8 }) do
+    local rec = Trainers.lookup(fakeMod.data.gen2Trainers, probe, 1)
+    local nm = rec and rec.name
+    assert(nm ~= "JOSH" and nm ~= "KENT" and nm ~= "JOVAN",
+      string.format("lookup(%d,1) must not be a Mt Moon dungeon trainer (got %s)", probe, tostring(nm)))
+  end
+  local indigo = Trainers.lookup(fakeMod.data.gen2Trainers, "RIVAL2", 1)
+    or Trainers.lookup(fakeMod.data.gen2Trainers, 42, 1)
+  assert(indigo ~= nil, "RIVAL2 member 1 exists")
+  assert(indigo.name ~= "SILVER", "RIVAL2 member 1 is not Mt Moon Silver")
+  assert(indigo.roster and indigo.roster[1] and indigo.roster[1].level < 50,
+    "RIVAL2 member 1 stays Indigo stock levels")
+  local silver = Trainers.lookup(fakeMod.data.gen2Trainers, "RIVAL2", 201)
+    or Trainers.lookup(fakeMod.data.gen2Trainers, 42, 201)
+  assert(silver and silver.name == "SILVER", "Mt Moon Silver at RIVAL2 member 201")
+
   local battle = Battle.new({
     data = fakeMod.data,
     party = { { species = "PIKACHU", level = 50, hp = 100, maxHp = 100, moves = {}, dvs = { attack = 15, defense = 15, speed = 15, special = 15 } } },
     trainer = {
-      class = record.class,
-      classId = record.classId,
-      name = "HIKER ANTHONY",
-      party = Trainers.party(fakeMod.data, record),
+      class = marcos.class,
+      classId = marcos.classId or "HIKER",
+      name = "HIKER MARCOS",
+      party = Trainers.party(fakeMod.data, marcos),
     }
   })
   local bs = BattleState.new(game, { battle = battle })
@@ -305,7 +350,7 @@ local function runTests()
   assert(bs.enemyTrainerPath == "assets/generated/battle/trainers/hiker.png", "Trainer path mismatch")
   assert(bs.queue[1].kind == "message" and bs.queue[1].text:find("wants to battle"), "Event 1 must be 'wants to battle'")
   assert(bs.queue[2].kind == "trainer-slide", "Event 2 must be 'trainer-slide'")
-  print("  Battle intro trainer sprite & slide sequence verified.")
+  print("  Battle intro + Gen1/Gold trainer identity collisions verified.")
 
   -- 9. Verify wall collisions and bidirectional warp traversal
   world:setMap("MT_MOON_1F_KR", 5, 6, "up")

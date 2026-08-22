@@ -53,7 +53,8 @@ Configured in the mod manager / F10 options:
 | **XP SHARE (SLOT 2)** | On | Splits the Gen 1 XP pool: ~70% to fighters, up to ~30% to party slot 2 (never more than a solo share total). Replaces EXP.ALL while enabled. |
 | **SMARTER AI** | On | Trainers (and wild scoring hooks) prefer useful damage and skip moves that would fail. |
 | **SWITCH HIT AI** | Classic | Free-hit timing when you switch: classic picks after send-out; Gen 3 locks against the outgoing mon. Labels are **GEN 1 / GEN 3** on Red, **GEN 2 / GEN 3** on Gold. |
-| **SP.ATK / SP.DEF** | Off | **Red only.** Special moves use separate Sp.Atk / Sp.Def bases (PokeAPI) instead of Gen 1 Special. Summary and Modern UI party/PC detail show both stats (`SAT` / `SDF`). Stages, DVs, and Calcium stay Gen 1 (one shared Special). Hidden on Gold (already split). |
+| **RULESET** | MODERN | **Red only.** Mirrors the engine OPTIONS → RULESET. **MODERN** (`modern_clean`): no 1/256 miss on 100% moves, Focus Energy helps crits, enemies spend PP, Hyper Beam always recharges, end-of-turn residuals, Gen3 crit stages. **GEN 1** (`gen1_faithful`): classic quirks. Seeded to MODERN once when KR is first enabled; flipping either UI keeps both in sync. Hidden on Gold (native Gen2 rules). |
+| **SP.ATK / SP.DEF** | On | **Red only.** Special moves use separate Sp.Atk / Sp.Def bases (PokeAPI) instead of Gen 1 Special. Summary and Modern UI party/PC detail show both stats (`SAT` / `SDF`). Stages, DVs, and Calcium stay Gen 1 (one shared Special). Hidden on Gold (already split). |
 | **DEXNAV** | DEXNAV | **Red only.** Start-menu label / off. Gold DexNav is a Pokegear card (no rename toggle). |
 
 ---
@@ -119,6 +120,8 @@ To eliminate the need for link trading to evolve certain species, several trade 
 
 ### Battle Mechanics
 
+- **RULESET (Red):** Defaults to **MODERN** (engine `modern_clean`) with Gen3-ish quirks and crit stages. Flip to **GEN 1** in the mod Manager or OPTIONS → RULESET to keep classic Gen1 quirks; the two UIs stay synced.
+- **Physical / special:** Damaging moves use Gen3 type categories (not Gen4 per-move split). Dark/Ghost are special; Fire/Water/Grass/etc. special; Normal/Fighting/etc. physical.
 - **Gen 3 Freeze Parity:** Frozen Pokémon have a 20% (1-in-5) chance to thaw naturally each turn. Furthermore, any damaging fire-type move used against a frozen target immediately unfreezes them.
 - **XP Bar:** A smooth blue EXP bar displays below the player Pokémon's HP bar in battle across Gen 1 (matching Gen 2 style) with widescreen support.
 

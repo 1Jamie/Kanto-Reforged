@@ -377,7 +377,7 @@ end
 -- `mon` self-alias is the post-rival SAVE crash (party[i].mon == party[i]).
 local AI_EPHEMERAL = {
   "curStats", "curTypes", "curMoves", "stages",
-  "expProtected", "expEnduring",
+  "expProtected", "expEnduring", "expFlashFire", "expProtectStreak",
 }
 
 --- Strip AI facade fields from party mons so Gold saves stay acyclic.

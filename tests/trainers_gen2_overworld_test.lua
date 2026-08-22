@@ -63,6 +63,20 @@ T.eq(hope[1].species, ExpTrainers.GEN2_KANTO_ROUTE_PARTIES.PICNICKER[6][1].speci
 T.check(hope[1].level >= 50, "Hope levels use postgame Kanto curve")
 T.check(ExpTrainers.hasGen2Override("PICNICKER"), "PICNICKER class has overrides")
 
+-- Routes 26/27 are Johto league approach — must stay vanilla, not postgame curve.
+local route = ExpTrainers.GEN2_KANTO_ROUTE_PARTIES
+T.check(route.COOLTRAINERF[8] == nil, "Joyce (Route 26) not in Kanto curve table")
+T.check(route.COOLTRAINERF[9] == nil, "Beth (Route 26) not in Kanto curve table")
+T.check(route.COOLTRAINERM == nil or route.COOLTRAINERM[9] == nil, "Jake (Route 26) not in Kanto curve table")
+T.check(route.BIRD_KEEPER[14] == nil, "Jose (Route 27) not in Kanto curve table")
+T.check(route.FISHER[21] == nil, "Scott (Route 26) not in Kanto curve table")
+T.check(route.PSYCHIC_T[9] == nil and route.PSYCHIC_T[10] == nil,
+  "Richard/Gilbert (Route 26/27) not in Kanto curve table")
+local joyce = classes.COOLTRAINERF.trainers[8]
+T.check(joyce and joyce.party and joyce.party[1].level < 45,
+  "Joyce stays near vanilla league-approach levels")
+T.check(joyce.party[1].species ~= "MILOTIC", "Joyce not force-remixed to Milotic")
+
 -- Lookup overlay resolves string + numeric class the way gym scripts do.
 ExpTrainers.installGen2(mod)
 local G2Trainers = require("src.world.gen2.Trainers")
@@ -77,10 +91,12 @@ T.check(type(brockIndex) == "number", "Brock has numeric class index")
 local recNum = G2Trainers.lookup(goldTrainers, brockIndex, 1)
 T.eq(recNum.roster[1].species, "SUDOWOODO", "numeric class lookup hits curated roster")
 
--- Johto rival parties must stay vanilla (Mt Moon rival is restored_dungeons).
+-- Johto rival parties must stay vanilla Indigo stock (Mt Moon Silver is member 201+).
 local rival = classes.RIVAL2.trainers[1].party
-T.eq(rival[1].species, "SNEASEL", "RIVAL2 member 1 left for stock/dungeons")
-T.check(rival[1].level == 41 or rival[1].level == 58, "RIVAL2 not force-overwritten by Gen1 Mt Moon draft")
+T.eq(rival[1].species, "SNEASEL", "RIVAL2 member 1 left for stock Indigo")
+T.eq(rival[1].level, 41, "RIVAL2 member 1 stays stock Lv41, not Mt Moon 58")
+T.check(classes.RIVAL2.trainers[201] == nil or classes.RIVAL2.trainers[201].name == "SILVER",
+  "Mt Moon Silver uses high member slot when installed")
 
 Host.clearForce()
 GameVersion.set("red")

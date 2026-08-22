@@ -155,12 +155,13 @@ return function(T, Data, run)
     T.eq(Data.constants.dexSize >= 252, true, "dexSize restored past Johto")
   end
 
-  -- Mod disable / SaveData.validate wipe: KR flags live in mod.save sidecar.
+  -- Mod disable / SaveData.validate wipe: ALL flags live in mod.save sidecar
+  -- (vanilla + Johto + Gen3 — randomizer / scope toggles touch everything).
   do
     setMode(SpeciesScope.MODE_NATIONAL)
     mod.save:set(SpeciesScope.APPLIED_KEY, SpeciesScope.MODE_NATIONAL)
     mod.save:set(SpeciesScope.STASH_KEY, nil)
-    mod.save:set(SpeciesScope.DEX_FLAGS_KEY, nil)
+    SpeciesScope.clearDexFlags(mod)
     local save = freshSave()
     save.party = { Pokemon.new(Data, "PIKACHU", 10) }
     save.pokedex.owned.PIKACHU = true
@@ -169,16 +170,26 @@ return function(T, Data, run)
     save.pokedex.seen.TREECKO = true
     save.pokedex.owned.CHIKORITA = true
     save.pokedex.seen.CHIKORITA = true
+    save.pokedex.caught = save.pokedex.caught or {}
+    save.pokedex.caught.CYNDAQUIL = true
+    save.pokedex.seen.CYNDAQUIL = true
     SpeciesScope.snapshotDexFlags(mod, save)
     local snap = mod.save:get(SpeciesScope.DEX_FLAGS_KEY, nil)
+      or Host.saveGet(mod.save, SpeciesScope.DEX_FLAGS_KEY, nil)
     T.check(snap and snap.owned.TREECKO and snap.owned.CHIKORITA,
       "sidecar stores Gen2/Gen3 owned flags")
+    T.check(snap and snap.owned.PIKACHU and snap.caught.CYNDAQUIL,
+      "sidecar stores vanilla Kanto + Johto flags (not pack-only)")
 
     -- Engine wipe while the mod is off (species missing from Data.pokemon).
     save.pokedex.owned.TREECKO = nil
     save.pokedex.seen.TREECKO = nil
     save.pokedex.owned.CHIKORITA = nil
     save.pokedex.seen.CHIKORITA = nil
+    save.pokedex.caught.CYNDAQUIL = nil
+    save.pokedex.seen.CYNDAQUIL = nil
+    save.pokedex.owned.PIKACHU = nil
+    save.pokedex.seen.PIKACHU = nil
     -- Union snapshot must not forget flags when live dex is empty.
     SpeciesScope.snapshotDexFlags(mod, save)
     T.eq(SpeciesScope.restoreDexFlags(mod, save) >= 2, true,
@@ -186,7 +197,8 @@ return function(T, Data, run)
     T.eq(save.pokedex.owned.TREECKO, true, "TREECKO owned survives mod toggle")
     T.eq(save.pokedex.seen.TREECKO, true, "TREECKO seen survives mod toggle")
     T.eq(save.pokedex.owned.CHIKORITA, true, "CHIKORITA owned survives mod toggle")
-    T.eq(save.pokedex.owned.PIKACHU, true, "vanilla owned untouched")
+    T.eq(save.pokedex.owned.PIKACHU, true, "vanilla owned restored from sidecar")
+    T.eq(save.pokedex.caught.CYNDAQUIL, true, "Johto native caught restored from sidecar")
     T.eq(save.pokedex.caught.TREECKO, true, "owned mirrors onto caught")
   end
 
@@ -195,7 +207,7 @@ return function(T, Data, run)
     setMode(SpeciesScope.MODE_NATIONAL)
     mod.save:set(SpeciesScope.APPLIED_KEY, SpeciesScope.MODE_NATIONAL)
     mod.save:set(SpeciesScope.STASH_KEY, nil)
-    mod.save:set(SpeciesScope.DEX_FLAGS_KEY, nil)
+    SpeciesScope.clearDexFlags(mod)
     local save = freshSave()
     save.party = { Pokemon.new(Data, "TREECKO", 12) }
     Boxes.ensure(save)
@@ -692,6 +704,57 @@ return function(T, Data, run)
     setMode(SpeciesScope.MODE_JOHTO_NATIVE)
     T.eq(SpeciesScope.maxDexForMap(mod, "ROUTE_30"), 251, "Johto map capped at 251")
     T.eq(SpeciesScope.maxDexForMap(mod, "ROUTE_1"), nil, "Kanto map uncapped under johto_native")
+
+    -- JOHTO 251 ↔ FULL: sidecar keeps ALL progress (Johto + Hoenn); party/PC
+    -- recovery fires even when MOD_DEX_RECOVERED is already latched.
+    local save = freshSave()
+    save.pokedex.caught = save.pokedex.caught or {}
+    save.pokedex.seen.TREECKO = true
+    save.pokedex.caught.TREECKO = true
+    save.pokedex.seen.CYNDAQUIL = true
+    save.pokedex.caught.CYNDAQUIL = true
+    save.party = { Pokemon.new(Data, "MUDKIP", 12) }
+    save.dayCare = {
+      man = { mon = Pokemon.new(Data, "TREECKO", 10) },
+      lady = {},
+    }
+    local game = makeGame(save)
+    SpeciesScope._game = game
+    SpeciesScope.snapshotDexFlags(mod, save)
+    -- Simulate wiped live dex after a spawn/scope toggle.
+    save.pokedex.caught.TREECKO = nil
+    save.pokedex.seen.TREECKO = nil
+    save.pokedex.caught.CYNDAQUIL = nil
+    save.pokedex.seen.CYNDAQUIL = nil
+    save.pokedex.caught.MUDKIP = nil
+    save.flags = { MOD_DEX_RECOVERED = true }
+    SpeciesScope.syncDexProgress(mod, save)
+    T.eq(save.pokedex.caught.TREECKO, true,
+      "Gen2 sync restores Hoenn caught from sidecar after wipe")
+    T.eq(save.pokedex.caught.CYNDAQUIL, true,
+      "Gen2 sync restores Johto native caught (not Gen3-only sidecar)")
+    T.eq(save.pokedex.caught.MUDKIP, true,
+      "Gen2 sync marks party MUDKIP caught despite MOD_DEX_RECOVERED")
+    T.eq(save.pokedex.caught.TREECKO, true,
+      "Gen2 dayCare TREECKO marked caught via sync")
+
+    -- applyTransition FULL → JOHTO 251 → FULL preserves sidecar + recovery.
+    setMode(SpeciesScope.MODE_NATIONAL)
+    SpeciesScope.applyTransition(mod, game, SpeciesScope.MODE_NATIONAL)
+    save.pokedex.caught.TREECKO = nil
+    save.pokedex.caught.CYNDAQUIL = nil
+    save.flags.MOD_DEX_RECOVERED = true
+    setMode(SpeciesScope.MODE_JOHTO_NATIVE)
+    SpeciesScope.applyTransition(mod, game, SpeciesScope.MODE_JOHTO_NATIVE)
+    T.eq(save.pokedex.caught.TREECKO, true,
+      "Gen2 JOHTO 251 transition restores TREECKO caught via sync")
+    T.eq(save.pokedex.caught.CYNDAQUIL, true,
+      "Gen2 JOHTO 251 transition restores CYNDAQUIL caught via sync")
+    setMode(SpeciesScope.MODE_NATIONAL)
+    SpeciesScope.applyTransition(mod, game, SpeciesScope.MODE_NATIONAL)
+    T.eq(save.pokedex.caught.MUDKIP, true,
+      "Gen2 FULL transition keeps party MUDKIP caught")
+
     Host.clearForce()
     setMode(SpeciesScope.MODE_NATIONAL)
   end

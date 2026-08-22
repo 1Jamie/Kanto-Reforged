@@ -52,6 +52,12 @@ end
 -- and honors test stubs already in the engine's package.loaded.
 function Host.liveGame(mod)
   if mod and mod.game then return mod.game end
+  if Host.isGen2() then
+    -- src.core.Game is the Gen1 singleton and has no Gold save. Prefer the
+    -- loader-injected Game2 instance via mod.game; if missing, there is no
+    -- safe global fallback.
+    return nil
+  end
   local ok, Game = pcall(require, "src.core.Game")
   if ok and type(Game) == "table" then return Game end
   return nil
@@ -73,6 +79,10 @@ local SAVE_MIGRATE = {
   soil_rank = true,
   starterGranted = true,
   blender_steps_anchor = true,
+  -- Dex sidecar / scope progress (may predate g1:/g2: prefixes).
+  pokedex_flags = true,
+  species_scope_stash = true,
+  species_scope_applied = true,
 }
 
 function Host.saveGet(bucket, key, default)

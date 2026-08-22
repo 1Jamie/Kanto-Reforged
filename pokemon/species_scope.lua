@@ -38,11 +38,15 @@ SpeciesScope._ignoreOptionEvent = false
 SpeciesScope._evoBaselines = nil
 
 local function breedingIsEgg(mon)
-  local ok, Breeding = pcall(require, "mods.Kanto-Reforged.breeding")
+  if not mon then return false end
+  local ok, Breeding = pcall(require, "mods.Kanto-Reforged.pokemon.breeding")
   if ok and Breeding and Breeding.isEgg then
-    return Breeding.isEgg(mon)
+    return Breeding.isEgg(mon) and true or false
   end
-  return mon and (mon.isEgg or mon.egg) and true or false
+  -- Gen2 eggs are flagged isEgg; do NOT treat a numeric `egg` leftover as an egg.
+  if mon.isEgg == true then return true end
+  if mon.species == "EGG" or mon.species == "EGG_SPECIES" then return true end
+  return false
 end
 
 function SpeciesScope.optionDef()
@@ -423,24 +427,59 @@ local function setStash(mod, stash)
   end
 end
 
-local function krPackSpecies()
-  local ok, pack = pcall(require, "mods.Kanto-Reforged.pokemon.pokemon_data")
-  if ok and pack and type(pack.species) == "table" then return pack.species end
-  return {}
-end
-
 local DEX_FLAG_KEYS = { "seen", "owned", "caught" }
 
 local function emptyDexSnap()
   return { seen = {}, owned = {}, caught = {} }
 end
 
--- Union-only: never drop a previously stored KR flag because the live
--- Pokédex was scrubbed (mod off, KANTO validate, etc.).
+-- Mirror owned↔caught (and imply seen) so Gen1 (owned) and Gold (caught)
+-- UIs stay aligned after partial wipes / toggles.
+local function mirrorOwnedCaught(bucket)
+  if type(bucket) ~= "table" then return end
+  bucket.seen = bucket.seen or {}
+  bucket.owned = bucket.owned or {}
+  bucket.caught = bucket.caught or {}
+  for id, on in pairs(bucket.owned) do
+    if on then
+      bucket.caught[id] = true
+      bucket.seen[id] = true
+    end
+  end
+  for id, on in pairs(bucket.caught) do
+    if on then
+      bucket.owned[id] = true
+      bucket.seen[id] = true
+    end
+  end
+end
+
+local function dexFlagsGet(mod)
+  if not (mod and mod.save) then return nil end
+  -- Prefer host-prefixed key; fall back to legacy unprefixed sidecar.
+  local v = Host.saveGet(mod.save, SpeciesScope.DEX_FLAGS_KEY, nil)
+  if v ~= nil then return v end
+  return mod.save:get(SpeciesScope.DEX_FLAGS_KEY, nil)
+end
+
+local function dexFlagsSet(mod, snap)
+  if not (mod and mod.save) then return end
+  Host.saveSet(mod.save, SpeciesScope.DEX_FLAGS_KEY, snap)
+  -- Keep legacy key in sync so older readers / mid-session tests still see it.
+  mod.save:set(SpeciesScope.DEX_FLAGS_KEY, snap)
+end
+
+-- Clear both host-prefixed and legacy sidecar keys (tests / hard resets).
+function SpeciesScope.clearDexFlags(mod)
+  dexFlagsSet(mod, nil)
+end
+
+-- Union-only snapshot of the FULL Pokédex (every species id): Johto natives,
+-- Kanto, and KR Gen3. Randomizer / JOHTO 251 / FULL toggles can scrub or
+-- reshuffle availability; progress for any species must survive.
 function SpeciesScope.snapshotDexFlags(mod, save)
   if not (mod and mod.save and save) then return end
-  local pack = krPackSpecies()
-  local snap = mod.save:get(SpeciesScope.DEX_FLAGS_KEY, nil)
+  local snap = dexFlagsGet(mod)
   if type(snap) ~= "table" then snap = emptyDexSnap() end
   local dex = save.pokedex
   for _, key in ipairs(DEX_FLAG_KEYS) do
@@ -448,7 +487,7 @@ function SpeciesScope.snapshotDexFlags(mod, save)
     local bucket = dex and dex[key]
     if type(bucket) == "table" then
       for id, on in pairs(bucket) do
-        if on and pack[id] then
+        if on and type(id) == "string" then
           snap[key][id] = true
         end
       end
@@ -457,14 +496,15 @@ function SpeciesScope.snapshotDexFlags(mod, save)
   local stash = getStash(mod)
   local stashDex = stash and stash.dex
   if type(stashDex) == "table" then
-    for _, key in ipairs({ "seen", "owned" }) do
+    for _, key in ipairs(DEX_FLAG_KEYS) do
       snap[key] = snap[key] or {}
       for id, on in pairs(stashDex[key] or {}) do
-        if on then snap[key][id] = true end
+        if on and type(id) == "string" then snap[key][id] = true end
       end
     end
   end
-  mod.save:set(SpeciesScope.DEX_FLAGS_KEY, snap)
+  mirrorOwnedCaught(snap)
+  dexFlagsSet(mod, snap)
 end
 
 local function pruneOutOfScopeDex(game, save)
@@ -486,7 +526,7 @@ end
 function SpeciesScope.restoreDexFlags(mod, save, targetMode)
   if not (mod and mod.save and save) then return 0 end
   targetMode = targetMode or SpeciesScope.mode(mod)
-  local snap = mod.save:get(SpeciesScope.DEX_FLAGS_KEY, nil)
+  local snap = dexFlagsGet(mod)
   if type(snap) ~= "table" then return 0 end
   save.pokedex = save.pokedex or {}
   local dex = save.pokedex
@@ -511,15 +551,7 @@ function SpeciesScope.restoreDexFlags(mod, save, targetMode)
     end
   end
   -- Gen1 UI reads owned; Gold reads caught. Mirror whichever we restored.
-  dex.owned = dex.owned or {}
-  dex.caught = dex.caught or {}
-  dex.seen = dex.seen or {}
-  for id, on in pairs(dex.owned) do
-    if on then dex.caught[id] = true end
-  end
-  for id, on in pairs(dex.caught) do
-    if on then dex.owned[id] = true end
-  end
+  mirrorOwnedCaught(dex)
   if isKanto then
     pruneOutOfScopeDex(SpeciesScope._game, save)
   else
@@ -535,8 +567,8 @@ local function snapshotOutOfScopeDex(mod, game, stash)
   local save = game and game.save
   local dex = save and save.pokedex
   if type(dex) ~= "table" then return end
-  stash.dex = stash.dex or { seen = {}, owned = {} }
-  for _, key in ipairs({ "seen", "owned" }) do
+  stash.dex = stash.dex or { seen = {}, owned = {}, caught = {} }
+  for _, key in ipairs(DEX_FLAG_KEYS) do
     stash.dex[key] = stash.dex[key] or {}
     local bucket = dex[key]
     if type(bucket) == "table" then
@@ -550,6 +582,7 @@ local function snapshotOutOfScopeDex(mod, game, stash)
       end
     end
   end
+  mirrorOwnedCaught(stash.dex)
   SpeciesScope.snapshotDexFlags(mod, save)
   pruneOutOfScopeDex(game, save)
 end
@@ -557,14 +590,16 @@ end
 local function restoreStashedDex(game, stash)
   local save = game and game.save
   if not save then return 0 end
-  save.pokedex = save.pokedex or { seen = {}, owned = {} }
+  save.pokedex = save.pokedex or { seen = {}, owned = {}, caught = {} }
   local dex = save.pokedex
   dex.seen = dex.seen or {}
   dex.owned = dex.owned or {}
+  dex.caught = dex.caught or {}
   local n = 0
   local snap = stash and stash.dex
   if type(snap) ~= "table" then return 0 end
-  for _, key in ipairs({ "seen", "owned" }) do
+  for _, key in ipairs(DEX_FLAG_KEYS) do
+    dex[key] = dex[key] or {}
     for id, on in pairs(snap[key] or {}) do
       if on and not dex[key][id] then
         dex[key][id] = true
@@ -574,18 +609,73 @@ local function restoreStashedDex(game, stash)
       end
     end
   end
+  mirrorOwnedCaught(dex)
+  return n
+end
+
+-- Gold sometimes stamps dex / wild script state with a numeric SPECIES INDEX
+-- while #DEX rows are keyed by string id. Resolve to the string the UI uses.
+local function resolveSpeciesId(monOrId, game)
+  local id = monOrId
+  if type(monOrId) == "table" then id = monOrId.species end
+  if type(id) == "string" and id ~= "" and id ~= "EGG" then
+    return id
+  end
+  if type(id) ~= "number" then return nil end
+  local data = game and (game.data or game)
+  local pokemon = data and data.pokemon
+  if type(pokemon) ~= "table" then return nil end
+  if not SpeciesScope._indexToId or SpeciesScope._indexToIdData ~= pokemon then
+    local map = {}
+    for sid, def in pairs(pokemon) do
+      if type(sid) == "string" and type(def) == "table" then
+        if def.index then map[def.index] = sid end
+        if def.dex then map[def.dex] = map[def.dex] or sid end
+      end
+    end
+    SpeciesScope._indexToId = map
+    SpeciesScope._indexToIdData = pokemon
+  end
+  return SpeciesScope._indexToId[id]
+end
+
+-- Rewrite numeric caught/seen keys to string species ids so #DEX lookups match.
+function SpeciesScope.normalizeDexFlagKeys(save, game)
+  if type(save) ~= "table" or type(save.pokedex) ~= "table" then return 0 end
+  local dex = save.pokedex
+  local n = 0
+  for _, key in ipairs(DEX_FLAG_KEYS) do
+    local bucket = dex[key]
+    if type(bucket) == "table" then
+      local add = {}
+      for id, on in pairs(bucket) do
+        if on and type(id) == "number" then
+          local sid = resolveSpeciesId(id, game or SpeciesScope._game)
+          if sid then
+            add[sid] = true
+            n = n + 1
+          end
+        end
+      end
+      for sid in pairs(add) do
+        bucket[sid] = true
+      end
+    end
+  end
+  mirrorOwnedCaught(dex)
   return n
 end
 
 local function markDexForMon(save, mon)
-  if not save or not mon or not mon.species then return false end
+  if not save or not mon then return false end
   if breedingIsEgg(mon) then return false end
+  local id = resolveSpeciesId(mon, SpeciesScope._game)
+  if not id then return false end
   save.pokedex = save.pokedex or {}
   local dex = save.pokedex
   dex.seen = dex.seen or {}
   dex.owned = dex.owned or {}
   dex.caught = dex.caught or {}
-  local id = mon.species
   local changed = not (dex.seen[id] and (dex.owned[id] or dex.caught[id]))
   dex.seen[id] = true
   dex.owned[id] = true
@@ -613,11 +703,19 @@ local function forEachOwnedMon(save, fn)
       fn(mon)
     end
   end
+  -- Gen1 daycare
   local dc = save.daycare
   if type(dc) == "table" then
     fn(dc.mon)
     fn(dc.mon2)
     fn(dc.egg)
+  end
+  -- Gen2 day-care (man / lady / pending egg)
+  local g2 = save.dayCare
+  if type(g2) == "table" then
+    if type(g2.man) == "table" then fn(g2.man.mon) end
+    if type(g2.lady) == "table" then fn(g2.lady.mon) end
+    fn(g2.egg)
   end
 end
 
@@ -626,6 +724,114 @@ function SpeciesScope.markDexDirty(save)
     save.flags = save.flags or {}
     save.flags.MOD_DEX_DIRTY = true
   end
+end
+
+-- Snapshot → restore → party/PC recovery. Call after Gen2 scope or spawn
+-- toggles so full-dex flags survive and owned mons reappear as caught.
+function SpeciesScope.syncDexProgress(mod, save)
+  if not save then return 0 end
+  SpeciesScope.normalizeDexFlagKeys(save, SpeciesScope._game)
+  SpeciesScope.snapshotDexFlags(mod, save)
+  SpeciesScope.markDexDirty(save)
+  local n = SpeciesScope.restoreDexFlags(mod, save)
+  -- restoreDexFlags already backfills when not in Gen1 KANTO; force another
+  -- pass so a prior MOD_DEX_RECOVERED cannot skip party/PC recovery.
+  n = n + SpeciesScope.backfillDexFromCollection(mod, save, nil, true)
+  SpeciesScope.normalizeDexFlagKeys(save, SpeciesScope._game)
+  SpeciesScope.snapshotDexFlags(mod, save)
+  return n
+end
+
+-- Gold #DEX: always re-bind so later wraps (catch-entry fix) cannot leave the
+-- engine's row-only totals() / empty caught flags in place. Safe to call more
+-- than once. Does not require Host.isGen2() so a late generation flip still
+-- wires the hooks when the Gen2 menu module is present.
+function SpeciesScope.ensureGen2PokedexSync(mod)
+  local ok, PM = pcall(require, "src.ui.gen2.PokedexMenu")
+  if not ok or type(PM) ~= "table" then return false end
+
+  -- Keep a stable pointer to the engine rebuild (unwrap our prior wrap).
+  if not PM._krEngineRebuild then
+    PM._krEngineRebuild = PM.rebuild
+  end
+  local engineRebuild = PM._krEngineRebuild
+  if type(engineRebuild) ~= "function" then return false end
+
+  PM.rebuild = function(self, ...)
+    local save = self.save or (self.game and self.game.save)
+    if save then
+      SpeciesScope._game = self.game or SpeciesScope._game
+      SpeciesScope.syncDexProgress(mod, save)
+      self.save = save
+    end
+    engineRebuild(self, ...)
+    -- Engine rebuild uses `caught[id] == true`. Re-stamp rows with truthy
+    -- checks so flags we just wrote (and any non-boolean truthy) show up.
+    local dex = save and save.pokedex
+    if type(dex) == "table" and type(self.rows) == "table" then
+      local seen = dex.seen or {}
+      local caught = dex.caught or {}
+      for _, row in ipairs(self.rows) do
+        local id = row.species
+        row.seen = seen[id] and true or false
+        row.caught = caught[id] and true or false
+      end
+    end
+  end
+
+  -- Match cart / Save.summary: SEEN/OWN are full flag counts, not the filtered
+  -- mode list (NEW hides Hoenn; counts must still match Continue).
+  function PM:totals()
+    local save = self.save or (self.game and self.game.save)
+    if save then
+      SpeciesScope.normalizeDexFlagKeys(save, self.game or SpeciesScope._game)
+      SpeciesScope.backfillDexFromCollection(mod, save, nil, true)
+    end
+    local dex = save and save.pokedex
+    local seenN, caughtN = 0, 0
+    for _, on in pairs((dex and dex.seen) or {}) do
+      if on then seenN = seenN + 1 end
+    end
+    for _, on in pairs((dex and dex.caught) or {}) do
+      if on then caughtN = caughtN + 1 end
+    end
+    return seenN, caughtN
+  end
+
+  if not PM._krDexNewWrap then
+    local origNew = PM.new
+    if type(origNew) == "function" then
+      PM.new = function(game, opts)
+        SpeciesScope._game = game or SpeciesScope._game
+        local save = (opts and opts.save) or (game and game.save)
+        if save then SpeciesScope.syncDexProgress(mod, save) end
+        return origNew(game, opts)
+      end
+      PM._krDexNewWrap = true
+    end
+  end
+
+  PM._krDexSync = true
+
+  -- Belt-and-suspenders: whenever Screens builds Gen2PokedexMenu, force sync
+  -- on the live save before the menu runs rebuild (covers any missed wrap).
+  if not SpeciesScope._krScreensDexHook then
+    local okScreens, Screens = pcall(require, "src.ui.Screens")
+    if okScreens and Screens and type(Screens.push) == "function" then
+      local origPush = Screens.push
+      Screens.push = function(game, id, ...)
+        if id == "Gen2PokedexMenu" and game and game.save then
+          SpeciesScope._game = game
+          SpeciesScope.syncDexProgress(mod, game.save)
+          SpeciesScope.ensureGen2PokedexSync(mod)
+        end
+        return origPush(game, id, ...)
+      end
+      SpeciesScope._krScreensDexHook = true
+    end
+  end
+
+  return true
 end
 
 -- Party / PC / daycare mons must show as caught if the dex was wiped
@@ -1227,9 +1433,10 @@ function SpeciesScope.applyTransition(mod, game, toMode)
       return true, nil, msg
     end
   else
-    -- Gen2: no stash; still mark party/PC as caught after FULL restore.
-    SpeciesScope.restoreDexFlags(mod, game and game.save)
-    SpeciesScope.backfillDexFromCollection(mod, game and game.save)
+    -- Gen2: no mon stash. Snapshot KR dex flags, restore sidecar progress,
+    -- and re-mark party/PC/daycare as caught after JOHTO 251 ↔ FULL flips
+    -- (and any other Gen2 scope hop).
+    SpeciesScope.syncDexProgress(mod, game and game.save)
     SpeciesScope.refresh(mod, game, toMode)
     mod.save:set(SpeciesScope.APPLIED_KEY, toMode)
     return true
@@ -1370,7 +1577,10 @@ function SpeciesScope.ensureBoot(mod, game)
   end
   SpeciesScope.refresh(mod, game, mode)
   mod.save:set(SpeciesScope.APPLIED_KEY, mode)
-  if mode ~= SpeciesScope.MODE_KANTO then
+  if Host.isGen2() then
+    -- Gen2: always re-sync sidecar + party/PC/daycare after boot / scope apply.
+    SpeciesScope.syncDexProgress(mod, game and game.save)
+  elseif mode ~= SpeciesScope.MODE_KANTO then
     SpeciesScope.backfillDexFromCollection(mod, game and game.save)
   end
   return true
@@ -1513,35 +1723,34 @@ function SpeciesScope.install(mod)
   local Gen1Patch = require("mods.Kanto-Reforged.core.gen1_patch")
 
   if Host.isGen1() then
-    -- Keep KR seen/owned flags across SaveData.validate even if a species is
-    -- briefly absent from data.pokemon (scope flips / partial loads).
+    -- Keep ALL seen/owned/caught flags across SaveData.validate (vanilla +
+    -- KR), even if a species is briefly absent from data.pokemon. Pack-only
+    -- preserve missed Johto natives and randomizer-touched ids.
     local SaveData = require("src.core.SaveData")
     if not SaveData._krScopeDexPreserve then
       local origValidate = SaveData.validate
       SaveData.validate = function(save, data)
         SpeciesScope.snapshotDexFlags(mod, save)
-        local preserved = { seen = {}, owned = {} }
+        local preserved = emptyDexSnap()
         local dex = save and save.pokedex
-        local packOk, pack = pcall(require, "mods.Kanto-Reforged.pokemon.pokemon_data")
-        local species = packOk and pack and pack.species
-        if type(dex) == "table" and type(species) == "table" then
-          for _, key in ipairs({ "seen", "owned" }) do
+        if type(dex) == "table" then
+          for _, key in ipairs(DEX_FLAG_KEYS) do
             if type(dex[key]) == "table" then
               for id, on in pairs(dex[key]) do
-                if on and species[id] then
+                if on and type(id) == "string" then
                   preserved[key][id] = true
                 end
               end
             end
           end
+          mirrorOwnedCaught(preserved)
         end
         local report = origValidate(save, data)
         SpeciesScope.restoreDexFlags(mod, save)
         if type(dex) == "table" then
-          dex.seen = dex.seen or {}
-          dex.owned = dex.owned or {}
           local isKanto = (Host.isGen1() and SpeciesScope.mode(mod) == SpeciesScope.MODE_KANTO)
-          for _, key in ipairs({ "seen", "owned" }) do
+          for _, key in ipairs(DEX_FLAG_KEYS) do
+            dex[key] = dex[key] or {}
             for id, on in pairs(preserved[key]) do
               if on then
                 local d = SpeciesScope.dexOf(SpeciesScope._game, id)
@@ -1551,6 +1760,7 @@ function SpeciesScope.install(mod)
               end
             end
           end
+          mirrorOwnedCaught(dex)
           if isKanto then
             pruneOutOfScopeDex(SpeciesScope._game, save)
           end
@@ -1560,6 +1770,28 @@ function SpeciesScope.install(mod)
       SaveData._krScopeDexPreserve = true
     end
   end
+
+  if Host.isGen2() then
+    -- Gold Save.validate does not scrub dex ids today, but snapshot/restore
+    -- around it so KR caught/seen survive any future scrub or mid-load gaps.
+    local okSave, Save = pcall(require, "src.core.gen2.Save")
+    if okSave and Save and not Save._krScopeDexPreserve then
+      local origValidate = Save.validate
+      Save.validate = function(save, ...)
+        SpeciesScope.snapshotDexFlags(mod, save)
+        local report = origValidate(save, ...)
+        SpeciesScope.restoreDexFlags(mod, save)
+        SpeciesScope.backfillDexFromCollection(mod, save, nil, true)
+        return report
+      end
+      Save._krScopeDexPreserve = true
+    end
+  end
+
+  -- Gold #DEX: re-bind every install (and again from DexEntries after its
+  -- catch-entry wrap) so party/PC backfill + global totals always stick.
+  SpeciesScope.ensureGen2PokedexSync(mod)
+
   if Host.isGen1() then
     Gen1Patch.apply(require("src.world.OverworldController"), function(OW)
       local target = OW.OverworldState or OW
@@ -1604,20 +1836,33 @@ function SpeciesScope.install(mod)
       if type(origNew) ~= "function" then return end
       PM.new = function(game, opts)
         if Host.isGen1() then
+          local save = (opts and opts.save) or (game and game.save)
           if SpeciesScope.mode(mod) == SpeciesScope.MODE_KANTO then
-            pruneOutOfScopeDex(game, game and game.save)
+            pruneOutOfScopeDex(game, save)
           else
             restoreStashedDex(game, getStash(mod))
-            SpeciesScope.restoreDexFlags(mod, game and game.save)
+            -- Force party/PC recovery every open — MOD_DEX_RECOVERED must not
+            -- leave OWN at 0 while the player is holding Pokémon.
+            SpeciesScope.syncDexProgress(mod, save)
           end
         end
         local menu = origNew(game, opts)
-        if Host.isGen1()
-            and SpeciesScope.mode(mod) == SpeciesScope.MODE_KANTO
-            and menu and menu.footer then
-          local ownedN = select(1, SpeciesScope.countOwnedInScope(game, mod))
-          local seenN = select(1, SpeciesScope.countSeenInScope(game, mod))
-          -- Keep OWN ≤ SEEN for display sanity.
+        if Host.isGen1() and menu and menu.footer then
+          local save = menu.save or (game and game.save)
+          local ownedN, seenN
+          if SpeciesScope.mode(mod) == SpeciesScope.MODE_KANTO then
+            ownedN = select(1, SpeciesScope.countOwnedInScope(game, mod))
+            seenN = select(1, SpeciesScope.countSeenInScope(game, mod))
+          else
+            local dex = save and save.pokedex
+            ownedN, seenN = 0, 0
+            for _, on in pairs((dex and dex.owned) or {}) do
+              if on then ownedN = ownedN + 1 end
+            end
+            for _, on in pairs((dex and dex.seen) or {}) do
+              if on then seenN = seenN + 1 end
+            end
+          end
           if ownedN > seenN then seenN = ownedN end
           menu.footer = Strings("SEEN %3d  OWN %3d", seenN, ownedN)
         end
@@ -1667,6 +1912,8 @@ function SpeciesScope.install(mod)
     local save = ev and ev.save
     if not save then return end
     SpeciesScope.restoreDexFlags(mod, save)
+    SpeciesScope.syncDexProgress(mod, save)
+    SpeciesScope.ensureGen2PokedexSync(mod)
   end)
 
   mod.events:on("game.ready", function(ev)
@@ -1674,6 +1921,10 @@ function SpeciesScope.install(mod)
       SpeciesScope._game = ev.game
       SpeciesScope.restoreDexFlags(mod, ev.game.save)
       SpeciesScope.ensureBoot(mod, ev.game)
+      SpeciesScope.ensureGen2PokedexSync(mod)
+      if ev.game.save then
+        SpeciesScope.syncDexProgress(mod, ev.game.save)
+      end
     end
   end)
 end

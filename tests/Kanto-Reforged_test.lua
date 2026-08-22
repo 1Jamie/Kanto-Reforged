@@ -178,6 +178,34 @@ do
   joined = table.concat(drawn, "\n")
   T.check(not joined:find("Data unknown", 1, true),
     "owned Tyranitar dex page is not Data unknown")
+
+  -- Empty game.data.text still resolves via ensureDexText (key present, body missing).
+  DexEntries.installInlineTextFallback({ log = { info = function() end } })
+  local emptyGame = {
+    data = { pokemon = Data.pokemon, text = {}, constants = Data.constants },
+    save = { pokedex = { owned = { CHIKORITA = true } } },
+  }
+  drawn = {}
+  Font.draw = function(text, x, y)
+    drawn[#drawn + 1] = tostring(text)
+    if oldDraw then return oldDraw(text, x, y) end
+  end
+  ok = pcall(DexEntryMenu.render, emptyGame, chiki, nil, true, false)
+  Font.draw = oldDraw
+  T.check(ok, "DexEntryMenu.render succeeds with empty text table")
+  joined = table.concat(drawn, "\n")
+  T.check(not joined:find("Data unknown", 1, true),
+    "empty text table still not Data unknown for owned Chikorita")
+  T.check(type(emptyGame.data.text[chiki.dexEntry.text]) == "string"
+      and #emptyGame.data.text[chiki.dexEntry.text] > 0,
+    "ensureDexText filled game.data.text for Chikorita key")
+
+  -- Pack weights are kg; Gen1 UI expects tenths of a pound.
+  local tree = Data.pokemon.TREECKO
+  T.check(tree and tree.dexEntry, "TREECKO has dexEntry")
+  local w = tree.dexEntry.weight
+  T.check(type(w) == "number" and w >= 100 and w <= 120,
+    "TREECKO weight converted to tenths-lb (~110 for 5.0 kg)")
 end
 
 -- 2. Verify custom moves registration
@@ -413,7 +441,7 @@ end
 local splitOpt = optByKey("split_special")
 T.check(splitOpt ~= nil, "split special option present")
 T.eq(splitOpt.type, "toggle", "split special is a toggle")
-T.eq(splitOpt.default, false, "SP.ATK / SP.DEF defaults off")
+T.eq(splitOpt.default, true, "SP.ATK / SP.DEF defaults on")
 T.eq(splitOpt.label, "SP.ATK / SP.DEF", "split special label")
 local dexOpt = optByKey("dexnav_mode")
 T.check(dexOpt ~= nil, "DexNav option present")
@@ -850,6 +878,32 @@ do
     moveType = "FIRE", source = "WILL_O_WISP",
   })
   T.eq(ffBurn.mon.status, nil, "Flash Fire blocks Fire-type burn moves")
+
+  -- Flash Fire: after absorb, user's Fire moves get ×1.5 offense
+  do
+    local ffUser = {
+      mon = { species = "VULPIX", hp = 50, stats = { hp = 50 } },
+      curStats = { attack = 50, defense = 50, special = 100, speed = 50 },
+      stages = {}, curTypes = { "FIRE" }, isPlayer = true, name = "Vulpix",
+      expFlashFire = true, expTracedAbility = "FLASH_FIRE",
+    }
+    local ffFoe = {
+      mon = { species = "RATTATA", hp = 50, stats = { hp = 50 } },
+      curStats = { attack = 50, defense = 50, special = 50, speed = 50 },
+      stages = {}, curTypes = { "NORMAL" }, isPlayer = false, name = "Rattata",
+    }
+    local seenSp
+    Abilities.onDamage(function(c)
+      seenSp = c.user.curStats.special
+      return 10, { crit = false, typeMult = 10 }
+    end, {
+      battle = { data = Data, sayNext = function() end },
+      user = ffUser, target = ffFoe,
+      move = { id = "EMBER", type = "FIRE", power = 40, category = "special" },
+    })
+    T.eq(seenSp, 150, "Flash Fire boosts Fire SpA after absorb")
+    T.eq(ffUser.curStats.special, 100, "Flash Fire boost restores after damage")
+  end
 
   -- Lightning Rod: Electric damage nullified
   abilityMon("RHYHORN", "LIGHTNING_ROD")
@@ -1306,6 +1360,98 @@ T.eq(Data.moves.WILL_O_WISP.effect, "EXP_BURN_EFFECT", "Will-O-Wisp burns")
 T.check(Data.move_effects.EXP_WEATHER_SUNNY ~= nil, "EXP weather effect registered")
 T.check(Data.move_effects.EXP_PROTECT_EFFECT ~= nil, "EXP protect effect registered")
 T.check(Data.move_effects.EXP_BELLY_DRUM_EFFECT ~= nil, "EXP belly drum effect registered")
+
+-- Protect successive-use fail (Gen3): first always works; second fails on bad roll
+do
+  local protect = Data.move_effects.EXP_PROTECT_EFFECT
+  local user = { name = "User", isPlayer = true, expProtectStreak = 0 }
+  local ok1 = protect.run({
+    user = user, battle = { rng = function(_, _) return 0 end },
+  })
+  T.check(user.expProtected == true, "first Protect succeeds")
+  T.eq(user.expProtectStreak, 1, "Protect streak advances")
+  T.check(#(ok1 or {}) > 0, "first Protect returns message")
+
+  user.expProtected = nil
+  local fail = protect.run({
+    user = user, battle = { rng = function(_, _) return 1 end },
+  })
+  T.eq(user.expProtected, nil, "second Protect can fail")
+  T.check(fail and fail[1] and fail[1]:find("failed"), "second Protect fail text")
+end
+
+-- Gen3 type categories: strip Gen4 move.category leftovers
+do
+  local MoveCategoryGen3 = require("mods.Kanto-Reforged.battle.move_category_gen3")
+  MoveCategoryGen3.apply()
+  local TypeChart = require("src.battle.TypeChart")
+  local samples = {
+    { "CRUNCH", "DARK", "special" },
+    { "SHADOW_BALL", "GHOST", "physical" }, -- Gen3 Ghost is physical
+    { "FLAME_WHEEL", "FIRE", "special" },
+    { "AQUA_TAIL", "WATER", "special" },
+  }
+  for _, row in ipairs(samples) do
+    local id, typ, expect = row[1], row[2], row[3]
+    local mv = Data.moves[id]
+    if mv then
+      T.eq(mv.category, nil, id .. " category stripped for Gen3 type split")
+      T.eq(MoveCategoryGen3.resolvedCategory(mv), expect,
+        id .. " resolves to Gen3 " .. expect)
+      T.eq(TypeChart.category(typ) or TypeChart.category(mv.type), expect,
+        id .. " type chart category is " .. expect)
+    end
+  end
+  T.eq(Data.moves.PROTECT.category, "status", "Protect stays status")
+end
+
+-- RULESET option + Gen3 crit helper
+do
+  local RulesetOpt = require("mods.Kanto-Reforged.battle.ruleset_option")
+  local CritGen3 = require("mods.Kanto-Reforged.battle.crit_gen3")
+  local rulesetOpt = optByKey(RulesetOpt.OPTION_KEY)
+  T.check(rulesetOpt ~= nil, "RULESET option present on Gen1")
+  T.eq(rulesetOpt.type, "choice", "RULESET is a choice")
+  T.eq(rulesetOpt.default, "modern_clean", "RULESET defaults to modern_clean")
+
+  T.eq(CritGen3.stage({ focusEnergy = true }, "SLASH", true), 3,
+    "Focus Energy + high-crit is stage 3")
+  T.eq(CritGen3.stage({}, "TACKLE", false), 0, "base crit stage is 0")
+  T.check(CritGen3.rulesetWants({ krGen3Crit = true }), "krGen3Crit enables Gen3 crit")
+  T.check(not CritGen3.rulesetWants({ name = "gen1_faithful" }),
+    "faithful ruleset keeps Gen1 crit")
+
+  -- Seed once → modern; second sync preserves user gen1_faithful
+  local Host = require("mods.Kanto-Reforged.core.host")
+  Host.force(1)
+  local game = {
+    save = { options = { ruleset = "gen1_faithful" } },
+    writeOptions = function() end,
+    mods = run.loader,
+  }
+  local fakeMod = {
+    id = "Kanto-Reforged",
+    log = { info = function() end },
+    game = game,
+    _loader = run.loader,
+    content = { rulesets = { patch = function() end } },
+    events = { on = function() end },
+    hooks = { wrap = function() end },
+  }
+  run.loader.modOptions["Kanto-Reforged"] = run.loader.modOptions["Kanto-Reforged"] or {}
+  local bucket = run.loader.modOptions["Kanto-Reforged"]
+  bucket[RulesetOpt.SEED_KEY] = nil
+  bucket[RulesetOpt.OPTION_KEY] = nil
+  RulesetOpt.seedAndSync(fakeMod)
+  T.eq(game.save.options.ruleset, "modern_clean", "first seed flips to modern_clean")
+  T.eq(bucket[RulesetOpt.SEED_KEY], true, "seed flag set")
+  game.save.options.ruleset = "gen1_faithful"
+  bucket[RulesetOpt.OPTION_KEY] = "modern_clean"
+  RulesetOpt.seedAndSync(fakeMod)
+  T.eq(game.save.options.ruleset, "gen1_faithful", "later sync does not overwrite user choice")
+  T.eq(bucket[RulesetOpt.OPTION_KEY], "gen1_faithful", "mod row aligns to engine")
+  Host.clearForce()
+end
 
 -- Rock Tomb / Snarl side effects apply stages to the target, not the user.
 do
@@ -2073,7 +2219,7 @@ T.eq(Abilities.illuminateRateMult(illumGame), 1.5, "Illuminate boosts encounter 
 T.eq(Abilities.illuminateRateMult({ data = Data, save = { party = { { species = "PIDGEY" } } } }),
   1, "No Illuminate leaves rate alone")
 
--- ------- Plus/Minus stand-in + ability/move batch
+-- ------- Plus/Minus: no-op in singles (Gen3 needs opposite ally in doubles)
 
 local plusCtx = {
   battle = { data = Data, expMudSport = false },
@@ -2095,8 +2241,8 @@ Abilities.onDamage(function(c)
   seenSpecial = c.user.curStats.special
   return 10, { crit = false, typeMult = 10 }
 end, plusCtx)
-T.eq(seenSpecial, 150, "Plus boosts SpA 1.5x in singles")
-T.eq(plusCtx.user.curStats.special, 100, "Plus SpA boost restores after damage")
+T.eq(seenSpecial, 100, "Plus does not boost SpA in singles")
+T.eq(plusCtx.user.curStats.special, 100, "Plus SpA unchanged after damage")
 
 T.eq(Data.moves.SKETCH.effect, "EXP_SKETCH_EFFECT", "Sketch effect id")
 T.eq(Data.moves.IMPRISON.effect, "EXP_IMPRISON_EFFECT", "Imprison effect id")

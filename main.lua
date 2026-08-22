@@ -4,6 +4,9 @@ local HeldItems = require("mods.Kanto-Reforged.items.held_items")
 local Gender = require("mods.Kanto-Reforged.pokemon.gender")
 local ModernXpShare = require("mods.Kanto-Reforged.ui.modern_xp_share")
 local SplitSpecial = require("mods.Kanto-Reforged.battle.split_special")
+local RulesetOpt = require("mods.Kanto-Reforged.battle.ruleset_option")
+local MoveCategoryGen3 = require("mods.Kanto-Reforged.battle.move_category_gen3")
+local CritGen3 = require("mods.Kanto-Reforged.battle.crit_gen3")
 local TrainerAi = require("mods.Kanto-Reforged.battle.trainer_ai")
 local ExpTrainers = require("mods.Kanto-Reforged.battle.trainers")
 local SpeciesScope = require("mods.Kanto-Reforged.pokemon.species_scope")
@@ -94,6 +97,18 @@ local function applySpawnTables(mod, pokemon_data, flags)
   mod.log:info("Wild encounters applied (%s)", tag)
 end
 
+-- After Gen2 spawn / Johto-scope toggles: keep the full-dex sidecar fresh and
+-- re-mark party/PC/daycare as caught (NEW order changes do not wipe flags,
+-- but recovery must still run when MOD_DEX_RECOVERED already latched).
+local function syncGen2DexAfterToggle(mod)
+  local Host = require("mods.Kanto-Reforged.core.host")
+  if not Host.isGen2() then return end
+  local game = Host.liveGame(mod)
+  local save = game and game.save
+  if not save then return end
+  SpeciesScope.syncDexProgress(mod, save)
+end
+
 local _cachedPokemonData = nil
 
 local function refreshScopeContent(mod, game, scopeMode)
@@ -164,7 +179,9 @@ return function(mod)
     HeldItems.BAG_GIVE_OPTION,
   }
   -- SpA/SpD split is a Gen1 single-Special concern; Gold already has both.
+  -- RULESET mirrors engine OPTIONS → RULESET (Gen1 only; Gold has no path).
   if Host.isGen1() then
+    optionDefs[#optionDefs + 1] = RulesetOpt.OPTION
     optionDefs[#optionDefs + 1] = SplitSpecial.OPTION
     optionDefs[#optionDefs + 1] = require("mods.Kanto-Reforged.ui.battle_exp_bar").OPTION
     -- DexNav label/off is only for the start-menu entry; Gold uses Pokegear.
@@ -173,6 +190,9 @@ return function(mod)
   mod.options:define(optionDefs)
   Host.installEngineShims(mod)
   Host.migrateScopedOptions(mod)
+  if Host.isGen1() then
+    RulesetOpt.install(mod)
+  end
 
   SpeciesScope._refreshContent = refreshScopeContent
   SpeciesScope.install(mod)
@@ -452,6 +472,9 @@ return function(mod)
       end
     end
 
+    -- Gen3 type-based physical/special: strip Gen4 move.category fields.
+    MoveCategoryGen3.stripTable(pokemon_data.moves)
+
     local moves_registered = 0
     if not Host.isGen2() or goldDataReady then
       for id, record in pairs(pokemon_data.moves) do
@@ -524,6 +547,8 @@ return function(mod)
       })
       -- Gold dex UI reads gen2Pokedex.entries (not Data.text). Fill Hoenn rows.
       DexEntries.bindGen2Pokedex(mod, pokemon_data.species)
+      -- Catch → NewPokedexEntry: land on OLD when species is off NEW/A–Z.
+      DexEntries.installGen2CatchEntryFix(mod)
       applySpawnTables(mod, pokemon_data)
       local JohtoDex = require("mods.Kanto-Reforged.pokemon.johto_dex")
       JohtoDex.installNests(mod)
@@ -550,11 +575,13 @@ return function(mod)
           else
             applySpawnTables(mod, pokemon_data, { clearPureSeed = true })
           end
+          syncGen2DexAfterToggle(mod)
           return
         end
         if Host.optionEventIs(ev.key, "full_spawn_random")
             or Host.optionEventIs(ev.key, "legends_in_mix") then
           applySpawnTables(mod, pokemon_data)
+          syncGen2DexAfterToggle(mod)
         end
       end)
       SpeciesScope.refresh(mod, nil, SpeciesScope.mode(mod))
@@ -1241,7 +1268,8 @@ return function(mod)
     return hit
   end)
 
-  -- Battle Armor / Shell Armor / Lucky Chant: never crit
+  -- Battle Armor / Shell Armor / Lucky Chant: never crit.
+  -- Under modern_clean (krGen3Crit), use Gen3 stage ladder instead of Gen1 speed crits.
   mod.hooks:wrap("battle.crit", function(next, ctx)
     local battle = mod.activeBattle or ctx.battle
     if battle and ctx.attacker then
@@ -1263,7 +1291,19 @@ return function(mod)
         return false
       end
     end
+    local ruleset = ctx.ruleset or (battle and battle.ruleset)
+    if CritGen3.rulesetWants(ruleset) then
+      return CritGen3.roll(ctx)
+    end
     return next(ctx)
+  end)
+
+  -- Ensure Data.moves also lose Gen4 categories after merge (vanilla + KR).
+  mod.events:on("game.ready", function()
+    local n = MoveCategoryGen3.apply()
+    if n > 0 and mod.log then
+      mod.log:info("Stripped Gen4 move.category on %d moves (Gen3 type split)", n)
+    end
   end)
 
   -- Rock Head: strip recoil from the vanilla recoil effect
@@ -1459,6 +1499,13 @@ return function(mod)
   end)
   
   mod.events:on("battle.battler_switched", function(ev)
+    if ev.previous then
+      ev.previous.expProtectStreak = nil
+      ev.previous.expFlashFire = nil
+    end
+    if ev.battler then
+      ev.battler.expProtectStreak = nil
+    end
     if ev.battle and ev.battler then
       Abilities.onEntry(ev.battle, ev.battler)
     end
@@ -1493,6 +1540,11 @@ return function(mod)
       end
       if ev.move.id ~= "FURY_CUTTER" then
         ev.user.expFuryCutter = nil
+      end
+      -- Gen3 Protect: consecutive-use counter resets on any other action.
+      if ev.move.id ~= "PROTECT" and ev.move.id ~= "DETECT"
+          and ev.move.id ~= "ENDURE" then
+        ev.user.expProtectStreak = nil
       end
     end
   end)

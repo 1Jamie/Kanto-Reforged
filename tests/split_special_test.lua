@@ -1,4 +1,4 @@
--- SP.ATK / SP.DEF toggle: default off; battle + UI when on.
+-- SP.ATK / SP.DEF toggle: default on; battle + UI when on.
 return function(T, Data, run)
   local SplitSpecial = require("mods.Kanto-Reforged.battle.split_special")
   local Runtime = require("src.mods.Runtime")
@@ -10,7 +10,7 @@ return function(T, Data, run)
   end
   T.check(opt ~= nil, "SP.ATK / SP.DEF option schema registered")
   T.eq(opt.type, "toggle", "split special is a toggle")
-  T.eq(opt.default, false, "SP.ATK / SP.DEF defaults off")
+  T.eq(opt.default, true, "SP.ATK / SP.DEF defaults on")
   T.eq(opt.label, "SP.ATK / SP.DEF", "split special label")
 
   -- Kanto species patched with PokeAPI SpA/SpD; Gen1 special untouched.
@@ -33,7 +33,7 @@ return function(T, Data, run)
       end,
     },
   }
-  T.eq(SplitSpecial.enabled(modApi), false, "enabled() false at default")
+  T.eq(SplitSpecial.enabled(modApi), true, "enabled() true at default")
 
   -- calcSpStats uses separate bases + shared Special DV.
   local mon = {

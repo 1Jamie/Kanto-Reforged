@@ -417,9 +417,39 @@ do
   T.check(tree and tree.text:find("<NEXT>", 1, true),
     "TREECKO dex text uses Gen2 <NEXT> breaks")
   T.check(tree and tree.dex == 252, "TREECKO dex number 252")
+  -- Pack kg → tenths of a pound (5.0 kg ≈ 110).
+  T.check(type(tree.weight) == "number" and tree.weight >= 100 and tree.weight <= 120,
+    "TREECKO gen2 weight is tenths-lb (~110)")
   -- Johto ROM entries must stay (we only fill missing).
   T.check(entries.CHIKORITA ~= nil and entries.CHIKORITA.text ~= nil,
     "Gold keeps ROM CHIKORITA dex entry")
+  -- ROM CHIKORITA stays in tenths (14.0 lb → 140), not re-converted from kg.
+  T.check(entries.CHIKORITA.weight == 140 or entries.CHIKORITA.weight == 141,
+    "ROM CHIKORITA weight left as cart tenths")
+end
+
+-- NewPokedexEntry: Hoenn off NEW list still opens via OLD fallback.
+do
+  local DexEntries = require("mods.Kanto-Reforged.pokemon.dex_entries")
+  DexEntries.installGen2CatchEntryFix({ log = { info = function() end } })
+  local PokedexMenu = require("src.ui.gen2.PokedexMenu")
+  local save = {
+    lastDexMode = "NEW",
+    pokedex = { seen = { TREECKO = true }, caught = { TREECKO = true } },
+  }
+  local game = { data = Data, save = save }
+  -- Ensure TREECKO is not in NEW order for this assertion.
+  local dex = Data.gen2Pokedex
+  local filtered = {}
+  for _, id in ipairs(dex.newOrder or {}) do
+    if id ~= "TREECKO" then filtered[#filtered + 1] = id end
+  end
+  dex.newOrder = filtered
+  local menu = PokedexMenu.new(game, { entrySpecies = "TREECKO", newEntry = true })
+  T.eq(menu.view, "entry", "catch entry opens entry view for TREECKO off NEW")
+  T.eq(menu:mode(), "OLD", "catch entry falls back to OLD mode")
+  T.check(menu:current() and menu:current().species == "TREECKO",
+    "catch entry lands on TREECKO row")
 end
 
 -- NEW (Johto) order follows live Johto availability, not every Gen3 species.
@@ -465,18 +495,115 @@ do
   do
     local SpeciesScope = require("mods.Kanto-Reforged.pokemon.species_scope")
     local save = {
-      pokedex = { seen = { TREECKO = true }, caught = { TREECKO = true } },
+      pokedex = {
+        seen = { TREECKO = true, CYNDAQUIL = true },
+        caught = { TREECKO = true, CYNDAQUIL = true },
+      },
     }
     local mod = SpeciesScope._mod or run.api
     T.check(mod ~= nil and mod.save ~= nil, "Gold species_scope has mod.save")
     SpeciesScope.snapshotDexFlags(mod, save)
     save.pokedex.seen.TREECKO = nil
     save.pokedex.caught.TREECKO = nil
+    save.pokedex.seen.CYNDAQUIL = nil
+    save.pokedex.caught.CYNDAQUIL = nil
     SpeciesScope.restoreDexFlags(mod, save)
     T.eq(save.pokedex.caught.TREECKO, true,
       "Gold Hoenn caught flag restores from sidecar")
     T.eq(save.pokedex.seen.TREECKO, true,
       "Gold Hoenn seen flag restores from sidecar")
+    T.eq(save.pokedex.caught.CYNDAQUIL, true,
+      "Gold Johto native caught also restores (full-dex sidecar, not Gen3-only)")
+
+    -- syncDexProgress: wiped caught + party mon → re-marked after toggle path.
+    save.party = { { species = "TREECKO", level = 10 } }
+    save.dayCare = { man = { mon = { species = "TORCHIC", level = 8 } }, lady = {} }
+    save.pokedex.caught.TREECKO = nil
+    save.pokedex.seen.TREECKO = nil
+    save.pokedex.caught.TORCHIC = nil
+    save.flags = { MOD_DEX_RECOVERED = true } -- would skip naive backfill
+    SpeciesScope.syncDexProgress(mod, save)
+    T.eq(save.pokedex.caught.TREECKO, true,
+      "syncDexProgress re-marks party TREECKO after latched recovery")
+    T.eq(save.pokedex.caught.TORCHIC, true,
+      "syncDexProgress re-marks Gen2 dayCare man mon")
+
+    -- #DEX SEEN/OWN must match Save.summary (global flags), not NEW-row count.
+    SpeciesScope.install(mod)
+    local dexSave = {
+      party = {},
+      pokedex = {
+        seen = { TREECKO = true, CHIKORITA = true, CYNDAQUIL = true },
+        caught = { TREECKO = true, CHIKORITA = true },
+      },
+      flags = {},
+    }
+    -- Fresh sidecar so earlier TORCHIC backfill does not leak into counts
+    -- (clear both g2:-prefixed and legacy keys).
+    SpeciesScope.clearDexFlags(mod)
+    SpeciesScope.snapshotDexFlags(mod, dexSave)
+    dexSave.pokedex.caught.TREECKO = nil
+    dexSave.pokedex.seen.TREECKO = nil
+    dexSave.flags = { MOD_DEX_RECOVERED = true }
+    local PokedexMenu = require("src.ui.gen2.PokedexMenu")
+    local game = {
+      data = Data, save = dexSave,
+      input = { wasPressed = function() return false end },
+    }
+    -- NEW order without TREECKO — undercount if totals() only walks rows.
+    Data.gen2Pokedex = Data.gen2Pokedex or {}
+    Data.gen2Pokedex.newOrder = { "CHIKORITA", "CYNDAQUIL" }
+    Data.gen2Pokedex.entries = Data.gen2Pokedex.entries or {}
+    for _, id in ipairs({ "CHIKORITA", "CYNDAQUIL", "TREECKO" }) do
+      Data.gen2Pokedex.entries[id] = Data.gen2Pokedex.entries[id]
+        or { id = id, dex = 1, text = "x", text2 = "" }
+    end
+    local menu = PokedexMenu.new(game, { save = dexSave, pokedex = Data.gen2Pokedex })
+    T.eq(dexSave.pokedex.caught.TREECKO, true,
+      "opening #DEX re-syncs TREECKO caught from sidecar")
+    local seenN, caughtN = menu:totals()
+    local rowCaught = 0
+    for _, row in ipairs(menu.rows or {}) do
+      if row.caught then rowCaught = rowCaught + 1 end
+    end
+    T.check(rowCaught < caughtN,
+      "NEW-row OWN count is below global OWN (TREECKO outside NEW)")
+    T.eq(seenN, 3, "#DEX SEEN matches global save flags (not NEW rows only)")
+    T.eq(caughtN, 2, "#DEX OWN matches global save flags (not NEW rows only)")
+
+    -- User report: party has mons but OWN shows 0. Opening #DEX must
+    -- backfill caught from party even when MOD_DEX_RECOVERED is latched and
+    -- the live caught table is empty.
+    SpeciesScope.clearDexFlags(mod)
+    local emptyOwnSave = {
+      party = {
+        { species = "CYNDAQUIL", level = 12 },
+        { species = "TOTODILE", level = 10 },
+      },
+      boxes = { { { species = "CHIKORITA", level = 8 } } },
+      pokedex = { seen = {}, caught = {}, owned = {} },
+      flags = { MOD_DEX_RECOVERED = true },
+    }
+    local emptyGame = {
+      data = Data, save = emptyOwnSave,
+      input = { wasPressed = function() return false end },
+    }
+    SpeciesScope._game = emptyGame
+    SpeciesScope.ensureGen2PokedexSync(mod)
+    local emptyMenu = PokedexMenu.new(emptyGame, {
+      save = emptyOwnSave, pokedex = Data.gen2Pokedex,
+    })
+    T.eq(emptyOwnSave.pokedex.caught.CYNDAQUIL, true,
+      "opening #DEX marks party CYNDAQUIL caught when OWN was 0")
+    T.eq(emptyOwnSave.pokedex.caught.TOTODILE, true,
+      "opening #DEX marks party TOTODILE caught when OWN was 0")
+    T.eq(emptyOwnSave.pokedex.caught.CHIKORITA, true,
+      "opening #DEX marks boxed CHIKORITA caught when OWN was 0")
+    local emptySeen, emptyCaught = emptyMenu:totals()
+    T.check(emptyCaught >= 3,
+      "#DEX OWN reflects party+PC after backfill (was 0)")
+    T.check(emptySeen >= 3,
+      "#DEX SEEN reflects party+PC after backfill")
   end
 
   -- AREA nests resolve against gen2Encounters + gen2Maps. Dex AREA itself also

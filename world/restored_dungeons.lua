@@ -224,7 +224,8 @@ local MT_MOON_RIVAL_LEFT_SCRIPT = {
   { op = "waitbutton" },
   { op = "closetext" },
   { op = "winlosstext", winText = DUNGEON_TEXT.TEXT_MT_MOON_SILVER_RIVAL_DEFEAT, lossText = "Humph! As expected." },
-  { op = "loadtrainer", class = 42, member = 1 },
+  -- Gold RIVAL2 index 42; member 201+ avoids Indigo rematch slots 1–3.
+  { op = "loadtrainer", class = 42, member = 201 },
   { op = "startbattle" },
   { op = "dontrestartmapmusic" },
   { op = "reloadmapafterbattle" },
@@ -259,7 +260,7 @@ local MT_MOON_RIVAL_RIGHT_SCRIPT = {
   { op = "waitbutton" },
   { op = "closetext" },
   { op = "winlosstext", winText = DUNGEON_TEXT.TEXT_MT_MOON_SILVER_RIVAL_DEFEAT, lossText = "Humph! As expected." },
-  { op = "loadtrainer", class = 42, member = 1 },
+  { op = "loadtrainer", class = 42, member = 201 },
   { op = "startbattle" },
   { op = "dontrestartmapmusic" },
   { op = "reloadmapafterbattle" },
@@ -321,8 +322,8 @@ local function ensureMtMoonSilverRival(mdef)
       eventFlag = 793,
       isRivalEvent = true,
       level = 58,
-      trainerClass = "OPP_RIVAL2",
-      trainerParty = 1,
+      trainerClass = "RIVAL2",
+      trainerParty = 201,
       text = "TEXT_MT_MOON_SILVER_RIVAL_SEEN",
     }
     table.insert(mdef.objects, rival)
@@ -339,8 +340,8 @@ local function ensureMtMoonSilverRival(mdef)
   rival.eventFlag = 793
   rival.isRivalEvent = true
   rival.level = 58
-  rival.trainerClass = "OPP_RIVAL2"
-  rival.trainerParty = rival.trainerParty or 1
+  rival.trainerClass = "RIVAL2"
+  rival.trainerParty = rival.trainerParty or 201
   rival.name = "MT_MOON_1F_SILVER_RIVAL"
   -- Cart object id 15 reads objects[14]; pin index to array slot when possible.
   if rivalPos == 14 then
@@ -581,7 +582,7 @@ local DUNGEON_ROSTERS = {
     classId = "OPP_BUG_CATCHER",
     classNum = 2,
     member = 4,
-    event = 2052,
+    event = 2055,
     className = "BUG CATCHER",
     name = "DOUG",
     baseMoney = 16,
@@ -665,7 +666,7 @@ local DUNGEON_ROSTERS = {
     classId = "OPP_BLAINE",
     classNum = 39,
     member = 1,
-    event = 2998,
+    event = 2401,
     className = "LEADER",
     name = "BLAINE",
     baseMoney = 70,
@@ -893,14 +894,99 @@ local DUNGEON_ROSTERS = {
   },
 }
 
--- Fast lookup maps for custom dungeon rosters
+-- Remap Gen1 OPP_* / classNum identities onto Gold class strings + high
+-- members (200+). Defeated state is stored on record.event (numeric event
+-- flags), not class_member, so remapping members does not require save
+-- migration. Stock Johto uses members 1–~100; high indexes isolate KR.
+local GEN1_TO_GOLD = {
+  OPP_YOUNGSTER = { id = "YOUNGSTER", index = 22 },
+  OPP_BUG_CATCHER = { id = "BUG_CATCHER", index = 36 },
+  OPP_PICNICKER = { id = "PICNICKER", index = 53 },
+  OPP_POKEMANIAC = { id = "POKEMANIAC", index = 30 },
+  OPP_SUPER_NERD = { id = "SUPER_NERD", index = 41 },
+  OPP_HIKER = { id = "HIKER", index = 44 },
+  OPP_ROCKET = { id = "GRUNTM", index = 31 },
+  OPP_COOLTRAINER_F = { id = "COOLTRAINERF", index = 28 },
+  OPP_BLAINE = { id = "BLAINE", index = 46 },
+  OPP_RIVAL2 = { id = "RIVAL2", index = 42 },
+}
+
+local GOLD_MEMBERS = {
+  MTMOON1F_HIKER = 201,
+  MTMOON1F_YOUNGSTER1 = 201,
+  MTMOON1F_COOLTRAINER_F1 = 201,
+  MTMOON1F_SUPER_NERD = 201,
+  MTMOON1F_COOLTRAINER_F2 = 202,
+  MTMOON1F_YOUNGSTER2 = 202,
+  MTMOON1F_BUG_CATCHER = 201,
+  MTMOONB2F_SUPER_NERD = 202,
+  MTMOONB2F_ROCKET1 = 201,
+  MTMOONB2F_ROCKET2 = 202,
+  MTMOONB2F_ROCKET3 = 203,
+  MTMOONB2F_ROCKET4 = 204,
+  VIRIDIANFOREST_YOUNGSTER1 = 202,
+  VIRIDIANFOREST_YOUNGSTER3 = 203,
+  VIRIDIANFOREST_YOUNGSTER4 = 204,
+  VIRIDIANFOREST_YOUNGSTER2 = 205,
+  MT_MOON_1F_SILVER_RIVAL = 201,
+  MT_MOON_1F_SILVER_RIVAL_2 = 202,
+  MT_MOON_1F_SILVER_RIVAL_3 = 203,
+  MTMOONB2F_SILVER_RIVAL = 210,
+  SEAFOAM_GYM_BLAINE = 201,
+  ROCKTUNNEL1F_HIKER1 = 202,
+  ROCKTUNNEL1F_HIKER2 = 203,
+  ROCKTUNNEL1F_HIKER3 = 204,
+  ROCKTUNNEL1F_SUPER_NERD = 201,
+  ROCKTUNNEL1F_COOLTRAINER_F1 = 201,
+  ROCKTUNNEL1F_COOLTRAINER_F2 = 202,
+  ROCKTUNNEL1F_COOLTRAINER_F3 = 203,
+  ROCKTUNNELB1F_COOLTRAINER_F1 = 204,
+  ROCKTUNNELB1F_HIKER1 = 205,
+  ROCKTUNNELB1F_SUPER_NERD1 = 202,
+  ROCKTUNNELB1F_SUPER_NERD2 = 203,
+  ROCKTUNNELB1F_HIKER2 = 206,
+  ROCKTUNNELB1F_COOLTRAINER_F2 = 205,
+  ROCKTUNNELB1F_HIKER3 = 207,
+  ROCKTUNNELB1F_SUPER_NERD3 = 204,
+}
+
+for rosterKey, entry in pairs(DUNGEON_ROSTERS) do
+  local gold = GEN1_TO_GOLD[entry.classId]
+  if gold then
+    entry.gen1ClassId = entry.classId
+    entry.gen1ClassNum = entry.classNum
+    entry.classId = gold.id
+    entry.classNum = gold.index
+    entry.goldClass = gold.id
+    entry.goldIndex = gold.index
+  end
+  local mid = GOLD_MEMBERS[rosterKey]
+  if mid then
+    entry.member = mid
+  end
+end
+
+-- Fast lookup: object name, Gold class string/index + high member, unique events.
+-- Never register Gen1 classNums — those collide with Gold RIVAL1/Falkner/etc.
 local DUNGEON_BY_KEY = {}
+local eventOwners = {}
 for k, entry in pairs(DUNGEON_ROSTERS) do
   DUNGEON_BY_KEY[k] = entry
-  DUNGEON_BY_KEY[string.format("%s_%s", tostring(entry.classId), tostring(entry.member))] = entry
-  DUNGEON_BY_KEY[string.format("%s_%s", tostring(entry.classNum), tostring(entry.member))] = entry
+  local goldId = entry.goldClass or entry.classId
+  local goldIdx = entry.goldIndex or entry.classNum
+  if goldId and entry.member then
+    DUNGEON_BY_KEY[string.format("%s_%s", tostring(goldId), tostring(entry.member))] = entry
+  end
+  if goldIdx and entry.member then
+    DUNGEON_BY_KEY[string.format("%s_%s", tostring(goldIdx), tostring(entry.member))] = entry
+  end
   if entry.event then
-    DUNGEON_BY_KEY[tostring(entry.event)] = entry
+    local ev = tostring(entry.event)
+    if not eventOwners[ev] then
+      eventOwners[ev] = k
+      DUNGEON_BY_KEY[ev] = entry
+    end
+    -- Shared events (e.g. Silver starter variants on 793) stay name/member keyed.
   end
 end
 
@@ -1049,8 +1135,8 @@ local function normalizeDungeonData(Data)
           obj.eventFlag = 793
           obj.isRivalEvent = true
           obj.level = 58
-          obj.trainerClass = "OPP_RIVAL2"
-          obj.trainerParty = obj.trainerParty or 1
+          obj.trainerClass = "RIVAL2"
+          obj.trainerParty = obj.trainerParty or 201
           obj.trainer = nil
           obj.scriptKey = {
             { op = "faceplayer" },
@@ -1088,7 +1174,7 @@ local function normalizeDungeonData(Data)
               { op = "waitbutton" },
               { op = "closetext" },
               { op = "winloss", win = "Defeated!", loss = "Humph! As expected." },
-              { op = "loadtrainer", class = 42, member = 10 },
+              { op = "loadtrainer", class = 42, member = 210 },
               { op = "startbattle" },
               { op = "reloadmapafterbattle" },
               { op = "opentext" },
@@ -1158,16 +1244,18 @@ local function normalizeDungeonData(Data)
         if obj.trainer and not obj.isRivalEvent then
           local tr = obj.trainer
           if customDef then
+            -- Embed roster on the object so battles work even if global
+            -- class/member lookup misses; class/member are Gold-scoped (200+).
             tr.roster = customDef.roster
             tr.party = customDef.roster
             tr.trainerName = customDef.name
             tr.name = customDef.name
             tr.className = customDef.className
-            tr.class = customDef.classNum or tr.class
+            tr.class = customDef.goldIndex or customDef.classNum or tr.class
             tr.member = customDef.member or tr.member
             tr.baseMoney = customDef.baseMoney
             tr.event = customDef.event or tr.event
-            obj.trainerClass = customDef.classId or obj.trainerClass
+            obj.trainerClass = customDef.goldClass or customDef.classId or obj.trainerClass
             obj.trainerParty = customDef.member or obj.trainerParty
           end
           if obj.eventFlag and not tr.event then
@@ -1276,7 +1364,7 @@ function RestoredDungeons.apply(mod)
       if customDef then
         return {
           class = class,
-          classId = customDef.classId or tostring(class),
+          classId = customDef.goldClass or customDef.classId or tostring(class),
           className = customDef.className or tostring(class),
           member = member,
           id = customDef.name .. "_" .. tostring(member),
@@ -1296,9 +1384,15 @@ function RestoredDungeons.apply(mod)
           local classes = trainerData.classes or trainerData
           for id, cl in pairs(classes) do
             if type(cl) == "table" then
-              if cl.index then cache[cl.index] = cl end
+              -- Only index real class tables (have .trainers/.index), never
+              -- flat dungeon leftover tables keyed by bare numbers.
+              if cl.index and (cl.trainers or cl.parties) then
+                cache[cl.index] = cl
+              end
               cl.id = cl.id or id
-              cache[id] = cl
+              if type(id) == "string" then
+                cache[id] = cl
+              end
             end
           end
           rawset(trainerData, "_byIndex", cache)
@@ -1425,43 +1519,29 @@ function RestoredDungeons.apply(mod)
     local gt = d.gen2Trainers
     if gt.classes == nil then rawset(gt, "classes", gt) end
 
-    -- Synchronize all custom dungeon rosters into Data.trainers and Data.gen2Trainers
-    for _, entry in pairs(DUNGEON_ROSTERS) do
-      if entry.classId and entry.member and entry.roster then
-        local rosterData = {
-          name = entry.name,
-          trainerType = "TRAINERTYPE_NORMAL",
-          roster = entry.roster,
-          baseMoney = entry.baseMoney or 30,
-        }
-        d.gen2Trainers[entry.classId] = d.gen2Trainers[entry.classId] or {}
-        d.gen2Trainers[entry.classId][entry.member] = rosterData
-        if d.trainers then
-          d.trainers[entry.classId] = d.trainers[entry.classId] or {}
-          d.trainers[entry.classId][entry.member] = rosterData
-        end
-        if entry.classNum then
-          d.gen2Trainers[entry.classNum] = d.gen2Trainers[entry.classNum] or {}
-          d.gen2Trainers[entry.classNum][entry.member] = rosterData
-          if d.trainers then
-            d.trainers[entry.classNum] = d.trainers[entry.classNum] or {}
-            d.trainers[entry.classNum][entry.member] = rosterData
-          end
-        end
-      end
+    -- Install dungeon parties into real Gold class tables at high members only.
+    -- Never write Gen1 numeric indexes or orphan OPP_* keys — those stomped
+    -- RIVAL1/Falkner/etc. Defeated flags remain on record.event, not class_member.
+    local function installDungeonMember(trainerRoot, entry)
+      if not trainerRoot then return end
+      local classes = trainerRoot.classes or trainerRoot
+      local classId = entry.goldClass or entry.classId
+      if not classId or not entry.member or not entry.roster then return end
+      local cls = classes[classId]
+      if type(cls) ~= "table" then return end
+      cls.trainers = cls.trainers or {}
+      cls.trainers[entry.member] = {
+        id = string.format("%s_%s", entry.name or classId, tostring(entry.member)),
+        index = entry.member,
+        name = entry.name,
+        party = entry.roster,
+        trainerType = "TRAINERTYPE_NORMAL",
+      }
     end
 
-    if d.gen2Trainers.OPP_PICNICKER then
-      d.gen2Trainers.OPP_JR_TRAINER_F = d.gen2Trainers.OPP_PICNICKER
-      d.gen2Trainers.OPP_LASS = d.gen2Trainers.OPP_LASS or d.gen2Trainers.OPP_PICNICKER
-      if d.trainers then
-        d.trainers.OPP_JR_TRAINER_F = d.gen2Trainers.OPP_PICNICKER
-        d.trainers.OPP_LASS = d.trainers.OPP_LASS or d.gen2Trainers.OPP_PICNICKER
-      end
-    end
-    if d.gen2Trainers.OPP_CAMPER then
-      d.gen2Trainers.OPP_JR_TRAINER_M = d.gen2Trainers.OPP_CAMPER
-      if d.trainers then d.trainers.OPP_JR_TRAINER_M = d.gen2Trainers.OPP_CAMPER end
+    for _, entry in pairs(DUNGEON_ROSTERS) do
+      installDungeonMember(d.gen2Trainers, entry)
+      installDungeonMember(d.trainers, entry)
     end
 
     d.gen2Maps = d.gen2Maps or {}
@@ -1580,11 +1660,38 @@ function RestoredDungeons.apply(mod)
 
     local origTrainerParty = World.trainerParty
     function World:trainerParty(class, member)
-      local key1 = string.format("%s_%s", tostring(class), tostring(member))
-      local custom = DUNGEON_BY_KEY[key1]
-      if not custom and (class == 42 or class == "OPP_RIVAL2" or class == "RIVAL2") then
-        custom = DUNGEON_BY_KEY[string.format("42_%s", tostring(member or 1))] or DUNGEON_BY_KEY[string.format("OPP_RIVAL2_%s", tostring(member or 1))]
+      member = tonumber(member) or member or 1
+      -- Prefer embedded roster on the engaged trainer object (normalize stamps it).
+      local engaged = self.vm and self.vm.trainerObject
+      if engaged and type(engaged.roster) == "table" and #engaged.roster > 0 then
+        local engClass = engaged.class
+        local engMember = engaged.member
+        if (engClass == nil or engClass == class) and (engMember == nil or engMember == member) then
+          local roster = {}
+          for si, slot in ipairs(engaged.roster) do
+            roster[si] = {
+              species = slot.species,
+              level = slot.level,
+              item = slot.item or slot.heldItem,
+              heldItem = slot.item or slot.heldItem,
+            }
+          end
+          return {
+            class = class,
+            classId = engaged.classId or (type(class) == "string" and class) or tostring(class),
+            className = engaged.className or "TRAINER",
+            name = engaged.name or engaged.trainerName or "TRAINER",
+            member = member,
+            roster = roster,
+            trainerType = "normal",
+            attributes = {},
+            items = {},
+          }
+        end
       end
+      -- Exact Gold class_member keys only (high members 200+). No blanket
+      -- RIVAL2 redirect — that hijacked Indigo rematches.
+      local custom = DUNGEON_BY_KEY[string.format("%s_%s", tostring(class), tostring(member))]
       if custom and custom.roster then
         local roster = {}
         for si, slot in ipairs(custom.roster) do
@@ -1597,10 +1704,10 @@ function RestoredDungeons.apply(mod)
         end
         return {
           class = class,
-          classId = custom.classId or (type(class) == "string" and class) or "OPP_RIVAL2",
-          className = custom.className or "RIVAL",
-          name = custom.name or "SILVER",
-          member = member or 1,
+          classId = custom.goldClass or custom.classId or (type(class) == "string" and class) or "RIVAL2",
+          className = custom.className or "TRAINER",
+          name = custom.name or "TRAINER",
+          member = member,
           roster = roster,
           trainerType = "normal",
           attributes = {},
@@ -1610,6 +1717,7 @@ function RestoredDungeons.apply(mod)
       if origTrainerParty then
         return origTrainerParty(self, class, member)
       end
+      return nil
     end
 
     local origSetMap = World.setMap
@@ -2097,20 +2205,12 @@ function RestoredDungeons.apply(mod)
       end
     end
 
-    local ClassIndexMap = {
-      OPP_YOUNGSTER = 1, OPP_BUG_CATCHER = 2, OPP_LASS = 3, OPP_SAILOR = 4,
-      OPP_JR_TRAINER_M = 5, OPP_JR_TRAINER_F = 6, OPP_POKEMANIAC = 7, OPP_SUPER_NERD = 8,
-      OPP_HIKER = 9, OPP_BIKER = 10, OPP_BURGLAR = 11, OPP_ENGINEER = 12,
-      OPP_UNUSED_JUGGLER = 13, OPP_FISHER = 14, OPP_SWIMMER = 15, OPP_CUE_BALL = 16,
-      OPP_GAMBLER = 17, OPP_BEAUTY = 18, OPP_PSYCHIC_TR = 19, OPP_ROCKER = 20,
-      OPP_JUGGLER = 21, OPP_TAMER = 22, OPP_BIRD_KEEPER = 23, OPP_BLACKBELT = 24,
-      OPP_RIVAL1 = 25, OPP_PROF_OAK = 26, OPP_CHIEF = 27, OPP_SCIENTIST = 28,
-      OPP_GIOVANNI = 29, OPP_ROCKET = 30, OPP_COOLTRAINER_M = 31, OPP_COOLTRAINER_F = 32,
-      OPP_BRUNO = 33, OPP_BROCK = 34, OPP_MISTY = 35, OPP_LT_SURGE = 36,
-      OPP_ERIKA = 37, OPP_KOGA = 38, OPP_BLAINE = 39, OPP_SABRINA = 40,
-      OPP_GENTLEMAN = 41, OPP_RIVAL2 = 42, OPP_RIVAL3 = 43, OPP_LORELEI = 44,
-      OPP_CHANNELER = 45, OPP_AGATHA = 46, OPP_LANCE = 47
-    }
+    -- Gold class indexes only (Gen1 OPP_* nums collided with Johto leaders).
+    local ClassIndexMap = {}
+    for gen1, gold in pairs(GEN1_TO_GOLD) do
+      ClassIndexMap[gen1] = gold.index
+      ClassIndexMap[gold.id] = gold.index
+    end
 
     local targetMaps = (data and (data.gen2Maps or data.maps or data)) or {}
     local mapIdx = 0
@@ -2120,20 +2220,25 @@ function RestoredDungeons.apply(mod)
         for objIdx, obj in ipairs(mdef.objects) do
           if type(obj) == "table" and obj.trainerClass and not obj.trainer then
             local customDef = DUNGEON_ROSTERS[obj.name]
-            local classId = (customDef and customDef.classId) or obj.trainerClass
-            local classNum = (customDef and customDef.classNum) or ClassIndexMap[classId] or classId
+            local classId = (customDef and (customDef.goldClass or customDef.classId)) or obj.trainerClass
+            local classNum = (customDef and (customDef.goldIndex or customDef.classNum))
+              or ClassIndexMap[classId] or classId
             local member = (customDef and customDef.member) or obj.trainerParty or 1
             local sight = obj.sight or 3
             local eventNum = (customDef and customDef.event) or obj.event or (3000 + mapIdx * 50 + objIdx)
             local textKey = obj.text or string.format("TEXT_%s_%d", mapId, objIdx)
             local winKey = textKey .. "_WIN"
 
+            obj.trainerClass = classId
+            obj.trainerParty = member
             obj.trainer = {
               class = classNum,
+              classId = classId,
               className = (customDef and customDef.className) or classId,
               member = member,
               party = (customDef and customDef.roster) or member,
               roster = customDef and customDef.roster or nil,
+              name = customDef and customDef.name or nil,
               event = eventNum,
               sight = sight,
               seenText = textKey,
