@@ -112,6 +112,8 @@ CUSTOM_KANTO_BLOCKS = {
     158: {"tiles": [17, 17, 17, 17, 17, 17, 17, 17, 77, 78, 77, 78, 83, 84, 83, 84], "collision": [0x00, 0x00, 0x00, 0x00]},
     # Authentic 4-step wooden stairs up into cliff
     159: {"tiles": [77, 78, 77, 78, 83, 84, 83, 84, 17, 17, 17, 17, 17, 17, 17, 17], "collision": [0x00, 0x00, 0x00, 0x00]},
+    # Gen1 FOREST wooden sign (tiles 96–99 patched into overrides/tilesets/kanto.png)
+    160: {"tiles": [96, 97, 35, 35, 98, 99, 35, 35, 35, 35, 35, 35, 35, 35, 35, 35], "collision": [0x82, 0x00, 0x00, 0x00]},
 }
 
 
@@ -121,12 +123,13 @@ FOREST_G1_TO_G2 = {
     6: 129,  # Tree left, Tall grass right (Block 129)
     7: 130,  # Tall grass left, Tree right (Block 130)
     20: 1,   # Plain grass / path corridor (Block 1)
-    21: 1,   # North gate door / path (Block 1)
-    22: 1,   # Path (Block 1)
+    21: 160, # Wooden sign (Gen1 FOREST → custom #160)
+    22: 160, # Wooden sign
     24: 1,   # Plain grass / path (Block 1)
     27: 1,   # Clear path (Block 1)
-    33: 135, # Ledge (Block 135)
+    33: 160, # Wooden sign (Safari / forest posts)
     41: 1,   # Path (Block 1)
+    51: 160, # Wooden sign
     53: 134, # Grass top, tree bottom (Block 134)
     55: 131, # Tree left, grass right (Block 131)
     57: 133, # Tree top, grass bottom (Block 133)
@@ -140,15 +143,16 @@ SAFARI_G1_TO_G2 = {
     0: 1, 3: 1, 27: 1, 44: 1, 46: 1, 47: 1,
     86: 1, 87: 1, 88: 1, 89: 1, 98: 1, 100: 1, 101: 1, 102: 1, 103: 1, 116: 1, 119: 1, 120: 1, 123: 1,
     # 2. Tall Grass (Wild Encounters - Complete Stepped Patterns)
+    # (Gen1 #21 is the forest sign/tree composite — mapped to custom sign #160 below)
     1: 11, 4: 11, 5: 11, 6: 11, 7: 11, 8: 11, 9: 11, 10: 11, 11: 11, 12: 11, 13: 11, 14: 11, 15: 11,
-    21: 11, 29: 11, 30: 11, 31: 11, 32: 11, 34: 11, 35: 11, 36: 11, 37: 11, 40: 11, 41: 11,
+    29: 11, 30: 11, 31: 11, 32: 11, 34: 11, 35: 11, 36: 11, 37: 11, 40: 11, 41: 11,
     52: 11, 53: 11, 54: 11, 55: 11, 56: 11, 57: 11, 58: 11, 59: 11,
     72: 11, 73: 11, 76: 11, 77: 11, 99: 11,
     # 3. Trees & Boundaries (Half-blocks 124=top grass/bot tree, 125=top tree/bot grass, 126=left grass/right tree, 127=left tree/right grass)
     124: 134, 125: 133, 126: 132, 127: 131,
     2: 15, 16: 15, 17: 15, 18: 15, 19: 15, 20: 15, 24: 15,
-    # 4. Fences & Wood Posts
-    23: 26, 38: 27, 39: 27, 42: 27, 43: 27, 33: 27, 51: 27, 78: 27, 97: 27, 22: 27,
+    # 4. Fences, posts, and Gen1 FOREST wooden signs → custom #160
+    21: 160, 22: 160, 23: 26, 38: 27, 39: 27, 42: 27, 43: 27, 33: 160, 51: 160, 78: 27, 97: 27,
     # 5. Rest House Cottage
     25: 2, 26: 3, 28: 3,
     # 6. Water & Shorelines
@@ -163,30 +167,6 @@ SAFARI_G1_TO_G2 = {
     60: 36, 61: 63, 62: 43, 63: 40, 64: 40, 65: 44, 66: 41, 67: 41,
     68: 36, 69: 87, 70: 37, 71: 158, 74: 159, 75: 158, 83: 87,
 }
-
-# Auto-merge generated Safari mappings and custom assembled blocks if present
-try:
-    import importlib.util
-    for p_candidate in [
-        os.path.abspath(os.path.join(os.path.dirname(__file__), "safari_g1_to_g2.py")),
-        os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "..", "safari_g1_to_g2.py")),
-        os.path.abspath(os.path.join(os.getcwd(), "safari_g1_to_g2.py")),
-    ]:
-        if os.path.exists(p_candidate):
-            spec = importlib.util.spec_from_file_location("safari_g1_to_g2", p_candidate)
-            if spec and spec.loader:
-                s_mod = importlib.util.module_from_spec(spec)
-                spec.loader.exec_module(s_mod)
-                if hasattr(s_mod, "SAFARI_G1_TO_G2"):
-                    SAFARI_G1_TO_G2.update(s_mod.SAFARI_G1_TO_G2)
-                if hasattr(s_mod, "CUSTOM_KANTO_BLOCKS_GENERATED"):
-                    CUSTOM_KANTO_BLOCKS.update(s_mod.CUSTOM_KANTO_BLOCKS_GENERATED)
-                print(f"[restore_kanto_dungeons] Loaded {len(s_mod.SAFARI_G1_TO_G2)} Safari mappings and {len(s_mod.CUSTOM_KANTO_BLOCKS_GENERATED)} custom blocks from {p_candidate}")
-                break
-except Exception as e:
-    print(f"[restore_kanto_dungeons] Notice: Could not import safari_g1_to_g2.py: {e}")
-
-
 
 KANTO_G1_TO_G2 = {
     1: 1,    # Path / grass
@@ -234,11 +214,315 @@ CAVE_G1_TO_G2 = {
     26: 8,   # Right wall
     28: 17,  # Wall corner
     29: 2,   # Bottom wall
+    42: 120, # Cave floor + Gen1 wooden sign (Mt. Moon / Rock Tunnel)
     43: 43,  # Ladder (0x2B)
     44: 43,  # Ladder
     62: 25,  # Floor
+    117: 121, # Water + Gen1 wooden sign (Seafoam B4F)
 }
 
+# Custom blocks injected into Gold TILESET_CAVE (tiles 90–93 from Gen1 CAVERN sign).
+# Extra assemblies from cave_g1_to_g2.py export are merged on top.
+CUSTOM_CAVE_BLOCKS = {
+    # Floor surround + sign in BR quadrant (Gen1 CAVERN #42)
+    120: {
+        "tiles": [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 90, 91, 1, 1, 92, 93],
+        "collision": [0x00, 0x00, 0x00, 0x82],
+    },
+    # Water surround + sign in BR quadrant (Gen1 CAVERN #117)
+    121: {
+        "tiles": [20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 90, 91, 20, 20, 92, 93],
+        "collision": [0x29, 0x29, 0x29, 0x82],
+    },
+}
+
+# Mapping export registry: (module filename stem, dict attr, custom-blocks attr, target bucket)
+MAPPING_EXPORTS = [
+    ("safari_g1_to_g2", "SAFARI_G1_TO_G2", "CUSTOM_KANTO_BLOCKS_GENERATED", "kanto"),
+    ("forest_g1_to_g2", "FOREST_G1_TO_G2", "CUSTOM_KANTO_BLOCKS_GENERATED", "kanto"),
+    ("cave_g1_to_g2", "CAVE_G1_TO_G2", "CUSTOM_CAVE_BLOCKS_GENERATED", "cave"),
+]
+
+
+def _merge_mapping_exports():
+    """Load all tools/*_g1_to_g2.py exports into the in-memory dicts."""
+    import importlib.util
+
+    tools_dir = os.path.dirname(os.path.abspath(__file__))
+    for stem, dict_attr, custom_attr, bucket in MAPPING_EXPORTS:
+        candidates = [
+            os.path.join(tools_dir, f"{stem}.py"),
+            os.path.abspath(os.path.join(os.getcwd(), f"{stem}.py")),
+        ]
+        for path in candidates:
+            if not os.path.isfile(path):
+                continue
+            try:
+                spec = importlib.util.spec_from_file_location(stem, path)
+                if not spec or not spec.loader:
+                    continue
+                mod = importlib.util.module_from_spec(spec)
+                spec.loader.exec_module(mod)
+                loaded_n = 0
+                custom_n = 0
+                if hasattr(mod, dict_attr):
+                    target = globals().get(dict_attr)
+                    if isinstance(target, dict):
+                        target.update(getattr(mod, dict_attr))
+                        loaded_n = len(getattr(mod, dict_attr))
+                if hasattr(mod, custom_attr):
+                    custom = getattr(mod, custom_attr) or {}
+                    if bucket == "kanto":
+                        CUSTOM_KANTO_BLOCKS.update(custom)
+                    else:
+                        CUSTOM_CAVE_BLOCKS.update(custom)
+                    custom_n = len(custom)
+                print(
+                    f"[restore_kanto_dungeons] Loaded {loaded_n} {dict_attr} "
+                    f"and {custom_n} custom blocks from {path}"
+                )
+                break
+            except Exception as exc:  # noqa: BLE001
+                print(f"[restore_kanto_dungeons] Notice: Could not import {path}: {exc}")
+
+
+_merge_mapping_exports()
+
+# Hand-authored blocks that depend on patched override tiles must win over HITL
+# exports (safari_g1_to_g2.py may reclaim low custom IDs with unrelated assemblies).
+_CANONICAL_KANTO_BLOCKS = {
+    158: {"tiles": [17, 17, 17, 17, 17, 17, 17, 17, 77, 78, 77, 78, 83, 84, 83, 84], "collision": [0x00, 0x00, 0x00, 0x00]},
+    159: {"tiles": [77, 78, 77, 78, 83, 84, 83, 84, 17, 17, 17, 17, 17, 17, 17, 17], "collision": [0x00, 0x00, 0x00, 0x00]},
+    # Gen1 FOREST wooden sign → tiles 96–99 on overrides/tilesets/kanto.png
+    160: {"tiles": [96, 97, 35, 35, 98, 99, 35, 35, 35, 35, 35, 35, 35, 35, 35, 35], "collision": [0x82, 0x00, 0x00, 0x00]},
+}
+CUSTOM_KANTO_BLOCKS.update(_CANONICAL_KANTO_BLOCKS)
+
+_CANONICAL_CAVE_BLOCKS = {
+    120: {"tiles": [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 90, 91, 1, 1, 92, 93], "collision": [0x00, 0x00, 0x00, 0x82]},
+    121: {"tiles": [20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 90, 91, 20, 20, 92, 93], "collision": [0x29, 0x29, 0x29, 0x82]},
+}
+CUSTOM_CAVE_BLOCKS.update(_CANONICAL_CAVE_BLOCKS)
+
+# Gen1 FOREST wooden sign metatiles → custom #160 (Viridian + Safari posts)
+for _sign_g1 in (21, 22, 33, 51):
+    FOREST_G1_TO_G2[_sign_g1] = 160
+    SAFARI_G1_TO_G2[_sign_g1] = 160
+
+# Gen1 CAVERN wooden signs → custom cave blocks
+CAVE_G1_TO_G2[42] = 120
+CAVE_G1_TO_G2[117] = 121
+
+
+# ---------------------------------------------------------------------------
+# Per-map conversion strategies (tileset / block remap). Warps & objects stay
+# in the dedicated branches below.
+# ---------------------------------------------------------------------------
+# strategy:
+#   remap        — apply named G1→G2 dict onto a Gen2 tileset
+#   keep_gen1    — keep Gen1 tileset id (+ kr_* sheet), Gen1 env for palettes
+#   stamp_gate   — fixed Gen2 gate layout
+#   stamp_house  — fixed Gen2 house layout
+#   pass_through — Gen2 tileset without block remap (Route 2)
+# ---------------------------------------------------------------------------
+
+def _strat_remap(dict_name, tileset, environment, palette="PALETTE_AUTO", border=15, default_block=1, patches=None):
+    return {
+        "strategy": "remap",
+        "dict": dict_name,
+        "tileset": tileset,
+        "environment": environment,
+        "palette": palette,
+        "borderBlock": border,
+        "default_block": default_block,
+        "patches": patches or [],
+    }
+
+
+def _strat_keep_gen1():
+    return {"strategy": "keep_gen1", "palette": "PALETTE_DAY"}
+
+
+def _strat_stamp_gate():
+    return {
+        "strategy": "stamp_gate",
+        "tileset": "TILESET_GATE",
+        "environment": "GATE",
+        "palette": "PALETTE_DAY",
+        "borderBlock": 0,
+        "width": 5,
+        "height": 4,
+    }
+
+
+def _strat_stamp_house():
+    return {
+        "strategy": "stamp_house",
+        "tileset": "TILESET_HOUSE",
+        "environment": "INDOOR",
+        "palette": "PALETTE_DAY",
+        "borderBlock": 0,
+        "width": 4,
+        "height": 4,
+    }
+
+
+# Maps that use Gold TILESET_CAVE via CAVE_G1_TO_G2. Empty = all caves keep Gen1 art.
+# Example after HITL mapping: CAVE_REMAP_MAPS = {"DIGLETTS_CAVE_ROUTE_2"}
+CAVE_REMAP_MAPS = set()
+
+
+def _build_map_strategies():
+    strategies = {}
+
+    strategies["VIRIDIAN_FOREST"] = _strat_remap(
+        "FOREST_G1_TO_G2", "TILESET_KANTO", "ROUTE",
+        default_block=15,
+        patches=[
+            {"index": 0 * 17 + 0, "block": 137},
+            {"index": 0 * 17 + 1, "block": 137},
+        ],
+    )
+    strategies["ROUTE_2"] = {
+        "strategy": "pass_through",
+        "tileset": "TILESET_KANTO",
+        "environment": "ROUTE",
+        "palette": "PALETTE_AUTO",
+        "borderBlock": 15,
+        "connections": {
+            "north": {"map": "PEWTER_CITY", "offset": -5},
+            "south": {"map": "VIRIDIAN_CITY", "offset": -5},
+        },
+    }
+    for mid in (
+        "VIRIDIAN_FOREST_NORTH_GATE",
+        "VIRIDIAN_FOREST_SOUTH_GATE",
+        "ROUTE_2_GATE",
+        "SAFARI_ZONE_GATE",
+    ):
+        strategies[mid] = _strat_stamp_gate()
+
+    strategies["ROUTE_2_TRADE_HOUSE"] = _strat_stamp_house()
+    for mid in (
+        "SAFARI_ZONE_CENTER_REST_HOUSE",
+        "SAFARI_ZONE_EAST_REST_HOUSE",
+        "SAFARI_ZONE_NORTH_REST_HOUSE",
+        "SAFARI_ZONE_WEST_REST_HOUSE",
+        "SAFARI_ZONE_SECRET_HOUSE",
+    ):
+        strategies[mid] = _strat_stamp_house()
+
+    for mid in (
+        "SAFARI_ZONE_CENTER",
+        "SAFARI_ZONE_EAST",
+        "SAFARI_ZONE_WEST",
+        "SAFARI_ZONE_NORTH",
+    ):
+        patches = []
+        if mid == "SAFARI_ZONE_CENTER":
+            patches = [{"index": 12 * 15 + 7, "block": 136}]
+        strategies[mid] = _strat_remap(
+            "SAFARI_G1_TO_G2", "TILESET_KANTO", "ROUTE",
+            default_block=1, patches=patches,
+        )
+
+    # Caves: keep Gen1 CAVERN art until cave_g1_to_g2.py mappings are accepted.
+    # Add map ids to CAVE_REMAP_MAPS to flip them onto Gold TILESET_CAVE.
+    cave_maps = [
+        "DIGLETTS_CAVE", "DIGLETTS_CAVE_ROUTE_2", "DIGLETTS_CAVE_ROUTE_11",
+        "MT_MOON_1F", "MT_MOON_B1F", "MT_MOON_B2F",
+        "CERULEAN_CAVE_1F", "CERULEAN_CAVE_2F", "CERULEAN_CAVE_B1F",
+        "SEAFOAM_ISLANDS_1F", "SEAFOAM_ISLANDS_B1F", "SEAFOAM_ISLANDS_B2F",
+        "SEAFOAM_ISLANDS_B3F", "SEAFOAM_ISLANDS_B4F",
+        "ROCK_TUNNEL_1F", "ROCK_TUNNEL_B1F",
+    ]
+    for mid in cave_maps:
+        if mid in CAVE_REMAP_MAPS:
+            strategies[mid] = _strat_remap(
+                "CAVE_G1_TO_G2", "TILESET_CAVE", "CAVE",
+                palette="PALETTE_DAY", border=1, default_block=25,
+            )
+        else:
+            strategies[mid] = _strat_keep_gen1()
+
+    strategies["ROCK_TUNNEL_POKECENTER"] = _strat_keep_gen1()
+    return strategies
+
+
+MAP_STRATEGIES = _build_map_strategies()
+
+# Dict name → live mapping table
+BLOCK_DICTS = {
+    "SAFARI_G1_TO_G2": SAFARI_G1_TO_G2,
+    "FOREST_G1_TO_G2": FOREST_G1_TO_G2,
+    "CAVE_G1_TO_G2": CAVE_G1_TO_G2,
+    "KANTO_G1_TO_G2": KANTO_G1_TO_G2,
+}
+
+
+def apply_map_strategy(map_id, mdef, restored_tilesets):
+    """Apply MAP_STRATEGIES entry to mdef (tileset / blocks / env). Returns mdef."""
+    ts_gen1 = mdef.get("tileset")
+    mdef["gen1Tileset"] = ts_gen1
+    strat = MAP_STRATEGIES.get(map_id, _strat_keep_gen1())
+    kind = strat["strategy"]
+
+    if kind == "remap":
+        mapping = BLOCK_DICTS.get(strat["dict"], {})
+        default_b = strat.get("default_block", 1)
+        blocks = [mapping.get(b, default_b) for b in mdef.get("blocks", [])]
+        for patch in strat.get("patches") or []:
+            idx = patch["index"]
+            if 0 <= idx < len(blocks):
+                blocks[idx] = patch["block"]
+        mdef["blocks"] = blocks
+        mdef["tileset"] = strat["tileset"]
+        mdef["environment"] = strat["environment"]
+        mdef["palette"] = strat.get("palette", "PALETTE_AUTO")
+        if "borderBlock" in strat:
+            mdef["borderBlock"] = strat["borderBlock"]
+
+    elif kind == "pass_through":
+        mdef["tileset"] = strat["tileset"]
+        mdef["environment"] = strat["environment"]
+        mdef["palette"] = strat.get("palette", "PALETTE_AUTO")
+        mdef["blocks"] = list(mdef.get("blocks", []))
+        if "borderBlock" in strat:
+            mdef["borderBlock"] = strat["borderBlock"]
+        if strat.get("connections"):
+            mdef["connections"] = dict(strat["connections"])
+
+    elif kind == "stamp_gate":
+        mdef["tileset"] = strat["tileset"]
+        mdef["environment"] = strat["environment"]
+        mdef["palette"] = strat.get("palette", "PALETTE_DAY")
+        mdef["borderBlock"] = strat.get("borderBlock", 0)
+        mdef["width"] = strat.get("width", 5)
+        mdef["height"] = strat.get("height", 4)
+        mdef["blocks"] = list(GEN2_GATE_BLOCKS)
+
+    elif kind == "stamp_house":
+        mdef["tileset"] = strat["tileset"]
+        mdef["environment"] = strat["environment"]
+        mdef["palette"] = strat.get("palette", "PALETTE_DAY")
+        mdef["borderBlock"] = strat.get("borderBlock", 0)
+        mdef["width"] = strat.get("width", 4)
+        mdef["height"] = strat.get("height", 4)
+        mdef["blocks"] = list(GEN2_HOUSE_BLOCKS)
+
+    else:  # keep_gen1
+        # Gen1 tileset id as environment so bakeMapImage uses groupColors[CAVERN]
+        # instead of Gold's generic CAVE pool (which left maps grayscale).
+        mdef["tileset"] = ts_gen1
+        mdef["environment"] = ts_gen1
+        mdef["palette"] = strat.get("palette", "PALETTE_DAY")
+        if ts_gen1 in restored_tilesets:
+            mdef["collision"] = restored_tilesets[ts_gen1]["collision"]
+
+    return mdef
+
+
+# Fixed Gen2 stamp layouts (must be defined before apply_map_strategy is called at runtime)
 GEN2_GATE_BLOCKS = [2, 2, 4, 2, 2, 9, 1, 1, 1, 8, 13, 1, 1, 1, 12, 20, 1, 10, 1, 20]
 GEN2_HOUSE_BLOCKS = [4, 30, 5, 29, 15, 1, 2, 15, 15, 12, 13, 15, 6, 11, 15, 7]
 
@@ -942,12 +1226,46 @@ def main():
             kanto_rec["blocks"] = kanto_blocks
             kanto_rec["collision"] = kanto_coll
             kanto_pals = list(kanto_rec.get("tilePalettes", []))
+            # Stair tiles (77/78/83) + outdoor sign tiles (96–99) on extended override sheet
+            while len(kanto_pals) < 100:
+                kanto_pals.append(1)
             if len(kanto_pals) >= 84:
                 kanto_pals[77] = 1
                 kanto_pals[78] = 1
                 kanto_pals[83] = 1
+            for t in (96, 97, 98, 99):
+                kanto_pals[t] = 1
             kanto_rec["tilePalettes"] = kanto_pals
+            # overrides/tilesets/kanto.png is 128×56 (extra row for sign tiles 96–99)
+            kanto_rec["imageHeight"] = 56
             restored_tilesets["TILESET_KANTO"] = kanto_rec
+
+        # Inject custom cave blocks into Gold TILESET_CAVE (cavern_cave profile + Gen1 signs)
+        if "TILESET_CAVE" in gold_tilesets:
+            cave_rec = dict(gold_tilesets["TILESET_CAVE"])
+            cave_blocks = list(cave_rec.get("blocks", []))
+            cave_coll = list(cave_rec.get("collision", []))
+            if CUSTOM_CAVE_BLOCKS:
+                max_custom = max([len(cave_blocks) - 1] + list(CUSTOM_CAVE_BLOCKS.keys()))
+                while len(cave_blocks) <= max_custom:
+                    cave_blocks.append([0] * 16)
+                    cave_coll.append([0x07] * 4)
+                for idx, c_def in CUSTOM_CAVE_BLOCKS.items():
+                    cave_blocks[idx] = list(c_def["tiles"])
+                    cave_coll[idx] = list(c_def["collision"])
+            cave_pals = list(cave_rec.get("tilePalettes", []))
+            # Sign tiles 90–93: match cave floor grey (palette 6)
+            while len(cave_pals) < 94:
+                cave_pals.append(6)
+            for t in (90, 91, 92, 93):
+                cave_pals[t] = 6
+            cave_rec["tilePalettes"] = cave_pals
+            cave_rec["blocks"] = cave_blocks
+            cave_rec["collision"] = cave_coll
+            # overrides/tilesets/cave.png shadows assets/generated/tilesets/cave.png
+            cave_rec["image"] = "assets/generated/tilesets/cave.png"
+            restored_tilesets["TILESET_CAVE"] = cave_rec
+            print(f"[restore_kanto_dungeons] TILESET_CAVE ready ({len(CUSTOM_CAVE_BLOCKS)} custom blocks)")
 
 
 
@@ -955,68 +1273,8 @@ def main():
         if map_id in maps_data:
             mdef = dict(maps_data[map_id])
             lvl_info = TRAINER_LEVEL_MAP.get(map_id)
-            
-            ts_gen1 = mdef.get("tileset")
-            mdef["gen1Tileset"] = ts_gen1
 
-            # Map to native Gen 2 tilesets, blocksets, and environments
-            if map_id == "VIRIDIAN_FOREST":
-                mdef["tileset"] = "TILESET_KANTO"
-                mdef["environment"] = "ROUTE"
-                mdef["palette"] = "PALETTE_AUTO"
-                mdef["borderBlock"] = 15
-                v_blocks = [FOREST_G1_TO_G2.get(b, 15) for b in mdef.get("blocks", [])]
-                v_blocks[0 * 17 + 0] = 137
-                v_blocks[0 * 17 + 1] = 137
-                mdef["blocks"] = v_blocks
-            elif map_id == "ROUTE_2":
-                mdef["tileset"] = "TILESET_KANTO"
-                mdef["environment"] = "ROUTE"
-                mdef["palette"] = "PALETTE_AUTO"
-                mdef["borderBlock"] = 15
-                mdef["blocks"] = list(mdef.get("blocks", []))
-                mdef["connections"] = {
-                    "north": {"map": "PEWTER_CITY", "offset": -5},
-                    "south": {"map": "VIRIDIAN_CITY", "offset": -5}
-                }
-            elif map_id in ("VIRIDIAN_FOREST_NORTH_GATE", "VIRIDIAN_FOREST_SOUTH_GATE", "ROUTE_2_GATE", "SAFARI_ZONE_GATE"):
-                mdef["tileset"] = "TILESET_GATE"
-                mdef["environment"] = "GATE"
-                mdef["palette"] = "PALETTE_DAY"
-                mdef["borderBlock"] = 0
-                mdef["width"] = 5
-                mdef["height"] = 4
-                mdef["blocks"] = list(GEN2_GATE_BLOCKS)
-            elif map_id == "ROUTE_2_TRADE_HOUSE" or (map_id.startswith("SAFARI_ZONE_") and (map_id.endswith("REST_HOUSE") or map_id.endswith("SECRET_HOUSE"))):
-                mdef["tileset"] = "TILESET_HOUSE"
-                mdef["environment"] = "INDOOR"
-                mdef["palette"] = "PALETTE_DAY"
-                mdef["borderBlock"] = 0
-                mdef["width"] = 4
-                mdef["height"] = 4
-                mdef["blocks"] = list(GEN2_HOUSE_BLOCKS)
-            elif map_id.startswith("MT_MOON") or map_id.startswith("CERULEAN_CAVE") or map_id.startswith("SEAFOAM_ISLANDS") or map_id.startswith("DIGLETTS_CAVE"):
-                # Use the Gen 1 tileset id as environment so bakeMapImage picks the
-                # custom environments[CAVERN] row registered from groupColors, not
-                # Gold's generic CAVE pool (which left these maps grayscale).
-                mdef["tileset"] = ts_gen1
-                mdef["environment"] = ts_gen1
-                mdef["palette"] = "PALETTE_DAY"
-                if ts_gen1 in restored_tilesets:
-                    mdef["collision"] = restored_tilesets[ts_gen1]["collision"]
-            elif map_id.startswith("SAFARI_ZONE") and not map_id.endswith("HOUSE") and not map_id.endswith("GATE"):
-                mdef["tileset"] = "TILESET_KANTO"
-                mdef["environment"] = "ROUTE"
-                mdef["palette"] = "PALETTE_AUTO"
-                mdef["borderBlock"] = 15
-                s_blocks = [SAFARI_G1_TO_G2.get(b, 1) for b in mdef.get("blocks", [])]
-                if map_id == "SAFARI_ZONE_CENTER":
-                    s_blocks[12 * 15 + 7] = 136  # South exit warp pad to SAFARI_ZONE_GATE
-                mdef["blocks"] = s_blocks
-            else:
-                mdef["tileset"] = ts_gen1
-                mdef["environment"] = ts_gen1
-                mdef["palette"] = "PALETTE_DAY"
+            apply_map_strategy(map_id, mdef, restored_tilesets)
 
             ts_final = mdef.get("tileset")
             if ts_final in restored_tilesets:

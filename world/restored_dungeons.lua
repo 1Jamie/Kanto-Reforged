@@ -2438,6 +2438,8 @@ function RestoredDungeons.apply(mod)
       [153] = { tiles = {35, 84, 20, 20, 35, 84, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20}, collision = {0x00, 0x07, 0x29, 0x29} },
       [158] = { tiles = {17, 17, 17, 17, 17, 17, 17, 17, 77, 78, 77, 78, 83, 84, 83, 84}, collision = {0x00, 0x00, 0x00, 0x00} },
       [159] = { tiles = {77, 78, 77, 78, 83, 84, 83, 84, 17, 17, 17, 17, 17, 17, 17, 17}, collision = {0x00, 0x00, 0x00, 0x00} },
+      -- Gen1 FOREST wooden sign (tiles 96–99 on extended overrides/tilesets/kanto.png)
+      [160] = { tiles = {96, 97, 35, 35, 98, 99, 35, 35, 35, 35, 35, 35, 35, 35, 35, 35}, collision = {0x82, 0x00, 0x00, 0x00} },
     }
 
     for _, tsKey in ipairs({"OVERWORLD", "TILESET_KANTO", "KANTO"}) do
@@ -2453,7 +2455,45 @@ function RestoredDungeons.apply(mod)
           ts.tilePalettes[78] = 1 -- Tile 77 (left stair step)
           ts.tilePalettes[79] = 1 -- Tile 78 (right stair step)
           ts.tilePalettes[84] = 1 -- Tile 83 (ladder rungs)
+          -- Outdoor sign tiles 96–99 (extra row on kanto.png override)
+          while #ts.tilePalettes < 100 do
+            table.insert(ts.tilePalettes, 1)
+          end
+          ts.tilePalettes[97] = 1
+          ts.tilePalettes[98] = 1
+          ts.tilePalettes[99] = 1
+          ts.tilePalettes[100] = 1
         end
+        -- overrides/tilesets/kanto.png is 128×56 (sign row)
+        ts.imageHeight = 56
+      end
+    end
+
+    -- Gen1 CAVERN wooden signs into Gold TILESET_CAVE (tiles 90–93 on overrides/tilesets/cave.png)
+    local customCaveBlocks = {
+      [120] = { tiles = {1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 90, 91, 1, 1, 92, 93}, collision = {0x00, 0x00, 0x00, 0x82} },
+      [121] = { tiles = {20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 90, 91, 20, 20, 92, 93}, collision = {0x29, 0x29, 0x29, 0x82} },
+    }
+    for _, tsKey in ipairs({"TILESET_CAVE", "CAVE"}) do
+      local ts = (Data.tilesets and Data.tilesets[tsKey]) or (data and data.gen2Tilesets and data.gen2Tilesets[tsKey]) or (data and data.tilesets and data.tilesets[tsKey])
+      if ts then
+        ts.blocks = ts.blocks or {}
+        ts.collision = ts.collision or {}
+        for bId, bDef in pairs(customCaveBlocks) do
+          ts.blocks[bId + 1] = bDef.tiles
+          ts.collision[bId + 1] = bDef.collision
+        end
+        if ts.tilePalettes then
+          while #ts.tilePalettes < 94 do
+            table.insert(ts.tilePalettes, 6)
+          end
+          -- Cave-grey palette for patched Gen1 sign tiles
+          ts.tilePalettes[91] = 6
+          ts.tilePalettes[92] = 6
+          ts.tilePalettes[93] = 6
+          ts.tilePalettes[94] = 6
+        end
+        ts.image = "assets/generated/tilesets/cave.png"
       end
     end
 

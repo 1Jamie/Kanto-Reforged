@@ -224,6 +224,32 @@ return function(T, Data, run)
     T.check(not openedMenu, "battle bag skips USE/GIVE/TOSS submenu")
   end
 
+  -- Yellow Pewter sleep must not permanently block party GIVE on the starter.
+  do
+    local GameVersion = require("src.core.GameVersion")
+    local Follower = require("src.world.PikachuFollower")
+    local old = GameVersion.get()
+    GameVersion.set("yellow")
+    local sleepOw = {
+      map = { id = "PEWTER_POKECENTER" },
+      pikachuPewterSleepScene = true,
+    }
+    T.check(Follower.isFollowingDisabled(sleepOw),
+      "Pewter sleep still disables follower inside the center")
+    local leftOw = {
+      map = { id = "ROUTE_2" },
+      player = { cellX = 1, cellY = 1, facing = "down" },
+      npcs = {},
+      pikachuPewterSleepScene = true,
+    }
+    T.check(not Follower.isFollowingDisabled(leftOw),
+      "Pewter sleep does not disable follower outside the center")
+    Follower.onMapEntered({ save = {}, data = Data }, leftOw)
+    T.check(not leftOw.pikachuPewterSleepScene,
+      "map enter clears Pewter sleep so party GIVE works again")
+    GameVersion.set(old)
+  end
+
   opts[HeldItems.BAG_GIVE_KEY] = saved
   BagPockets._resetFilter()
 end

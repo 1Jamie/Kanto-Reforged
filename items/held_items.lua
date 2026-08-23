@@ -777,6 +777,40 @@ function HeldItems.install(mod)
   local ListMenu = require("src.ui.ListMenu")
   local TextBox = require("src.render.TextBox")
 
+  -- Yellow Pewter Jigglypuff sleep sets ow.pikachuPewterSleepScene, and stock
+  -- never clears it on map enter (unlike Bills / Fan Club). That permanently
+  -- refuses party GIVE/TAKE on the starter. Clear + scope the flag here.
+  if Host.isGen1() then
+    local Gen1Patch = require("mods.Kanto-Reforged.core.gen1_patch")
+    Gen1Patch.apply(require("src.world.PikachuFollower"), function(follower)
+      if follower._krPewterSleepFix then return end
+      follower._krPewterSleepFix = true
+
+      local origDisabled = follower.isFollowingDisabled
+      if type(origDisabled) == "function" then
+        follower.isFollowingDisabled = function(ow)
+          if ow and ow.pikachuPewterSleepScene
+              and not (ow.map and ow.map.id == "PEWTER_POKECENTER") then
+            local saved = ow.pikachuPewterSleepScene
+            ow.pikachuPewterSleepScene = nil
+            local disabled = origDisabled(ow)
+            ow.pikachuPewterSleepScene = saved
+            return disabled
+          end
+          return origDisabled(ow)
+        end
+      end
+
+      local origMapEntered = follower.onMapEntered
+      if type(origMapEntered) == "function" then
+        follower.onMapEntered = function(game, ow, opts, viaMapLoad)
+          if ow then ow.pikachuPewterSleepScene = nil end
+          return origMapEntered(game, ow, opts, viaMapLoad)
+        end
+      end
+    end)
+  end
+
   -- Party GIVE / TAKE (field menu only — not mid-battle switch submenu)
   mod.hooks:wrap("ui.party.submenu", function(next, game, items, mon, ctx)
     local out = next(game, items, mon, ctx)
