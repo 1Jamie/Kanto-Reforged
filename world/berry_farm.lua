@@ -424,12 +424,47 @@ local function plotAnchor(r)
   return r.x0, r.y1
 end
 
+-- Gen1 WorldAPI:npc puts the runtime id on handle.id; Gen2 only exposes
+-- handle.objectId (people-event index) and leaves the string on npc.id.
+-- removeNpc always wants mapId_obj_<index> — never Gen2's objectId.
+local function runtimeNpcId(handle)
+  if not handle then return nil end
+  if type(handle.id) == "string" then return handle.id end
+  local npc = handle.npc
+  if npc and type(npc.id) == "string" then return npc.id end
+  return nil
+end
+
+-- Drop every live marker with this plot name. Gen2 used to call
+-- removeNpc(handle.id) with a nil id, so each growth-stage swap left the
+-- old sprite in place and spawned another — duplicates then piled up on
+-- every world.stepped while on the farm (frame drops + input lag).
+local function removePlotMarkers(world, name)
+  -- Cap iterations so a broken remove cannot spin forever.
+  for _ = 1, 32 do
+    local handle = world:npc(BerryFarm.MAP_ID, name)
+    if not handle then return end
+    local rid = runtimeNpcId(handle)
+    if not rid then return end
+    local ok = world:removeNpc(rid)
+    if not ok then return end
+  end
+end
+
 -- One marker per plot, spawned at runtime from save state and swapped in
 -- place as it grows: soil patch → shared sprout → berry-specific ripe
 -- tree. A second sprite stacked on the same cell (an earlier version had
 -- a permanent soil layer plus a separate growth overlay) fought the first
 -- for draw order every time either got removed/respawned, flickering which
 -- one rendered on top — one marker per plot sidesteps that entirely.
+local function countNamedNpcs(ow, name)
+  local n = 0
+  for _, npc in ipairs((ow and ow.npcs) or {}) do
+    if npc.def and npc.def.name == name then n = n + 1 end
+  end
+  return n
+end
+
 local function syncPlotMarkers(mod)
   local world = mod.world
   if not world or not world.overworld then return end
@@ -443,8 +478,9 @@ local function syncPlotMarkers(mod)
     local sprite = plotSpriteFor(steps, p, growNeed)
     local handle = world:npc(BerryFarm.MAP_ID, name)
     local current = handle and handle.npc and handle.npc.def and handle.npc.def.sprite
-    if current ~= sprite then
-      if handle then world:removeNpc(handle.id) end
+    local dupes = countNamedNpcs(ow, name) > 1
+    if current ~= sprite or dupes or not handle then
+      removePlotMarkers(world, name)
       local r = BerryFarm.PLOT_RECTS[i]
       local ax, ay = plotAnchor(r)
       world:spawnNpc(BerryFarm.MAP_ID, {
@@ -460,6 +496,29 @@ local function syncPlotMarkers(mod)
   end
 end
 
+-- True when any planted plot crosses the ready threshold between two step
+-- counts. Stage swaps are the only reason bumpStep needs to touch NPCs;
+-- calling sync every step was wasteful and, with the Gen2 remove-id bug,
+-- catastrophic once a plot ripened.
+local function plotStageChanged(mod, prevSteps, newSteps)
+  if prevSteps == newSteps then return false end
+  local _, plots = ensureState(mod)
+  local growNeed = BerryFarm.growSteps(mod)
+  for i = 1, BerryFarm.PLOT_COUNT do
+    local p = getPlot(plots, i)
+    if p and p.berryId then
+      local planted = p.plantedAtSteps or 0
+      local wasReady = (prevSteps - planted) >= growNeed
+      local nowReady = (newSteps - planted) >= growNeed
+      if wasReady ~= nowReady then return true end
+    end
+  end
+  return false
+end
+
+-- Exported for tests / Gen2 handle-id diagnostics.
+BerryFarm.runtimeNpcId = runtimeNpcId
+
 function BerryFarm.farmSteps(mod)
   local steps = ensureState(mod)
   return steps
@@ -471,8 +530,14 @@ function BerryFarm.bumpStep(mod)
   local Host = require("mods.Kanto-Reforged.core.host")
   local steps = Host.saveGet(mod.save, "farmSteps", 0)
   if type(steps) ~= "number" then steps = 0 end
-  Host.saveSet(mod.save, "farmSteps", steps + 1)
-  syncPlotMarkers(mod)
+  local nextSteps = steps + 1
+  Host.saveSet(mod.save, "farmSteps", nextSteps)
+  -- Markers only change on soil→sprout (plant/harvest paths call sync
+  -- themselves) or sprout→ripe (detected here). Skip the NPC walk on
+  -- every other step.
+  if plotStageChanged(mod, steps, nextSteps) then
+    syncPlotMarkers(mod)
+  end
 end
 
 function BerryFarm.plotReady(mod, plotIndex)

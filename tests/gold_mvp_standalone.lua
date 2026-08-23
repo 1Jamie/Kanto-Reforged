@@ -366,7 +366,7 @@ do
   T.check(byKey.full_spawn_random == nil, "Gold does not use unprefixed spawn key")
   local lock = byKey.switch_hit_ai
   T.check(lock ~= nil, "Gold still has SWITCH HIT AI")
-  T.eq(lock.choices[1][1], "GEN 2", "Gold switch-hit classic label is GEN 2")
+  T.eq(lock.choices[1][1], "CLASSIC", "Gold switch-hit classic label is CLASSIC")
   T.eq(lock.choices[2][1], "GEN 3", "Gold switch-hit lock label is GEN 3")
 end
 do

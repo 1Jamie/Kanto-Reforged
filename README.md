@@ -12,18 +12,19 @@ Has support for Gen1 Modern UI mod (on Gen1) and Pokegear Cards (on Gen2).
 Fully functional with the occasional bug still being chased down, but fully playable and all 386 are obtainable.
 
 **Gold (generation 2 of gen1recomp++):**
-Gen 2 Gold support is live and actively expanding! The core engine integration is solid:
+Gen 2 Gold support is live. Core pieces:
 - Full Hoenn integration (species dex 252 through 386 registered, sprites scaled, Gen 3 abilities patched onto 1–251).
-- Type chart and move typing parity across both generations (Dark, Steel, Fairy matchups, physical/special types).
-- Gen 3 freeze mechanics updated across battles (1/5 thaw rate per turn, fire moves melt frozen targets).
-- DexNav integration via Pokegear card (requires `pokegear_cards` mod) showing current route spawns dynamically.
-- Party Summary menu gets a dedicated 4th page (after stats/moves) showing ability, held item, gender glyph, and ability descriptions.
-- Berry Farm fully operational in Johto and Kanto (accessible from Pokecenter stairs/mats) with Soil Expert Johto badge unlocks, Berry Scholar, and farm merchant.
-- Cherrygrove Rare Candy kid and a tailored level cap progression spanning all 8 Johto gyms, E4 Lance, the overhauled Kanto postgame circuit, and Red at Mt. Silver.
-- Kanto postgame wild encounters rebuilt with full Gen 3 postgame grass tables; Johto grass gets curated Gen 3 guests.
-- Overhauled Kanto Gym Circuit, gym trainers, Fighting Dojo, Nugget Bridge circuit, and Mt. Moon rival with rebalanced level curves and teams.
-- Moon Stone evolution bypasses for trade evolutions (Steelix, Scizor, Politoed, Slowking, Porygon2, etc.) so you can get them without trading.
-- Relocated utility NPCs in Gold Kanto: Move Hub at Mr. Psychic's house in Saffron, Item Smith at Cinnabar Pokecenter 1F, and DV/HP Judge in the Underground Path.
+- Type chart and move typing parity across both generations (Dark, Steel, Fairy matchups; Gen 3 physical/special by type).
+- Gen 3 freeze parity (1/5 thaw per turn; fire moves melt frozen targets).
+- DexNav via Pokegear card (requires `pokegear_cards`) with live route spawns.
+- Party Summary page 4: ability, held item, gender glyph, and ability text.
+- Berry Farm in Johto and Kanto Centers (stairs / south mats) with Soil Expert badge unlocks, Berry Scholar, and farm merchant.
+- Cherrygrove Rare Candy kid + soft level caps through Johto, Lance, the retuned Kanto circuit, and Red at Mt. Silver.
+- **Restored Gen 1 Kanto dungeons** back into Gold (layouts, trainers, items, warps): Viridian Forest, Mt. Moon, Diglett's Cave, Rock Tunnel, Safari Zone (4 zones + Secret House), Seafoam Islands (with a dedicated Blaine gym room), and Cerulean Cave. Wilds/trainers scaled for postgame; Articuno (Seafoam B4F) and Mewtwo (Cerulean Cave B1F) return; Mt. Moon hosts the Silver rematch.
+- Kanto outdoor wilds rebuilt with Gen 3 postgame grass tables (~Lv 28–40+ on routes; restored caves higher, roughly mid-40s into the 60s). Johto grass keeps curated Gen 3 guests.
+- **Retuned Kanto postgame level curve:** gym leaders ~52–72 (Surge → Blue), gym trainees / Fighting Dojo / Nugget Bridge / route trainers matched to that band, dungeon parties in the mid-40s–60s. Soft level caps track it (58 → 64 → 72 → 85 → 100).
+- Moon Stone trade-evo bypasses (Steelix, Scizor, Politoed, Slowking, Porygon2, etc.).
+- Utility NPCs relocated for Gold Kanto: Move Hub at Mr. Psychic's (Saffron), Item Smith at Cinnabar Center 1F, Judge in the Underground Path.
 
 **Sevii Islands:** On hold. Maps, ferry, and tooling live under `sevii/` but are not loaded (`SEVII_ENABLED = false`). Reserved map ids stay reserved; no Sevii play path until that work resumes.
 
@@ -40,32 +41,34 @@ If you are trying to play, ignore the build instructions below and go to the rel
 ## Features
 
 - Johto and Hoenn species (dex 152 through 386), with sprites, learnsets, and Gen 3 abilities. The original 151 get Gen 3 abilities too, plus some Gen 2/3 moves on learnsets and TMs.
-- Dark, Steel, and Fairy types, and a big Gen 2/3 move list (Rollout, weather, hazards, status berries, that kind of thing).
-- Curated Gen 2/3 mixes in wilds, gyms, Elite Four, and the rival. Optional FULL SPAWN MIX rolls encounters from the whole Gen 1 through 3 pool (with a density pass so Kanto stays full on Gold).
-- Moon Stone evolutions to bypass trade-evolution requirements (Moon Stone evolves Onix→Steelix, Scyther→Scizor, Poliwhirl→Politoed, Slowpoke→Slowking, Porygon→Porygon2, Gloom→Bellossom, Eevee→Umbreon, Sunkern→Sunflora, etc.).
-- Held items: berries, Leftovers, Focus Band, type boosters, plus Choice Band / Life Orb / Focus Sash from house NPCs and the blacksmith. Give/Take from the party menu. Berries can be used from the bag. Leftovers and Focus Band are overworld finds. Status berries are not sold in city marts. You plant berries at the farm to grow more, buy unlocked ones from the farm merchant, or find them held on wilds.
-- Berry Farm map (accessible via the right carpet in Gen 1 Centers, or the stairs / south pads in Gen 2 Centers). Plant a berry, walk, harvest more. Badge unlocks open new berry types via the Soil Expert. First unlock of each type gifts you 3 so you can plant without eating your last one. Farm merchant sells whatever youve unlocked. Berry Scholar explains effects.
+- Dark, Steel, and Fairy types, and a big Gen 2/3 move list (Rollout, weather, hazards, status berries, that kind of thing). Damaging moves use Gen 3 type categories (not Gen 4 per-move split).
+- Curated Gen 2/3 mixes in wilds, gyms, Elite Four, and the rival. Optional **FULL SPAWN MIX** / **PURE RANDOM SPAWN** reshuffle from the Gen 1–3 pool (Gold density pass keeps Kanto full; **LEGENDS IN MIX** can open the legendary pool).
+- **Gold Kanto restored dungeons:** Gen 1 layouts for Viridian Forest, Mt. Moon, Diglett's Cave, Rock Tunnel, Safari Zone, Seafoam (+ Blaine gym), and Cerulean Cave, with postgame-scaled encounters, trainers, Articuno / Mewtwo, and the Mt. Moon Silver fight.
+- **Gold Kanto level curve:** gyms, routes, Dojo, Nugget Bridge, and restored dungeon parties retuned as one postgame band (leaders ~52–72; Blue / Silver / Red sit at the top). Opt-in level caps follow the same milestones (Kanto: 58 / 64 / 72 / 85 / 100).
+- Moon Stone evolutions to bypass trade-evolution requirements (Onix→Steelix, Scyther→Scizor, Poliwhirl→Politoed, Slowpoke→Slowking, Porygon→Porygon2, Gloom→Bellossom, Eevee→Umbreon, Sunkern→Sunflora, etc.).
+- Held items: berries, Leftovers, Focus Band, type boosters, plus Choice Band / Life Orb / Focus Sash from house NPCs and the blacksmith. Give/Take from the party menu (optional **BAG GIVE** from the bag). Berries work from the bag. Leftovers and Focus Band are overworld finds. Status berries are not sold in city marts — plant at the farm, buy unlocked ones from the farm merchant, or TAKE them off wilds.
+- Berry Farm map (right carpet in Gen 1 Centers; stairs / south pads in Gen 2 Centers). Plant, walk, harvest. Soil Expert unlocks by badge (gifts 3 of each new type once). Farm merchant sells unlocked berries. Berry Scholar explains effects.
 
 ![Celadon Mansion Juice Club blender](screen-shots/juice-blender.png)
 
-- Optional smarter trainer AI, slot-2 XP Share (70% pool to fighters, up to 30% to party slot 2, never more than a solo share total), and story level caps.
-- Opt-in level cap system: talk to the Rare Candy kid outside the Viridian Mart (Gen 1) or in Cherrygrove City (Gen 2). Saying yes tops you up to 99 Rare Candies and locks in level caps that expand with story milestones and gym badges to prevent overleveling.
-- DexNav: On Gen 1 Red, appears on the start menu after getting the Pokédex. On Gen 2 Gold, it's a dedicated Pokegear card via the `pokegear_cards` mod.
-- Party summary page for ability, held item, and gender glyph (Page 3 on Gen 1, Page 4 on Gen 2).
+- Optional smarter trainer AI, **XP SHARE (SLOT 2)** (~70% to fighters, up to ~30% to party slot 2), and story level caps.
+- Opt-in level caps: Rare Candy kid outside Viridian Mart (Gen 1) or in Cherrygrove (Gen 2). Accepting tops you toward 99 Rare Candies and enables soft caps that rise with story / badges.
+- DexNav: start menu on Red after the Pokédex; Pokegear card on Gold via `pokegear_cards`.
+- Party summary page for ability, held item, and gender glyph (Page 3 on Gen 1, Page 4 on Gen 2 with ability text).
 - Optional Gen1 Modern UI support for bag pockets and the summary ability page on Red.
 [https://github.com/ArmstrongThomas/gen1-modern-ui/](https://github.com/ArmstrongThomas/gen1-modern-ui/)
 
 ![Summary page with ability text](screen-shots/summary-ability.png)
 
-- Gender on every mon calculated from Gen 2 DV rules.
-- Bag pockets on Gen 1: Items, Balls, Key Items, TMs & HMs, Berries. Bag capacity bumped to 60.
+- Gender on every mon from Gen 2 DV rules.
+- Bag pockets on Gen 1: Items, Balls, Key Items, TMs & HMs, Berries. Capacity 60. (Conflicts with `modern_bag`.)
 
 ![Berries pocket](screen-shots/bag-berries.png)
 ![TMs & HMs pocket](screen-shots/bag-tms.png)
 
-- Blue XP bar under the HP bar (Gen 1 gets an XP bar matching Gen 2 style, with widescreen support).
-- Route 5 Day Care supports two parents, Eggs, and hatching (Gen 1).
-- House NPCs for utility (Move Hub for relearn/tutor/delete, Item Smith for Life Orb / Focus Sash / berry packs, DV/Hidden Power Judge).
+- Optional **EXP BAR** on Gen 1: blue EXP bar under the HP bar (Gen 2 style, widescreen-aware; toggleable).
+- Route 5 Day Care: two parents, Eggs, hatching (Gen 1).
+- House NPCs: Move Hub (relearn/tutor/delete), Item Smith (Life Orb / Focus Sash / berry packs), DV/Hidden Power Judge.
 - Roaming beasts / Eon duo with Radar + Pokédex AREA, plus Gen 2–3 legendary statics in Gen 1.
 
 ## Overworld NPCs
@@ -86,20 +89,24 @@ Competitive held items (Choice Band, Life Orb, Focus Sash) work in battle: band 
 
 ## Options
 
-- **DEX SCOPE / JOHTO SCOPE**: Gen 1 **KANTO** locks to the original 151 (out-of-scope party/PC mons are safely stored and restored when switched back). Gen 2 **JOHTO 251** restricts Johto wild tables to dex 251 while Kanto postgame keeps Gen 3 guests.
-- **FULL SPAWN MIX** (default off): random Gen 1 through 3 wild tables (Red: Kanto routes; Gold: Johto + Kanto, with a density pass so Kanto stays full).
-- **PURE RANDOM SPAWN** (default off): full chaos mode with no habitat or BST constraints.
-- **LEGENDS IN MIX** (default off): with FULL SPAWN MIX or PURE RANDOM on, legendaries/mythicals can appear in wild tables (level-gated).
-- **XP SHARE (SLOT 2)** (default on): fighters split 70% of the XP pool; party slot 2 gets up to 30% (clamped below actives).
+Configured in the mod manager / F10 options. Host-scoped keys (spawn/scope) keep Red and Gold settings independent.
+
+- **DEX SCOPE / JOHTO SCOPE** (default NATIONAL / FULL): Gen 1 **KANTO** locks to the original 151 (out-of-scope party/PC mons stash and restore when you switch back). Gen 2 **JOHTO 251** caps Johto wilds at dex 251; Kanto postgame (including restored dungeons) still gets Gen 3 guests.
+- **FULL SPAWN MIX** (default off): rebuild wild tables from the Gen 1–3 pool (habitat / level gated). Gold reshuffles Johto + Kanto with a density pass so Kanto stays full. Applies live mid-session.
+- **PURE RANDOM SPAWN** (default off): chaos pick from the allowed dex — no habitat / stage / BST gates. Overrides FULL SPAWN MIX when both are on.
+- **LEGENDS IN MIX** (default off): with FULL SPAWN MIX or PURE RANDOM SPAWN on, legendaries/mythicals can appear (level-gated). Curated mode ignores this (including a leftover on if you turn FULL/PURE off).
+- **XP SHARE (SLOT 2)** (default on): fighters get ~70% of the XP pool; party slot 2 up to ~30% (never more than a solo share total).
 - **SMARTER AI** (default on): prefer useful damage, skip moves that would fail.
-- **SWITCH HIT AI**: classic free-hit timing vs Gen 3 lock-on-switch (labels GEN 1/3 on Red, GEN 2/3 on Gold).
-- **RULESET** (Red only, default MODERN): mirrors OPTIONS → RULESET. MODERN cleans Gen1 quirks and uses Gen3 crit stages; GEN 1 keeps faithful quirks. Seeded once when the mod is first enabled.
-- **SP.ATK / SP.DEF** (Red only, default on): use separate Special Attack / Special Defense from PokeAPI for special damage and summary UI; off keeps Gen 1 single Special.
-- **DEXNAV** (Red only): start-menu label / off (Gold uses Pokegear card).
+- **SWITCH HIT AI** (default classic): free-hit timing on switch — **CLASSIC** after send-out vs **GEN 3** lock-on-switch. Same labels on Red and Gold.
+- **BAG GIVE** (default on): Give held items from the bag as well as from the party menu.
+- **RULESET** (Red only, default MODERN): mirrors OPTIONS → RULESET. **MODERN** cleans Gen 1 quirks and uses Gen 3 crit stages; **GEN 1** keeps faithful quirks. Seeded once when KR is first enabled; either UI stays in sync. Hidden on Gold.
+- **SP.ATK / SP.DEF** (Red only, default on): separate Sp.Atk / Sp.Def bases for special damage and summary UI; off keeps Gen 1 single Special. Hidden on Gold (already split).
+- **EXP BAR** (Red only, default on): blue EXP bar under the HP bar in battle (widescreen-aware). Hidden on Gold (native bar).
+- **DEXNAV** (Red only): start-menu label / off. Gold DexNav is the Pokegear card (no rename toggle).
 
 ## Generating the data files
 
-Sprites, `pokemon_data.lua`, ability/learnset/gender/breeding patches, and berry farm art come from `generate_pokemon_mod.py`. It hits PokeAPI (and a couple public sprite sources). Run it from inside the mod folder if you're building from source.
+Sprites, `pokemon_data.lua`, ability/learnset/gender/breeding patches, and berry farm art come from `tools/generate_pokemon_mod.py`. It hits PokeAPI (and a couple public sprite sources). Run it from inside the mod folder if you're building from source.
 
 You need Python 3, `requests`, and `Pillow`, plus network on the first run.
 

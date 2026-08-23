@@ -49,11 +49,60 @@ end
 
 local function spawnOptsFromOptions(mod)
   local Host = require("mods.Kanto-Reforged.core.host")
+  -- LEGENDS IN MIX stays visible in the Manager (hiding it via mid-session
+  -- re-define would reset the options cursor). Curated mode must ignore a
+  -- leftover true if the player turned FULL/PURE off after enabling legends.
+  local mode = spawnModeFromOptions(mod)
+  local legends = false
+  if mode == "full_random" or mode == "pure_random" then
+    legends = mod.options
+      and mod.options:get(Host.optionKey("legends_in_mix")) and true or false
+  end
   return {
-    legendsInMix = mod.options
-      and mod.options:get(Host.optionKey("legends_in_mix")) and true or false,
+    legendsInMix = legends,
     speciesScope = SpeciesScope.mode(mod),
   }
+end
+
+-- Central schema for Manager / card options. Host rows use loader.generation
+-- so a sticky GameVersion cannot mis-label Gen1 vs Gen2 menus.
+local function buildOptionDefs(mod)
+  local Host = require("mods.Kanto-Reforged.core.host")
+  local defs = {
+    SpeciesScope.optionDef(mod),
+    {
+      key = Host.optionKey("full_spawn_random"),
+      label = "FULL SPAWN MIX",
+      type = "toggle",
+      default = false,
+    },
+    {
+      key = Host.optionKey("pure_spawn_random"),
+      label = "PURE RANDOM SPAWN",
+      type = "toggle",
+      default = false,
+    },
+    {
+      key = Host.optionKey("legends_in_mix"),
+      label = "LEGENDS IN MIX",
+      type = "toggle",
+      default = false,
+    },
+    ModernXpShare.OPTION,
+    TrainerAi.OPTION,
+    TrainerAi.switchLockOptionForHost(),
+    HeldItems.BAG_GIVE_OPTION,
+  }
+  -- SpA/SpD split is a Gen1 single-Special concern; Gold already has both.
+  -- RULESET mirrors engine OPTIONS → RULESET (Gen1 only; Gold has no path).
+  if Host.isGen1From(mod) then
+    defs[#defs + 1] = RulesetOpt.OPTION
+    defs[#defs + 1] = SplitSpecial.OPTION
+    defs[#defs + 1] = require("mods.Kanto-Reforged.ui.battle_exp_bar").OPTION
+    -- DexNav label/off is only for the start-menu entry; Gold uses Pokegear.
+    defs[#defs + 1] = require("mods.Kanto-Reforged.ui.dexnav").OPTION
+  end
+  return defs
 end
 
 local function applySpawnTables(mod, pokemon_data, flags)
@@ -152,45 +201,10 @@ return function(mod)
   end
 
   -- Manager / card options (host-aware labels / visibility).
-  -- Spawn + dex-scope keys are g1:/g2: so Red and Gold keep separate state.
-  local optionDefs = {
-    SpeciesScope.optionDef(),
-    {
-      key = Host.optionKey("full_spawn_random"),
-      label = "FULL SPAWN MIX",
-      type = "toggle",
-      default = false,
-    },
-    {
-      key = Host.optionKey("pure_spawn_random"),
-      label = "PURE RANDOM SPAWN",
-      type = "toggle",
-      default = false,
-    },
-    {
-      key = Host.optionKey("legends_in_mix"),
-      label = "LEGENDS IN MIX",
-      type = "toggle",
-      default = false,
-    },
-    ModernXpShare.OPTION,
-    TrainerAi.OPTION,
-    TrainerAi.switchLockOptionForHost(),
-    HeldItems.BAG_GIVE_OPTION,
-  }
-  -- SpA/SpD split is a Gen1 single-Special concern; Gold already has both.
-  -- RULESET mirrors engine OPTIONS → RULESET (Gen1 only; Gold has no path).
-  if Host.isGen1() then
-    optionDefs[#optionDefs + 1] = RulesetOpt.OPTION
-    optionDefs[#optionDefs + 1] = SplitSpecial.OPTION
-    optionDefs[#optionDefs + 1] = require("mods.Kanto-Reforged.ui.battle_exp_bar").OPTION
-    -- DexNav label/off is only for the start-menu entry; Gold uses Pokegear.
-    optionDefs[#optionDefs + 1] = require("mods.Kanto-Reforged.ui.dexnav").OPTION
-  end
-  mod.options:define(optionDefs)
+  mod.options:define(buildOptionDefs(mod))
   Host.installEngineShims(mod)
   Host.migrateScopedOptions(mod)
-  if Host.isGen1() then
+  if Host.isGen1From(mod) then
     RulesetOpt.install(mod)
   end
 

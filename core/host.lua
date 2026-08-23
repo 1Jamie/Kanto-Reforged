@@ -43,6 +43,26 @@ function Host.isGen2()
   return Host.generation() == 2
 end
 
+-- Prefer the loader's fixed generation when building option schemas or
+-- branching at define time. Launcher return can leave GameVersion / globals
+-- sticky across boots; loader.generation is set once in Loader.new.
+function Host.generationFrom(mod)
+  local loader = Host.modLoader(mod)
+  local gen = loader and loader.generation
+  if gen == 1 or gen == 2 then
+    return gen
+  end
+  return Host.generation()
+end
+
+function Host.isGen1From(mod)
+  return Host.generationFrom(mod) == 1
+end
+
+function Host.isGen2From(mod)
+  return Host.generationFrom(mod) == 2
+end
+
 function Host.versionId()
   return GameVersion.get()
 end

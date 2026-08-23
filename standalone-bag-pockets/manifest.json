@@ -1,0 +1,17 @@
+{
+  "id": "standalone-bag-pockets",
+  "name": "Bag Pockets",
+  "version": "1.0.0",
+  "api": 2,
+  "entry": "main.lua",
+  "profile": "content",
+  "category": "CONTENT",
+  "game_version": ">=0.1.84 <1.0.0",
+  "priority": 50,
+  "games": [
+    "gen1",
+    "gen2"
+  ],
+  "description": "Adds bag pockets and increased capacity (60 items) for Gen 1.",
+  "affects_link": true
+}

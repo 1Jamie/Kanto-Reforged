@@ -17,8 +17,8 @@ return function(T, Data, run)
   T.check(lockOpt ~= nil, "SWITCH HIT AI option schema registered")
   T.eq(lockOpt.type, "choice", "switch hit AI is a choice")
   T.eq(lockOpt.default, TrainerAi.SWITCH_LOCK_GEN1, "switch hit AI defaults to classic timing")
-  T.eq(lockOpt.choices[1][1], "GEN 1", "Red switch-hit classic label is GEN 1")
-  T.eq(lockOpt.choices[2][1], "GEN 3", "Red switch-hit lock label is GEN 3")
+  T.eq(lockOpt.choices[1][1], "CLASSIC", "switch-hit classic label is CLASSIC")
+  T.eq(lockOpt.choices[2][1], "GEN 3", "switch-hit lock label is GEN 3")
 
   local opts = run.loader.modOptions["Kanto-Reforged"]
       or {}

@@ -49,9 +49,16 @@ local function breedingIsEgg(mon)
   return false
 end
 
-function SpeciesScope.optionDef()
+function SpeciesScope.optionDef(mod)
   local key = Host.optionKey(SpeciesScope.OPTION_KEY)
-  if Host.isGen2() then
+  -- Prefer loader generation when defining so schema matches this boot.
+  local gen2
+  if mod ~= nil then
+    gen2 = Host.isGen2From(mod)
+  else
+    gen2 = Host.isGen2()
+  end
+  if gen2 then
     return {
       key = key,
       label = "JOHTO SCOPE",

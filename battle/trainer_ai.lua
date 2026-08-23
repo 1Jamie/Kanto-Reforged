@@ -31,30 +31,24 @@ TrainerAi.OPTION = {
 -- Voluntary-switch free-hit timing (player Switch → enemy attack).
 -- classic (stored as "gen1"): pick after send-out (engine / pre-Gen3 timing).
 -- gen3: lock AI move against the outgoing mon, then land it on the switch-in.
+-- Labels are host-agnostic (CLASSIC / GEN 3) so Red and Gold share one UI.
 TrainerAi.SWITCH_LOCK_KEY = "switch_hit_ai"
 TrainerAi.SWITCH_LOCK_GEN3 = "gen3"
-TrainerAi.SWITCH_LOCK_GEN1 = "gen1" -- classic timing value (label is host-aware)
+TrainerAi.SWITCH_LOCK_GEN1 = "gen1" -- classic timing value
 
-local function switchLockOption(classicLabel)
-  return {
-    key = TrainerAi.SWITCH_LOCK_KEY,
-    label = "SWITCH HIT AI",
-    type = "choice",
-    default = TrainerAi.SWITCH_LOCK_GEN1,
-    choices = {
-      { classicLabel, TrainerAi.SWITCH_LOCK_GEN1 },
-      { "GEN 3", TrainerAi.SWITCH_LOCK_GEN3 },
-    },
-  }
-end
+TrainerAi.SWITCH_LOCK_OPTION = {
+  key = TrainerAi.SWITCH_LOCK_KEY,
+  label = "SWITCH HIT AI",
+  type = "choice",
+  default = TrainerAi.SWITCH_LOCK_GEN1,
+  choices = {
+    { "CLASSIC", TrainerAi.SWITCH_LOCK_GEN1 },
+    { "GEN 3", TrainerAi.SWITCH_LOCK_GEN3 },
+  },
+}
 
--- Red/Blue: GEN 1 vs GEN 3. Gold: GEN 2 vs GEN 3 (same stored values).
-TrainerAi.SWITCH_LOCK_OPTION = switchLockOption("GEN 1")
-TrainerAi.SWITCH_LOCK_OPTION_GEN2 = switchLockOption("GEN 2")
-
+-- Kept for call sites that historically branched on host; both return the same row.
 function TrainerAi.switchLockOptionForHost()
-  local Host = require("mods.Kanto-Reforged.core.host")
-  if Host.isGen2() then return TrainerAi.SWITCH_LOCK_OPTION_GEN2 end
   return TrainerAi.SWITCH_LOCK_OPTION
 end
 

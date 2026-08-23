@@ -329,6 +329,17 @@ return function(T, Data, HeldItems, run)
   T.eq(BerryFarm.plotMarkerSprite(fakeMod, 1), "SPRITE_PLOT_SOIL",
     "empty plot shows the soil-patch sprite")
 
+  -- Gen2 WorldAPI:npc omits handle.id (only npc.id / objectId). removeNpc
+  -- must use the string runtime id or plot markers duplicate every step.
+  T.eq(BerryFarm.runtimeNpcId({ id = "BERRY_FARM_obj_9" }),
+    "BERRY_FARM_obj_9", "Gen1-style handle.id is preferred")
+  T.eq(BerryFarm.runtimeNpcId({
+    objectId = 10,
+    npc = { id = "BERRY_FARM_obj_9", def = { sprite = "SPRITE_PLOT_SOIL" } },
+  }), "BERRY_FARM_obj_9", "Gen2-style handle resolves via npc.id")
+  T.eq(BerryFarm.runtimeNpcId({ objectId = 10 }), nil,
+    "Gen2 objectId alone is not a removeNpc id")
+
   -- Every plot sprite (soil, growing, and each ripe berry) is registered
   -- with a real 16x16 field-object image
   for _, spriteId in ipairs({

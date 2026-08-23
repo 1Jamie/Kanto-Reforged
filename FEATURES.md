@@ -14,23 +14,24 @@ Mod id: `Kanto-Reforged`. Enable it in the launcher Mods tab or the F10 manager.
 4. [Trade Evolution Bypasses (Moon Stone)](#trade-evolution-bypasses-moon-stone)
 5. [Abilities and Battle Mechanics](#abilities-and-battle-mechanics)
 6. [Wild encounters and trainers](#wild-encounters-and-trainers)
-7. [Gender](#gender)
-8. [Day Care and breeding](#day-care-and-breeding)
-9. [Held items](#held-items)
-10. [Berry Farm and berry economy](#berry-farm-and-berry-economy)
-11. [Bag and party QoL](#bag-and-party-qol)
-12. [Level caps](#level-caps)
-13. [XP Share (slot 2)](#xp-share-slot-2)
-14. [Smarter AI](#smarter-ai)
-15. [House NPCs and utility](#house-npcs-and-utility)
-16. [Move Hub](#move-hub)
-17. [Blacksmith](#blacksmith)
-18. [Gen 3 fossils](#gen-3-fossils)
-19. [Roaming legendaries](#roaming-legendaries)
-20. [Static legendaries and mythicals](#static-legendaries-and-mythicals)
-21. [Custom maps](#custom-maps)
-22. [Caveats and save notes](#caveats-and-save-notes)
-23. [Module map (for modders)](#module-map-for-modders)
+7. [Restored Gold Kanto dungeons](#restored-gold-kanto-dungeons)
+8. [Gender](#gender)
+9. [Day Care and breeding](#day-care-and-breeding)
+10. [Held items](#held-items)
+11. [Berry Farm and berry economy](#berry-farm-and-berry-economy)
+12. [Bag and party QoL](#bag-and-party-qol)
+13. [Level caps](#level-caps)
+14. [XP Share (slot 2)](#xp-share-slot-2)
+15. [Smarter AI](#smarter-ai)
+16. [House NPCs and utility](#house-npcs-and-utility)
+17. [Move Hub](#move-hub)
+18. [Blacksmith](#blacksmith)
+19. [Gen 3 fossils](#gen-3-fossils)
+20. [Roaming legendaries](#roaming-legendaries)
+21. [Static legendaries and mythicals](#static-legendaries-and-mythicals)
+22. [Custom maps](#custom-maps)
+23. [Caveats and save notes](#caveats-and-save-notes)
+24. [Module map (for modders)](#module-map-for-modders)
 
 ---
 
@@ -46,15 +47,17 @@ Configured in the mod manager / F10 options:
 
 | Option | Default | Effect |
 |---|---|---|
-| **DEX SCOPE** (Gen1) / **JOHTO SCOPE** (Gen2) | NATIONAL / FULL | Restricts wilds, trainers, and legends. Gen1 **KANTO** locks to the original 151 (out-of-scope party/PC mons are safely stored and restored when switched back). Gen2 **JOHTO 251** caps Johto spawns at dex 251 while Kanto postgame maps keep Gen3 guests. |
+| **DEX SCOPE** (Gen1) / **JOHTO SCOPE** (Gen2) | NATIONAL / FULL | Restricts wilds, trainers, and legends. Gen1 **KANTO** locks to the original 151 (out-of-scope party/PC mons are safely stored and restored when switched back). Gen2 **JOHTO 251** caps Johto spawns at dex 251 while Kanto postgame maps (including restored dungeons) keep Gen3 guests. |
 | **FULL SPAWN MIX** | Off | Rebuilds wild tables from the full Gen 1–3 pool instead of curated mixes (habitat / level gated, deterministic). On **Gold**, reshuffles Johto and Kanto grass/water (with a density pass so Kanto stays full). Mid-session toggles apply live. |
 | **PURE RANDOM SPAWN** | Off | Chaos mode: seeded pick from the whole allowed dex (respects DEX/JOHTO SCOPE). No habitat, stage, or BST gates. Overrides FULL SPAWN MIX when both are on. Rolls once when toggled on and persists across loads; toggle off/on for a new mix. |
-| **LEGENDS IN MIX** | Off | When FULL SPAWN MIX or PURE RANDOM SPAWN is on, allow legendaries/mythicals into the wild pool. Curated mode ignores this. |
+| **LEGENDS IN MIX** | Off | When FULL SPAWN MIX or PURE RANDOM SPAWN is on, allow legendaries/mythicals into the wild pool. Curated mode ignores this (including a leftover on after turning FULL/PURE off). |
 | **XP SHARE (SLOT 2)** | On | Splits the Gen 1 XP pool: ~70% to fighters, up to ~30% to party slot 2 (never more than a solo share total). Replaces EXP.ALL while enabled. |
 | **SMARTER AI** | On | Trainers (and wild scoring hooks) prefer useful damage and skip moves that would fail. |
-| **SWITCH HIT AI** | Classic | Free-hit timing when you switch: classic picks after send-out; Gen 3 locks against the outgoing mon. Labels are **GEN 1 / GEN 3** on Red, **GEN 2 / GEN 3** on Gold. |
+| **SWITCH HIT AI** | Classic | Free-hit timing when you switch: **CLASSIC** picks after send-out; **GEN 3** locks against the outgoing mon. Same labels on Red and Gold. |
+| **BAG GIVE** | On | Allow Give held item from the bag as well as from the party menu. |
 | **RULESET** | MODERN | **Red only.** Mirrors the engine OPTIONS → RULESET. **MODERN** (`modern_clean`): no 1/256 miss on 100% moves, Focus Energy helps crits, enemies spend PP, Hyper Beam always recharges, end-of-turn residuals, Gen3 crit stages. **GEN 1** (`gen1_faithful`): classic quirks. Seeded to MODERN once when KR is first enabled; flipping either UI keeps both in sync. Hidden on Gold (native Gen2 rules). |
 | **SP.ATK / SP.DEF** | On | **Red only.** Special moves use separate Sp.Atk / Sp.Def bases (PokeAPI) instead of Gen 1 Special. Summary and Modern UI party/PC detail show both stats (`SAT` / `SDF`). Stages, DVs, and Calcium stay Gen 1 (one shared Special). Hidden on Gold (already split). |
+| **EXP BAR** | On | **Red only.** Blue EXP bar under the HP bar in battle (Gen 2 style, widescreen-aware). Hidden on Gold (native bar). |
 | **DEXNAV** | DEXNAV | **Red only.** Start-menu label / off. Gold DexNav is a Pokegear card (no rename toggle). |
 
 ---
@@ -133,7 +136,8 @@ To eliminate the need for link trading to evolve certain species, several trade 
 
 - **Gen 1 (Red / Blue):** Curated mixes: habitats and levels mix Gen 2–3 species into Kanto routes without replacing the whole table. A coverage pass ensures every non-legendary **line** is obtainable.
 - **Gen 2 (Gold) Johto:** Native Johto tables are preserved with curated Gen 3 guests in rare slots across grasslands, forests, caves, and mountains.
-- **Gen 2 (Gold) Kanto:** Fully rebuilt postgame grass tables featuring Gen 3 lines scaled from **Lv 28 to Lv 40+**.
+- **Gen 2 (Gold) Kanto outdoors:** Fully rebuilt postgame grass tables featuring Gen 3 lines scaled from **Lv 28 to Lv 40+**.
+- **Gen 2 (Gold) restored dungeons:** Separate postgame tables for Viridian Forest / Mt. Moon / Diglett's Cave / Rock Tunnel / Safari / Seafoam / Cerulean Cave (see [Restored Gold Kanto dungeons](#restored-gold-kanto-dungeons)); cave bands run roughly mid-40s into the 60s.
 - **Full Spawn Mix (Option):** Reshuffles all wild grass/water tables across the entire game from the Gen 1–3 pool.
 - Wilds have a ~**5%** chance to hold a berry (rolled only from types you have already unlocked at the farm). Catching the mon keeps `heldItem`; use party **TAKE** to move it to the bag.
 
@@ -142,18 +146,36 @@ To eliminate the need for link trading to evolve certain species, several trade 
 ### Trainers
 
 - **Gen 1 (Red / Blue):** Gym leaders and Elite Four get a curated **Gen 2 swap + Gen 3 add**. Ace mons hold a **berry ramp** (plain `BERRY` on Brock → status berries mid-game → Lum on Agatha/Lance). Rival mixes follow **continuity** (mid fights foreshadow a line; League fights debut finals). Tier 2 set pieces (Nugget Bridge, gym trainers, Mt. Moon, Fighting Dojo, Tower, Silph, Victory Road) get heavier mixes.
-- **Gen 2 (Gold) Kanto Overhaul:** The entire Kanto postgame circuit is overhauled with competitive 6-Pokémon rosters, Gen 2/3 additions, held berries, and higher level targets:
+- **Gen 2 (Gold) Kanto Overhaul:** The entire Kanto postgame circuit is overhauled with competitive 6-Pokémon rosters, Gen 2/3 additions, held berries, and higher level targets aligned to the soft caps (58 → 64 → 72 → 85 → 100):
   - **Lt. Surge (Vermilion):** Levels 52–55 (Ace Raichu holding Chesto Berry).
   - **Janine (Fuchsia):** Levels 52–56 (Ace Venomoth holding Persim Berry).
   - **Erika (Celadon):** Levels 53–57 (Ace Bellossom holding Rawst Berry).
   - **Misty (Cerulean):** Levels 57–61 (Ace Starmie holding Pecha Berry).
   - **Sabrina (Saffron):** Levels 58–62 (Ace Alakazam holding Cheri Berry).
   - **Brock (Pewter):** Levels 58–62 (Ace Steelix holding Berry).
-  - **Blaine (Cinnabar / Seafoam):** Levels 59–63 (Ace Magmar holding Persim Berry).
+  - **Blaine (Seafoam Gym):** Levels 59–63 (Ace Magmar holding Persim Berry); fought in the restored Seafoam gym room.
   - **Blue (Viridian):** Levels 70–72 (Ace Arcanine holding Cheri Berry).
   - **Fighting Dojo (Saffron):** Levels 60–64 Blackbelts (Hariyama, Breloom, Medicham, Primeape, Hitmons).
   - **Nugget Bridge Circuit (Route 24/25):** Levels 56–60.
-  - **Mt. Moon Rival Rematch:** Levels 75–78 (Ace Tyranitar holding Lum Berry).
+  - **Mt. Moon Silver Rematch:** Levels 75–78 (Ace Tyranitar holding Lum Berry), on the restored Mt. Moon 1F entrance.
+
+---
+
+## Restored Gold Kanto dungeons
+
+On **Gold**, Gen 1 Kanto dungeon layouts (blocks, warps, NPCs, items, signs) are injected as `*_KR` maps and overworld mouths are redirected into them. Trainers and wilds are scaled for the postgame curve.
+
+| Area | Notes |
+|---|---|
+| **Viridian Forest** | Full Gen 1 maze + bug catchers; wilds ~Lv 43–49. |
+| **Mt. Moon** | 1F / B1F / B2F; fossils + Rockets; **Silver rematch** on 1F entrance corridor (~Lv 58 story object / 75–78 rematch roster). Wilds ~Lv 46–50. |
+| **Diglett's Cave** | Full tunnel + Route 2 / Route 11 mouths. |
+| **Rock Tunnel** | 1F / B1F + linked Poké Center; hikers/pokémaniacs retuned. |
+| **Safari Zone** | Gate + Center / East / West / North + rest houses + Secret House; postgame preserve framing. |
+| **Seafoam Islands** | 1F–B4F boulder puzzles; **Blaine's gym** as a dedicated room off 1F; **Articuno** on B4F (Lv 60). |
+| **Cerulean Cave** | 1F / 2F / B1F; **Mewtwo** on B1F (Lv 70); wilds ~Lv 59–65 on B1F. |
+
+Related Route 2 gate / trade house pieces ship with the Viridian Forest restore so the classic Forest path works again.
 
 ---
 
@@ -553,6 +575,7 @@ The codebase is organized into domain-specific subdirectories:
 | `battle/trainer_ai.lua` / `battle/trainers.lua` | Smarter AI system, Gen 1 & Gen 2 Gym / Trainer mix overhauls |
 | `battle/abilities.lua` / `battle/move_effects.lua` / `battle/move_type_patches.lua` | Gen 3 ability runners, custom move effects, type alignment |
 | `world/encounters.lua` / `world/encounters_gen2.lua` | Wild encounter tables for Gen 1 Kanto, Gen 2 Johto, and Gen 2 Kanto postgame |
+| `world/restored_dungeons.lua` / `world/restored_dungeons_data.lua` | Restored Gen 1 Kanto dungeons for Gold (layouts, warps, trainers, items, scaled wilds) |
 | `world/berry_farm.lua` / `world/berry_quests.lua` | Berry Farm map, Pokecenter warps, Soil Expert badge unlocks, Blender |
 | `world/house_npcs.lua` / `world/move_hub.lua` / `world/item_smith.lua` | House NPCs, Move Relearner/Tutor hub, Cinnabar Blacksmith |
 | `world/roamers.lua` / `world/roaming_radar.lua` | Roaming beasts / Eon duo mechanics, radar item |
