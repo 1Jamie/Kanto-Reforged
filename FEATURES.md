@@ -55,7 +55,7 @@ Configured in the mod manager / F10 options:
 | **SMARTER AI** | On | Trainers (and wild scoring hooks) prefer useful damage and skip moves that would fail. |
 | **SWITCH HIT AI** | Classic | Free-hit timing when you switch: **CLASSIC** picks after send-out; **GEN 3** locks against the outgoing mon. Same labels on Red and Gold. |
 | **BAG GIVE** | On | Allow Give held item from the bag as well as from the party menu. |
-| **RULESET** | MODERN | **Red only.** Mirrors the engine OPTIONS → RULESET. **MODERN** (`modern_clean`): no 1/256 miss on 100% moves, Focus Energy helps crits, enemies spend PP, Hyper Beam always recharges, end-of-turn residuals, Gen3 crit stages. **GEN 1** (`gen1_faithful`): classic quirks. Seeded to MODERN once when KR is first enabled; flipping either UI keeps both in sync. Hidden on Gold (native Gen2 rules). |
+| **RULESET** | MODERN (forced) | **Red only.** KR always forces engine `modern_clean` (no 1/256 miss, Focus Energy helps crits, enemies spend PP, Hyper Beam always recharges, end-of-turn residuals) plus Gen3 crit / partial-trap capabilities. The old GEN 1 / `gen1_faithful` toggle is removed; leftover faithful saves migrate to `modern_clean`. Hidden on Gold (native Gen2 rules + same KR Gen3 overlays where applicable). |
 | **SP.ATK / SP.DEF** | On | **Red only.** Special moves use separate Sp.Atk / Sp.Def bases (PokeAPI) instead of Gen 1 Special. Summary and Modern UI party/PC detail show both stats (`SAT` / `SDF`). Stages, DVs, and Calcium stay Gen 1 (one shared Special). Hidden on Gold (already split). |
 | **EXP BAR** | On | **Red only.** Blue EXP bar under the HP bar in battle (Gen 2 style, widescreen-aware). Hidden on Gold (native bar). |
 | **DEXNAV** | DEXNAV | **Red only.** Start-menu label / off. Gold DexNav is a Pokegear card (no rename toggle). |
@@ -67,7 +67,7 @@ Configured in the mod manager / F10 options:
 ### Species
 
 - Dex **152–386** (Johto + Hoenn) with sprites, learnsets, and Gen 3 abilities.
-- Original 151 also receive Gen 3 ability assignments and selected Gen 2/3 learnset / TM backports.
+- Original 151 receive Gen 3 abilities and Emerald-first level-up learnsets / TM/HM from `learnset_gen3.lua` (runtime apply on Red and Gold). Pragmatic L30 TM backports for AI when not naturally level-up.
 - Pokédex size extended to **386**.
 - Special evolution methods for branching lines (e.g. Tyrogue ATK/DEF/BAL, Wurmple A/B).
 - Friendship / time / location evolutions are approximated to fit classic triggers.
@@ -123,7 +123,7 @@ To eliminate the need for link trading to evolve certain species, several trade 
 
 ### Battle Mechanics
 
-- **RULESET (Red):** Defaults to **MODERN** (engine `modern_clean`) with Gen3-ish quirks and crit stages. Flip to **GEN 1** in the mod Manager or OPTIONS → RULESET to keep classic Gen1 quirks; the two UIs stay synced.
+- **RULESET (Red):** Always **MODERN** (`modern_clean`) with Gen3 crit stages and Gen3 partial trapping. Faithful Gen1 quirks are not offered; old faithful saves are migrated.
 - **Physical / special:** Damaging moves use Gen3 type categories (not Gen4 per-move split). Dark/Ghost are special; Fire/Water/Grass/etc. special; Normal/Fighting/etc. physical.
 - **Gen 3 Freeze Parity:** Frozen Pokémon have a 20% (1-in-5) chance to thaw naturally each turn. Furthermore, any damaging fire-type move used against a frozen target immediately unfreezes them.
 - **XP Bar:** A smooth blue EXP bar displays below the player Pokémon's HP bar in battle across Gen 1 (matching Gen 2 style) with widescreen support.
@@ -184,7 +184,7 @@ Related Route 2 gate / trade house pieces ship with the Viridian Forest restore 
 Every mon gets a gender from Gen 2 rules: Attack DV vs species `genderRate` (female eighths from PokéAPI). Always-male / always-female / genderless lines stay that way.
 
 - Existing saves are **backfilled from DVs on load** (deterministic).
-- Summary / nickname can show ♂ / ♀.
+- **♂ / ♀** show in battle HUD names, party menu rows, catch nickname prompt, naming keyboard, PC withdraw/deposit lists, and the summary screen.
 - Attract and Cute Charm use opposite-gender infatuation (Cute Charm at Gen 3’s 1/3 rate).
 - Captivate only hits the opposite gender.
 - Cute Charm lead biases wild genders (~2/3 opposite), Emerald-style.
@@ -570,7 +570,7 @@ The codebase is organized into domain-specific subdirectories:
 |---|---|
 | `core/host.lua` / `core/gen2_compat.lua` / `core/options.lua` | Host generation shims, Gen 2 infrastructure seeding, mod options |
 | `pokemon/pokemon_data.lua` / `pokemon/pokemon_gen2.lua` | Species definitions, Hoenn Gen 2 record converters, base stats |
-| `pokemon/learnset_patches.lua` / `pokemon/gender.lua` / `pokemon/breeding.lua` | Learnsets, Gen 2 DV gender calculations, Day Care breeding logic |
+| `pokemon/learnset_gen3.lua` / `tools/gen3_learnsets.py` / `pokemon/gender.lua` / `pokemon/breeding.lua` | Gen3 learnsets (#1–386), gender, Day Care breeding |
 | `pokemon/species_scope.lua` / `pokemon/species_palettes.lua` | Dex scope filters (Kanto / Johto 251 / National), Gen 2 palette hooks |
 | `battle/trainer_ai.lua` / `battle/trainers.lua` | Smarter AI system, Gen 1 & Gen 2 Gym / Trainer mix overhauls |
 | `battle/abilities.lua` / `battle/move_effects.lua` / `battle/move_type_patches.lua` | Gen 3 ability runners, custom move effects, type alignment |

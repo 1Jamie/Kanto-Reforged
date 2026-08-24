@@ -110,28 +110,7 @@ function Competitive.install(mod)
     Competitive.clearChoiceLocks(ev and ev.battle)
   end)
 
-  -- Life Orb recoil after a connecting damaging move
-  mod.events:on("battle.turn_ended", function(ev)
-    if not ev or not ev.battle then return end
-    local function tick(b)
-      if not b or not b.expLifeOrbPending then return end
-      b.expLifeOrbPending = nil
-      local mon = monOf(b)
-      if not mon or holdId(b) ~= "LIFE_ORB" or (mon.hp or 0) <= 0 then return end
-      local maxHp = (mon.stats and mon.stats.hp) or mon.maxHp or mon.hp or 1
-      local recoil = math.max(1, math.floor(maxHp / 10))
-      mon.hp = math.max(0, mon.hp - recoil)
-      if ev.battle.sayNext then
-        ev.battle:sayNext(Strings("%s is hurt\nby its LIFE ORB!", displayName(b)))
-      elseif BattleCompat.say then
-        BattleCompat.say(ev.battle, Strings("%s is hurt\nby its LIFE ORB!",
-          BattleCompat.displayName(ev.battle, b)))
-      end
-      if ev.battle.drainNext then ev.battle:drainNext() end
-    end
-    tick(ev.battle.player)
-    tick(ev.battle.enemy)
-  end)
+  -- Life Orb recoil: core/residual_handlers.lua (held_items phase).
 
   -- Focus Sash / Choice Band BattleState patches are Gen1-only (Gold battle
   -- lives in src/battle/gen2). Damage/event hooks above still apply on both.

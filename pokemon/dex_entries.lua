@@ -81,35 +81,31 @@ local function softLines(text, cols, maxLines)
   return lines
 end
 
--- Soft-wrap like Gen 1 dex pages (~18 cols, \n between lines, \f every 3).
--- Hard-capped at MAX_LINES so nothing overflows DexEntryMenu (y 72..122).
+-- Soft-wrap like Gen 1 dex pages (~18 cols, \n between lines, \f every 3 lines).
+-- Note: Gen 1 DexEntryMenu unconditionally appends a period '.' to the final line,
+-- so we strip trailing periods from the source text to prevent double/triple dots.
 function DexEntries.wrap(text, cols, maxLines)
-  local lines = softLines(text, cols, maxLines)
+  local clean = tostring(text or ""):gsub("%s*%.+$", "")
+  local Dialogue = require("mods.Kanto-Reforged.core.dialogue")
+  local pages = Dialogue.dexPages(clean, cols or COLS)
   local chunks = {}
-  for i, L in ipairs(lines) do
-    chunks[#chunks + 1] = L
-    if i < #lines then
-      if i % 3 == 0 then
-        chunks[#chunks + 1] = "\f"
-      else
-        chunks[#chunks + 1] = "\n"
-      end
-    end
+  for pi, pageLines in ipairs(pages) do
+    if maxLines and (pi - 1) * 3 >= maxLines then break end
+    local pageChunk = table.concat(pageLines, "\n")
+    chunks[#chunks + 1] = pageChunk
   end
-  return table.concat(chunks)
+  return table.concat(chunks, "\f")
 end
 
--- Gen2 entry pages: two pages of three `<NEXT>`-joined lines (~18 cols).
+-- Gen2 entry pages: three `<NEXT>`-joined lines (~18 cols) per page.
 function DexEntries.wrapGen2(text, cols)
-  local lines = softLines(text, cols or COLS, 6)
-  local function page(from, to)
-    local parts = {}
-    for i = from, to do
-      if lines[i] then parts[#parts + 1] = lines[i] end
-    end
-    return table.concat(parts, "<NEXT>")
+  local clean = tostring(text or "")
+  if not clean:match("[%?!%.]$") then
+    clean = clean .. "."
   end
-  return page(1, 3), page(4, 6)
+  local Dialogue = require("mods.Kanto-Reforged.core.dialogue")
+  local pages = Dialogue.dexGen2(clean, cols or COLS)
+  return pages[1] or "", pages[2] or "", pages
 end
 
 function DexEntries.textKey(speciesId)
@@ -199,13 +195,13 @@ function DexEntries.ensureDexText(game, def)
     return true
   end
 
+  if type(e.text) == "string" and game.data.text[e.text] then
+    return true
+  end
+
   if type(e.text) == "string" and not isTextKey(e.text) then
     local key = DexEntries.textKey((def and def.id) or "UNKNOWN")
     return publish(key, DexEntries.wrap(e.text))
-  end
-
-  if isTextKey(e.text) and game.data.text[e.text] then
-    return true
   end
 
   local key = isTextKey(e.text) and e.text
@@ -241,7 +237,7 @@ function DexEntries.toGen2Entry(speciesId, record)
   end
   if not prose or prose == "" then return nil end
 
-  local text, text2 = DexEntries.wrapGen2(prose)
+  local text, text2, pages = DexEntries.wrapGen2(prose)
   local ft = entry.heightFt or 0
   local inch = entry.heightIn or 0
   ensureWeightTenths(entry)
@@ -253,6 +249,7 @@ function DexEntries.toGen2Entry(speciesId, record)
     weight = entry.weight or 0,
     text = text,
     text2 = text2 or "",
+    pages = pages,
   }
 end
 
@@ -307,9 +304,9 @@ function DexEntries.installInlineTextFallback(mod)
     if DexEntryMenu._krInlineText then return end
     local orig = DexEntryMenu.render
     if type(orig) ~= "function" then return end
-    DexEntryMenu.render = function(game, def, sprite, forceOwned, trueColor)
+    DexEntryMenu.render = function(game, def, sprite, forceOwned, trueColor, page, ...)
       DexEntries.ensureDexText(game, def)
-      return orig(game, def, sprite, forceOwned, trueColor)
+      return orig(game, def, sprite, forceOwned, trueColor, page, ...)
     end
     local origNew = DexEntryMenu.new
     if type(origNew) == "function" then
@@ -371,6 +368,58 @@ function DexEntries.installGen2CatchEntryFix(mod)
       end
       return self
     end
+
+    local origUpdate = PokedexMenu.update
+    if type(origUpdate) == "function" then
+      PokedexMenu.update = function(self, dt)
+        if self.view == "entry" then
+          local row = self.current and self:current()
+          local entry = row and self.dex and self.dex.entries and self.dex.entries[row.species]
+          local pageCount = (entry and entry.pages and #entry.pages) or (entry and entry.text2 and 2 or 1)
+          local input = self.game and self.game.input
+          if self.newEntry and input and (input:wasPressed("a") or input:wasPressed("b")) then
+            if self.page < pageCount then
+              self.page = self.page + 1
+              return
+            else
+              self:close()
+              return
+            end
+          end
+          if not self.newEntry and input and input:wasPressed("a") then
+            local ENTRY_ACTIONS = { "PAGE", "AREA", "CRY", "PRNT" }
+            local action = ENTRY_ACTIONS[self.entryAction or 1]
+            if action == "PAGE" and pageCount > 1 then
+              self.page = (self.page % pageCount) + 1
+              return
+            end
+          end
+        end
+        return origUpdate(self, dt)
+      end
+    end
+
+    local origDrawBody = PokedexMenu.drawEntryBody
+    if type(origDrawBody) == "function" then
+      PokedexMenu.drawEntryBody = function(self, row, entry)
+        if entry and entry.pages and entry.pages[self.page] then
+          local savedText = entry.text
+          local savedText2 = entry.text2
+          if self.page == 1 then
+            entry.text = entry.pages[1]
+          else
+            entry.text2 = entry.pages[self.page]
+          end
+          local ok, err = pcall(origDrawBody, self, row, entry)
+          entry.text = savedText
+          entry.text2 = savedText2
+          if not ok then error(err, 0) end
+          return
+        end
+        return origDrawBody(self, row, entry)
+      end
+    end
+
     PokedexMenu._krCatchEntry = true
   end)
   -- Re-bind dex sync AFTER this wrap so rebuild/totals still force party
@@ -378,7 +427,7 @@ function DexEntries.installGen2CatchEntryFix(mod)
   local SpeciesScope = require("mods.Kanto-Reforged.pokemon.species_scope")
   SpeciesScope.ensureGen2PokedexSync(mod)
   if mod and mod.log then
-    mod.log:info("Dex entries: Gen2 NewPokedexEntry OLD-mode fallback")
+    mod.log:info("Dex entries: Gen2 multi-page and NewPokedexEntry fallback installed")
   end
 end
 

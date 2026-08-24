@@ -6889,44 +6889,9 @@ def main():
         return
 
     if args.learnset_patches_only:
-        print("Collecting Gen 2/3 learnset/TM patches for Kanto species...")
-        registered_moves = {}
-        # Seed with moves already emitted by a prior full generation so we
-        # do not drop patches that reference them.
-        existing = mod_data_path(args.outdir, PATH_POKEMON_DATA)
-        if os.path.exists(existing):
-            with open(existing, "r", encoding="utf-8") as f:
-                for line in f:
-                    line = line.strip()
-                    if line.endswith("= {") and line[0].isupper() and "P.moves" not in line:
-                        # crude: move keys sit under P.moves; species under P.species.
-                        # Prefer scanning the moves block only.
-                        pass
-            # Parse move ids from P.moves = { ... }
-            in_moves = False
-            with open(existing, "r", encoding="utf-8") as f:
-                for line in f:
-                    if line.startswith("P.moves"):
-                        in_moves = True
-                        continue
-                    if in_moves and line.startswith("}"):
-                        break
-                    if in_moves:
-                        stripped = line.strip()
-                        if stripped.endswith("= {") and stripped[0].isupper():
-                            registered_moves[stripped.split("=")[0].strip()] = True
-        learnset_patches, tmhm_patches = collect_kanto_move_patches(
-            registered_moves, outdir=args.outdir
-        )
-        write_learnset_patches_lua(
-            mod_data_path(args.outdir, PATH_LEARNSET_PATCHES),
-            learnset_patches,
-            tmhm_patches,
-        )
         print(
-            f"Done: {len(learnset_patches)} species learnset patches, "
-            f"{len(tmhm_patches)} species TM/HM patches "
-            f"({len(registered_moves)} Kanto Reforged moves known)"
+            "Deprecated: use tools/gen3_learnsets.py instead "
+            "(writes pokemon/learnset_gen3.lua for runtime apply)."
         )
         return
 
@@ -7076,22 +7041,24 @@ def main():
 
             def collect_level_up(vg_allow):
                 out = []
-            for move_entry in poke_data["moves"]:
-                m_name = remap_move(move_entry["move"]["name"].upper().replace("-", "_"))
-                for detail in move_entry["version_group_details"]:
-                    method = detail["move_learn_method"]["name"]
+                for move_entry in poke_data["moves"]:
+                    m_name = remap_move(
+                        move_entry["move"]["name"].upper().replace("-", "_")
+                    )
+                    for detail in move_entry["version_group_details"]:
+                        method = detail["move_learn_method"]["name"]
                         vg = detail["version_group"]["name"]
-                    if method == "level-up":
+                        if method == "level-up":
                             if vg_allow is None or vg in vg_allow:
                                 out.append({
-                            "level": detail["level_learned_at"],
-                            "move": m_name
-                        })
-                    elif method == "machine":
+                                    "level": detail["level_learned_at"],
+                                    "move": m_name,
+                                })
+                        elif method == "machine":
                             if preferred_vgs is None or vg in preferred_vgs \
                                     or vg in ("emerald", "ruby-sapphire", "firered-leafgreen",
                                               "crystal", "gold-silver", "xd", "colosseum"):
-                        tmhm_set.add(m_name)
+                                tmhm_set.add(m_name)
                 return out
 
             if preferred_vgs:
@@ -7487,19 +7454,6 @@ def main():
         )
         print(f"Wrote {len(pals)} species palettes")
 
-    # Gen 2/3 learnset/TM additions for vanilla Kanto species (trainers/wild/gyms
-    # build moves from Pokemon.movesAtLevel, so these patches are how Gen 1 mons
-    # actually receive Metal Claw / Smokescreen / etc.)
-    print("Collecting Gen 2/3 learnset/TM patches for Kanto species...")
-    learnset_patches, tmhm_patches = collect_kanto_move_patches(
-        registered_moves, outdir=args.outdir
-    )
-    write_learnset_patches_lua(
-        mod_data_path(args.outdir, PATH_LEARNSET_PATCHES),
-        learnset_patches,
-        tmhm_patches,
-    )
-
     print("Collecting Gen 3 abilities for Kanto species...")
     ability_patches = collect_kanto_ability_patches()
     write_ability_patches_lua(
@@ -7520,8 +7474,9 @@ def main():
         mod_data_path(args.outdir, PATH_BREEDING_PATCHES),
         breeding_patches,
     )
-        
+
     print("Done generating Pokémon mod files!")
+    print("Learnsets: run tools/gen3_learnsets.py (does not touch sprites).")
 
 if __name__ == "__main__":
     main()

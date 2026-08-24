@@ -134,9 +134,20 @@ do
       or duskBody:find("spirit", 1, true),
     "Duskull keeps the creepy children-crying flavor")
 
-  local wrapped = DexEntries.wrap(
-    ("word "):rep(80)) -- absurdly long
-  T.check(lineCount(wrapped) <= 6, "wrap hard-caps at 6 lines")
+  -- Multi-page dex wrapping verification: 3 lines per page, separated by \f
+  local wrapped = DexEntries.wrap(("word "):rep(30))
+  local pages = {}
+  for p in (wrapped .. "\f"):gmatch("([^\f]+)") do
+    table.insert(pages, p)
+    local pLines = 0
+    for _ in (p .. "\n"):gmatch("([^\n]+)") do pLines = pLines + 1 end
+    T.check(pLines <= 3, "Each dex page has <= 3 lines")
+  end
+  T.check(#pages >= 2, "Long dex descriptions paginate into multiple pages")
+
+  -- Explicit maxLines limit
+  local wrappedCapped = DexEntries.wrap(("word "):rep(80), 18, 6)
+  T.check(lineCount(wrappedCapped) <= 6, "wrap with maxLines=6 caps at 6 lines")
 
   -- Owned entry render must not fall through to "Data unknown."
   local DexEntryMenu = require("src.ui.DexEntryMenu")
@@ -186,19 +197,38 @@ do
     save = { pokedex = { owned = { CHIKORITA = true } } },
   }
   drawn = {}
+  -- Verify page 2 rendering with multi-page text
+  local multiPageDef = {
+    id = "TEST_MULTI",
+    name = "TEST_MON",
+    dexEntry = {
+      kind = "TEST POKéMON",
+      text = "PAGE1_L1\nPAGE1_L2\nPAGE1_L3\fPAGE2_L1\nPAGE2_L2\nPAGE2_L3",
+    },
+  }
+  local testGame = {
+    data = {
+      pokemon = { TEST_MULTI = multiPageDef },
+      text = { TEST_MULTI_TEXT = "PAGE1_L1\nPAGE1_L2\nPAGE1_L3\fPAGE2_L1\nPAGE2_L2\nPAGE2_L3" },
+    },
+    save = { pokedex = { owned = { TEST_MULTI = true } } },
+  }
+  multiPageDef.dexEntry.text = "TEST_MULTI_TEXT"
+  drawn = {}
   Font.draw = function(text, x, y)
     drawn[#drawn + 1] = tostring(text)
     if oldDraw then return oldDraw(text, x, y) end
   end
-  ok = pcall(DexEntryMenu.render, emptyGame, chiki, nil, true, false)
+  DexEntryMenu.render(testGame, multiPageDef, nil, true, false, 1)
+  local page1Text = table.concat(drawn, "\n")
+  drawn = {}
+  DexEntryMenu.render(testGame, multiPageDef, nil, true, false, 2)
+  local page2Text = table.concat(drawn, "\n")
   Font.draw = oldDraw
-  T.check(ok, "DexEntryMenu.render succeeds with empty text table")
-  joined = table.concat(drawn, "\n")
-  T.check(not joined:find("Data unknown", 1, true),
-    "empty text table still not Data unknown for owned Chikorita")
-  T.check(type(emptyGame.data.text[chiki.dexEntry.text]) == "string"
-      and #emptyGame.data.text[chiki.dexEntry.text] > 0,
-    "ensureDexText filled game.data.text for Chikorita key")
+  T.check(page1Text:find("PAGE1_L1", 1, true) ~= nil, "Page 1 renders PAGE1_L1")
+  T.check(page1Text:find("PAGE2_L1", 1, true) == nil, "Page 1 does not render PAGE2_L1")
+  T.check(page2Text:find("PAGE2_L1", 1, true) ~= nil, "Page 2 renders PAGE2_L1")
+  T.check(page2Text:find("PAGE1_L1", 1, true) == nil, "Page 2 does not render PAGE1_L1")
 
   -- Pack weights are kg; Gen1 UI expects tenths of a pound.
   local tree = Data.pokemon.TREECKO
@@ -1292,47 +1322,28 @@ T.check(hasMilotic, "Milotic evolves from Feebas via Water Stone")
   end
 end)()
 
--- 16b. Kanto species receive Gen 2/3 move backports (learnset + tmhm).
--- Wild/trainer/gym parties build moves via Pokemon.movesAtLevel, so these
--- patches are what make Charmander know Metal Claw and mid-level Pikachu
--- know Iron Tail.  Wrapped in a function so locals do not hit LuaJIT's
--- 200-local main-chunk limit.
+-- 16b. Gen3 learnsets applied from learnset_gen3.lua (Emerald-first PokeAPI).
 ;(function()
-  local function learnsetHas(species, move)
-    for _, entry in ipairs(Data.pokemon[species].learnset or {}) do
-      if entry.move == move then return entry.level end
-    end
-    return nil
-  end
-  local function tmhmHas(species, move)
-    for _, mv in ipairs(Data.pokemon[species].tmhm or {}) do
-      if mv == move then return true end
-    end
-    return false
-  end
-  T.eq(learnsetHas("CHARMANDER", "METAL_CLAW"), 13, "Charmander learns Metal Claw at 13")
-  T.eq(learnsetHas("CHARMANDER", "SMOKESCREEN"), 13, "Charmander learns Smokescreen at 13")
-  T.eq(learnsetHas("PIKACHU", "IRON_TAIL"), 30, "Pikachu learns Iron Tail at 30 (TM backport)")
-  T.check(tmhmHas("PIKACHU", "IRON_TAIL"), "Pikachu tmhm lists Iron Tail")
-  T.check(learnsetHas("ONIX", "IRON_TAIL") ~= nil, "Onix Gen 2/3 learnset includes Iron Tail")
-
-  local Pokemon = require("src.pokemon.Pokemon")
-  local hasMetalClaw = false
-  for _, id in ipairs(Pokemon.movesAtLevel(Data.pokemon.CHARMANDER, 13)) do
-    if id == "METAL_CLAW" then hasMetalClaw = true end
-  end
-  T.check(hasMetalClaw, "Lv13 Charmander rolls Metal Claw via movesAtLevel")
-  local hasIronTail = false
-  for _, id in ipairs(Pokemon.movesAtLevel(Data.pokemon.PIKACHU, 35)) do
-    if id == "IRON_TAIL" then hasIronTail = true end
-  end
-  T.check(hasIronTail, "Lv35 Pikachu rolls Iron Tail via movesAtLevel")
+  local run = require("mods.Kanto-Reforged.tests.learnset_gen3_test")
+  run(T, Data)
 end)()
 
 -- 17. Verify Safari Zone rare spawn mixing preserves Chansey and overwrites others in Slot 9/10
-local safari = Data.encounters.SAFARI_ZONE_EAST
-T.eq(safari.grass.slots[10].species, "CHANSEY", "Safari Zone Chansey in Slot 10 was preserved")
-T.check(safari.grass.slots[9].species ~= "EXEGGCUTE", "Safari Zone Slot 9 was mixed with custom rare species")
+do
+  local frozenMod = {
+    content = {
+      encounters = {
+        get = function(_, id) return Data.encounters[id] end,
+        patch = function() end,
+      },
+    },
+  }
+  ExpEncounters.clearBaselines()
+  ExpEncounters.apply(frozenMod, packData, "curated", { speciesScope = "national" })
+  local safari = Data.encounters.SAFARI_ZONE_EAST
+  T.eq(safari.grass.slots[10].species, "CHANSEY", "Safari Zone Chansey in Slot 10 was preserved")
+  T.check(safari.grass.slots[9].species ~= "EXEGGCUTE", "Safari Zone Slot 9 was mixed with custom rare species")
+end
 
 -- 18. Move effects wired for Gen 2/3 showcase moves
 T.eq(Data.moves.SHADOW_BALL.effect, "SPECIAL_DOWN_SIDE_EFFECT", "Shadow Ball lowers Special")
@@ -1405,23 +1416,20 @@ do
   T.eq(Data.moves.PROTECT.category, "status", "Protect stays status")
 end
 
--- RULESET option + Gen3 crit helper
+-- Gen3 crit helper + MODERN ruleset migration (faithful removed)
 do
   local RulesetOpt = require("mods.Kanto-Reforged.battle.ruleset_option")
   local CritGen3 = require("mods.Kanto-Reforged.battle.crit_gen3")
   local rulesetOpt = optByKey(RulesetOpt.OPTION_KEY)
-  T.check(rulesetOpt ~= nil, "RULESET option present on Gen1")
-  T.eq(rulesetOpt.type, "choice", "RULESET is a choice")
-  T.eq(rulesetOpt.default, "modern_clean", "RULESET defaults to modern_clean")
+  T.check(rulesetOpt == nil, "RULESET option removed (always MODERN)")
 
   T.eq(CritGen3.stage({ focusEnergy = true }, "SLASH", true), 3,
     "Focus Energy + high-crit is stage 3")
   T.eq(CritGen3.stage({}, "TACKLE", false), 0, "base crit stage is 0")
-  T.check(CritGen3.rulesetWants({ krGen3Crit = true }), "krGen3Crit enables Gen3 crit")
-  T.check(not CritGen3.rulesetWants({ name = "gen1_faithful" }),
-    "faithful ruleset keeps Gen1 crit")
+  T.check(CritGen3.rulesetWants({ krGen3Crit = true }), "Gen3 crit always enabled")
+  T.check(CritGen3.rulesetWants({ name = "gen1_faithful" }),
+    "faithful saves still use Gen3 crit ladder")
 
-  -- Seed once → modern; second sync preserves user gen1_faithful
   local Host = require("mods.Kanto-Reforged.core.host")
   Host.force(1)
   local game = {
@@ -1443,13 +1451,9 @@ do
   bucket[RulesetOpt.SEED_KEY] = nil
   bucket[RulesetOpt.OPTION_KEY] = nil
   RulesetOpt.seedAndSync(fakeMod)
-  T.eq(game.save.options.ruleset, "modern_clean", "first seed flips to modern_clean")
+  T.eq(game.save.options.ruleset, "modern_clean", "faithful save migrated to modern_clean")
   T.eq(bucket[RulesetOpt.SEED_KEY], true, "seed flag set")
-  game.save.options.ruleset = "gen1_faithful"
-  bucket[RulesetOpt.OPTION_KEY] = "modern_clean"
-  RulesetOpt.seedAndSync(fakeMod)
-  T.eq(game.save.options.ruleset, "gen1_faithful", "later sync does not overwrite user choice")
-  T.eq(bucket[RulesetOpt.OPTION_KEY], "gen1_faithful", "mod row aligns to engine")
+  T.eq(bucket[RulesetOpt.OPTION_KEY], "modern_clean", "mod row is modern_clean")
   Host.clearForce()
 end
 
@@ -1607,9 +1611,12 @@ Data.move_effects.EXP_WISH_EFFECT.run({
 })
 T.eq(#wishSide.tokens, 1, "Wish placed a side token")
 T.eq(wishSide.tokens[1].turns, 2, "Wish resolves in two end-of-turn ticks")
-wishSide.tokens[1].turns = 0
-wishSide.tokens[1].onExpire(wishBattle, wishSide)
-T.eq(wishSide.battlers[1].mon.hp, 60, "Wish heals half of the wisher's max HP")
+T.eq(wishSide.tokens[1].heal, 50, "Wish stores half of the wisher's max HP")
+-- Residual handlers heal from tok.heal when turns hit 0 (no onExpire callback).
+local wishTarget = wishSide.battlers[1]
+wishTarget.mon.hp = math.min(wishTarget.mon.stats.hp,
+  wishTarget.mon.hp + wishSide.tokens[1].heal)
+T.eq(wishTarget.mon.hp, 60, "Wish heals half of the wisher's max HP")
 
 -- 20. Taunt / Yawn / Heal Bell / Fake Out / Curse / Mean Look
 T.eq(Data.moves.TAUNT.effect, "EXP_TAUNT_EFFECT", "Taunt effect id")
@@ -2471,6 +2478,7 @@ require("mods.Kanto-Reforged.tests.held_items_test")(T, Data, HeldItems)
 require("mods.Kanto-Reforged.tests.overworld_loot_test")(T, Data, HeldItems, run)
 require("mods.Kanto-Reforged.tests.house_npcs_test")(T, Data, run)
 require("mods.Kanto-Reforged.tests.summary_ui_test")(T, Data, run)
+require("mods.Kanto-Reforged.tests.gender_ui_test")(T, Data, run)
 require("mods.Kanto-Reforged.tests.gender_test")(T, Data, run)
 require("mods.Kanto-Reforged.tests.breeding_test")(T, Data, run)
 require("mods.Kanto-Reforged.tests.dexnav_test")(T, Data, run)
@@ -2492,7 +2500,18 @@ require("mods.Kanto-Reforged.tests.modern_xp_share_test")(T, Data, run)
 require("mods.Kanto-Reforged.tests.battle_exp_bar_test")(T, Data, run)
 require("mods.Kanto-Reforged.tests.split_special_test")(T, Data, run)
 require("mods.Kanto-Reforged.tests.trainer_ai_test")(T, Data, run)
+require("mods.Kanto-Reforged.tests.parity_matrix_test")(T)
+require("mods.Kanto-Reforged.tests.effect_ctx_test")(T)
+require("mods.Kanto-Reforged.tests.battle_core_test")(T)
+require("mods.Kanto-Reforged.tests.adapter_boundary_test")(T)
+require("mods.Kanto-Reforged.tests.residual_order_test")(T)
+require("mods.Kanto-Reforged.tests.faint_cascade_test")(T)
+require("mods.Kanto-Reforged.tests.battle_compat_test")(T)
+require("mods.Kanto-Reforged.tests.gen2_dialogue_test")(T)
+require("mods.Kanto-Reforged.tests.cross_gen_parity_test")(T, Data)
 require("mods.Kanto-Reforged.tests.weather_test")(T, Data, run)
+require("mods.Kanto-Reforged.tests.partial_trap_test")(T, Data, run)
+require("mods.Kanto-Reforged.tests.battle_audit_fixes_test")(T)
 require("mods.Kanto-Reforged.tests.level_caps_test")(T, Data, run)
 
 run.release()

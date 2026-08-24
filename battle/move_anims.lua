@@ -380,6 +380,12 @@ local CUSTOM = {
     se("SE_SPIRAL_BALLS_INWARD"),
     se("SE_RESET_SCREEN_PALETTE"),
   }),
+  MORNING_SUN = custom("custom:morning_sun", {
+    se("SE_LIGHT_SCREEN_PALETTE", "GROWTH"),
+    se("SE_BLINK_MON"),
+    se("SE_SPIRAL_BALLS_INWARD"),
+    se("SE_RESET_SCREEN_PALETTE"),
+  }),
   CHARM = custom("custom:charm", {
     se("SE_LIGHT_SCREEN_PALETTE", "LOVELY_KISS"),
     sub(18, 0, 6, "LOVELY_KISS"),
@@ -672,6 +678,13 @@ local CUSTOM = {
     se("SE_SPIRAL_BALLS_INWARD"),
     se("SE_RESET_SCREEN_PALETTE"),
   }),
+  -- Weather: stock SE_* + subanims only (Growth / Solarbeam / Sand-Attack / Blizzard).
+  SUNNY_DAY = custom("custom:sunny_day", {
+    se("SE_LIGHT_SCREEN_PALETTE", "GROWTH"),
+    sub(46, 0, 6, "SOLARBEAM"),
+    se("SE_SPIRAL_BALLS_INWARD"),
+    se("SE_RESET_SCREEN_PALETTE"),
+  }),
   RAIN_DANCE = custom("custom:rain_dance", {
     se("SE_DARKEN_MON_PALETTE"),
     se("SE_WATER_DROPLETS_EVERYWHERE", "SURF"),
@@ -908,7 +921,7 @@ local CUSTOM = {
     se("SE_DARK_SCREEN_FLASH"),
   }),
   HAIL = custom("custom:hail", {
-    se("SE_WATER_DROPLETS_EVERYWHERE"),
+    sub(56, 0, 4, "BLIZZARD"),
     se("SE_DARK_SCREEN_FLASH"),
   }),
   AURORA_VEIL = custom("custom:aurora_veil", {
@@ -979,7 +992,7 @@ local CUSTOM = {
     se("SE_DARK_SCREEN_FLASH"),
   }),
   SANDSTORM = custom("custom:sandstorm", {
-    se("SE_WATER_DROPLETS_EVERYWHERE"),
+    sub(40, 0, 4, "SAND_ATTACK"),
     se("SE_SHAKE_SCREEN"),
   }),
   ROCK_POLISH = custom("custom:rock_polish", {
@@ -1639,7 +1652,57 @@ function MoveAnims.specFor(move)
   return { alias = alias, source = "alias:" .. alias, custom = false }
 end
 
+-- Gold: map missing Gen 3+ move / field ids onto existing ROM script pointers.
+-- Pointers are taken from the live moves/ids tables so they stay valid across
+-- ROM caches (no hard-coded bank offsets).
+function MoveAnims.registerGen2(mod)
+  local Host = require("mods.Kanto-Reforged.core.host")
+  if not Host.isGen2From(mod) then return 0 end
+  local anims = mod.content and mod.content.battle_anims
+  if not anims or type(anims.get) ~= "function" then return 0 end
+
+  local moves = anims:get("moves")
+  local ids = anims:get("ids")
+  if type(moves) ~= "table" then return 0 end
+
+  local n = 0
+  local hailPtr = moves.POWDER_SNOW or moves.BLIZZARD or moves.ICE_BEAM
+  if hailPtr and not moves.HAIL then
+    local ok = pcall(function()
+      anims:patch("moves", { HAIL = hailPtr })
+    end)
+    if ok then
+      MoveAnims.ALIAS_BY_ID.HAIL = "POWDER_SNOW"
+      n = n + 1
+    end
+  end
+
+  if type(ids) == "table" then
+    local tickPtr = ids.ANIM_IN_SANDSTORM or hailPtr
+    if tickPtr and not ids.ANIM_IN_HAIL then
+      local ok = pcall(function()
+        anims:patch("ids", { ANIM_IN_HAIL = tickPtr })
+      end)
+      if ok then n = n + 1 end
+    end
+  end
+
+  if n > 0 then
+    mod.log:info("Mapped %d Gen2 battle-anim primitives (Hail / field hail)", n)
+  end
+  return n
+end
+
 function MoveAnims.register(mod, moves)
+  local Host = require("mods.Kanto-Reforged.core.host")
+  if Host.isGen2From(mod) then
+    local n = MoveAnims.registerGen2(mod)
+    pcall(function()
+      require("mods.Kanto-Reforged.battle.weather").registerAnims(mod)
+    end)
+    return n
+  end
+
   local ok, base = pcall(require, "data.generated.battle_anims")
   if not ok or type(base) ~= "table" or not base.moveAnims then
     mod.log:warn("battle_anims missing; move anim aliases skipped")

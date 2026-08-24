@@ -191,11 +191,14 @@ end
 
 function BattleCompat.setTypes(battler, types)
   if not battler or not types then return end
-  if battler.curTypes ~= nil or battler.mon then
-    battler.curTypes = types
-  end
+  -- Always persist on the battler. Gold party mons have no .mon wrapper, so
+  -- the old `curTypes or battler.mon` guard never stored Forecast's type and
+  -- the next move re-read CASTFORM's species NORMAL.
+  battler.curTypes = types
   local mon = BattleCompat.mon(battler)
-  if mon then mon.types = types end
+  if mon and mon ~= battler then
+    mon.curTypes = types
+  end
 end
 
 function BattleCompat.stages(battle, battler)
@@ -225,12 +228,22 @@ function BattleCompat.displayName(battle, battler)
   return (mon and (mon.nickname or mon.species)) or "POKéMON"
 end
 
-function BattleCompat.say(battle, text)
+function BattleCompat.formatBattleText(text, maxCols)
+  local Dialogue = require("mods.Kanto-Reforged.core.dialogue")
+  if maxCols then
+    return Dialogue.format({ maxCols = maxCols, maxLinesPerPage = 2, line2Sep = "\n", overflowSep = "\v" }, text)
+  end
+  return Dialogue.battle(text)
+end
+
+function BattleCompat.say(battle, text, ...)
   if not battle or not text then return end
+  local Dialogue = require("mods.Kanto-Reforged.core.dialogue")
+  local formatted = Dialogue.battle(text, ...)
   if type(battle.sayNext) == "function" then
-    battle:sayNext(text)
+    battle:sayNext(formatted)
   elseif type(battle.emit) == "function" then
-    battle:emit({ kind = "message", text = tostring(text) })
+    battle:emit({ kind = "message", text = formatted })
   end
 end
 
@@ -304,6 +317,7 @@ function BattleCompat.castformSuffix(weather)
   if weather == "HAIL" or weather == "SNOWY" then return "snowy" end
   return nil
 end
+BattleCompat.castformSuffix = BattleCompat.castformSuffix
 
 --- Scale a Gen2 damage opts attacker/defender stat (or Gen1 curStats).
 function BattleCompat.scaleOffense(ctx, user, isPhysical, factor)
@@ -512,6 +526,26 @@ function BattleCompat.hasSubstitute(battle, battler)
   return vol and vol.substitute and true or false
 end
 
+--- Apply confusion (Gen1 confusedTurns; Gen2 volatile.confuseCount).
+--- Returns true when newly inflicted.
+function BattleCompat.applyConfusion(battle, battler, turns, source)
+  if not battler then return false end
+  if BattleCompat.isConfused(battle, battler) then return false end
+  turns = turns or (2 + math.random(0, 3)) -- Gen3: 2-5 turns
+  if BattleCompat.isGen2(battle) then
+    if type(battle.applyConfusion) == "function" then
+      local ok = battle:applyConfusion(battler, turns, source)
+      return ok ~= false
+    end
+    local vol = BattleCompat.volatile(battle, battler)
+    if not vol then return false end
+    vol.confuseCount = turns
+    return true
+  end
+  battler.confusedTurns = turns
+  return true
+end
+
 function BattleCompat.hasMist(battle, battler)
   if not battler then return false end
   if battler.mist then return true end
@@ -635,6 +669,9 @@ end
 
 function BattleCompat.install(mod)
   local Host = require("mods.Kanto-Reforged.core.host")
+  if Host.isGen2() then
+    require("mods.Kanto-Reforged.battle.gen2_dialogue").install(mod)
+  end
   if Host.isGen1() then
     local Gen1Patch = require("mods.Kanto-Reforged.core.gen1_patch")
     pcall(function()

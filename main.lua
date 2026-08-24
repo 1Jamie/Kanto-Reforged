@@ -93,10 +93,8 @@ local function buildOptionDefs(mod)
     TrainerAi.switchLockOptionForHost(),
     HeldItems.BAG_GIVE_OPTION,
   }
-  -- SpA/SpD split is a Gen1 single-Special concern; Gold already has both.
-  -- RULESET mirrors engine OPTIONS → RULESET (Gen1 only; Gold has no path).
+  -- RULESET is always MODERN (faithful removed); Gen3 crit via core capabilities.
   if Host.isGen1From(mod) then
-    defs[#defs + 1] = RulesetOpt.OPTION
     defs[#defs + 1] = SplitSpecial.OPTION
     defs[#defs + 1] = require("mods.Kanto-Reforged.ui.battle_exp_bar").OPTION
     -- DexNav label/off is only for the start-menu entry; Gold uses Pokegear.
@@ -214,11 +212,13 @@ return function(mod)
   local BattleCompat = require("mods.Kanto-Reforged.battle.battle_compat")
   BattleCompat.install(mod)
 
+  require("mods.Kanto-Reforged.battle.core.install").install(mod)
+
   local Weather = require("mods.Kanto-Reforged.battle.weather")
   Weather.install(mod)
 
-  ExpMoveEffects.register(mod)
-  ExpMoveEffects.install(mod)
+  require("mods.Kanto-Reforged.battle.adapters.register").installContent(mod)
+  require("mods.Kanto-Reforged.battle.adapters.register").installRuntime(mod)
 
   HeldItems.register(mod)
   if Host.isGen1() then
@@ -790,116 +790,14 @@ return function(mod)
       SpeciesScope.applyEvoScope(mod, SpeciesScope.mode(mod))
     end
 
-    -- Patch Gen 1 species with Gen 2/3 level-up + TM learnset additions.
-    -- Wild/trainer/gym parties all build moves via Pokemon.movesAtLevel, so
-    -- this is what makes Charmander know Metal Claw, etc.
-    local okPatches, learnset_patches = pcall(require, "mods.Kanto-Reforged.pokemon.learnset_patches")
-    if okPatches and learnset_patches then
-      local function mergeLearnset(existing, additions)
-        local byMove = {}
-        local out = {}
-        for _, entry in ipairs(existing or {}) do
-          local copy = { level = entry.level, move = entry.move }
-          out[#out + 1] = copy
-          byMove[entry.move] = copy
-        end
-        for _, entry in ipairs(additions or {}) do
-          local prev = byMove[entry.move]
-          if prev then
-            if entry.level < prev.level then
-              prev.level = entry.level
-            end
-          else
-            local copy = { level = entry.level, move = entry.move }
-            out[#out + 1] = copy
-            byMove[entry.move] = copy
-          end
-        end
-        table.sort(out, function(a, b)
-          if a.level == b.level then return a.move < b.move end
-          return a.level < b.level
-        end)
-        return out
-      end
-
-      local function mergeTmhm(existing, additions)
-        local seen = {}
-        local out = {}
-        for _, mv in ipairs(existing or {}) do
-          if not seen[mv] then
-            out[#out + 1] = mv
-            seen[mv] = true
-          end
-        end
-        for _, mv in ipairs(additions or {}) do
-          if not seen[mv] then
-            out[#out + 1] = mv
-            seen[mv] = true
-          end
-        end
-        table.sort(out)
-        return out
-      end
-
-      local nLearn, nTm = 0, 0
-      local speciesSeen = {}
-      local learnField = Host.isGen2() and "levelMoves" or "learnset"
-      local function knownMove(id)
-        return mod.content.moves:get(id) ~= nil
-      end
-      local function filterMoves(list)
-        local out = {}
-        for _, entry in ipairs(list or {}) do
-          if type(entry) == "string" then
-            if knownMove(entry) then out[#out + 1] = entry end
-          elseif entry.move and knownMove(entry.move) then
-            out[#out + 1] = entry
-          end
-        end
-        return out
-      end
-      if learnset_patches.learnset then
-        for speciesId, additions in pairs(learnset_patches.learnset) do
-          local existing = mod.content.pokemon:get(speciesId)
-          if existing then
-            local base = existing[learnField] or existing.learnset or existing.levelMoves
-            local ok = pcall(function()
-              mod.content.pokemon:patch(speciesId, {
-                [learnField] = mergeLearnset(base, filterMoves(additions)),
-              })
-            end)
-            if ok then
-              nLearn = nLearn + 1
-              speciesSeen[speciesId] = true
-            end
-          end
-        end
-      end
-      if learnset_patches.tmhm then
-        for speciesId, additions in pairs(learnset_patches.tmhm) do
-          local existing = mod.content.pokemon:get(speciesId)
-          if existing then
-            existing = mod.content.pokemon:get(speciesId)
-            local ok = pcall(function()
-              mod.content.pokemon:patch(speciesId, {
-                tmhm = mergeTmhm(existing.tmhm, filterMoves(additions)),
-              })
-            end)
-            if ok then
-              nTm = nTm + 1
-              speciesSeen[speciesId] = true
-            end
-          end
-        end
-      end
-      local nSpecies = 0
-      for _ in pairs(speciesSeen) do nSpecies = nSpecies + 1 end
-      mod.log:info(
-        "Patched Gen 2/3 moves onto %d Kanto species (%d learnsets, %d tmhm)",
-        nSpecies, nLearn, nTm
-      )
+    -- Gen3 learnsets (#1–386): replace ROM/Gold tables from learnset_gen3.lua.
+    local ApplyGen3 = require("mods.Kanto-Reforged.pokemon.apply_gen3_learnsets")
+    local okGen3, learnset_gen3 = pcall(require, "mods.Kanto-Reforged.pokemon.learnset_gen3")
+    if okGen3 and learnset_gen3 then
+      local nGen3 = ApplyGen3.apply(mod, Host, learnset_gen3)
+      mod.log:info("Applied Gen3 learnsets to %d species (dex 1–386)", nGen3)
     else
-      mod.log:warn("learnset_patches.lua missing; Kanto Gen 2/3 move backports skipped")
+      mod.log:warn("learnset_gen3.lua missing; run tools/gen3_learnsets.py")
     end
 
     -- Gen 3 abilities for vanilla Kanto species (Bulbasaur OVERGROW, etc.)
@@ -1023,6 +921,9 @@ return function(mod)
 
   local SummaryUi = require("mods.Kanto-Reforged.ui.summary_ui")
   SummaryUi.register(mod)
+
+  local GenderUi = require("mods.Kanto-Reforged.ui.gender_ui")
+  GenderUi.register(mod)
 
   local DexNav = require("mods.Kanto-Reforged.ui.dexnav")
   DexNav.register(mod)
@@ -1185,6 +1086,16 @@ return function(mod)
       return damage, info
     end
 
+    -- Gold damage calc prefers speciesDef.types, which ignores Forecast.
+    if ctx.opts then
+      if ctx.opts.attacker and user then
+        ctx.opts.attacker.types = BattleCompat.types(user, ctx.battle and ctx.battle.data)
+      end
+      if ctx.opts.defender and target then
+        ctx.opts.defender.types = BattleCompat.types(target, ctx.battle and ctx.battle.data)
+      end
+    end
+
     local category = move.category or TypeChart.category(move.type) or "physical"
     local isSpecial = category == "special"
 
@@ -1222,6 +1133,17 @@ return function(mod)
     local Weather = require("mods.Kanto-Reforged.battle.weather")
     if Weather.neverMiss(ctx.battle, ctx.move) then
       return true
+    end
+    -- Gen 3: Thunder accuracy drops to 50% in harsh sunlight
+    local curWeather = Weather.current(ctx.battle)
+    if curWeather == "SUNNY" and ctx.move and ctx.move.id == "THUNDER" then
+      if type(ctx.accuracy) == "number" then
+        oldAcc = ctx.accuracy
+        ctx.accuracy = 50
+      elseif ctx.move and ctx.move.accuracy then
+        oldAcc = ctx.move.accuracy
+        ctx.move.accuracy = 50
+      end
     end
     -- Lock-On / Mind Reader: next move against the marked target never misses
     if ctx.target and ctx.target.expLockedOn then
@@ -1306,7 +1228,7 @@ return function(mod)
       end
     end
     local ruleset = ctx.ruleset or (battle and battle.ruleset)
-    if CritGen3.rulesetWants(ruleset) then
+    if CritGen3.rulesetWants(ruleset) or not battle or not BattleCompat.isGen2(battle) then
       return CritGen3.roll(ctx)
     end
     return next(ctx)
@@ -1402,6 +1324,14 @@ return function(mod)
     if playerAbility == "RUN_AWAY" and battle.kind == "wild" then
       return true
     end
+    do
+      local PartialTrap = require("mods.Kanto-Reforged.battle.partial_trap")
+      if PartialTrap.active(battle) and PartialTrap.isTrapped(battle.player)
+          and not battlerHasType(battle.player, "GHOST") then
+        battle:sayNext(Strings("Cannot escape!"))
+        return false
+      end
+    end
     if battle.player and battle.player.expTrapped
         and not battlerHasType(battle.player, "GHOST") then
       battle:sayNext(Strings("Cannot escape!"))
@@ -1446,15 +1376,12 @@ return function(mod)
   mod.events:on("game.ready", function() patchIlluminate() end)
   patchIlluminate()
 
-  -- Castform Weather Forms Sprite Resolver Hook
+  -- Gold BattleState:pic re-resolves every frame through pokemon.sprite
+  -- (same ctx as Sprites.path: species, side front/back, kind, trueColor).
   mod.hooks:wrap("pokemon.sprite", function(next, path, ctx)
-    if ctx.species == "CASTFORM" and mod.activeBattle then
-      local weather = BattleCompat.getWeather(mod.activeBattle)
-      local suffix = BattleCompat.castformSuffix(weather)
-      if suffix then
-        return mod.path .. "/assets/castform_" .. suffix .. "_" .. ctx.side .. ".png"
-      end
-    end
+    local CastformFx = require("mods.Kanto-Reforged.battle.castform_fx")
+    local resolved = CastformFx.resolveSprite(path, ctx, mod.activeBattle, mod)
+    if resolved and resolved ~= path then return resolved end
     return next(path, ctx)
   end)
 
@@ -1523,6 +1450,10 @@ return function(mod)
     if ev.battle and ev.battler then
       Abilities.onEntry(ev.battle, ev.battler)
     end
+    if ev.battle then
+      Abilities.updateForecast(ev.battle, ev.battle.player)
+      Abilities.updateForecast(ev.battle, ev.battle.enemy)
+    end
   end)
 
   -- Protect / Detect / Endure: clear each turn, force accuracy misses while up
@@ -1563,13 +1494,7 @@ return function(mod)
     end
   end)
 
-  mod.events:on("battle.turn_ended", function(ev)
-    if not ev.battle then return end
-    -- Gen 1 residual; Gold HandleWeather already ran inside takeTurn.
-    require("mods.Kanto-Reforged.battle.weather").tick(ev.battle)
-    Abilities.onTurnEnded(ev.battle, ev.battle.player)
-    Abilities.onTurnEnded(ev.battle, ev.battle.enemy)
-  end)
+  -- End-of-turn volatiles/weather/held items/abilities: core/residual_handlers.lua
 
   -- Nincada → Ninjask leaves a Shedinja behind when a Poké Ball is
   -- consumed (Gen 3 split evolution). Inventory is id→count, not a list.

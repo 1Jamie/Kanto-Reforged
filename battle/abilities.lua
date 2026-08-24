@@ -134,7 +134,7 @@ local function triggerIntimidate(battle, source, target)
   stages.attack = math.max(-6, cur - 1)
   target.hazeStatReset = nil
 
-  BattleCompat.say(battle, Strings("%s's\nINTIMIDATE cuts\n%s's ATTACK!",
+  BattleCompat.say(battle, Strings("%s's\nINTIMIDATE cuts\v%s's ATTACK!",
     displayName(battle, source), displayName(battle, target)))
 end
 
@@ -156,12 +156,21 @@ function Abilities.updateForecast(battle, battler)
     newType = "ICE"
   end
 
+  local suffix = BattleCompat.castformSuffix(weather)
+  local mon = BattleCompat.mon(battler)
+
   if oldType ~= newType then
     BattleCompat.setTypes(battler, { newType })
-    BattleCompat.say(battle, Strings("%s transformed\ninto its weather form!",
+    BattleCompat.say(battle, Strings("%s\ntransformed!",
       displayName(battle, battler)))
-    local Weather = require("mods.Kanto-Reforged.battle.weather")
-    Weather.refreshSprite(battle, battler)
+    local CastformFx = require("mods.Kanto-Reforged.battle.castform_fx")
+    CastformFx.play(battle, battler, oldType)
+    -- Gen2: _krCastformForm is committed when the morph finishes.
+    if mon and not BattleCompat.isGen2(battle) then
+      mon._krCastformForm = suffix
+    end
+  elseif mon then
+    mon._krCastformForm = suffix
   end
 end
 
@@ -205,19 +214,19 @@ function Abilities.onEntry(battle, battler)
   elseif ability == "FORECAST" then
     Abilities.updateForecast(battle, battler)
   elseif ability == "DROUGHT" then
-    setWeather(battle, "SUNNY", name .. "'s\nDROUGHT intensified\nthe sun!",
+    setWeather(battle, "SUNNY", Strings("%s's\nDROUGHT flared\vthe sun!", name),
       { fromAbility = true })
   elseif ability == "DRIZZLE" then
-    setWeather(battle, "RAINY", name .. "'s\nDRIZZLE made it\nrain!",
+    setWeather(battle, "RAINY", Strings("%s's\nDRIZZLE made\vit rain!", name),
       { fromAbility = true })
   elseif ability == "SAND_STREAM" then
-    setWeather(battle, "SANDSTORM", name .. "'s\nSAND STREAM whipped\nup a sandstorm!",
+    setWeather(battle, "SANDSTORM", Strings("%s's\nSAND STREAM made\va sandstorm!", name),
       { fromAbility = true })
-  elseif ability == "AIR_LOCK" then
+  elseif ability == "AIR_LOCK" or ability == "CLOUD_NINE" then
     -- Gen 3: suppress weather effects; do not delete the weather.
-    BattleCompat.say(battle, Strings("%s's\nAIR LOCK suppresses\nthe weather!", name))
+    local abilityName = ability == "AIR_LOCK" and "AIR LOCK" or "CLOUD NINE"
+    BattleCompat.say(battle, Strings("%s's\n%s stopped\vthe weather!", name, abilityName))
     local Weather = require("mods.Kanto-Reforged.battle.weather")
-    Weather.refreshSprite(battle, battler)
     Abilities.updateForecast(battle, battle.player)
     Abilities.updateForecast(battle, battle.enemy)
   elseif ability == "TRACE" then
@@ -225,19 +234,24 @@ function Abilities.onEntry(battle, battler)
     local foeAbility = abilityOf(battle, foe)
     if foeAbility and foeAbility ~= "TRACE" then
       battler.expTracedAbility = foeAbility
-      BattleCompat.say(battle, Strings("%s traced\n%s!", name, foeAbility:gsub("_", " ")))
+      BattleCompat.say(battle, Strings("%s\ntraced %s!", name, foeAbility:gsub("_", " ")))
       if foeAbility == "INTIMIDATE" then
         triggerIntimidate(battle, battler, foe)
       elseif foeAbility == "FORECAST" then
         Abilities.updateForecast(battle, battler)
+      elseif foeAbility == "AIR_LOCK" or foeAbility == "CLOUD_NINE" then
+        local abilityName = foeAbility == "AIR_LOCK" and "AIR LOCK" or "CLOUD NINE"
+        BattleCompat.say(battle, Strings("%s's\n%s stopped\vthe weather!", name, abilityName))
+        Abilities.updateForecast(battle, battle.player)
+        Abilities.updateForecast(battle, battle.enemy)
       elseif foeAbility == "DROUGHT" then
-        setWeather(battle, "SUNNY", name .. "'s\nDROUGHT intensified\nthe sun!",
+        setWeather(battle, "SUNNY", Strings("%s's\nDROUGHT flared\vthe sun!", name),
           { fromAbility = true })
       elseif foeAbility == "DRIZZLE" then
-        setWeather(battle, "RAINY", name .. "'s\nDRIZZLE made it\nrain!",
+        setWeather(battle, "RAINY", Strings("%s's\nDRIZZLE made\vit rain!", name),
           { fromAbility = true })
       elseif foeAbility == "SAND_STREAM" then
-        setWeather(battle, "SANDSTORM", name .. "'s\nSAND STREAM whipped\nup a sandstorm!",
+        setWeather(battle, "SANDSTORM", Strings("%s's\nSAND STREAM made\va sandstorm!", name),
           { fromAbility = true })
       end
     end
@@ -257,11 +271,16 @@ function Abilities.onMoveUsed(battle, user, move)
       or weather == "RAINY"
     if not (okH and Host and Host.isGen2 and Host.isGen2() and goldNative) then
       setWeather(battle, weather)
+      Abilities.updateForecast(battle, battle.player)
+      Abilities.updateForecast(battle, battle.enemy)
     end
+    -- Gold StartSun/StartRain/StartSandstorm run AFTER move_used. Forecast
+    -- is invoked from Weather.install's MOVE_EFFECTS wrap once weather is up
+    -- (FRLG: weather string, then AbilityBattleEffects ON_WEATHER).
+    return
   end
-  -- Also sync when Gold native weather moves already wrote battle.weather.
-  Abilities.updateForecast(battle, battle.player)
-  Abilities.updateForecast(battle, battle.enemy)
+  -- FRLG Forecast is weather-change / switch-in only. Re-running it on every
+  -- move_used reverted Castform mid-attack when the live weather read missed.
 end
 
 -- Turn start triggers (Truant)
@@ -272,7 +291,7 @@ function Abilities.onTurnStart(battle, battler)
     if battler.loafing then
       battler.loafing = false
       battler.skipMove = true
-      BattleCompat.say(battle, Strings("%s is\nloafing around!", displayName(battle, battler)))
+      BattleCompat.say(battle, Strings("%s\nis loafing around!", displayName(battle, battler)))
     else
       battler.loafing = true
     end
@@ -290,7 +309,7 @@ function Abilities.onTurnEnded(battle, battler)
   if cur >= 6 then return end
   stages.speed = cur + 1
   battler.hazeStatReset = nil
-  BattleCompat.say(battle, Strings("%s's SPEED\nrose!", displayName(battle, battler)))
+  BattleCompat.say(battle, Strings("%s's\nSPEED rose!", displayName(battle, battler)))
 end
 
 -- Damage pipeline triggers (Gen1 curStats + Gen2 ctx.opts)
@@ -312,14 +331,14 @@ function Abilities.onDamage(next, ctx)
   if targetAbility == "FLASH_FIRE" and move.type == "FIRE"
       and move.power and move.power > 0 then
     target.expFlashFire = true
-    BattleCompat.say(battle, Strings("%s's FLASH FIRE\nmade it immune!",
+    BattleCompat.say(battle, Strings("%s's\nFLASH FIRE took\vthe attack!",
       displayName(battle, target)))
     return 0, { crit = false, typeMult = 0, effectiveness = 0 }
   end
 
   if targetAbility == "LIGHTNING_ROD" and move.type == "ELECTRIC"
       and move.power and move.power > 0 then
-    BattleCompat.say(battle, Strings("%s's LIGHTNING ROD\ntook the attack!",
+    BattleCompat.say(battle, Strings("%s's\nLIGHTNING ROD took\vthe attack!",
       displayName(battle, target)))
     return 0, { crit = false, typeMult = 0, effectiveness = 0 }
   end
@@ -341,7 +360,7 @@ function Abilities.onDamage(next, ctx)
       and targetMon then
     local heal = math.max(1, math.floor(BattleCompat.maxHp(target) / 4))
     BattleCompat.heal(target, heal)
-    BattleCompat.say(battle, Strings("%s restored HP\nusing its %s!",
+    BattleCompat.say(battle, Strings("%s\nrestored HP with\vits %s!",
       displayName(battle, target), targetAbility:gsub("_", " ")))
     return 0, { crit = false, typeMult = 0, effectiveness = 0 }
   end
@@ -446,7 +465,7 @@ function Abilities.onPostDamage(battle, user, target, move, damage)
   local types = BattleCompat.types(target)
   if targetAbility == "COLOR_CHANGE" and damage > 0 and move.type ~= types[1] then
     BattleCompat.setTypes(target, { move.type })
-    BattleCompat.say(battle, Strings("%s's type\nchanged to %s!",
+    BattleCompat.say(battle, Strings("%s's\ntype changed to\v%s!",
       displayName(battle, target), move.type))
   end
 
@@ -459,7 +478,7 @@ function Abilities.onPostDamage(battle, user, target, move, damage)
   if targetAbility == "ROUGH_SKIN" and userMon and (userMon.hp or 0) > 0 then
     local dmg = math.max(1, math.floor(BattleCompat.maxHp(user) / 8))
     BattleCompat.applyHpLoss(battle, user, dmg)
-    BattleCompat.say(battle, Strings("%s was hurt by\nROUGH SKIN!",
+    BattleCompat.say(battle, Strings("%s\nwas hurt by\vROUGH SKIN!",
       displayName(battle, user)))
     if BattleCompat.hp(user) <= 0 and battle.onFaint and user.mon then
       battle:onFaint(user)
@@ -502,7 +521,7 @@ function Abilities.onPostDamage(battle, user, target, move, damage)
       end
       local moveName = (battle.data and battle.data.moves and battle.data.moves[move.id]
         and battle.data.moves[move.id].name) or move.id
-      BattleCompat.say(battle, Strings("%s's\n%s was\ndisabled!",
+      BattleCompat.say(battle, Strings("%s's\n%s was\vdisabled!",
         displayName(battle, user), moveName))
     end
   end

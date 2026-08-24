@@ -366,7 +366,7 @@ local function replacementPlan(mapDef, avgLevel, maxLevel, slots)
       local slot = slots[idx]
       if slot and not VANILLA_RARES[slot.species] then
         plan[#plan + 1] = {
-          index = idx, preferStage = 0, allowRare = true, rareOnly = true,
+          index = idx, preferStage = 0, allowRare = true, rareOnly = ((maxLevel or 0) >= 55),
         }
         if #plan >= 4 then break end
       end

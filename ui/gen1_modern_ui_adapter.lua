@@ -5,7 +5,7 @@ local SummaryUi = require("mods.Kanto-Reforged.ui.summary_ui")
 local SplitSpecial = require("mods.Kanto-Reforged.battle.split_special")
 local TypeChart = require("src.battle.TypeChart")
 local Growth = require("src.pokemon.Growth")
-local Gender = require("mods.Kanto-Reforged.pokemon.gender")
+local GenderUi = require("mods.Kanto-Reforged.ui.gender_ui")
 
 local function call(state, names, ...)
   local api = state and state.gen1ModernUi
@@ -64,9 +64,9 @@ local function summaryMatches(state)
     and state.mon ~= nil
 end
 
-local function monTitle(mon, def)
+local function monTitle(mon, def, data)
   local base = mon.nickname or (def and def.name) or mon.species or "POKéMON"
-  return Gender.nameWithGlyph(mon, base)
+  return GenderUi.label(mon, base, data)
 end
 
 local function typeLabel(def)
@@ -88,7 +88,7 @@ local function summaryModel(mod, game, state)
   local mon = state.mon
   local def = data.pokemon and data.pokemon[mon.species]
   local page = state.page or 1
-  local title = monTitle(mon, def)
+  local title = monTitle(mon, def, data)
   local assets = state.sprite and { portrait = state.sprite } or nil
   local footer = { ("A/B next  %d/3"):format(page) }
   local rows

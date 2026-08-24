@@ -48,6 +48,9 @@ return function(T, Data, run)
   T.eq(BagPockets.classify("MIRACLE_SEED", Data.items.MIRACLE_SEED), "items",
     "Miracle Seed → items")
 
+  T.check(type(BagPockets.drawNativeHeader) == "function",
+    "BagPockets exposes drawNativeHeader for native UI")
+
   -- Filter: only matching pocket ids appear
   BagPockets._resetFilter()
   local save = {

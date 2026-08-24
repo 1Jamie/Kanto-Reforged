@@ -45,6 +45,8 @@ return function(T, Data, run)
   local Gender = require("mods.Kanto-Reforged.pokemon.gender")
   T.eq(Gender.glyph(mon), "♂", "summary mon gender glyph")
   T.eq(Gender.nameWithGlyph(mon, "SPARKY"), "SPARKY♂", "page 3 name includes gender")
+  local GenderUi = require("mods.Kanto-Reforged.ui.gender_ui")
+  T.eq(GenderUi.label(mon, "SPARKY", Data), "SPARKY♂", "GenderUi.label on summary mon")
   -- Minimal game stub for SummaryMenu.new (needs data, input, save, stack)
   local fakeGame = {
     data = Data,

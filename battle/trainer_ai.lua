@@ -1698,10 +1698,12 @@ function TrainerAi.eliteAction(battle)
   local switchBias = theme.switchBias or 1
   local bestIdx, bestScore, currentScore = TrainerAi.bestSwitchIndex(battle)
   if bestIdx then
+    local PartialTrap = require("mods.Kanto-Reforged.battle.partial_trap")
+    local trapped = PartialTrap.active(battle) and PartialTrap.isTrapped(user)
     local margin = 20 / switchBias
     local dying = userHp <= 0.25
-    if bestScore >= currentScore + margin
-       or (dying and bestScore > currentScore * 1.25) then
+    if not trapped and (bestScore >= currentScore + margin
+       or (dying and bestScore > currentScore * 1.25)) then
       -- Rate-limit: at most one AI switch per mon send-out unless Agatha-ish.
       local switches = battle.expAiSwitches or 0
       local maxSwitches = switchBias >= 1.5 and 2 or 1

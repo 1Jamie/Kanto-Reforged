@@ -40,7 +40,7 @@ If you are trying to play, ignore the build instructions below and go to the rel
 
 ## Features
 
-- Johto and Hoenn species (dex 152 through 386), with sprites, learnsets, and Gen 3 abilities. The original 151 get Gen 3 abilities too, plus some Gen 2/3 moves on learnsets and TMs.
+- Johto and Hoenn species (dex 152 through 386), with sprites, learnsets, and Gen 3 abilities. All dex #1–386 use Gen 3 Emerald-first learnsets from `tools/gen3_learnsets.py` (runtime `learnset_gen3.lua`); original 151 also get Gen 3 abilities.
 - Dark, Steel, and Fairy types, and a big Gen 2/3 move list (Rollout, weather, hazards, status berries, that kind of thing). Damaging moves use Gen 3 type categories (not Gen 4 per-move split).
 - Curated Gen 2/3 mixes in wilds, gyms, Elite Four, and the rival. Optional **FULL SPAWN MIX** / **PURE RANDOM SPAWN** reshuffle from the Gen 1–3 pool (Gold density pass keeps Kanto full; **LEGENDS IN MIX** can open the legendary pool).
 - **Gold Kanto restored dungeons:** Gen 1 layouts for Viridian Forest, Mt. Moon, Diglett's Cave, Rock Tunnel, Safari Zone, Seafoam (+ Blaine gym), and Cerulean Cave, with postgame-scaled encounters, trainers, Articuno / Mewtwo, and the Mt. Moon Silver fight.
@@ -106,7 +106,7 @@ Configured in the mod manager / F10 options. Host-scoped keys (spawn/scope) keep
 
 ## Generating the data files
 
-Sprites, `pokemon_data.lua`, ability/learnset/gender/breeding patches, and berry farm art come from `tools/generate_pokemon_mod.py`. It hits PokeAPI (and a couple public sprite sources). Run it from inside the mod folder if you're building from source.
+Sprites and `pokemon_data.lua` come from `tools/generate_pokemon_mod.py` (PokeAPI + sprite sources). **Learnsets** for all #1–386 are generated separately by `tools/gen3_learnsets.py` into `pokemon/learnset_gen3.lua` (does not touch sprites). Ability/gender/breeding patches also come from the pokemon generator. Run from inside the mod folder if you're building from source.
 
 You need Python 3, `requests`, and `Pillow`, plus network on the first run.
 

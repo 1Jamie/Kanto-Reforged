@@ -3,6 +3,7 @@
 -- monkey-patches overworld steps. Route 5 outdoors is unchanged.
 
 local Breeding = require("mods.Kanto-Reforged.pokemon.breeding")
+local GenderUi = require("mods.Kanto-Reforged.ui.gender_ui")
 local Strings = require("src.core.Strings")
 
 local Daycare = {}
@@ -55,7 +56,8 @@ end
 local function monName(game, mon)
   if Breeding.isEgg(mon) then return "EGG" end
   local def = game.data.pokemon[mon.species]
-  return mon.nickname or (def and def.name) or mon.species
+  local base = mon.nickname or (def and def.name) or mon.species
+  return GenderUi.label(mon, base, game.data)
 end
 
 local function ensureDaycare(save)

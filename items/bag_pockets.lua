@@ -39,6 +39,44 @@ function BagPockets.current()
   return BagPockets.POCKETS[pocketIndex]
 end
 
+-- Native Gen1 header aligned with LIST_MENU_BOX (tx=4, tw=16).
+local HEADER_X, HEADER_W, HEADER_H, HEADER_Y = 32, 128, 16, 8
+
+local function drawCycleArrow(code, x, y, flip)
+  if flip then
+    love.graphics.push()
+    love.graphics.translate(x + 8, y)
+    love.graphics.scale(-1, 1)
+    require("src.render.Font").drawCode(code, 0, 0)
+    love.graphics.pop()
+  else
+    require("src.render.Font").drawCode(code, x, y)
+  end
+end
+
+-- Pocket plaque for standard UI: white strip above the item list, name plus
+-- mirrored ▶ glyphs (ASCII "<"/">" are box-border tiles in the GB font).
+function BagPockets.drawNativeHeader()
+  local Font = require("src.render.Font")
+  local Theme = require("src.ui.Theme")
+  local label = Strings(BagPockets.current().label)
+
+  love.graphics.setColor(1, 1, 1, 1)
+  love.graphics.rectangle("fill", HEADER_X, 0, HEADER_W, HEADER_H)
+
+  love.graphics.setColor(0, 0, 0, 1)
+  local arrowW, gap = 8, 4
+  local labelW = Font.width(label)
+  local groupW = arrowW + gap + labelW + gap + arrowW
+  local x = HEADER_X + math.floor((HEADER_W - groupW) / 2)
+
+  drawCycleArrow(Theme.cursor, x, HEADER_Y, true)
+  Font.draw(label, x + arrowW + gap, HEADER_Y)
+  drawCycleArrow(Theme.cursor, x + arrowW + gap + labelW + gap, HEADER_Y, false)
+
+  love.graphics.setColor(1, 1, 1, 1)
+end
+
 function BagPockets.classify(id, def)
   if not id then return "items" end
   if HeldItems.isBerry(id) then return "berries" end
@@ -262,12 +300,8 @@ function BagPockets.register(mod)
 
       local baseDraw = list.draw
       function list:draw()
+        BagPockets.drawNativeHeader()
         baseDraw(self)
-        -- Tiny pocket hint under the money line (left/right).
-        love.graphics.setColor(0, 0, 0, 1)
-        local Font = require("src.render.Font")
-        Font.draw(Strings("< >"), 8, 128)
-        love.graphics.setColor(1, 1, 1, 1)
       end
 
       return list

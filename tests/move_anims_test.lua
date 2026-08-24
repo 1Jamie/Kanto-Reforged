@@ -40,6 +40,22 @@ return function(T, Data, run)
   T.eq(MoveAnims.pickAlias({ id = "VAR_GROUND", type = "GROUND", power = 0, category = "physical" }),
     "BONE_CLUB", "unlisted variable-power Ground uses damage default")
 
+  -- Weather moves: custom compositions, not type-default status clips
+  T.eq(MoveAnims.pickAlias({ id = "SUNNY_DAY", type = "FIRE", power = 0, category = "status" }),
+    nil, "Sunny Day uses a custom composition")
+  T.check(MoveAnims.CUSTOM.SUNNY_DAY ~= nil, "SUNNY_DAY custom exists")
+  T.eq(MoveAnims.CUSTOM.SUNNY_DAY.seq[1].effect, "SE_LIGHT_SCREEN_PALETTE",
+    "Sunny Day opens with light palette (not Smokescreen sand)")
+  T.check(MoveAnims.CUSTOM.SUNNY_DAY.seq[2].subanim == 46,
+    "Sunny Day uses Solarbeam gather subanim")
+  T.eq(MoveAnims.pickAlias({ id = "MORNING_SUN", type = "NORMAL", power = 0, category = "status" }),
+    nil, "Morning Sun uses a custom composition")
+  T.check(MoveAnims.CUSTOM.MORNING_SUN ~= nil, "MORNING_SUN custom exists")
+  T.eq(MoveAnims.CUSTOM.SANDSTORM.seq[1].subanim, 40,
+    "Sandstorm cast uses Sand-Attack subanim")
+  T.eq(MoveAnims.CUSTOM.HAIL.seq[1].subanim, 56,
+    "Hail cast uses Blizzard subanim")
+
   -- Ghost/Dark type defaults no longer collapse onto the same clip
   T.eq(MoveAnims.pickAlias({ id = "WEAK_GHOST", type = "GHOST", power = 40 }),
     "LICK", "weak Ghost defaults to Lick (not Night Shade)")
@@ -128,4 +144,46 @@ return function(T, Data, run)
   T.check(player.steps and #player.steps > 0, "AnimPlayer builds steps for PSYSHOCK")
   player:start("MOONBLAST", true)
   T.check(player.steps and #player.steps > 0, "AnimPlayer builds steps for MOONBLAST")
+
+  -- Gen2 Hail primitives: alias onto stock Powder Snow / ANIM_IN_SANDSTORM.
+  do
+    local Host = require("mods.Kanto-Reforged.core.host")
+    local ok, err = xpcall(function()
+      Host.force(2)
+      local patchedMoves, patchedIds = nil, nil
+      local fakeMod = {
+        log = { info = function() end, warn = function() end },
+        content = {
+          battle_anims = {
+            get = function(_, key)
+              if key == "moves" then
+                return {
+                  POWDER_SNOW = "6e7b",
+                  BLIZZARD = "5883",
+                  HAIL = patchedMoves and patchedMoves.HAIL or nil,
+                }
+              end
+              if key == "ids" then
+                return {
+                  ANIM_IN_SANDSTORM = "54ce",
+                  ANIM_IN_HAIL = patchedIds and patchedIds.ANIM_IN_HAIL or nil,
+                }
+              end
+            end,
+            patch = function(_, key, partial)
+              if key == "moves" then patchedMoves = partial end
+              if key == "ids" then patchedIds = partial end
+            end,
+          },
+        },
+      }
+      local n = MoveAnims.registerGen2(fakeMod)
+      T.check(n >= 2, "Gen2 register maps Hail move + field residual")
+      T.eq(patchedMoves.HAIL, "6e7b", "HAIL aliases Powder Snow's script pointer")
+      T.eq(patchedIds.ANIM_IN_HAIL, "54ce",
+        "ANIM_IN_HAIL aliases ANIM_IN_SANDSTORM's script pointer")
+    end, debug.traceback)
+    Host.clearForce()
+    if not ok then error(err) end
+  end
 end

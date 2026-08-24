@@ -3,6 +3,7 @@
 -- optional Give from the bag (BAG GIVE option).
 
 local Strings = require("src.core.Strings")
+local GenderUi = require("mods.Kanto-Reforged.ui.gender_ui")
 
 local HeldItems = {}
 
@@ -134,6 +135,18 @@ HeldItems.CATALOG = {
   PINK_BOW = {
     id = "PINK_BOW", name = "PINK BOW", price = 100,
     holdEffect = "type_boost", boostType = "NORMAL",
+  },
+  SCOPE_LENS = {
+    id = "SCOPE_LENS", name = "SCOPE LENS", price = 200,
+    holdEffect = "crit_boost", critBoost = 1,
+  },
+  LUCKY_PUNCH = {
+    id = "LUCKY_PUNCH", name = "LUCKY PUNCH", price = 10,
+    holdEffect = "crit_boost", critBoost = 2, species = "CHANSEY",
+  },
+  STICK = {
+    id = "STICK", name = "STICK", price = 200,
+    holdEffect = "crit_boost", critBoost = 2, species = "FARFETCHD",
   },
 }
 
@@ -370,8 +383,9 @@ local function bagHoldables(save)
 end
 
 local function monDisplayName(data, mon)
-  return mon.nickname or (data.pokemon[mon.species] and data.pokemon[mon.species].name)
+  local base = mon.nickname or (data.pokemon[mon.species] and data.pokemon[mon.species].name)
     or mon.species or "?????"
+  return GenderUi.label(mon, base, data)
 end
 
 -- Move one holdable from the bag onto a party mon. Swaps the previous
@@ -910,27 +924,7 @@ function HeldItems.install(mod)
 
   -- ---- Gen1 battle / bag hooks below ----
 
-  -- Leftovers residual only. Status berries are Gen 3: eat on inflict /
-  -- switch-in / item gift, not on the poison/burn HP tick.
-  mod.events:on("battle.turn_ended", function(ev)
-    if not ev.battle then return end
-    local function tick(b)
-      if not b or not b.mon or b.mon.hp <= 0 then return end
-      local id = b.mon.heldItem
-      local def = id and HeldItems.def(id)
-      if not def or def.holdEffect ~= "leftovers" then return end
-      if b.mon.hp >= b.mon.stats.hp then return end
-      local heal = math.max(1, math.floor(b.mon.stats.hp / 16))
-      b.mon.hp = math.min(b.mon.stats.hp, b.mon.hp + heal)
-      if ev.battle.sayNext then
-        ev.battle:sayNext(Strings("%s restored a little\nHP using its LEFTOVERS!",
-          displayName(b)))
-      end
-      if ev.battle.drainNext then ev.battle:drainNext() end
-    end
-    tick(ev.battle.player)
-    tick(ev.battle.enemy)
-  end)
+  -- Leftovers + Life Orb residuals: core/residual_handlers.lua (held_items phase).
 
   HeldItems.installStatusBerryOnInflict()
 

@@ -11,8 +11,8 @@ function RoamerDex.install(mod)
   local DexEntryMenu = require("src.ui.DexEntryMenu")
   if DexEntryMenu._expansionRoamerArea then return end
   local original = DexEntryMenu.render
-  DexEntryMenu.render = function(game, def, sprite, forceOwned, trueColor)
-    original(game, def, sprite, forceOwned, trueColor)
+  DexEntryMenu.render = function(game, def, sprite, forceOwned, trueColor, page, ...)
+    original(game, def, sprite, forceOwned, trueColor, page, ...)
     if not def or not def.id or not game then return end
     local seen = game.save and game.save.pokedex and game.save.pokedex.seen
     if not (seen and seen[def.id]) then return end

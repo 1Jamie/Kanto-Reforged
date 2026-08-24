@@ -13,12 +13,21 @@ end
 
 local function toLevelMoves(record)
   local moves = {}
+  local seen = {}
+  local function add(level, move)
+    if not move or seen[move] then return end
+    seen[move] = true
+    moves[#moves + 1] = { level = level, move = move }
+  end
+  for _, mv in ipairs(record.evolutionMoves or {}) do
+    add(1, mv)
+  end
   for _, row in ipairs(record.level1Moves or {}) do
-    moves[#moves + 1] = { level = 1, move = row }
+    add(1, row)
   end
   for _, row in ipairs(record.learnset or {}) do
     if row.move then
-      moves[#moves + 1] = { level = row.level or 1, move = row.move }
+      add(row.level or 1, row.move)
     end
   end
   return moves

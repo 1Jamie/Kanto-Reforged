@@ -11,6 +11,7 @@ local TextBox = require("src.render.TextBox")
 local HeldItems = require("mods.Kanto-Reforged.items.held_items")
 local AbilityText = require("mods.Kanto-Reforged.battle.ability_text")
 local Gender = require("mods.Kanto-Reforged.pokemon.gender")
+local GenderUi = require("mods.Kanto-Reforged.ui.gender_ui")
 local SplitSpecial = require("mods.Kanto-Reforged.battle.split_special")
 
 local SummaryUi = {}
@@ -31,9 +32,9 @@ local function heldLabel(mon, data)
   return def and def.name or id:gsub("_", " ")
 end
 
-local function monDisplayName(mon, def)
+local function monDisplayName(mon, def, data)
   local base = mon.nickname or (def and def.name) or "?????"
-  return Gender.nameWithGlyph(mon, base)
+  return GenderUi.label(mon, base, data)
 end
 
 local function genderLabel(mon)
@@ -62,11 +63,12 @@ end
 -- Wipe + redraw the summary name line with an optional gender glyph.
 local function redrawNameWithGender(self)
   local mon = self.mon
-  local def = self.game.data.pokemon[mon.species]
+  local data = self.game.data
+  local def = data.pokemon[mon.species]
   love.graphics.setColor(1, 1, 1, 1)
   love.graphics.rectangle("fill", 72, 8, 88, 8)
   love.graphics.setColor(0, 0, 0, 1)
-  Font.draw(monDisplayName(mon, def), 72, 8)
+  Font.draw(monDisplayName(mon, def, data), 72, 8)
   love.graphics.setColor(1, 1, 1, 1)
 end
 
@@ -112,7 +114,7 @@ local function drawHeader(self)
     end
   end
   love.graphics.setColor(0, 0, 0, 1)
-  Font.draw(monDisplayName(mon, def), 72, 8)
+  Font.draw(monDisplayName(mon, def, data), 72, 8)
   HudTiles.statusTile(0x74, 8, 56)
   Font.drawCode(0xF2, 16, 56)
   Font.draw(("%03d"):format(def and def.dex or 0), 24, 56)
