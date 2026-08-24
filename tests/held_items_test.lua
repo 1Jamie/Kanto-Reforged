@@ -2,20 +2,55 @@
 -- LuaJIT's 200-local limit).
 return function(T, Data, HeldItems)
   local drains = 0
+  local says = {}
+  local anims = {}
   local berryTarget = {
     mon = { heldItem = "BERRY", hp = 20, stats = { hp = 50 } },
     name = "Foe", isPlayer = false,
   }
   HeldItems.afterDamage({
     battle = {
-      sayNext = function() end,
+      sayNext = function(_, text) says[#says + 1] = text end,
       drainNext = function() drains = drains + 1 end,
+      animNext = function(_, name) anims[#anims + 1] = name end,
+      player = {},
     },
     target = berryTarget,
   }, 10)
   T.eq(berryTarget.mon.hp, 30, "Berry heals 10 at half HP (detail)")
   T.eq(berryTarget.mon.heldItem, nil, "Berry consumed (detail)")
   T.eq(drains, 1, "Berry heal animates HP bar")
+  T.eq(anims[1], "KR_BERRY_HEAL", "Berry queues spiral-only heal anim")
+  T.check(says[1] and says[1]:find("BERRY"), "Berry queues restore dialog")
+
+  -- During a move, FX wait until flush (after attack dialog).
+  do
+    local order = {}
+    local tgt = {
+      mon = { heldItem = "BERRY", hp = 20, stats = { hp = 50 } },
+      name = "Foe", isPlayer = false,
+    }
+    local battle = {
+      _krDeferItemHeals = true,
+      player = {},
+      sayNext = function(_, text)
+        order[#order + 1] = "berry:" .. tostring(text)
+      end,
+      drainNext = function() order[#order + 1] = "drain" end,
+      animNext = function(_, name) order[#order + 1] = "anim:" .. name end,
+    }
+    HeldItems.afterDamage({ battle = battle, target = tgt }, 10)
+    T.eq(tgt.mon.heldItem, nil, "deferred berry still consumes immediately")
+    T.eq(tgt.mon.hp, 30, "deferred berry still heals the model")
+    T.eq(#order, 0, "deferred berry does not queue FX mid-damage")
+    -- Simulate EffectRegistry: damage first, then attack result text.
+    order[#order + 1] = "attack:super"
+    HeldItems.flushDeferredHeals(battle)
+    T.eq(order[1], "attack:super", "attack dialog stays ahead of berry FX")
+    T.eq(order[2], "anim:KR_BERRY_HEAL", "spiral heal follows attack dialog")
+    T.check(order[3] and order[3]:find("berry:"), "eat dialog follows heal anim")
+    T.eq(order[4], "drain", "heal drain follows eat dialog")
+  end
 
   -- Pinch berry via applyDamage: model heals, damage drain still pins to
   -- the post-hit HP so the bar dips then climbs (not a silent no-op).
@@ -37,23 +72,40 @@ return function(T, Data, HeldItems)
     }
     local b = BattleState.newWild(game, "RATTATA", 5)
     b.player.shownHP = mon.hp
-    b.sayNext = function() end
+    -- Mid-move: heal the model now, present after flush (performMove end).
+    b._krDeferItemHeals = true
     local start = mon.hp
     local dealt = b:applyDamage(b.player, 5)
     local damaged = start - dealt
     T.check(dealt == 5, "applyDamage dealt 5")
     T.eq(mon.hp, damaged + 10, "Berry healed +10 on the model after damage")
     T.eq(mon.heldItem, nil, "Berry consumed after applyDamage")
-    -- First queued drain should pin at the post-hit HP.
     local drainRow
+    local textRow
+    local animRow
     for _, item in ipairs(b.queue) do
-      if item.drain and item.stopAt ~= nil then drainRow = item break end
+      if item.drain and item.stopAt ~= nil and not drainRow then drainRow = item end
+      if item.text and not textRow then textRow = item end
+      if item.anim == "KR_BERRY_HEAL" and not animRow then animRow = item end
     end
     T.check(drainRow ~= nil, "damage drain queued with stopAt")
     T.eq(drainRow.stopAt, damaged, "damage drain stopAt is post-hit HP")
+    T.check(textRow == nil, "berry dialog deferred until move ends")
+    T.check(animRow == nil, "heal anim deferred until move ends")
+    b:sayNext("It's super\neffective!")
+    HeldItems.flushDeferredHeals(b)
+    local berryTextAt, recoverAt, superAt
+    for i, item in ipairs(b.queue) do
+      if item.text and item.text:find("super", 1, true) then superAt = i end
+      if item.text and item.text:find("BERRY", 1, true) then berryTextAt = i end
+      if item.anim == "KR_BERRY_HEAL" then recoverAt = i end
+    end
+    T.check(superAt ~= nil and berryTextAt ~= nil and recoverAt ~= nil,
+      "flush queues attack text then berry FX")
+    T.check(superAt < recoverAt and recoverAt < berryTextAt,
+      "super-effective before spiral heal before berry dialog")
     b.draining = true
     b.player.drainFloor = drainRow.stopAt
-    -- One long step burst should land on the pin, not skip to healed HP.
     for _ = 1, 500 do
       if not b:stepHPDrain() then break end
     end
@@ -62,6 +114,31 @@ return function(T, Data, HeldItems)
     T.check(type(b.player.shownPx) == "number",
       "pixel-step HP bar length is tracked")
     T.eq(mon.hp, damaged + 10, "model stays healed while bar shows the dip")
+  end
+
+  -- Gen1 Leftovers presentation: adapter:heal must drain the bar (native UI).
+  do
+    local Adapters = require("mods.Kanto-Reforged.battle.adapters")
+    local saysLeft = {}
+    local drainsLeft = 0
+    local battler = {
+      mon = { heldItem = "LEFTOVERS", hp = 40, stats = { hp = 80 } },
+      name = "RED", isPlayer = true,
+    }
+    local battle = {
+      player = battler,
+      enemy = { mon = { hp = 50, stats = { hp = 50 } }, name = "Foe" },
+      sayNext = function(_, text) saysLeft[#saysLeft + 1] = text end,
+      drainNext = function() drainsLeft = drainsLeft + 1 end,
+    }
+    local adapter = Adapters.forBattle(battle)
+    T.check(adapter ~= nil, "leftovers path has Gen1 adapter")
+    adapter:say("%s restored a little\nHP using its LEFTOVERS!", "RED")
+    adapter:heal(battler, 5)
+    T.check(saysLeft[1] and saysLeft[1]:find("LEFTOVERS"),
+      "Leftovers dialog reaches sayNext")
+    T.eq(battler.mon.hp, 45, "Leftovers heal mutates HP")
+    T.eq(drainsLeft, 1, "Gen1.heal queues drainNext for the HP bar")
   end
 
   for _, row in ipairs({

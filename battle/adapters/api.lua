@@ -11,6 +11,7 @@
   clearStatus(battler) -> bool
   hasStatus(battler, ...) -> bool
   applyHpLoss(battler, amount), heal(battler, amount)
+  healAnim(battler, animId?)  -- Gen1: KR_BERRY_HEAL spiral clip; Gen2: no-op
   say(text, ...), sayFail(), displayName(battler)
 
   -- Field / sides

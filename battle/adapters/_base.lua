@@ -63,6 +63,12 @@ function Base.new(battle, host)
     host.heal(self, battler, amount)
   end
 
+  function adapter:healAnim(battler, animId)
+    if host.healAnim then
+      host.healAnim(self, battler, animId)
+    end
+  end
+
   function adapter:say(text, ...)
     host.say(self, text, ...)
   end

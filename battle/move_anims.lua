@@ -328,6 +328,11 @@ local CUSTOM = {
     se("SE_RESET_SCREEN_PALETTE"),
   }),
 
+  -- Pinch-berry / held heal: spiral only (no LightScreenPalette wash).
+  KR_BERRY_HEAL = custom("custom:berry_heal", {
+    { effect = "SE_SPIRAL_BALLS_INWARD", sound = "RECOVER" },
+  }),
+
   -- Fairy
   MOONBLAST = custom("custom:moonblast", {
     se("SE_LIGHT_SCREEN_PALETTE", "LOVELY_KISS"),
@@ -1746,6 +1751,18 @@ function MoveAnims.register(mod, moves)
   mod.log:info(
     "Registered %d move anims (%d composed, %d aliased; %d already present)",
     n, composed, n - composed, skipped)
+  -- Not a real move id — held-item heal FX (spiral without palette wash).
+  do
+    local c = CUSTOM.KR_BERRY_HEAL
+    if c and c.seq then
+      pcall(function()
+        mod.content.battle_anims:register("KR_BERRY_HEAL", {
+          seq = c.seq,
+          source = c.source or "custom:berry_heal",
+        })
+      end)
+    end
+  end
   pcall(function()
     require("mods.Kanto-Reforged.battle.weather").registerAnims(mod)
   end)

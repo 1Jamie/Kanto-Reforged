@@ -10,8 +10,21 @@ function Gen1.say(adapter, text, ...)
   BattleCompat.say(adapter._battle, text, ...)
 end
 
-function Gen1.heal(_adapter, battler, amount)
+function Gen1.heal(adapter, battler, amount)
   BattleCompat.heal(battler, amount)
+  -- BattleCompat.heal only mutates mon.hp; Gen1 bars chase via drainNext.
+  local battle = adapter._battle
+  if battle and type(battle.drainNext) == "function" then
+    battle:drainNext(battler)
+  end
+end
+
+-- Optional heal clip for held-item FX (spiral only; see KR_BERRY_HEAL).
+function Gen1.healAnim(adapter, battler, animId)
+  local battle = adapter._battle
+  if not battle or type(battle.animNext) ~= "function" then return end
+  local isPlayer = battler and (battler.isPlayer or battler == battle.player)
+  battle:animNext(animId or "KR_BERRY_HEAL", isPlayer and true or false)
 end
 
 function Gen1.emitFaint(adapter, battler)

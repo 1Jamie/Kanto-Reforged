@@ -194,9 +194,10 @@ function Handlers.registerAll()
       local cur = ctx.adapter:hp(b)
       if cur < maxHp then
         local heal = math.max(1, math.floor(maxHp / 16))
-        ctx.adapter:heal(b, math.min(heal, maxHp - cur))
+        -- Message first, then heal+drain (poison residual order).
         ctx.adapter:say(Strings("%s restored a little\nHP using its LEFTOVERS!",
           ctx.adapter:displayName(b)))
+        ctx.adapter:heal(b, math.min(heal, maxHp - cur))
       end
     end
     if b.expLifeOrbPending then
@@ -204,9 +205,9 @@ function Handlers.registerAll()
       if id == "LIFE_ORB" and ctx.adapter:hp(b) > 0 then
         local maxHp = ctx.adapter:maxHp(b)
         local recoil = math.max(1, math.floor(maxHp / 10))
-        ctx.adapter:applyHpLoss(b, recoil)
         ctx.adapter:say(Strings("%s is hurt\nby its LIFE ORB!",
           ctx.adapter:displayName(b)))
+        ctx.adapter:applyHpLoss(b, recoil)
       end
     end
   end)

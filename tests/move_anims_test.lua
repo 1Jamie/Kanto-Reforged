@@ -20,6 +20,13 @@ return function(T, Data, run)
   T.check(hasDark and hasSpiral and hasSwiftSub,
     "Shadow Ball mixes dark palette + swift stars + spiral balls")
 
+  local berry = MoveAnims.CUSTOM.KR_BERRY_HEAL
+  T.check(berry and berry.seq, "KR_BERRY_HEAL custom exists")
+  T.eq(#berry.seq, 1, "berry heal is a single spiral row")
+  T.eq(berry.seq[1].effect, "SE_SPIRAL_BALLS_INWARD", "berry heal is spiral only")
+  T.check(berry.seq[1].effect ~= "SE_LIGHT_SCREEN_PALETTE",
+    "berry heal has no light-screen palette wash")
+
   T.check(MoveAnims.CUSTOM.DARK_PULSE ~= nil, "DARK_PULSE custom exists")
   T.check(MoveAnims.CUSTOM.SHADOW_BALL.source ~= MoveAnims.CUSTOM.DARK_PULSE.source,
     "Shadow Ball and Dark Pulse are distinct customs")

@@ -999,6 +999,19 @@ function HeldItems.install(mod)
     return dealt
   end
 
+  -- Defer pinch-berry dialog/anim until the move finishes queuing its own
+  -- text (applyDamage runs before Critical hit! / It's super effective!).
+  if not BattleState._krBerryHealDefer then
+    local original_performMove = BattleState.performMove
+    BattleState.performMove = function(self, user, target, moveInst, isCalled)
+      self._krDeferItemHeals = true
+      original_performMove(self, user, target, moveInst, isCalled)
+      self._krDeferItemHeals = false
+      HeldItems.flushDeferredHeals(self)
+    end
+    BattleState._krBerryHealDefer = true
+  end
+
   -- Damage drains pin stopAt so multi-hit bars step correctly.  HP Berry
   -- heals the model immediately (before the queue runs), which made
   -- stopAt < mon.hp and skipped the damage dip — the following heal drain
@@ -1086,6 +1099,35 @@ function HeldItems.modifyDamage(damage, ctx)
   return damage
 end
 
+function HeldItems.presentBerryHeal(battle, target, itemName)
+  if not battle or not target then return end
+  if type(battle.animNext) == "function" then
+    local isPlayer = target.isPlayer or target == battle.player
+    -- Spiral only — stock RECOVER also washes the screen with
+    -- SE_LIGHT_SCREEN_PALETTE (the "inversion" look).
+    battle:animNext("KR_BERRY_HEAL", isPlayer and true or false)
+  end
+  if type(battle.sayNext) == "function" then
+    battle:sayNext(Strings("%s's %s\nrestored health!",
+      displayName(target), itemName or "BERRY"))
+  end
+  if type(battle.drainNext) == "function" then
+    battle:drainNext(target)
+  end
+end
+
+-- Queue deferred pinch-berry FX after the current move's dialog (crit /
+-- effectiveness / secondaries).  Called from the performMove wrap.
+function HeldItems.flushDeferredHeals(battle)
+  if not battle then return end
+  local list = battle._krDeferredItemHeals
+  battle._krDeferredItemHeals = nil
+  if not list then return end
+  for _, row in ipairs(list) do
+    HeldItems.presentBerryHeal(battle, row.target, row.itemName)
+  end
+end
+
 function HeldItems.afterDamage(ctx, damage)
   local target = ctx.target
   if not target or not target.mon or not damage or damage <= 0 then return end
@@ -1099,13 +1141,22 @@ function HeldItems.afterDamage(ctx, damage)
     local heal = def.heal or 10
     target.mon.hp = math.min(target.mon.stats.hp, target.mon.hp + heal)
     HeldItems.consume(target.mon, target)
-    if ctx.battle and ctx.battle.sayNext then
-      ctx.battle:sayNext(Strings("%s's %s\nrestored health!",
-        displayName(target), def.name))
+    local battle = ctx.battle
+    if not battle then return end
+    -- EffectRegistry applies damage before crit / "It's super effective!".
+    -- During a move, stash FX and flush at performMove end so the eat line
+    -- follows that attack's dialog (then the next mon's turn).
+    if battle._krDeferItemHeals then
+      local list = battle._krDeferredItemHeals
+      if not list then
+        list = {}
+        battle._krDeferredItemHeals = list
+      end
+      list[#list + 1] = { target = target, itemName = def.name }
+      return
     end
-    if ctx.battle and ctx.battle.drainNext then
-      ctx.battle:drainNext(target)
-    end  end
+    HeldItems.presentBerryHeal(battle, target, def.name)
+  end
 end
 
 function HeldItems.focusBandClamp(battle, target, dmg)
