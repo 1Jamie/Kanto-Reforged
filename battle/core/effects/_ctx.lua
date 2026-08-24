@@ -5,6 +5,12 @@ local EffectCtx = require("mods.Kanto-Reforged.battle.core.effect_ctx")
 
 local CtxShim = {}
 
+-- Love / LuaJIT 5.1: table.pack is often missing; table.unpack may be too.
+local unpack = table.unpack or unpack
+local function pack(...)
+  return { n = select("#", ...), ... }
+end
+
 function CtxShim.buildAdapter(ctx, id)
   local adapter = Adapters.forBattle(ctx.battle or {})
   local msgs = {}
@@ -61,10 +67,10 @@ function CtxShim.with(id, raw, fn)
   local adapter, opts, msgs = CtxShim.buildAdapter(raw, id)
   local ec = EffectCtx.push(adapter, raw.user, raw.target, raw.move, id,
     raw.rng or adapter:rng(), opts)
-  local packed = table.pack(pcall(fn, ec, raw))
+  local packed = pack(pcall(fn, ec, raw))
   EffectCtx.pop()
   if not packed[1] then error(packed[2]) end
-  return table.unpack(packed, 2, packed.n)
+  return unpack(packed, 2, packed.n)
 end
 
 function CtxShim.gen2(battle, id, user, target, move, _hookName, fn)
@@ -74,12 +80,12 @@ function CtxShim.gen2(battle, id, user, target, move, _hookName, fn)
   local adapter = Adapters.forBattle(battle)
   local ec = EffectCtx.push(adapter, user, target, move, id,
     battle.rng or battle.random or math.random, {})
-  local packed = table.pack(pcall(fn, ec, {
+  local packed = pack(pcall(fn, ec, {
     battle = battle, user = user, target = target, move = move,
   }))
   EffectCtx.pop()
   if not packed[1] then error(packed[2]) end
-  return table.unpack(packed, 2, packed.n)
+  return unpack(packed, 2, packed.n)
 end
 
 return CtxShim

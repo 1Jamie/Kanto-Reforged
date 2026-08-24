@@ -47,4 +47,12 @@ return function(T)
   T.eq(#said, 1, "performMove path prints the weather line once")
   T.check(said[1] and said[1]:find("sunlight", 1, true),
     "Sunny Day text mentions sunlight")
+
+  -- CtxShim.with must work without table.pack (Love / Lua 5.1).
+  local a, b, c = CtxShim.with("EXP_WEATHER_SUNNY", gen1Ctx, function()
+    return "one", "two", "three"
+  end)
+  T.eq(a, "one", "with preserves multi-return a")
+  T.eq(b, "two", "with preserves multi-return b")
+  T.eq(c, "three", "with preserves multi-return c")
 end
