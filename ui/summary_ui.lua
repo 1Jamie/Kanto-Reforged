@@ -73,6 +73,7 @@ local function redrawNameWithGender(self)
 end
 
 -- Compact 5-stat redraw when SP.ATK / SP.DEF is on (fits the Gen1 10x10 box).
+-- Labels share the value column (x=48); ATTACK/DEFENSE overflow into the digits.
 local function redrawSplitSpecialStats(self)
   local mon = self.mon
   local def = self.game.data.pokemon[mon.species]
@@ -83,8 +84,8 @@ local function redrawSplitSpecialStats(self)
   love.graphics.rectangle("fill", 8, 72, 64, 64)
   love.graphics.setColor(0, 0, 0, 1)
   local rows = {
-    { "ATTACK", stats.attack },
-    { "DEFENSE", stats.defense },
+    { "ATK.", stats.attack },
+    { "DEF.", stats.defense },
     { "SPEED", stats.speed },
     { "SP.ATK", sp and sp.sp_attack or stats.special },
     { "SP.DEF", sp and sp.sp_defense or stats.special },

@@ -6,7 +6,7 @@ local Data = require("src.core.Data")
 local GameVersion = require("src.core.GameVersion")
 local Host = require("mods.Kanto-Reforged.core.host")
 
--- Loader generation=2 alone does not flip GameVersion; Host (and real Gold
+-- Loader generation=2 alone does not flip GameVersion; Host (and real Gen2
 -- boots) key off GameVersion / Host.force. Keep this in-mod — no engine edits.
 GameVersion.set("gold")
 Host.force(2)
@@ -15,24 +15,18 @@ pcall(function()
   Data:load()
 end)
 
--- Prefer a local Gold ROM cache so TILESET_JOHTO collision is real (berry farm
--- block remap). Game2 boots load this via data/generated under the gold root.
+-- Prefer a local Gen2 ROM cache so TILESET_JOHTO collision is real (berry farm
+-- block remap). Game2 boots load this via data/generated under the edition root.
 -- Do NOT preload encounters.lua here: ROM ids like FARFETCH_D fail registry
--- resolve against the KR/Gold pokemon sheet during merge. JohtoDex loads
+-- resolve against the KR/Gen2 pokemon sheet during merge. JohtoDex loads
 -- encounters lazily when rebuilding NEW.
 do
-  local home = os.getenv("HOME") or ""
+  local CachePaths = require("mods.Kanto-Reforged.core.cache_paths")
   local function loadGen(name, field)
-    local paths = {
-      home .. "/.local/share/love/pokemon-love2d/gold/data/generated/" .. name,
-      "data/generated/" .. name,
-    }
-    for _, p in ipairs(paths) do
-      local ok, val = pcall(dofile, p)
-      if ok and type(val) == "table" then
-        Data[field] = val
-        return true
-      end
+    local val = CachePaths.loadGenerated(name, "gold")
+    if val then
+      Data[field] = val
+      return true
     end
     return false
   end
@@ -612,21 +606,13 @@ do
   -- map registrations are not full Gold map headers with landmark bytes.
   do
     local Nests = require("src.core.gen2.Nests")
-    local home = os.getenv("HOME") or ""
-    local function loadGold(name)
-      local paths = {
-        home .. "/.local/share/love/pokemon-love2d/gold/data/generated/" .. name,
-        "data/generated/" .. name,
-      }
-      for _, p in ipairs(paths) do
-        local ok, val = pcall(dofile, p)
-        if ok and type(val) == "table" then return val end
-      end
-      return nil
+    local CachePaths = require("mods.Kanto-Reforged.core.cache_paths")
+    local function loadGen2(name)
+      return CachePaths.loadGenerated(name, "gold")
     end
-    local enc = loadGold("encounters.lua")
-    local maps = loadGold("maps.lua")
-    local menuGfx = Data.gen2MenuGfx or loadGold("menu_gfx.lua")
+    local enc = loadGen2("encounters.lua")
+    local maps = loadGen2("maps.lua")
+    local menuGfx = Data.gen2MenuGfx or loadGen2("menu_gfx.lua")
     if enc and enc.grass and maps and maps.SILVER_CAVE_ROOM_1
         and maps.SILVER_CAVE_ROOM_1.landmark then
       local nests = Nests.find({

@@ -350,12 +350,15 @@ function Gen2Compat.seedInfra(mod, pokemon_data)
   return g, e, m
 end
 
---- True when Gold's own move_effects / Dark type are present (full ROM cache).
-function Gen2Compat.goldDataReady(mod)
+--- True when Gen2 ROM cache seeded move_effects / Dark type (full import).
+function Gen2Compat.gen2DataReady(mod)
   local dark = mod.content.type_chart:get("DARK")
   local sample = mod.content.move_effects:get("EFFECT_BURN")
     or mod.content.move_effects:get("NO_ADDITIONAL_EFFECT")
   return dark ~= nil and sample ~= nil
 end
+
+-- Compat alias for older call sites / tests.
+Gen2Compat.goldDataReady = Gen2Compat.gen2DataReady
 
 return Gen2Compat

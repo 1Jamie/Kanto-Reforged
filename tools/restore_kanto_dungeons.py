@@ -1019,6 +1019,20 @@ MAP_PALETTE_MAP = {
 }
 
 def main():
+    import argparse
+
+    parser = argparse.ArgumentParser(
+        description="Build restored Gen1 Kanto dungeon data for Gen2 hosts."
+    )
+    parser.add_argument(
+        "--game",
+        default="gold",
+        choices=("gold", "silver", "crystal"),
+        help="Gen2 ROM cache to read tilesets from (default: gold).",
+    )
+    args = parser.parse_args()
+    gen2_game = args.game
+
     root_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
     os.chdir(root_dir)
 
@@ -1207,9 +1221,17 @@ def main():
     kr_needed = bind_kr_tileset_images(restored_tilesets)
     copy_kr_tileset_overrides(kr_needed)
 
-    gold_ts_path = os.path.expanduser("~/.local/share/love/pokemon-love2d/gold/data/generated/tilesets.lua")
-    if os.path.exists(gold_ts_path):
-        gold_tilesets = load_lua_json(gold_ts_path)
+    gen2_ts_path = None
+    home = os.path.expanduser("~/.local/share/love/pokemon-love2d")
+    for game in (gen2_game, "gold", "silver", "crystal"):
+        cand = os.path.join(home, game, "data", "generated", "tilesets.lua")
+        if os.path.exists(cand):
+            gen2_ts_path = cand
+            if game != gen2_game:
+                print(f"NOTE: --game {gen2_game} cache missing; using {game} tilesets")
+            break
+    if gen2_ts_path:
+        gold_tilesets = load_lua_json(gen2_ts_path)
         if "TILESET_KANTO" in gold_tilesets:
             kanto_rec = dict(gold_tilesets["TILESET_KANTO"])
             kanto_blocks = list(kanto_rec.get("blocks", []))

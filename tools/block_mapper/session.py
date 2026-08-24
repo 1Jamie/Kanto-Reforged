@@ -158,9 +158,14 @@ def _rebuild_blocks_for_tileset(tileset_id: str, game: str, tile_size: int, max_
 def _load_g2_tileset_data(profile: dict):
     tileset_id = profile.get("g2_tileset_id") or "TILESET_KANTO"
     tile_size = int(profile.get("g2_tile_size") or 8)
-    g2_tiles_raw, g2_coll_raw, rebuilt = _rebuild_blocks_for_tileset(
-        tileset_id, "gold", tile_size, profile.get("g2_max_blocks")
-    )
+    g2_game = profile.get("g2_game") or profile.get("game") or "gold"
+    g2_tiles_raw, g2_coll_raw, rebuilt = None, None, None
+    for game in (g2_game, "gold", "silver", "crystal"):
+        g2_tiles_raw, g2_coll_raw, rebuilt = _rebuild_blocks_for_tileset(
+            tileset_id, game, tile_size, profile.get("g2_max_blocks")
+        )
+        if g2_tiles_raw:
+            break
     g2_tiles_raw = g2_tiles_raw or []
     g2_coll_raw = g2_coll_raw or []
     custom = _load_restore_custom_blocks(profile.get("custom_blocks_source"))

@@ -1,10 +1,10 @@
 -- Dual-gen battle accessors: Gen1 battler wrappers vs Gen2 bare party mons,
--- and KR weather ids (SUNNY/RAINY/…) vs Gold (sun/rain/sandstorm).
+-- and KR weather ids (SUNNY/RAINY/…) vs Gen2 (sun/rain/sandstorm).
 local BattleCompat = {}
 
 function BattleCompat.isGen2(battle)
   if not battle then return false end
-  -- Live Gold boot.  KR AI may stamp player.mon on a Gold party table;
+  -- Live Gen2 boot.  KR AI may stamp player.mon on a Gen2 party table;
   -- that must not flip the battle to the Gen 1 weather path (double chip
   -- + clipped "buffeted" text).
   local okH, Host = pcall(require, "mods.Kanto-Reforged.core.host")
@@ -12,7 +12,7 @@ function BattleCompat.isGen2(battle)
     okH, Host = pcall(require, "mods.Kanto-Reforged.host")
   end
   if okH and Host and Host.isGen2 and Host.isGen2() then return true end
-  -- Headless tests: Gold-shaped battles (weatherTurns, no Gen1 wrapper).
+  -- Headless tests: Gen2-shaped battles (weatherTurns, no Gen1 wrapper).
   if battle.weather ~= nil or battle.weatherTurns ~= nil then
     if battle.player and battle.player.mon then return false end
     return true
@@ -22,6 +22,25 @@ function BattleCompat.isGen2(battle)
     return true
   end
   return false
+end
+
+--- Cart bug-fix flags for the active Gen2 edition (Crystal sets these).
+function BattleCompat.fixes()
+  local okH, Host = pcall(require, "mods.Kanto-Reforged.core.host")
+  if okH and Host and type(Host.fixes) == "function" then
+    return Host.fixes() or {}
+  end
+  local ok, GameVersion = pcall(require, "src.core.GameVersion")
+  if ok and type(GameVersion.fixes) == "function" then
+    return GameVersion.fixes() or {}
+  end
+  return {}
+end
+
+--- Prefer engine Damage.calc's GameVersion.fixes().reflectOverflow; expose
+-- for any KR path that builds damage opts itself.
+function BattleCompat.reflectOverflowFixed()
+  return BattleCompat.fixes().reflectOverflow == true
 end
 
 --- Underlying party mon table (Gen1: battler.mon, Gen2: battler itself).

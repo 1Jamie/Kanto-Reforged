@@ -102,7 +102,9 @@ end
 
 function JudgeNpc.register(mod)
   local mapId = Host.isGen2() and "UNDERGROUND_PATH" or "UNDERGROUND_PATH_ROUTE_5"
-  local index = Host.isGen2() and 1 or 2
+  local index = Host.isGen2()
+    and HouseNpcs.nextFreeIndex(mod, mapId, 1)
+    or 2
   local x = Host.isGen2() and 2 or 5
   local y = Host.isGen2() and 10 or 3
 

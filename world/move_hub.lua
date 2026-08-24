@@ -257,7 +257,9 @@ end
 function MoveHub.register(mod)
   local Host = require("mods.Kanto-Reforged.core.host")
   local mapId = Host.isGen2() and "MR_PSYCHICS_HOUSE" or "SAFFRON_PIDGEY_HOUSE"
-  local index = Host.isGen2() and 2 or 5
+  local index = Host.isGen2()
+    and HouseNpcs.nextFreeIndex(mod, mapId, 2)
+    or 5
 
   HouseNpcs.appendNpc(mod, mapId, {
     index = index,

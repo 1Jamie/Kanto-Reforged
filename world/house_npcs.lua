@@ -113,6 +113,34 @@ function HouseNpcs.appendNpc(mod, mapId, row, owner)
   })
 end
 
+-- Next free object index for a map. Prefer `preferred` when it does not collide
+-- with stock ROM objects (Gold/Silver/Crystal may differ). Falls back to
+-- max(preferred, stockCount+1).
+function HouseNpcs.nextFreeIndex(mod, mapId, preferred)
+  preferred = tonumber(preferred) or 1
+  local Host = require("mods.Kanto-Reforged.core.host")
+  local game = Host.liveGame(mod)
+  local maps = game and game.data and game.data.maps
+  if type(maps) ~= "table" then
+    local okM, mapsMod = pcall(require, "data.generated.maps")
+    if okM and type(mapsMod) == "table" then maps = mapsMod end
+  end
+  local def = maps and maps[mapId]
+  local objs = def and def.objects
+  local stock = 0
+  if type(objs) == "table" then
+    local maxIdx = 0
+    local count = 0
+    for _, obj in ipairs(objs) do
+      count = count + 1
+      local idx = obj and tonumber(obj.index)
+      if idx and idx > maxIdx then maxIdx = idx end
+    end
+    stock = math.max(count, maxIdx)
+  end
+  return math.max(preferred, stock + 1)
+end
+
 -- Register TEXT_* talk handlers. Gen1 → map_scripts; Gen2 → talkTo seam.
 function HouseNpcs.registerTalk(textId, handler)
   HouseNpcs._talks[textId] = handler

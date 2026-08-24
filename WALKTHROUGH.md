@@ -8,18 +8,18 @@ If you want full raw tables (recipes, internal module maps, formulas), that's [F
 
 ## Before you start (Options & Setup)
 
-1. Enable **Kanto Reforged** (`Kanto-Reforged`) in the Mods tab or F10 manager. (If playing Gold, also enable `pokegear_cards` for the DexNav card!).
+1. Enable **Kanto Reforged** (`Kanto-Reforged`) in the Mods tab or F10 manager. (If playing Gold/Silver/Crystal, also enable `pokegear_cards` for the DexNav card!).
 2. Decide these options early:
    - **DEX SCOPE / JOHTO SCOPE**: Gen 1 **KANTO** restricts spawns and trainer mixes to the original 151 (out-of-scope party/PC mons are stashed and returned safely when you swap back). Gen 2 **JOHTO 251** caps Johto grass at dex 251 while Kanto keeps Gen 3 postgame guests.
    - **XP SHARE (SLOT 2)** (default on): fighters get ~70% of the XP pool; party slot 2 gets up to ~30%. Replaces old EXP.ALL behavior while on.
    - **SMARTER AI** (default on): trainers play less dumb (prefer super effective moves, skip failing status). Turn off if you miss classic gen1 randomness.
-   - **SWITCH HIT AI**: classic free-hit on switch vs Gen 3 lock (Red shows GEN 1/3; Gold shows GEN 2/3).
-   - **FULL SPAWN MIX** (default off): fully random gen1-3 wilds. On Gold this covers Johto and Kanto (with a density pass so Kanto stays full). It rewrites encounter tables, so flip it before a long run if you care.
+   - **SWITCH HIT AI**: classic free-hit on switch vs Gen 3 lock (Red shows GEN 1/3; Gen 2 shows GEN 2/3).
+   - **FULL SPAWN MIX** (default off): fully random gen1-3 wilds. On Gen 2 this covers Johto and Kanto (with a density pass so Kanto stays full). It rewrites encounter tables, so flip it before a long run if you care.
    - **PURE RANDOM SPAWN** (default off): absolute chaos mode with no habitat or BST restrictions.
    - **LEGENDS IN MIX** (default off): only matters with FULL SPAWN MIX / PURE RANDOM on — lets legendaries/mythicals roll into wild grass (still level-gated).
    - **SP.ATK / SP.DEF** (Red only, default off): special damage and summary UI use separate Sp.Atk / Sp.Def instead of Gen 1 Special. Leave off for classic mechanics.
-   - **DEXNAV** (Red only): start-menu label or off. (Gold DexNav is automatically a card on your Pokegear).
-
+   - **DEXNAV** (Red only): start-menu label or off. (Gen 2 DexNav is automatically a card on your Pokegear).
+   - **SPRITES 1-251** (Red only): boot KR on the Gen 2 ROM whose sprites you want (Gold / Silver / Crystal) so it caches dex 1–251, then load Red and set this toggle to that edition (or **CUSTOM KR**). Hoenn (252+) always stays KR. Details: [README — Gen1 sprite sets](README.md#gen1-sprite-sets-sprites-1-251).
 ---
 
 # Part 1: Gen 1 (Red / Blue) Walkthrough
@@ -196,11 +196,13 @@ With **60+ species owned** in your Pokédex, talk to the NPC in the Route 16 Fly
 
 ---
 
-# Part 2: Gen 2 (Gold) Walkthrough
+# Part 2: Gen 2 (Gold / Silver / Crystal) Walkthrough
+
+Johto wild version exclusives are cross-injected so each cart can catch the bases it was missing (Gold gets Ledyba/Phanpy/…, Silver gets Spinarak/Gligar/…, Crystal gets Mareep/Girafarig/…). Legendary mascot story beats still follow the cart you imported — KR overlays Gen 3 guests onto the active ROM tables rather than forcing one cart's mascot quest onto another.
 
 > [!IMPORTANT]
-> **A quick heads up on how Gold works in Kanto Reforged:**
-> Vanilla Johto plays almost entirely the same as the classic game, with several nice QoL additions built right in (Pokegear DexNav, Berry Farm access, Cherrygrove level caps, Johto badge berry unlocks, Gen 3 wild guests, and Moon Stone trade evos). 
+> **A quick heads up on how Gen 2 works in Kanto Reforged:**
+> Vanilla Johto plays almost entirely the same as the classic game (Gold, Silver, or Crystal), with several nice QoL additions built right in (Pokegear DexNav, Berry Farm access, Cherrygrove level caps, Johto badge berry unlocks, Gen 3 wild guests, Moon Stone trade evos, and cross-injected wild exclusives). Story mascots still follow the cart.
 > **The massive bulk and meat of Kanto-Reforged's new content in Gen 2 is the fully overhauled Post-Johto Kanto campaign.** 
 > Once you step off the S.S. Aqua in Vermilion, Kanto has been rebuilt with a rebalanced level progression, full Gen 3 wild encounter tables, overhauled Gym Leaders and gym trainers, dedicated battle circuits (Nugget Bridge, Saffron Dojo), relocated utility hubs, and a proper ramp up to Red at Mt. Silver.
 
@@ -344,7 +346,7 @@ With all 8 Kanto Badges and the Mt. Moon Rival conquered, your level cap expands
 
 ## Where is that again? (Quick Reference)
 
-| What | Gen 1 (Red / Blue) | Gen 2 (Gold) |
+| What | Gen 1 (Red / Blue) | Gen 2 (Gold / Silver / Crystal) |
 |---|---|---|
 | **Rare Candy / Level Caps** | Viridian City (east of Mart) | Cherrygrove City (east path) |
 | **Berry Farm Access** | Right carpet in any Center | Stairs / south mat in any Center |

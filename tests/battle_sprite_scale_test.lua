@@ -70,6 +70,27 @@ local scaled = PokemonGen2.toGen2Record({
 eq(scaled.battleScaleFront, 0.65, "scaled front")
 eq(scaled.battleScaleBack, 0.975, "scaled back")
 
+-- Gen1 Hoenn default: match Gen2 on-screen without mutating shared data.
+local castform = { id = "CASTFORM", dex = 351, battleScaleBack = nil }
+local reg = Scale.gen1RegisterCopy(castform)
+eq(reg.battleScaleBack, 1.5, "castform gen1 back matches gen2 on-screen")
+eq(castform.battleScaleBack, nil, "shared record untouched")
+local g2After = PokemonGen2.toGen2Record({
+  id = "CASTFORM", name = "CASTFORM", dex = 351,
+  types = { "NORMAL" },
+  baseStats = { hp = 1, attack = 1, defense = 1, speed = 1, special = 1 },
+  level1Moves = { "POUND" },
+  spriteFront = "a", spriteBack = "b",
+})
+eq(g2After.battleScaleBack, 1.5, "gen2 castform still 1.5 after gen1 copy helper")
+
+local authored = { dex = 252, battleScaleBack = 1.3 }
+eq(Scale.gen1RegisterCopy(authored), authored, "authored back reused")
+eq(authored.battleScaleBack, 1.3, "authored back kept")
+
+local johto = { dex = 177 }
+eq(Scale.gen1RegisterCopy(johto), johto, "johto not auto-scaled")
+
 if fails == 0 then
   print("OK battle_sprite_scale tests")
   os.exit(0)

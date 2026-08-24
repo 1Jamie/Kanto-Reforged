@@ -1,7 +1,7 @@
 -- Host generation helpers for dual Gen1/Gen2 boot.
--- Prefer GameVersion (real Gold/Red boot). Tests that inject Loader
+-- Prefer GameVersion (real Gen2/Red boot). Tests that inject Loader
 -- generation=2 without switching version should call Host.force(2) or
--- GameVersion.set("gold") before load.
+-- GameVersion.set("gold"|"silver"|"crystal") before load.
 local GameVersion = require("src.core.GameVersion")
 
 local Host = {}
@@ -19,17 +19,15 @@ function Host.generation()
   if forced == 1 or forced == 2 then
     return forced
   end
-  if GameVersion.get() == "gold" or (type(GameVersion.isGold) == "function" and GameVersion.isGold()) then
+  -- NOTE: do NOT probe package.loaded["src.core.Game2"] here.
+  -- Game2 is cached by Lua's require system for the lifetime of the process;
+  -- if a Gen2 game was booted first in the launcher, this would falsely
+  -- return 2 for Red.  GameVersion.generation() is authoritative for all
+  -- Gen2 ids (gold / silver / crystal).
+  if type(GameVersion.generation) == "function" and GameVersion.generation() == 2 then
     return 2
   end
   if _G.game and (_G.game.generation == 2 or _G.game.isGold) then
-    return 2
-  end
-  -- NOTE: do NOT probe package.loaded["src.core.Game2"] here.
-  -- Game2 is cached by Lua's require system for the lifetime of the process;
-  -- if Gold was booted first in the launcher, this would falsely return 2
-  -- for Red.  GameVersion.generation() below is the authoritative check.
-  if type(GameVersion.generation) == "function" and GameVersion.generation() == 2 then
     return 2
   end
   return 1
@@ -65,6 +63,30 @@ end
 
 function Host.versionId()
   return GameVersion.get()
+end
+
+-- "gen1" | "gs" | "crystal" within the active (or forced) boot.
+function Host.engine()
+  if type(GameVersion.engine) == "function" then
+    return GameVersion.engine()
+  end
+  return Host.isGen2() and "gs" or "gen1"
+end
+
+function Host.isGs()
+  return Host.engine() == "gs"
+end
+
+function Host.isCrystal()
+  return Host.engine() == "crystal"
+end
+
+-- Cart bugs this version fixed (Crystal); empty table on GS / Gen1.
+function Host.fixes()
+  if type(GameVersion.fixes) == "function" then
+    return GameVersion.fixes()
+  end
+  return {}
 end
 
 -- Live Game without _G or package (both absent / private under Grandma's
@@ -204,8 +226,8 @@ end
 -- Engine gaps KR fills without shipping engine patches:
 --   * Game2 has persistOptions but Manager calls writeOptions (Gen1 API)
 --   * Game:writeOptions can persist a stale save.options.modOptions copy
---   * Gold Save.saveOptions stashes under options.gold; Loader reads
---     top-level options.modOptions
+--   * Gen2 Save.saveOptions stashes under options.gold (engine OPTIONS_KEY
+--     for all Gen2 editions); Loader reads top-level options.modOptions
 function Host.installEngineShims(mod)
   if Host._engineShims then return end
   Host._engineShims = true

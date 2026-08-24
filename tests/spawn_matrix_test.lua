@@ -128,28 +128,25 @@ return function(T, Data, run, opts)
 
   if Host.isGen2() and not opts.skipGen2 then
     local EG2 = require("mods.Kanto-Reforged.world.encounters_gen2")
-    -- Headless Gold boots may lack the ROM encounter cache; pull it if present.
+    local CachePaths = require("mods.Kanto-Reforged.core.cache_paths")
+    -- Headless Gen2 boots may lack the ROM encounter cache; pull it if present.
     if not (Data.gen2Encounters and Data.gen2Encounters.grass
         and Data.gen2Encounters.grass.ROUTE_29) then
-      local home = os.getenv("HOME") or ""
-      local path = home .. "/.local/share/love/pokemon-love2d/gold/data/generated/encounters.lua"
-      local ok, enc = pcall(dofile, path)
-      if ok and enc and enc.grass then
+      local enc = CachePaths.loadGenerated("encounters.lua", "gold")
+      if enc and enc.grass then
         Data.gen2Encounters = enc
       end
     end
     if not (Data.gen2Encounters and Data.gen2Encounters.grass
         and Data.gen2Encounters.grass.ROUTE_29
         and Data.gen2Encounters.grass.ROUTE_1) then
-      T.check(true, "G2 spawn matrix skipped (no Gold encounter cache)")
+      T.check(true, "G2 spawn matrix skipped (no Gen2 encounter cache)")
       return
     end
-    -- Ensure pokemon defs exist for Gold natives referenced by the pool.
+    -- Ensure pokemon defs exist for Gen2 natives referenced by the pool.
     do
-      local home = os.getenv("HOME") or ""
-      local path = home .. "/.local/share/love/pokemon-love2d/gold/data/generated/pokemon.lua"
-      local ok, poke = pcall(dofile, path)
-      if ok and type(poke) == "table" then
+      local poke = CachePaths.loadGenerated("pokemon.lua", "gold")
+      if type(poke) == "table" then
         Data.pokemon = Data.pokemon or {}
         for id, rec in pairs(poke) do
           if not Data.pokemon[id] then Data.pokemon[id] = rec end

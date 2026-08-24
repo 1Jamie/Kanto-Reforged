@@ -26,7 +26,7 @@ return {
       "mod option: XP SHARE (SLOT 2) (default on; 70% pool to fighters, ≤30% to party slot 2)",
       "mod option: SMARTER AI (default on)",
       "Viridian / Cherrygrove Rare Candy NPC; taking candy permanently enables story level caps",
-      "Gen 2 Gold support: Hoenn species, Pokegear DexNav card, summary page 4, Berry Farm, and Kanto postgame overhaul",
+      "Gen 2 Gold/Silver/Crystal support: Hoenn species, Pokegear DexNav card, summary page 4, Berry Farm, and Kanto postgame overhaul",
     },
     known = {
       "some Gen 4+ learnset leftovers remain registered",

@@ -7,7 +7,9 @@
 -- KR / Hoenn art is Gen1-shaped (32×32 backs). On Gold that reads tiny
 -- unless battleScaleBack compensates (32 × 1.5 = 48). Gold Johto art is
 -- 48×48; on Gen1 that reads huge at 2× unless resampled or scaled
--- (48 × 4/3 ≈ 64).
+-- (48 × 4/3 ≈ 64). On Gen1, Hoenn denser fills look oversized at the
+-- default 2× — gen1RegisterCopy applies the same 1.5 on-screen target
+-- without mutating shared pokemon_data (Gen2 still converts unset → 1.5).
 --
 -- Author pokemon_data in Gen1 absolute scales (what you tune while playing
 -- Red). Convert at the Gen2 bridge — never copy raw battleScaleBack to Gold.
@@ -120,6 +122,62 @@ function BattleSpriteScale.applyGoldBackOnGen1(record, backPx)
     record.battleScaleFront, record.battleScaleBack)
   record.battleScaleBack = BattleSpriteScale.gen1ScaleForGoldBack(backFrac, backPx)
   return record
+end
+
+--- Gen1-only: Hoenn KR backs fill the 32×32 canvas denser than Gen1 natives,
+-- so the Gen1 default 2× (64 on-screen) reads oversized vs Gen2 (where
+-- applyGen1RecordToGold already targets 48 on-screen). When no authored
+-- battleScaleBack, match that Gen2 size (32 × 1.5). Mutates `record`.
+-- Do not bake this into shared pokemon_data — Gen2 registration must still
+-- see unset → fraction 1 → Gold back 1.5.
+function BattleSpriteScale.applyHoennBackOnGen1(record)
+  if not record then return record end
+  local dex = record.dex or 0
+  if dex < 252 then return record end
+  if record.battleScaleBack ~= nil then return record end
+  local _, back = BattleSpriteScale.defaultsForGen1ArtOnGold()
+  record.battleScaleBack = back
+  return record
+end
+
+--- Shallow copy for Gen1 pokemon:register so applyHoennBackOnGen1 never
+-- mutates the shared pokemon_data table Gen2 also loads.
+function BattleSpriteScale.gen1RegisterCopy(record)
+  if not record then return record end
+  local dex = record.dex or 0
+  if dex < 252 or record.battleScaleBack ~= nil then
+    return record
+  end
+  local copy = {}
+  for k, v in pairs(record) do
+    copy[k] = v
+  end
+  return BattleSpriteScale.applyHoennBackOnGen1(copy)
+end
+
+--- Gen2 intro draws the trainer in the player/enemy pic box while still
+-- passing the lead mon into drawPic.  KR Hoenn backs use battleScaleBack
+-- 1.5 (32→48); that must not resize Chris/Kris or the foe trainer.
+function BattleSpriteScale.install(mod)
+  local Host = require("mods.Kanto-Reforged.core.host")
+  if not Host.isGen2From(mod) and not Host.isGen2() then return end
+  local Gen1Patch = require("mods.Kanto-Reforged.core.gen1_patch")
+  local ok, BS = pcall(require, "src.ui.gen2.BattleState")
+  if not ok or not BS then return end
+  Gen1Patch.apply(BS, function(BattleState)
+    if BattleState._krTrainerPicScale then return end
+    local origPicScale = BattleState.picScale
+    BattleState.picScale = function(self, path, mon, back)
+      if back and self.showPlayerTrainer then
+        return self:imageScale(path) or 1
+      end
+      if (not back) and self.showEnemyTrainer then
+        return self:imageScale(path) or 1
+      end
+      return origPicScale(self, path, mon, back)
+    end
+    BattleState._krTrainerPicScale = true
+  end)
 end
 
 return BattleSpriteScale

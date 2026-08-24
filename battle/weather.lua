@@ -344,6 +344,9 @@ function Weather.install(mod)
   pcall(function()
     require("mods.Kanto-Reforged.battle.castform_fx").install(mod)
   end)
+  pcall(function()
+    require("mods.Kanto-Reforged.battle.battle_sprite_scale").install(mod)
+  end)
 
   local okE, Effects = pcall(require, "src.battle.gen2.Effects")
   if okE and Effects and not Effects._krGen3SandChip then

@@ -2,8 +2,10 @@
 --   curated (default):
 --     * Kanto — full Gen3 grass tables at postgame levels (mid/final forms
 --       that fit the band; TOD-biased). No legendaries / starters / Shedinja.
---     * Johto — keep Gold natives; inject a couple of habitat-fitting Gen3
---       basics into rare slots, clamped to each species' wild level band.
+--     * Johto — keep active-ROM natives, then cross-inject the host's missing
+--       Gold/Silver/Crystal wild exclusives (see version_exclusives.lua);
+--       plus a couple of habitat-fitting Gen3 basics into rare slots,
+--       clamped to each species' wild level band.
 --   full_random (FULL SPAWN MIX toggle):
 --     * All Johto + Kanto grass/water maps reshuffled from Gen 1–3
 --       (level/stage gated, legends excluded unless legends_in_mix).
@@ -16,7 +18,7 @@ local Host = require("mods.Kanto-Reforged.core.host")
 
 local EncountersGen2 = {}
 
--- Gold Kanto outdoor grass maps (postgame bands). Levels biased above Gen1 early-game.
+-- Gen2 Kanto outdoor grass maps (postgame bands). Levels biased above Gen1 early-game.
 local KANTO_GRASS = {
   ROUTE_1 = { level = 28, habitats = { "grassland" } },
   ROUTE_2 = { level = 28, habitats = { "grassland" } },
@@ -96,7 +98,7 @@ local JOHTO_GUESTS = {
   SLOWPOKE_WELL_B1F = { level = 10, habitats = { "cave", "waters-edge" }, count = 2 },
 }
 
--- Johto curated injects: early/mid Gen3 basics only (Gold natives stay).
+-- Johto curated injects: early/mid Gen3 basics only (ROM natives stay).
 -- Still no legendaries / starters / cocoons / fish-in-grass.
 local HABITAT_POOL = {
   grassland = {
@@ -127,7 +129,7 @@ local HABITAT_POOL = {
   cave = { "WHISMUR", "ARON", "NOSEPASS", "MAWILE", "SABLEYE", "DUSKULL", "LAIRON" },
 }
 
--- Gold Kanto is postgame (lv ~28–40). Bases with Johto-early bands would
+-- Gen2 Kanto is postgame (lv ~28–40). Bases with Johto-early bands would
 -- otherwise empty out (Absol-only mountains, blank Routes 24/25). Use
 -- mid/final Gen3 forms that fit the band — still no legends/starters/Shedinja.
 local KANTO_HABITAT_POOL = {
@@ -336,9 +338,9 @@ local function slotsFor(mod, habitats, level, tod, habitatPools)
   return todSlots(orderForTod(base, tod), level, tod)
 end
 
--- Gold keeps wild tables on game.data.gen2Encounters (Game2 builds its own
+-- Gen2 keeps wild tables on game.data.gen2Encounters (Game2 builds its own
 -- data table). Gen1's Data *module* is NOT that table — writing only there
--- makes mid-session FULL/PURE SPAWN MIX look like a no-op on Gold while Red
+-- makes mid-session FULL/PURE SPAWN MIX look like a no-op on Gen2 while Red
 -- still works. Prefer game.data, then Data (headless tests), then registry.
 local function liveEncountersRoot(mod)
   local game = (mod and Host.liveGame(mod))
@@ -446,7 +448,7 @@ local function copySlots(slots)
   return out
 end
 
--- Keep Gold / Restored commons; overwrite rarest slots with Gen3 guests at a level
+-- Keep ROM / restored commons; overwrite rarest slots with Gen3 guests at a level
 -- that fits both the slot and the species' wild band.
 local function injectGuests(slots, guests)
   local out = copySlots(slots)
@@ -580,6 +582,7 @@ local function applyCurated(mod)
       nJohto = nJohto + 1
     end
   end
+  require("mods.Kanto-Reforged.world.version_exclusives").apply(mod)
   mod.log:info(
     "Gen2 encounters curated: %d Kanto maps + %d Johto guest maps",
     nKanto, nJohto)
@@ -701,7 +704,7 @@ local function bstOf(rec)
       + (b.specialDefense or 0)
 end
 
-local function buildGoldIndex(mod, pokemon_data, allowLegends, mapId)
+local function buildGen2Index(mod, pokemon_data, allowLegends, mapId)
   local ExpEncounters = require("mods.Kanto-Reforged.world.encounters")
   local SpeciesScope = require("mods.Kanto-Reforged.pokemon.species_scope")
   local maxDex = SpeciesScope.maxDexForMap(mod, mapId)
@@ -1012,8 +1015,8 @@ local function applyFullRandom(mod, pokemon_data, opts)
   opts = opts or {}
   local allowLegends = opts.legendsInMix and true or false
   -- Separate pools so Johto-native can cap Gen3 on Johto maps only.
-  local indexJohto = buildGoldIndex(mod, pokemon_data, allowLegends, "ROUTE_29")
-  local indexKanto = buildGoldIndex(mod, pokemon_data, allowLegends, "ROUTE_1")
+  local indexJohto = buildGen2Index(mod, pokemon_data, allowLegends, "ROUTE_29")
+  local indexKanto = buildGen2Index(mod, pokemon_data, allowLegends, "ROUTE_1")
   local grassMaps, waterMaps = {}, {}
   for mapId in pairs(baselines.grass) do
     grassMaps[#grassMaps + 1] = mapId
@@ -1160,7 +1163,8 @@ EncountersGen2._clampWildLevel = clampWildLevel
 EncountersGen2._fitsRouteLevel = fitsRouteLevel
 EncountersGen2._pickGuests = pickGuests
 EncountersGen2._isKantoMap = isKantoMap
-EncountersGen2._buildGoldIndex = buildGoldIndex
+EncountersGen2._buildGen2Index = buildGen2Index
+EncountersGen2._buildGoldIndex = buildGen2Index -- compat alias
 EncountersGen2._habitatsForMap = habitatsForMap
 EncountersGen2._eligibleForSlot = eligibleForSlot
 EncountersGen2._WATER_HABITAT = WATER_HABITAT

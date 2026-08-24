@@ -502,6 +502,37 @@ return function(T, Data, run)
       clearPath, "clear weather keeps the default Castform pic")
     T.eq(clearCtx.trueColor, false, "default Castform pic does not force trueColor")
 
+    -- Hoenn battleScaleBack 1.5 must not resize the trainer intro pic when
+    -- Castform (or any KR mon) is the lead.
+    do
+      local ok, err = xpcall(function()
+        Host.force(2)
+        local Scale = require("mods.Kanto-Reforged.battle.battle_sprite_scale")
+        Scale.install({ loader = { generation = 2 } })
+        local BS = require("src.ui.gen2.BattleState")
+        T.check(BS._krTrainerPicScale,
+          "Gen2 trainer intro ignores lead mon battleScale*")
+        local view = {
+          showPlayerTrainer = true,
+          showEnemyTrainer = false,
+          pokemon = { CASTFORM = { battleScaleBack = 1.5, battleScaleFront = 1 } },
+          imageScale = function() return nil end,
+        }
+        setmetatable(view, { __index = BS })
+        T.eq(view:picScale("assets/chris_back.png", { species = "CASTFORM" }, true),
+          1, "Castform lead does not 1.5x the player trainer back")
+        view.showPlayerTrainer = false
+        T.eq(view:picScale("mods/Kanto-Reforged/assets/castform_back.png",
+            { species = "CASTFORM" }, true),
+          1.5, "Castform back still uses Hoenn battleScaleBack after send-out")
+        view.showEnemyTrainer = true
+        T.eq(view:picScale("assets/youngster.png", { species = "RATTATA" }, false),
+          1, "enemy trainer front ignores foe mon battleScale*")
+      end, debug.traceback)
+      Host.clearForce()
+      if not ok then error(err) end
+    end
+
     -- Gen2 Weather.tick is wired from battle.turn_ended AFTER takeEvents.
     -- Emitting Forecast there deferred "transformed!" to the next turn.
     do

@@ -1,7 +1,7 @@
 {
   "id": "Kanto-Reforged",
   "name": "Kanto Reforged",
-  "version": "1.4.0",
+  "version": "1.5.1",
   "api": 2,
   "entry": "main.lua",
   "profile": "content",
@@ -33,7 +33,7 @@
   "conflicts": [
     "modern_bag"
   ],
-  "description": "Gen 2-3 Pokemon, moves, abilities & more. Gold: Hoenn in Kanto + farm/abilities/AI.",
+  "description": "Gen 2-3 Pokemon, moves, abilities & more. Gold/Silver/Crystal: Hoenn in Kanto + farm/abilities/AI.",
   "github": "1Jamie/Kanto-Reforged",
   "affects_link": true
 }

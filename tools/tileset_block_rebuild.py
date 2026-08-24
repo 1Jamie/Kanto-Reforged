@@ -33,7 +33,21 @@ def find_tileset_image(rel_or_name: str, game: str = "gold") -> str | None:
 
 
 def find_gold_tileset_image(rel_or_name: str) -> str | None:
-    return find_tileset_image(rel_or_name, game="gold")
+    """Prefer Gold, then other Gen2 caches (Silver/Crystal), then legacy roots."""
+    for game in ("gold", "silver", "crystal"):
+        hit = find_tileset_image(rel_or_name, game=game)
+        if hit:
+            return hit
+    return None
+
+
+def find_gen2_tileset_image(rel_or_name: str, game: str | None = None) -> str | None:
+    """Resolve a Gen2 tileset sheet for the given edition (or any Gen2)."""
+    if game:
+        hit = find_tileset_image(rel_or_name, game=game)
+        if hit:
+            return hit
+    return find_gold_tileset_image(rel_or_name)
 
 
 def rebuild_blocks_from_tileset(

@@ -14,7 +14,7 @@ Mod id: `Kanto-Reforged`. Enable it in the launcher Mods tab or the F10 manager.
 4. [Trade Evolution Bypasses (Moon Stone)](#trade-evolution-bypasses-moon-stone)
 5. [Abilities and Battle Mechanics](#abilities-and-battle-mechanics)
 6. [Wild encounters and trainers](#wild-encounters-and-trainers)
-7. [Restored Gold Kanto dungeons](#restored-gold-kanto-dungeons)
+7. [Restored Gen 2 Kanto dungeons](#restored-gen-2-kanto-dungeons)
 8. [Gender](#gender)
 9. [Day Care and breeding](#day-care-and-breeding)
 10. [Held items](#held-items)
@@ -48,7 +48,7 @@ Configured in the mod manager / F10 options:
 | Option | Default | Effect |
 |---|---|---|
 | **DEX SCOPE** (Gen1) / **JOHTO SCOPE** (Gen2) | NATIONAL / FULL | Restricts wilds, trainers, and legends. Gen1 **KANTO** locks to the original 151 (out-of-scope party/PC mons are safely stored and restored when switched back). Gen2 **JOHTO 251** caps Johto spawns at dex 251 while Kanto postgame maps (including restored dungeons) keep Gen3 guests. |
-| **FULL SPAWN MIX** | Off | Rebuilds wild tables from the full Gen 1–3 pool instead of curated mixes (habitat / level gated, deterministic). On **Gold**, reshuffles Johto and Kanto grass/water (with a density pass so Kanto stays full). Mid-session toggles apply live. |
+| **FULL SPAWN MIX** | Off | Rebuilds wild tables from the full Gen 1–3 pool instead of curated mixes (habitat / level gated, deterministic). On **Gen 2** (Gold/Silver/Crystal), reshuffles Johto and Kanto grass/water (with a density pass so Kanto stays full). Mid-session toggles apply live. |
 | **PURE RANDOM SPAWN** | Off | Chaos mode: seeded pick from the whole allowed dex (respects DEX/JOHTO SCOPE). No habitat, stage, or BST gates. Overrides FULL SPAWN MIX when both are on. Rolls once when toggled on and persists across loads; toggle off/on for a new mix. |
 | **LEGENDS IN MIX** | Off | When FULL SPAWN MIX or PURE RANDOM SPAWN is on, allow legendaries/mythicals into the wild pool. Curated mode ignores this (including a leftover on after turning FULL/PURE off). |
 | **XP SHARE (SLOT 2)** | On | Splits the Gen 1 XP pool: ~70% to fighters, up to ~30% to party slot 2 (never more than a solo share total). Replaces EXP.ALL while enabled. |
@@ -59,6 +59,7 @@ Configured in the mod manager / F10 options:
 | **SP.ATK / SP.DEF** | On | **Red only.** Special moves use separate Sp.Atk / Sp.Def bases (PokeAPI) instead of Gen 1 Special. Summary and Modern UI party/PC detail show both stats (`SAT` / `SDF`). Stages, DVs, and Calcium stay Gen 1 (one shared Special). Hidden on Gold (already split). |
 | **EXP BAR** | On | **Red only.** Blue EXP bar under the HP bar in battle (Gen 2 style, widescreen-aware). Hidden on Gold (native bar). |
 | **DEXNAV** | DEXNAV | **Red only.** Start-menu label / off. Gold DexNav is a Pokegear card (no rename toggle). |
+| **SPRITES 1-251** | CUSTOM KR | **Red only**, and only after at least one Gen 2 cache exists. Boot KR on **Gold / Silver / Crystal** to copy that edition’s static battle pics (dex 1–251) into `save/mod-derived/.../sprites/<edition>/` while that ROM is mounted. Return to Red and choose **CUSTOM KR**, **GOLD**, **SILVER**, and/or **CRYSTAL** (only captured editions appear). Hoenn (252+) always stays KR. Crystal anim sheets are never cached. Mid-session swaps apply live; re-boot each Gen2 column once after a KR update if the set looks incomplete. |
 
 ---
 
@@ -134,10 +135,10 @@ To eliminate the need for link trading to evolve certain species, several trade 
 
 ### Wild Encounters
 
-- **Gen 1 (Red / Blue):** Curated mixes: habitats and levels mix Gen 2–3 species into Kanto routes without replacing the whole table. A coverage pass ensures every non-legendary **line** is obtainable.
-- **Gen 2 (Gold) Johto:** Native Johto tables are preserved with curated Gen 3 guests in rare slots across grasslands, forests, caves, and mountains.
-- **Gen 2 (Gold) Kanto outdoors:** Fully rebuilt postgame grass tables featuring Gen 3 lines scaled from **Lv 28 to Lv 40+**.
-- **Gen 2 (Gold) restored dungeons:** Separate postgame tables for Viridian Forest / Mt. Moon / Diglett's Cave / Rock Tunnel / Safari / Seafoam / Cerulean Cave (see [Restored Gold Kanto dungeons](#restored-gold-kanto-dungeons)); cave bands run roughly mid-40s into the 60s.
+- **Gen 1 (Red / Blue / Yellow):** Curated mixes: habitats and levels mix Gen 2–3 species into Kanto routes without replacing the whole table. A coverage pass ensures every non-legendary **line** is obtainable. Host version exclusives (e.g. Red gets Sandshrew/Vulpix/…, Blue gets Ekans/Oddish/…) are cross-injected into classic wild slots.
+- **Gen 2 (Gold/Silver/Crystal) Johto:** Native Johto tables are preserved with curated Gen 3 guests in rare slots across grasslands, forests, caves, and mountains. Missing Gold/Silver/Crystal wild exclusives are cross-injected (story mascots still follow the cart).
+- **Gen 2 (Gold/Silver/Crystal) Kanto outdoors:** Fully rebuilt postgame grass tables featuring Gen 3 lines scaled from **Lv 28 to Lv 40+**.
+- **Gen 2 (Gold/Silver/Crystal) restored dungeons:** Separate postgame tables for Viridian Forest / Mt. Moon / Diglett's Cave / Rock Tunnel / Safari / Seafoam / Cerulean Cave (see [Restored Gen 2 Kanto dungeons](#restored-gen-2-kanto-dungeons)); cave bands run roughly mid-40s into the 60s.
 - **Full Spawn Mix (Option):** Reshuffles all wild grass/water tables across the entire game from the Gen 1–3 pool.
 - Wilds have a ~**5%** chance to hold a berry (rolled only from types you have already unlocked at the farm). Catching the mon keeps `heldItem`; use party **TAKE** to move it to the bag.
 
@@ -146,7 +147,7 @@ To eliminate the need for link trading to evolve certain species, several trade 
 ### Trainers
 
 - **Gen 1 (Red / Blue):** Gym leaders and Elite Four get a curated **Gen 2 swap + Gen 3 add**. Ace mons hold a **berry ramp** (plain `BERRY` on Brock → status berries mid-game → Lum on Agatha/Lance). Rival mixes follow **continuity** (mid fights foreshadow a line; League fights debut finals). Tier 2 set pieces (Nugget Bridge, gym trainers, Mt. Moon, Fighting Dojo, Tower, Silph, Victory Road) get heavier mixes.
-- **Gen 2 (Gold) Kanto Overhaul:** The entire Kanto postgame circuit is overhauled with competitive 6-Pokémon rosters, Gen 2/3 additions, held berries, and higher level targets aligned to the soft caps (58 → 64 → 72 → 85 → 100):
+- **Gen 2 (Gold/Silver/Crystal) Kanto Overhaul:** The entire Kanto postgame circuit is overhauled with competitive 6-Pokémon rosters, Gen 2/3 additions, held berries, and higher level targets aligned to the soft caps (58 → 64 → 72 → 85 → 100):
   - **Lt. Surge (Vermilion):** Levels 52–55 (Ace Raichu holding Chesto Berry).
   - **Janine (Fuchsia):** Levels 52–56 (Ace Venomoth holding Persim Berry).
   - **Erika (Celadon):** Levels 53–57 (Ace Bellossom holding Rawst Berry).
@@ -161,9 +162,9 @@ To eliminate the need for link trading to evolve certain species, several trade 
 
 ---
 
-## Restored Gold Kanto dungeons
+## Restored Gen 2 Kanto dungeons
 
-On **Gold**, Gen 1 Kanto dungeon layouts (blocks, warps, NPCs, items, signs) are injected as `*_KR` maps and overworld mouths are redirected into them. Trainers and wilds are scaled for the postgame curve.
+On **Gold/Silver/Crystal**, Gen 1 Kanto dungeon layouts (blocks, warps, NPCs, items, signs) are injected as `*_KR` maps and overworld mouths are redirected into them. Trainers and wilds are scaled for the postgame curve.
 
 | Area | Notes |
 |---|---|
@@ -367,7 +368,7 @@ Step cool-down between crafts: **640** farm steps (480 at soil rank 3).
 ## Bag and party QoL
 
 - **Pockets (Gen 1):** Items, Balls, Key Items, TMs & HMs, Berries. Bag capacity **60**.
-- **DexNav:** On the start menu (Red) / Pokegear Card (Gold, via `pokegear_cards` mod) after getting the Pokédex: shows current map species (more detail once seen/caught). Optional **ROAM** row when a roamer is present.
+- **DexNav:** On the start menu (Red) / Pokegear Card (Gold/Silver/Crystal, via `pokegear_cards` mod) after getting the Pokédex: shows current map species (more detail once seen/caught). Optional **ROAM** row when a roamer is present.
 - **Summary Menu:**
   - **Gen 1:** Page 3 displays ability, held item, and gender glyph.
   - **Gen 2:** Page 4 displays ability, held item, gender glyph, and ability description text.

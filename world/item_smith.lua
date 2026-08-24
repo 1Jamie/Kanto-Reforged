@@ -113,7 +113,9 @@ function ItemSmith.register(mod)
   end
 
   local mapId = Host.isGen2() and "CINNABAR_POKECENTER_1F" or "CINNABAR_LAB_METRONOME_ROOM"
-  local index = Host.isGen2() and 4 or 3
+  local index = Host.isGen2()
+    and HouseNpcs.nextFreeIndex(mod, mapId, 4)
+    or 3
   local x = Host.isGen2() and 1 or 5
   local y = Host.isGen2() and 3 or 5
 

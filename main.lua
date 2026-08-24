@@ -97,8 +97,11 @@ local function buildOptionDefs(mod)
   if Host.isGen1From(mod) then
     defs[#defs + 1] = SplitSpecial.OPTION
     defs[#defs + 1] = require("mods.Kanto-Reforged.ui.battle_exp_bar").OPTION
-    -- DexNav label/off is only for the start-menu entry; Gold uses Pokegear.
+    -- DexNav label/off is only for the start-menu entry; Gen2 uses Pokegear.
     defs[#defs + 1] = require("mods.Kanto-Reforged.ui.dexnav").OPTION
+    local SpriteCache = require("mods.Kanto-Reforged.core.sprite_cache")
+    local spriteOpt = SpriteCache.optionDef(mod)
+    if spriteOpt then defs[#defs + 1] = spriteOpt end
   end
   return defs
 end
@@ -194,6 +197,11 @@ return function(mod)
   pcall(function() ExpTrainers.apply(mod) end)
 
   if Host.isGen2() then
+    -- Capture static 1–251 battle pics into a per-edition sprite cache so
+    -- Gen1 can offer GOLD/SILVER/CRYSTAL sprite sets. Never copies anim sheets.
+    local SpriteCache = require("mods.Kanto-Reforged.core.sprite_cache")
+    pcall(function() SpriteCache.captureActiveEdition(mod) end)
+
     local RestoredDungeons = require("mods.Kanto-Reforged.world.restored_dungeons")
     RestoredDungeons.apply(mod)
   end
@@ -216,6 +224,8 @@ return function(mod)
 
   local Weather = require("mods.Kanto-Reforged.battle.weather")
   Weather.install(mod)
+
+  Abilities.install(mod)
 
   require("mods.Kanto-Reforged.battle.adapters.register").installContent(mod)
   require("mods.Kanto-Reforged.battle.adapters.register").installRuntime(mod)
@@ -472,16 +482,16 @@ return function(mod)
   -- 3. Register Custom Moves and Pokémon Species
   if has_pokemon then
     local Gen2Compat = require("mods.Kanto-Reforged.core.gen2_compat")
-    local goldDataReady = false
+    local gen2DataReady = false
     if Host.isGen2() then
       -- Seed growth rates, EVOLVE_* aliases, and move-effect stubs so Gen3
-      -- content can resolve without requiring a full Gold ROM cache first.
+      -- content can resolve without requiring a full Gen2 ROM cache first.
       Gen2Compat.seedInfra(mod, pokemon_data)
-      goldDataReady = Gen2Compat.goldDataReady(mod)
-      if not goldDataReady then
+      gen2DataReady = Gen2Compat.gen2DataReady(mod)
+      if not gen2DataReady then
         mod.log:warn(
-          "Gold ROM cache incomplete; Hoenn moves use effect stubs / "
-            .. "Gen1-known learnsets. Import Gold for full move tables."
+          "Gen2 ROM cache incomplete; Hoenn moves use effect stubs / "
+            .. "known learnsets. Import Gold/Silver/Crystal for full move tables."
         )
       end
     end
@@ -490,7 +500,7 @@ return function(mod)
     MoveCategoryGen3.stripTable(pokemon_data.moves)
 
     local moves_registered = 0
-    if not Host.isGen2() or goldDataReady then
+    if not Host.isGen2() or gen2DataReady then
       for id, record in pairs(pokemon_data.moves) do
         local ok = pcall(function()
           if Host.isGen2() then
@@ -510,7 +520,7 @@ return function(mod)
       MoveAnims.register(mod, pokemon_data.moves)
       MoveAnims.install(mod)
     else
-      -- Incomplete Gold: still register moves whose type + effect already resolve.
+      -- Incomplete Gen2 cache: still register moves whose type + effect already resolve.
       for id, record in pairs(pokemon_data.moves) do
         local ok = pcall(function()
           local copy = {}
@@ -526,10 +536,10 @@ return function(mod)
           moves_registered = moves_registered + 1
         end
       end
-      mod.log:info("Registered %d custom moves (compat / partial Gold)", moves_registered)
+      mod.log:info("Registered %d custom moves (compat / partial Gen2)", moves_registered)
     end
 
-    -- Gen3 move types on Red and Gold (Bite→Dark, Charm→Normal, …).
+    -- Gen3 move types on Red and Gen2 (Bite→Dark, Charm→Normal, …).
     -- Does not touch sprites or generate_pokemon_mod.py.
     local okMoves, MoveTypePatches = pcall(require, "mods.Kanto-Reforged.battle.move_type_patches")
     if okMoves then
@@ -544,7 +554,7 @@ return function(mod)
     local PaletteGen2 = require("mods.Kanto-Reforged.pokemon.palette_gen2")
     if okPals and type(species_palettes) == "table" then
       if Host.isGen2() then
-        -- Gold: middle-two-color rows under gen2Palettes.pokemon[species].
+        -- Gen2: middle-two-color rows under gen2Palettes.pokemon[species].
         -- Do NOT Gen1-register named packs here — that pollutes top-level
         -- gen2Palettes keys and leaves Hoenn monColors nil (grayscale).
         PaletteGen2.apply(mod, species_palettes, pokemon_data)
@@ -556,10 +566,10 @@ return function(mod)
     end
 
     if Host.isGen2() then
-      PokemonGen2.registerForGold(mod, pokemon_data, {
-        goldDataReady = goldDataReady,
+      PokemonGen2.registerForGen2(mod, pokemon_data, {
+        gen2DataReady = gen2DataReady,
       })
-      -- Gold dex UI reads gen2Pokedex.entries (not Data.text). Fill Hoenn rows.
+      -- Gen2 dex UI reads gen2Pokedex.entries (not Data.text). Fill Hoenn rows.
       DexEntries.bindGen2Pokedex(mod, pokemon_data.species)
       -- Catch → NewPokedexEntry: land on OLD when species is off NEW/A–Z.
       DexEntries.installGen2CatchEntryFix(mod)
@@ -602,10 +612,13 @@ return function(mod)
       mod.save:set(SpeciesScope.APPLIED_KEY, SpeciesScope.mode(mod))
     else
       PokemonGen2.applyGen1DerivedSprites(mod, pokemon_data)
+      local BattleSpriteScale = require("mods.Kanto-Reforged.battle.battle_sprite_scale")
       local species_registered = 0
       local highestDex = 151
       for id, record in pairs(pokemon_data.species) do
-        mod.content.pokemon:register(id, record)
+        -- Hoenn backs: Gen1-only 1.5× so they match Gen2 on-screen size
+        -- (shared pokemon_data stays unset for the Gen2 bridge).
+        mod.content.pokemon:register(id, BattleSpriteScale.gen1RegisterCopy(record))
         species_registered = species_registered + 1
         if record.dex and record.dex > highestDex then
           highestDex = record.dex
@@ -630,6 +643,11 @@ return function(mod)
           SpeciesScope.onOptionsChanged(mod, Host.liveGame(mod), ev)
           return
         end
+        if ev.key == "sprite_source" then
+          local SpriteCache = require("mods.Kanto-Reforged.core.sprite_cache")
+          SpriteCache.onSourceChanged(mod, pokemon_data)
+          return
+        end
         if Host.optionEventIs(ev.key, "pure_spawn_random") then
           if mod.options:get(Host.optionKey("pure_spawn_random")) then
             applySpawnTables(mod, pokemon_data, { rerollPure = true })
@@ -645,6 +663,10 @@ return function(mod)
       end)
       SpeciesScope.refresh(mod, nil, SpeciesScope.mode(mod))
       mod.save:set(SpeciesScope.APPLIED_KEY, SpeciesScope.mode(mod))
+      -- Apply after merge so Red natives (1–151) pick up Gen2 caches too.
+      local SpriteCache = require("mods.Kanto-Reforged.core.sprite_cache")
+      SpriteCache.applyLive(mod)
+      SpriteCache.invalidateAssets()
     end
 
     if dexTexts > 0 then
@@ -1376,12 +1398,16 @@ return function(mod)
   mod.events:on("game.ready", function() patchIlluminate() end)
   patchIlluminate()
 
-  -- Gold BattleState:pic re-resolves every frame through pokemon.sprite
-  -- (same ctx as Sprites.path: species, side front/back, kind, trueColor).
+  -- Battle pics re-resolve every frame through pokemon.sprite
+  -- (Sprites.path: species, side front/back, kind, trueColor).
   mod.hooks:wrap("pokemon.sprite", function(next, path, ctx)
     local CastformFx = require("mods.Kanto-Reforged.battle.castform_fx")
     local resolved = CastformFx.resolveSprite(path, ctx, mod.activeBattle, mod)
     if resolved and resolved ~= path then return resolved end
+    -- Gen1: Gold/Silver/Crystal static caches for dex 1–251.
+    local SpriteCache = require("mods.Kanto-Reforged.core.sprite_cache")
+    local alt = SpriteCache.resolvePath(mod, ctx and ctx.species, ctx and ctx.side)
+    if alt then return alt end
     return next(path, ctx)
   end)
 
@@ -1409,8 +1435,9 @@ return function(mod)
       mod.activeBattle = ev.battle
       ensureTypeChart(ev.battle.data or (ev.game and ev.game.data)
         or (mod.activeGame and mod.activeGame.data))
-      Abilities.onEntry(ev.battle, ev.battle.player)
-      Abilities.onEntry(ev.battle, ev.battle.enemy)
+      -- After send-outs, not before trainer / "Go!" dialog (sayNext would
+      -- otherwise insert at the front of the intro queue on Gen1).
+      Abilities.scheduleBattleStartEntries(ev.battle)
     end
   end)
   

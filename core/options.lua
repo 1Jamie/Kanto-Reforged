@@ -20,11 +20,20 @@ return {
     blue = {
       ["Kanto-Reforged"] = true,
     },
+    crystal = {
+      ["Kanto-Reforged"] = true,
+      pokegear_cards = true,
+    },
     gold = {
       ["Kanto-Reforged"] = true,
+      pokegear_cards = true,
     },
     red = {
       ["Kanto-Reforged"] = true,
+    },
+    silver = {
+      ["Kanto-Reforged"] = true,
+      pokegear_cards = true,
     },
     yellow = {
       ["Kanto-Reforged"] = true,

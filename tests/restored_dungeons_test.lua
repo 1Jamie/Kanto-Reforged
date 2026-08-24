@@ -17,33 +17,17 @@ local function runTests()
   assert(Data.seafoamBoulderPatches ~= nil, "Data.seafoamBoulderPatches must not be nil")
 
   local home = os.getenv("HOME") or ""
-  local goldTilesets = {}
-  local gtsPaths = {
-    home .. "/.local/share/love/pokemon-love2d/gold/data/generated/tilesets.lua",
-    "data/generated/tilesets.lua",
-  }
-  for _, p in ipairs(gtsPaths) do
-    local ok, val = pcall(dofile, p)
-    if ok and type(val) == "table" then
-      goldTilesets = val
-      break
-    end
-  end
+  local CachePaths = require("mods.Kanto-Reforged.core.cache_paths")
+  local goldTilesets = CachePaths.loadGenerated("tilesets.lua", "gold") or {}
+  local _ = home -- kept for any local path fallbacks below
 
-  -- Prefer Gold trainers so class-index collision checks are meaningful
-  -- (Gen1 OPP_HIKER=9 is Gold RIVAL1=9).
-  local goldTrainers = nil
-  for _, p in ipairs({
-    home .. "/.local/share/love/pokemon-love2d/gold/data/generated/trainers.lua",
-    "data/generated/trainers.lua",
-  }) do
-    local ok, val = pcall(dofile, p)
-    if ok and type(val) == "table" and (val.classes and val.classes.RIVAL1 or val.RIVAL1) then
-      goldTrainers = val
-      break
-    end
+  -- Prefer Gen2 trainers so class-index collision checks are meaningful
+  -- (Gen1 OPP_HIKER=9 is Gen2 RIVAL1=9).
+  local goldTrainers = CachePaths.loadGenerated("trainers.lua", "gold")
+  if goldTrainers and not (goldTrainers.classes and goldTrainers.classes.RIVAL1 or goldTrainers.RIVAL1) then
+    goldTrainers = nil
   end
-  assert(goldTrainers, "Gold trainers.lua with RIVAL1 required for collision tests")
+  assert(goldTrainers, "Gen2 trainers.lua with RIVAL1 required for collision tests")
 
   local gen2Maps = dofile("data/generated/maps.lua")
   local fakeMod = {

@@ -7,6 +7,8 @@
 --   * Curated mode finishes with a coverage pass so every non-legendary
 --     line is obtainable: catch the base (or an earlier stage), then evolve
 --     / breed. Not every mid/final needs its own wild slot.
+--   * Host version exclusives (Red/Blue/Yellow) are cross-injected afterward
+--     via version_exclusives.lua.
 
 local Merge = require("src.mods.Merge")
 
@@ -625,6 +627,7 @@ local function mixCurated(mod, index)
   end
 
   ensureBaseCoverage(mod, index)
+  require("mods.Kanto-Reforged.world.version_exclusives").apply(mod)
 end
 
 -- Full mix: every unprotected slot is a pick from Gen 1 locals on that

@@ -1,18 +1,18 @@
 # Kanto Reforged
 
-Gen 2 and 3 content for Red/Blue and Gold on this engine. Same classic story, more Pokemon, moves, abilities, held items, and some bag/party QoL so the extra stuff is easier to use. My goal here was not to bolt on or make things feel weird, but if Game Freak were to do these pieces back in gen1 and gen2, how would they have done it? The features added are attempted to be done in a way to make them feel like they are part of the base games, inspired by some of my favorite things from different generations and rom hacks ive played. I tried my best in the import pipeline to make the gen2-3 mons look good and look like they belong by scaling them, adjusting pixel counts, and following the color count rules and style constraints where i could. Hopefully at the end of the day it looks like an almost "alternate history" version of the classic games.
+Gen 2 and 3 content for Red/Blue and Gold/Silver/Crystal on this engine. Same classic story, more Pokemon, moves, abilities, held items, and some bag/party QoL so the extra stuff is easier to use. My goal here was not to bolt on or make things feel weird, but if Game Freak were to do these pieces back in gen1 and gen2, how would they have done it? The features added are attempted to be done in a way to make them feel like they are part of the base games, inspired by some of my favorite things from different generations and rom hacks ive played. I tried my best in the import pipeline to make the gen2-3 mons look good and look like they belong by scaling them, adjusting pixel counts, and following the color count rules and style constraints where i could. Hopefully at the end of the day it looks like an almost "alternate history" version of the classic games.
 
 Mod id is `Kanto-Reforged`. Turn it on in the launcher Mods tab or the F10 manager.
 
-Has support for Gen1 Modern UI mod (on Gen1) and Pokegear Cards (on Gen2).
+Has support for Gen1 Modern UI mod (on Gen1) and Pokegear Cards (on Gen2 — Gold, Silver, and Crystal).
 
 ## Current status
 
 **RBY (generation 1 of gen1recomp++):**
 Fully functional with the occasional bug still being chased down, but fully playable and all 386 are obtainable.
 
-**Gold (generation 2 of gen1recomp++):**
-Gen 2 Gold support is live. Core pieces:
+**Gold / Silver / Crystal (generation 2 of gen1recomp++):**
+Gen 2 support is live on Gold, Silver, and Crystal. Core pieces:
 - Full Hoenn integration (species dex 252 through 386 registered, sprites scaled, Gen 3 abilities patched onto 1–251).
 - Type chart and move typing parity across both generations (Dark, Steel, Fairy matchups; Gen 3 physical/special by type).
 - Gen 3 freeze parity (1/5 thaw per turn; fire moves melt frozen targets).
@@ -20,15 +20,37 @@ Gen 2 Gold support is live. Core pieces:
 - Party Summary page 4: ability, held item, gender glyph, and ability text.
 - Berry Farm in Johto and Kanto Centers (stairs / south mats) with Soil Expert badge unlocks, Berry Scholar, and farm merchant.
 - Cherrygrove Rare Candy kid + soft level caps through Johto, Lance, the retuned Kanto circuit, and Red at Mt. Silver.
-- **Restored Gen 1 Kanto dungeons** back into Gold (layouts, trainers, items, warps): Viridian Forest, Mt. Moon, Diglett's Cave, Rock Tunnel, Safari Zone (4 zones + Secret House), Seafoam Islands (with a dedicated Blaine gym room), and Cerulean Cave. Wilds/trainers scaled for postgame; Articuno (Seafoam B4F) and Mewtwo (Cerulean Cave B1F) return; Mt. Moon hosts the Silver rematch.
-- Kanto outdoor wilds rebuilt with Gen 3 postgame grass tables (~Lv 28–40+ on routes; restored caves higher, roughly mid-40s into the 60s). Johto grass keeps curated Gen 3 guests.
+- **Restored Gen 1 Kanto dungeons** back into Gen 2 (layouts, trainers, items, warps): Viridian Forest, Mt. Moon, Diglett's Cave, Rock Tunnel, Safari Zone (4 zones + Secret House), Seafoam Islands (with a dedicated Blaine gym room), and Cerulean Cave. Wilds/trainers scaled for postgame; Articuno (Seafoam B4F) and Mewtwo (Cerulean Cave B1F) return; Mt. Moon hosts the Silver rematch.
+- Kanto outdoor wilds rebuilt with Gen 3 postgame grass tables (~Lv 28–40+ on routes; restored caves higher, roughly mid-40s into the 60s). Johto grass keeps each cart's natives, cross-injects the host's missing Gold/Silver/Crystal wild exclusives, and adds curated Gen 3 guests in rare slots.
 - **Retuned Kanto postgame level curve:** gym leaders ~52–72 (Surge → Blue), gym trainees / Fighting Dojo / Nugget Bridge / route trainers matched to that band, dungeon parties in the mid-40s–60s. Soft level caps track it (58 → 64 → 72 → 85 → 100).
 - Moon Stone trade-evo bypasses (Steelix, Scizor, Politoed, Slowking, Porygon2, etc.).
-- Utility NPCs relocated for Gold Kanto: Move Hub at Mr. Psychic's (Saffron), Item Smith at Cinnabar Center 1F, Judge in the Underground Path.
+- Utility NPCs relocated for Gen 2 Kanto: Move Hub at Mr. Psychic's (Saffron), Item Smith at Cinnabar Center 1F, Judge in the Underground Path.
+- Crystal keeps its native gender select / Kris / cart bugfixes; KR does not pull Crystal animated front sheets into Gen1-shared art (static battle pics only).
+- **Gen1 sprite sets (SPRITES 1-251):** optional Gold / Silver / Crystal battle pics on Red — see [Gen1 sprite sets](#gen1-sprite-sets-sprites-1-251) below.
 
 **Sevii Islands:** On hold. Maps, ferry, and tooling live under `sevii/` but are not loaded (`SEVII_ENABLED = false`). Reserved map ids stay reserved; no Sevii play path until that work resumes.
 
 If you are trying to play, ignore the build instructions below and go to the releases to grab the latest zip. It has custom sprites available in the release that are not in the raw repo. You do not need to generate everything yourself, just install the zip into your game.
+
+## Gen1 sprite sets (SPRITES 1-251)
+
+On **Red / Blue / Yellow**, you can swap battle pics for dex **1–251** between KR’s custom art and a cached copy of **Gold**, **Silver**, or **Crystal** sprites. Hoenn (252+) always stays KR custom. Crystal animated front sheets are never used — only static `battle/front` / `battle/back` pics.
+
+### How it works
+
+1. Caches are built **only while that Gen 2 game is mounted** (KR running on Gold, Silver, or Crystal). Gen1 never reaches into another version’s ROM tree.
+2. On each Gen2 boot with KR enabled, fronts/backs for dex 1–251 are copied into `save/mod-derived/Kanto-Reforged/sprites/<edition>/`.
+3. After at least one edition is cached, Gen1 shows a mod option **SPRITES 1-251** with choices like **CUSTOM KR**, **GOLD**, **SILVER**, and/or **CRYSTAL** (only editions you’ve captured appear).
+4. Changing the option applies live in battle / summary (no restart required). Pick **CUSTOM KR** to go back to KR’s own 1–251 art.
+
+### How to use it
+
+1. Enable **Kanto-Reforged**, then boot the Gen 2 ROM whose sprites you want (e.g. Crystal if you want Crystal’s looks). Let the title / overworld load so the cache can finish.
+2. Quit back to the launcher and boot **Red** (or Blue / Yellow) with KR still enabled.
+3. Open the Mods / F10 options for Kanto Reforged and set **SPRITES 1-251** to that edition (e.g. **CRYSTAL**).
+4. To capture another set, boot that Gen 2 game once with KR, then return to Gen1 and pick it from the same toggle.
+
+**Tips:** After a KR update, re-boot each Gen2 edition once if 1–251 look incomplete. You can keep several caches and flip between them anytime on Gen1. Mid-session swaps are fine.
 
 ## What it looks like
 
@@ -54,6 +76,7 @@ If you are trying to play, ignore the build instructions below and go to the rel
 - Optional smarter trainer AI, **XP SHARE (SLOT 2)** (~70% to fighters, up to ~30% to party slot 2), and story level caps.
 - Opt-in level caps: Rare Candy kid outside Viridian Mart (Gen 1) or in Cherrygrove (Gen 2). Accepting tops you toward 99 Rare Candies and enables soft caps that rise with story / badges.
 - DexNav: start menu on Red after the Pokédex; Pokegear card on Gold via `pokegear_cards`.
+- **SPRITES 1-251** (Red): after booting KR on Gold/Silver/Crystal once each, swap dex 1–251 battle pics on Gen1 between CUSTOM KR and those caches (see [above](#gen1-sprite-sets-sprites-1-251)).
 - Party summary page for ability, held item, and gender glyph (Page 3 on Gen 1, Page 4 on Gen 2 with ability text).
 - Optional Gen1 Modern UI support for bag pockets and the summary ability page on Red.
 [https://github.com/ArmstrongThomas/gen1-modern-ui/](https://github.com/ArmstrongThomas/gen1-modern-ui/)

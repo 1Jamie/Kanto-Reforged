@@ -10,13 +10,10 @@ local ExpTrainers = require("mods.Kanto-Reforged.battle.trainers")
 GameVersion.set("gold")
 Host.force(2)
 
-local home = os.getenv("HOME") or ""
-local trainersPath = home .. "/.local/share/love/pokemon-love2d/gold/data/generated/trainers.lua"
-local okTrainers, goldTrainers = pcall(dofile, trainersPath)
-if not okTrainers or type(goldTrainers) ~= "table" then
-  okTrainers, goldTrainers = pcall(dofile, "data/generated/trainers.lua")
-end
-T.check(okTrainers and type(goldTrainers) == "table", "Gold trainers.lua available")
+local CachePaths = require("mods.Kanto-Reforged.core.cache_paths")
+local goldTrainers = CachePaths.loadGenerated("trainers.lua", "gold")
+local okTrainers = type(goldTrainers) == "table"
+T.check(okTrainers, "Gen2 trainers.lua available")
 
 local Data = {
   gen2Trainers = goldTrainers,

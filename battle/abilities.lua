@@ -258,6 +258,57 @@ function Abilities.onEntry(battle, battler)
   end
 end
 
+-- Lead abilities with dialog (Intimidate, weather, Trace, …) must run after
+-- both sides are sent out — not when battle.started fires.
+function Abilities.runBattleStartEntries(battle)
+  if not battle then return end
+  Abilities.onEntry(battle, battle.player)
+  Abilities.onEntry(battle, battle.enemy)
+end
+
+--- Queue entry abilities for the correct beat after battle.started.
+--- Gen1: enter() already built the intro queue; act appends after send-outs.
+--- Gen2: Battle.new emits started before the UI intro exists — flag for flush.
+function Abilities.scheduleBattleStartEntries(battle)
+  if not battle then return end
+  if type(battle.act) == "function" then
+    -- sayNext inserts at nextInsert; a sync onEntry would land at queue[1]
+    -- (before "wants to fight!" / "Go!"). act resets nextInsert so dialog
+    -- follows the already-queued intro.
+    battle:act(function()
+      Abilities.runBattleStartEntries(battle)
+    end)
+    return
+  end
+  battle._krPendingEntryAbilities = true
+end
+
+--- Gen2 BattleState.new: intro is already in ui.queue; append ability events.
+function Abilities.flushPendingBattleStartEntries(ui)
+  local battle = ui and ui.battle
+  if not battle or not battle._krPendingEntryAbilities then return end
+  battle._krPendingEntryAbilities = nil
+  Abilities.runBattleStartEntries(battle)
+  if type(ui.pushAll) == "function" and type(battle.takeEvents) == "function" then
+    ui:pushAll(battle:takeEvents())
+  end
+end
+
+function Abilities.install(mod)
+  local Host = require("mods.Kanto-Reforged.core.host")
+  if not (Host.isGen2 and Host.isGen2()) then return end
+  local ok, BattleState = pcall(require, "src.ui.gen2.BattleState")
+  if not ok or not BattleState or not BattleState.new then return end
+  if BattleState._krEntryAbilityWrap then return end
+  local originalNew = BattleState.new
+  BattleState.new = function(game, opts)
+    local self = originalNew(game, opts)
+    Abilities.flushPendingBattleStartEntries(self)
+    return self
+  end
+  BattleState._krEntryAbilityWrap = true
+end
+
 -- Weather-setting moves (Sunny Day / Rain Dance / Sandstorm / Hail)
 function Abilities.onMoveUsed(battle, user, move)
   if not battle or not move then return end
