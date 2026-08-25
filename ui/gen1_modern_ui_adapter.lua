@@ -1,6 +1,5 @@
 -- Optional Gen1 Modern UI contract for Kanto Reforged.
 -- No-op when gen1_modern_ui is not installed; native Gen1 screens stay as-is.
-
 local SummaryUi = require("mods.Kanto-Reforged.ui.summary_ui")
 local SplitSpecial = require("mods.Kanto-Reforged.battle.split_special")
 local TypeChart = require("src.battle.TypeChart")
@@ -56,12 +55,16 @@ local function bagModel(_, state)
   }
 end
 
+-- KR's native SummaryMenu wrapper (summary_ui.lua) bumps _expMaxPage to 4
+-- only when HiddenStats is installed; both values are valid here so the
+-- overlay keeps working whether or not that companion mod is present.
 local function summaryMatches(state)
   return type(state) == "table"
     and state.screenId == "SummaryMenu"
-    and state._expMaxPage == 3
+    and (state._expMaxPage == 3 or state._expMaxPage == 4)
     and type(state.page) == "number"
     and state.mon ~= nil
+    and state.page <= state._expMaxPage
 end
 
 local function monTitle(mon, def, data)
@@ -90,7 +93,7 @@ local function summaryModel(mod, game, state)
   local page = state.page or 1
   local title = monTitle(mon, def, data)
   local assets = state.sprite and { portrait = state.sprite } or nil
-  local footer = { ("A/B next  %d/3"):format(page) }
+  local footer = { ("A/B next  %d/%d"):format(page, state._expMaxPage or 3) }
   local rows
 
   if page == 1 then
@@ -170,7 +173,7 @@ local function summaryModel(mod, game, state)
         enabled = false,
       }
     end
-  else
+  elseif page == 3 then
     local info = SummaryUi.abilityPage(mon, data)
     local effect = table.concat(info.description or {}, " ")
     if effect == "" then effect = "-----" end
@@ -182,8 +185,22 @@ local function summaryModel(mod, game, state)
     }
   end
 
+  local extraTitle
+  if page == 4 then
+    -- HiddenStats (optional companion mod) owns page 4's content.
+    local hiddenStats = mod.find and mod.find("hidden_stats")
+    local extra = hiddenStats and hiddenStats.exports
+      and type(hiddenStats.exports.summaryPageModel) == "function"
+      and hiddenStats.exports.summaryPageModel(mon, data)
+    rows = extra and extra.rows or {}
+    extraTitle = extra and extra.title
+  end
+
   return {
-    title = page == 1 and "STATUS" or (page == 2 and "MOVES / EXP" or "ABILITY"),
+    title = page == 1 and "STATUS"
+      or (page == 2 and "MOVES / EXP")
+      or (page == 3 and "ABILITY")
+      or (extraTitle or "EXTRA"),
     rows = rows,
     index = 1,
     scroll = 0,
