@@ -2146,23 +2146,8 @@ function TrainerAi.install(mod)
         end
       end
 
-      if not BattleState._krGen3SwitchLock and type(BattleState.resolveSwitch) == "function" then
-        BattleState._krGen3SwitchLock = true
-        local originalResolveSwitch = BattleState.resolveSwitch
-        BattleState.resolveSwitch = function(self, newMon)
-          local skipFree = (self.player and self.player.expBatonPass)
-              or (self.player and self.player.expWantsSwitch)
-              or self.expSkipNextEnemyAction
-          if not skipFree and TrainerAi.switchLockGen3(mod) then
-            local locked = self:enemyAction()
-            self.enemyAction = function()
-              self.enemyAction = nil
-              return locked
-            end
-          end
-          return originalResolveSwitch(self, newMon)
-        end
-      end
+      -- Switch free-hit lock + Pursuit intercept (battle/pursuit.lua).
+      require("mods.Kanto-Reforged.battle.pursuit").installGen1(mod)
 
       if not BattleState._krEliteFaintSend and type(BattleState.enemyMonFainted) == "function" then
         BattleState._krEliteFaintSend = true
@@ -2262,6 +2247,9 @@ function TrainerAi.install(mod)
         end
       end
     end)
+
+    -- Pursuit switch-out intercept + switch-hit lock for Gen2.
+    require("mods.Kanto-Reforged.battle.pursuit").installGen2(mod)
   end
 
   -- Shared overhaul: both gens use the same enemy_action brain.

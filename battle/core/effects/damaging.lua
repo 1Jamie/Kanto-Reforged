@@ -112,6 +112,112 @@ function Damaging.fakeOutAfter(ec, _raw)
   ec.target.flinched = true
 end
 
+--- Sucker Punch: fail unless foe is committed to a damaging move and hasn't acted.
+function Damaging.suckerPunchGate(ec, _raw)
+  local MoveEffects = require("mods.Kanto-Reforged.battle.move_effects")
+  local target = ec.target
+  if not target then return false, Strings("But, it failed!") end
+  if target.expActedThisTurn then
+    return false, Strings("But, it failed!")
+  end
+  local pending = MoveEffects.pendingMoveOf(target)
+  if not pending then return false, Strings("But, it failed!") end
+  local data = (ec.opts and ec.opts.data)
+      or (ec.adapter and ec.adapter.battle and ec.adapter.battle.data)
+  local def = data and data.moves and data.moves[pending]
+  if not def or (def.power or 0) <= 0 then
+    return false, Strings("But, it failed!")
+  end
+  return true
+end
+
+function Damaging.wakeUpSlapAfter(ec, _raw)
+  local BattleCompat = require("mods.Kanto-Reforged.battle.battle_compat")
+  if not BattleCompat.hasStatus(ec.target, "SLP", "sleep") then return end
+  if ec.adapter:clearStatus(ec.target) then
+    ec.adapter:say(Strings("%s woke up!", H.displayName(ec, ec.target)))
+  end
+end
+
+function Damaging.metalBurstChoose(ec, _raw)
+  local taken = ec.user.expDamageTakenThisTurn or 0
+  if taken <= 0 then return nil, Strings("But, it failed!") end
+  return math.max(1, math.floor(taken * 1.5)), { crit = false, typeMult = 10 }
+end
+
+function Damaging.finalGambitChoose(ec, _raw)
+  local userMon = ec.adapter:mon(ec.user)
+  if not userMon or (userMon.hp or 0) <= 0 then
+    return nil, Strings("But, it failed!")
+  end
+  local dmg = userMon.hp
+  userMon.hp = 0
+  if type(ec.adapter.onFaint) == "function" then
+    ec.adapter:onFaint(ec.user)
+  elseif ec.adapter.battle and type(ec.adapter.battle.onFaint) == "function" then
+    ec.adapter.battle:onFaint(ec.user)
+  end
+  return dmg, { crit = false, typeMult = 10 }
+end
+
+function Damaging.lastResortGate(ec, _raw)
+  local moves = ec.adapter:preparedMoves(ec.user) or {}
+  local used = ec.user.expMovesUsedThisBattle or {}
+  local others = 0
+  local unused = 0
+  for _, mv in ipairs(moves) do
+    local id = type(mv) == "table" and mv.id or mv
+    if id and id ~= "LAST_RESORT" then
+      others = others + 1
+      if not used[id] then unused = unused + 1 end
+    end
+  end
+  if others == 0 or unused > 0 then
+    return false, Strings("But, it failed!")
+  end
+  return true
+end
+
+function Damaging.belchGate(ec, _raw)
+  if not ec.user.expAteBerry then
+    return false, Strings("But, it failed!")
+  end
+  return true
+end
+
+function Damaging.naturalGiftAfter(ec, _raw)
+  local HeldItems = require("mods.Kanto-Reforged.items.held_items")
+  local item = HeldItems.ofBattler and HeldItems.ofBattler(ec.user)
+  if item then
+    local mon = ec.adapter:mon(ec.user)
+    if mon then mon.heldItem = nil end
+    if ec.user.heldItem then ec.user.heldItem = nil end
+  end
+end
+
+function Damaging.naturalGiftGate(ec, _raw)
+  local HeldItems = require("mods.Kanto-Reforged.items.held_items")
+  local VP = require("mods.Kanto-Reforged.battle.variable_power")
+  local item = HeldItems.ofBattler and HeldItems.ofBattler(ec.user)
+  if not item or not VP.naturalGift(item) then
+    return false, Strings("But, it failed!")
+  end
+  return true
+end
+
+function Damaging.flingGate(ec, _raw)
+  local HeldItems = require("mods.Kanto-Reforged.items.held_items")
+  local item = HeldItems.ofBattler and HeldItems.ofBattler(ec.user)
+  if not item then return false, Strings("But, it failed!") end
+  return true
+end
+
+function Damaging.flingAfter(ec, _raw)
+  local mon = ec.adapter:mon(ec.user)
+  if mon then mon.heldItem = nil end
+  if ec.user.heldItem then ec.user.heldItem = nil end
+end
+
 function Damaging.endeavorChoose(ec, _raw)
   local userMon = ec.adapter:mon(ec.user)
   local targetMon = ec.adapter:mon(ec.target)

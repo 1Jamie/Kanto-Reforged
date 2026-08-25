@@ -906,6 +906,7 @@ return function(mod)
     local okBreed, breeding_patches = pcall(require, "mods.Kanto-Reforged.pokemon.breeding_patches")
     if okBreed and breeding_patches then
       local Breeding = require("mods.Kanto-Reforged.pokemon.breeding")
+      local DisabledMoves = require("mods.Kanto-Reforged.pokemon.disabled_moves")
       local nBreed = 0
       if Host.isGen2() then
         -- Gen2 schema uses eggSteps (not hatchCounter) and rejects KR-only fields.
@@ -919,7 +920,9 @@ return function(mod)
           if row.eggMoves then
             local moves = {}
             for _, mv in ipairs(row.eggMoves) do
-              if mod.content.moves:get(mv) then moves[#moves + 1] = mv end
+              if mod.content.moves:get(mv) and not DisabledMoves.isDisabled(mv) then
+                moves[#moves + 1] = mv
+              end
             end
             patch.eggMoves = moves
           end
@@ -937,6 +940,13 @@ return function(mod)
     else
       mod.log:warn("breeding_patches.lua missing; daycare breeding skipped")
     end
+
+    -- Strip singles-useless moves (Helping Hand) from every learnset.
+    do
+      local DisabledMoves = require("mods.Kanto-Reforged.pokemon.disabled_moves")
+      local nStrip = DisabledMoves.stripAllSpecies(mod)
+      mod.log:info("Scrubbed disabled moves from %d species learnsets", nStrip)
+    end
   else
     mod.log:warn("pokemon_data.lua not found or failed to load: " .. tostring(pokemon_data))
   end
@@ -951,7 +961,23 @@ return function(mod)
   DexNav.register(mod)
 
   local BagPockets = require("mods.Kanto-Reforged.items.bag_pockets")
-  BagPockets.register(mod)
+  local Host = require("mods.Kanto-Reforged.core.host")
+  local bagMod = mod.find("gen1_bag_pockets")
+  if bagMod and bagMod.exports and bagMod.exports.addBagMenuDecorator then
+    -- Gen1 UI owned by gen1_bag_pockets: inject BAG GIVE only.
+    bagMod.exports.addBagMenuDecorator(function(game, list, opts)
+      HeldItems.decorateBagMenu(mod, game, list, opts)
+    end)
+    -- Bag mod is Gen1-only; Gen2 still needs ITEM-pocket capacity 60.
+    if Host.isGen2From(mod) then
+      BagPockets.applyCapacity(mod)
+    end
+  elseif Host.isGen2From(mod) then
+    -- Gen2 already has PackMenu pockets; only raise ITEM capacity.
+    BagPockets.applyCapacity(mod)
+  else
+    BagPockets.register(mod)
+  end
 
   -- Optional Gen1 Modern UI adapter (no-op when that mod is absent).
   if require("mods.Kanto-Reforged.ui.gen1_modern_ui_adapter")(mod) then
@@ -1015,8 +1041,58 @@ return function(mod)
       bumpPower((move.power or 60) * 2)
     elseif move and move.id == "PAYBACK" and target.expActedThisTurn then
       bumpPower((move.power or 50) * 2)
-    elseif move and move.id == "PURSUIT" and target.expActedThisTurn then
+    elseif move and move.id == "PURSUIT" and ctx.battle and ctx.battle.expPursuitSwitch then
       bumpPower((move.power or 40) * 2)
+    elseif move and move.id == "ASSURANCE" and target.expTookDamageThisTurn then
+      bumpPower((move.power or 60) * 2)
+    elseif move and move.id == "BEAT_UP" then
+      local VP = require("mods.Kanto-Reforged.battle.variable_power")
+      bumpPower(VP.beatUpPower(ctx.battle, user))
+    elseif move and (move.id == "GRASS_KNOT" or move.id == "LOW_KICK") then
+      local VP = require("mods.Kanto-Reforged.battle.variable_power")
+      bumpPower(VP.weightPower(ctx.battle, target))
+    elseif move and (move.id == "HEAVY_SLAM" or move.id == "HEAT_CRASH"
+        or move.id == "HARD_PRESS") then
+      local VP = require("mods.Kanto-Reforged.battle.variable_power")
+      bumpPower(VP.heavySlamPower(ctx.battle, user, target))
+    elseif move and move.id == "GYRO_BALL" then
+      local VP = require("mods.Kanto-Reforged.battle.variable_power")
+      bumpPower(VP.gyroBallPower(ctx.battle, user, target))
+    elseif move and move.id == "ELECTRO_BALL" then
+      local VP = require("mods.Kanto-Reforged.battle.variable_power")
+      bumpPower(VP.electroBallPower(ctx.battle, user, target))
+    elseif move and move.id == "PUNISHMENT" then
+      local VP = require("mods.Kanto-Reforged.battle.variable_power")
+      bumpPower(VP.punishmentPower(ctx.battle, target))
+    elseif move and (move.id == "STORED_POWER" or move.id == "POWER_TRIP") then
+      local VP = require("mods.Kanto-Reforged.battle.variable_power")
+      bumpPower(VP.storedPower(ctx.battle, user))
+    elseif move and (move.id == "WRING_OUT" or move.id == "CRUSH_GRIP") then
+      local VP = require("mods.Kanto-Reforged.battle.variable_power")
+      bumpPower(VP.wringOutPower(target))
+    elseif move and move.id == "TRUMP_CARD" then
+      local VP = require("mods.Kanto-Reforged.battle.variable_power")
+      local inst = ctx.moveInst or (user.curMoves and user.curMoves[1])
+      bumpPower(VP.trumpCardPower(inst))
+    elseif move and move.id == "ACROBATICS"
+        and not (HeldItems.ofBattler and HeldItems.ofBattler(user)) then
+      bumpPower((move.power or 55) * 2)
+    elseif move and move.id == "FLING" then
+      local VP = require("mods.Kanto-Reforged.battle.variable_power")
+      local item = HeldItems.ofBattler and HeldItems.ofBattler(user)
+      local p = VP.flingPower(item)
+      if p then bumpPower(p) else bumpPower(1) end
+    elseif move and move.id == "NATURAL_GIFT" then
+      local VP = require("mods.Kanto-Reforged.battle.variable_power")
+      local item = HeldItems.ofBattler and HeldItems.ofBattler(user)
+      local gift = VP.naturalGift(item)
+      if gift then
+        oldType, oldPower, oldCategory = move.type, move.power, move.category
+        move.type, move.power = gift.type, gift.power
+        move.category = TypeChart.category(gift.type) or "physical"
+      else
+        bumpPower(1)
+      end
     elseif move and move.id == "KNOCK_OFF" and HeldItems.ofBattler
         and HeldItems.ofBattler(target) then
       bumpPower(math.floor((move.power or 65) * 1.5))
@@ -1121,27 +1197,74 @@ return function(mod)
     local category = move.category or TypeChart.category(move.type) or "physical"
     local isSpecial = category == "special"
 
+    -- Foul Play: use target's Attack. Body Press: use user's Defense as Attack.
+    -- Psyshock: special attack vs physical Defense.
+    local oldUserAtk, oldUserDef, oldTargetDef, oldTargetSp
+    if move and move.id == "FOUL_PLAY" and target.curStats and user.curStats then
+      oldUserAtk = user.curStats.attack
+      user.curStats.attack = target.curStats.attack or oldUserAtk
+    elseif move and move.id == "BODY_PRESS" and user.curStats then
+      oldUserAtk = user.curStats.attack
+      user.curStats.attack = user.curStats.defense or oldUserAtk
+    elseif move and move.id == "PSYSHOCK" and target.curStats then
+      oldTargetSp = target.curStats.special
+      target.curStats.special = target.curStats.defense or oldTargetSp
+      isSpecial = true
+    end
+
+    -- Freeze-Dry: Ice hits Water super-effectively.
+    local oldTypeMult
+    if move and move.id == "FREEZE_DRY" and target then
+      local types = target.curTypes or {}
+      for _, t in ipairs(types) do
+        if t == "WATER" then
+          ctx.expFreezeDryWater = true
+          break
+        end
+      end
+    end
+
     if isSpecial and SplitSpecial.enabled(mod)
         and user.curStats and target.curStats then
       local oldUserSpecial = user.curStats.special
       local oldTargetSpecial = target.curStats.special
 
       user.curStats.special = SplitSpecial.getBattleStat(user, true)
-      target.curStats.special = SplitSpecial.getBattleStat(target, false)
+      if not oldTargetSp then
+        target.curStats.special = SplitSpecial.getBattleStat(target, false)
+      end
 
       local damage, info = Abilities.onDamage(next, ctx)
 
       user.curStats.special = oldUserSpecial
-      target.curStats.special = oldTargetSpecial
+      if not oldTargetSp then
+        target.curStats.special = oldTargetSpecial
+      else
+        target.curStats.special = oldTargetSp
+      end
+      if oldUserAtk then user.curStats.attack = oldUserAtk end
 
       if damage and damage > 0 then
         Abilities.onPostDamage(ctx.battle, user, target, move, damage)
       end
+      if ctx.expFreezeDryWater and info then
+        info.typeMult = math.max(info.typeMult or 10, 20)
+      end
       return finish(damage, info)
     else
       local damage, info = Abilities.onDamage(next, ctx)
+      if oldUserAtk and user.curStats then user.curStats.attack = oldUserAtk end
+      if oldTargetSp and target.curStats then target.curStats.special = oldTargetSp end
       if damage and damage > 0 then
         Abilities.onPostDamage(ctx.battle, user, target, move, damage)
+      end
+      if ctx.expFreezeDryWater and info and (info.typeMult or 10) > 0 then
+        -- Force at least 2× from the Water interaction on top of other matchups.
+        local mult = info.typeMult or 10
+        if mult < 20 then
+          damage = math.max(1, math.floor(damage * 20 / math.max(1, mult)))
+          info.typeMult = 20
+        end
       end
       return finish(damage, info)
     end
@@ -1150,7 +1273,12 @@ return function(mod)
   -- Hustle accuracy cut / Compound Eyes boost / Sand Veil / Lock-On / Foresight
   mod.hooks:wrap("battle.accuracy", function(next, ctx)
     if ctx.target and ctx.target.expProtected then
-      return false
+      -- Feint breaks Protect / Detect.
+      if ctx.move and ctx.move.id == "FEINT" then
+        ctx.target.expProtected = nil
+      else
+        return false
+      end
     end
     local Weather = require("mods.Kanto-Reforged.battle.weather")
     if Weather.neverMiss(ctx.battle, ctx.move) then

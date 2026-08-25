@@ -8,7 +8,8 @@
 --     line is obtainable: catch the base (or an earlier stage), then evolve
 --     / breed. Not every mid/final needs its own wild slot.
 --   * Host version exclusives (Red/Blue/Yellow) are cross-injected afterward
---     via version_exclusives.lua.
+--     via version_exclusives.lua, then coverage runs once more so pack bases
+--     those fixed-home injects overwrote are placed again.
 
 local Merge = require("src.mods.Merge")
 
@@ -628,6 +629,9 @@ local function mixCurated(mod, index)
 
   ensureBaseCoverage(mod, index)
   require("mods.Kanto-Reforged.world.version_exclusives").apply(mod)
+  -- Version exclusives share fixed classic homes (e.g. Sandshrew → Route 11
+  -- slot 8). Re-run coverage so pack bases those injects overwrote land again.
+  ensureBaseCoverage(mod, index)
 end
 
 -- Full mix: every unprotected slot is a pick from Gen 1 locals on that

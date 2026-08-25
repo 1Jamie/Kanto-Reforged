@@ -50,6 +50,8 @@ return function(T, Data, run)
 
   T.check(type(BagPockets.drawNativeHeader) == "function",
     "BagPockets exposes drawNativeHeader for native UI")
+  T.check(type(BagPockets.applyCapacity) == "function",
+    "BagPockets exposes applyCapacity")
 
   -- Filter: only matching pocket ids appear
   BagPockets._resetFilter()
@@ -87,8 +89,8 @@ return function(T, Data, run)
   factory = type(factory) == "function" and factory or factory.new
   local bagSave = {
     money = 1000,
-    inventory = { POTION = 2, POKE_BALL = 3 },
-    bagOrder = { "POTION", "POKE_BALL" },
+    inventory = { POTION = 2, ANTIDOTE = 1, POKE_BALL = 3 },
+    bagOrder = { "POTION", "POKE_BALL", "ANTIDOTE" },
     player = { name = "RED" },
   }
   local fakeGame = {
@@ -108,12 +110,39 @@ return function(T, Data, run)
     T.eq(#list.__pocketIds, #BagPockets.POCKETS, "pocket id count matches")
     T.check(list.gen1ModernUi and type(list.gen1ModernUi.switchPocket) == "function",
       "BagMenu exposes gen1ModernUi.switchPocket")
+    T.check(type(list.onSelectKey) == "function",
+      "SELECT reorder enabled on ITEMS pocket")
     local before = list.__pocketIndex
     list.gen1ModernUi.switchPocket(list.gen1ModernUi, 1)
     T.eq(list.__pocketIndex, (before % #BagPockets.POCKETS) + 1,
       "switchPocket advances __pocketIndex")
     T.eq(list.title, BagPockets.POCKETS[list.__pocketIndex].label,
       "switchPocket updates title")
+
+    -- Reorder in ITEMS: swap POTION and ANTIDOTE in real bagOrder
+    BagPockets.setIndex(1)
+    list.gen1ModernUi.switchPocket(list.gen1ModernUi, 0) -- refresh current
+    -- Force back to items
+    while BagPockets.current().id ~= "items" do
+      list.gen1ModernUi.switchPocket(list.gen1ModernUi, 1)
+    end
+    T.check(type(list.onSelectKey) == "function", "SELECT enabled after return to items")
+    local antidoteIdx
+    for i, row in ipairs(list.items) do
+      if row.value == "ANTIDOTE" then antidoteIdx = i break end
+    end
+    T.check(antidoteIdx ~= nil, "ANTIDOTE in items pocket")
+    list.index = 1
+    list.onSelectKey(list.items[1], list)
+    list.index = antidoteIdx
+    list.onSelectKey(list.items[antidoteIdx], list)
+    T.eq(bagSave.bagOrder[1], "ANTIDOTE", "SELECT swap updates save.bagOrder")
+
+    -- TM/HM: reorder disabled
+    while BagPockets.current().id ~= "tmhm" do
+      list.gen1ModernUi.switchPocket(list.gen1ModernUi, 1)
+    end
+    T.eq(list.onSelectKey, nil, "SELECT reorder disabled on tmhm")
   else
     T.check(true, "BagMenu factory present (public fields skipped headless)")
   end

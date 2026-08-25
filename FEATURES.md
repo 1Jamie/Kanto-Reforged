@@ -86,7 +86,7 @@ Type-chart quirks are patched to Gen2/Gen3 values on **both** Red and Gold (`typ
 
 ### Moves
 
-Hundreds of Gen 2–3 moves with custom effects (Rollout, weather, hazards, status berries as bag/held medicine, Hidden Power from DVs, etc.). New moves reuse Gen 1 battle animations (composed or aliased).
+Hundreds of Gen 2–3 moves with custom effects (Rollout, weather, hazards, status berries as bag/held medicine, Hidden Power from DVs, etc.). New moves reuse Gen 1 battle animations (composed or aliased). Doubles-only moves (Helping Hand, Follow Me, etc.) are stripped from learnsets.
 
 Vanilla Gen1 move types are patched to Gen3 on **both** hosts (`move_type_patches.lua`): Bite→Dark, Gust→Flying, Karate Chop→Fighting, Sand-Attack→Ground. Gen6 Fairy retcons on Gen2 moves (Charm, Sweet Kiss, Moonlight) stay **Normal** to match Gen3 (same policy as species typings).
 
@@ -126,6 +126,10 @@ To eliminate the need for link trading to evolve certain species, several trade 
 
 - **RULESET (Red):** Always **MODERN** (`modern_clean`) with Gen3 crit stages and Gen3 partial trapping. Faithful Gen1 quirks are not offered; old faithful saves are migrated.
 - **Physical / special:** Damaging moves use Gen3 type categories (not Gen4 per-move split). Dark/Ghost are special; Fire/Water/Grass/etc. special; Normal/Fighting/etc. physical.
+- **Pursuit:** Hits the Pokémon switching out for double power (both hosts), then spends the free-hit turn.
+- **Sucker Punch / Me First:** Read the foe’s selected move for the turn (pending-move stash).
+- **Variable power:** Natural Gift, Punishment, Gyro Ball, Electro Ball, Grass Knot / Low Kick, Heavy Slam family, Stored Power / Power Trip, Wring Out, Trump Card, Fling, Beat Up, Acrobatics.
+- **Doubles-only moves** (Helping Hand, Follow Me, Rage Powder, Ally Switch, Wide/Quick Guard, After You, Quash, Spotlight): stripped from learnsets; leftovers fail.
 - **Gen 3 Freeze Parity:** Frozen Pokémon have a 20% (1-in-5) chance to thaw naturally each turn. Furthermore, any damaging fire-type move used against a frozen target immediately unfreezes them.
 - **XP Bar:** A smooth blue EXP bar displays below the player Pokémon's HP bar in battle across Gen 1 (matching Gen 2 style) with widescreen support.
 
@@ -146,7 +150,7 @@ To eliminate the need for link trading to evolve certain species, several trade 
 
 ### Trainers
 
-- **Gen 1 (Red / Blue):** Gym leaders and Elite Four get a curated **Gen 2 swap + Gen 3 add**. Ace mons hold a **berry ramp** (plain `BERRY` on Brock → status berries mid-game → Lum on Agatha/Lance). Rival mixes follow **continuity** (mid fights foreshadow a line; League fights debut finals). Tier 2 set pieces (Nugget Bridge, gym trainers, Mt. Moon, Fighting Dojo, Tower, Silph, Victory Road) get heavier mixes.
+- **Gen 1 (Red / Blue):** Gym leaders and Elite Four get a curated **Gen 2 swap + Gen 3 add**. Ace mons hold a **berry ramp** (plain `BERRY` on Brock → status berries mid-game → Lum on Agatha/Lance). Rival mixes follow **continuity** (mid fights foreshadow a line; League fights debut finals). Tier 2 set pieces (Nugget Bridge, gym trainers, Mt. Moon, **Rocket Hideout / Game Corner basement**, Fighting Dojo, Tower, **Silph Co**, **Pokémon Mansion**, **Victory Road**) get heavier mixes. Giovanni continuity: Hideout Steelix + Trapinch → Silph Donphan + Vibrava → gym Donphan + Flygon.
 - **Gen 2 (Gold/Silver/Crystal) Kanto Overhaul:** The entire Kanto postgame circuit is overhauled with competitive 6-Pokémon rosters, Gen 2/3 additions, held berries, and higher level targets aligned to the soft caps (58 → 64 → 72 → 85 → 100):
   - **Lt. Surge (Vermilion):** Levels 52–55 (Ace Raichu holding Chesto Berry).
   - **Janine (Fuchsia):** Levels 52–56 (Ace Venomoth holding Persim Berry).
@@ -367,7 +371,8 @@ Step cool-down between crafts: **640** farm steps (480 at soil rank 3).
 
 ## Bag and party QoL
 
-- **Pockets (Gen 1):** Items, Balls, Key Items, TMs & HMs, Berries. Bag capacity **60**.
+- **Pockets (Gen 1):** Prefer the optional companion mod `gen1_bag_pockets` (Items, Balls, Key Items, TMs & HMs, capacity **60**). When that mod is installed, KR adds the **Berries** pocket and optional **BAG GIVE**. If `gen1_bag_pockets` is absent, KR still provides the full five-pocket bag + capacity as a fallback.
+- **SELECT reorder:** Works inside Items / Balls / Key Items / Berries. TMs & HMs stay sorted (reorder disabled).
 - **DexNav:** On the start menu (Red) / Pokegear Card (Gold/Silver/Crystal, via `pokegear_cards` mod) after getting the Pokédex: shows current map species (more detail once seen/caught). Optional **ROAM** row when a roamer is present.
 - **Summary Menu:**
   - **Gen 1:** Page 3 displays ability, held item, and gender glyph.
@@ -581,7 +586,7 @@ The codebase is organized into domain-specific subdirectories:
 | `world/house_npcs.lua` / `world/move_hub.lua` / `world/item_smith.lua` | House NPCs, Move Relearner/Tutor hub, Cinnabar Blacksmith |
 | `world/roamers.lua` / `world/roaming_radar.lua` | Roaming beasts / Eon duo mechanics, radar item |
 | `world/legend_shrines.lua` / `world/legend_regis.lua` / `world/legend_mythicals.lua` | Custom static encounters (Ho-Oh, Lugia, Regis, Rayquaza, Deoxys, etc.) |
-| `items/held_items.lua` / `items/competitive_items.lua` / `items/bag_pockets.lua` | Held item effects, battle items (Choice Band/Life Orb/Focus Sash), bag pockets |
+| `items/held_items.lua` / `items/competitive_items.lua` / `items/bag_pockets.lua` | Held item effects, battle items (Choice Band/Life Orb/Focus Sash), Gen1 bag pockets fallback (companion: `gen1_bag_pockets`) |
 | `ui/summary_ui.lua` / `ui/dexnav.lua` / `ui/level_caps.lua` / `ui/xp_bar.lua` | Extra summary page (Page 3/4), DexNav start menu / Pokegear, level caps, XP bar |
 | `tools/generate_pokemon_mod.py` | Data generator pipeline from PokeAPI |
 | `sevii/` (parked) | Sevii ferry/maps/tooling — disabled until `SEVII_ENABLED` |

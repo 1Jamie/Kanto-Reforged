@@ -80,9 +80,11 @@ end
 
 function ApplyGen3Learnsets.apply(mod, Host, gen3Table)
   if not (mod and gen3Table and gen3Table.species) then return 0 end
+  local DisabledMoves = require("mods.Kanto-Reforged.pokemon.disabled_moves")
 
   local knownMove = function(id)
     return id and mod.content.moves:get(id) ~= nil
+      and not DisabledMoves.isDisabled(id)
   end
 
   local n = 0

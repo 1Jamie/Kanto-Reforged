@@ -1395,6 +1395,25 @@ return function(T, Data, run)
   T.eq(blaine[5].species, "ARCANINE", "Blaine still ends on Arcanine")
   T.eq(blaine[5].heldItem, "PERSIM_BERRY", "Blaine Arcanine holds Persim (not Aspear)")
 
+  local hideoutGiovanni = Data.trainers.OPP_GIOVANNI.parties[1]
+  T.eq(hideoutGiovanni[1].species, "STEELIX", "Hideout Giovanni Onix → Steelix")
+  T.eq(hideoutGiovanni[2].species, "RHYHORN", "Hideout Giovanni keeps Rhyhorn")
+  T.eq(hideoutGiovanni[#hideoutGiovanni - 1].species, "TRAPINCH",
+    "Hideout Giovanni Gen3 add is Trapinch before ace")
+  T.eq(hideoutGiovanni[#hideoutGiovanni].species, "KANGASKHAN",
+    "Hideout Giovanni still ends on Kangaskhan")
+  T.eq(hideoutGiovanni[#hideoutGiovanni].heldItem, "BERRY",
+    "Hideout Giovanni Kangaskhan holds Berry")
+
+  local silphGiovanni = Data.trainers.OPP_GIOVANNI.parties[2]
+  T.eq(silphGiovanni[3].species, "DONPHAN", "Silph Giovanni Rhyhorn → Donphan")
+  T.eq(silphGiovanni[#silphGiovanni - 1].species, "VIBRAVA",
+    "Silph Giovanni Gen3 add is Vibrava before ace")
+  T.eq(silphGiovanni[#silphGiovanni].species, "NIDOQUEEN",
+    "Silph Giovanni still ends on Nidoqueen")
+  T.eq(silphGiovanni[#silphGiovanni].heldItem, "RAWST_BERRY",
+    "Silph Giovanni Nidoqueen holds Rawst")
+
   local giovanni = Data.trainers.OPP_GIOVANNI.parties[3]
   T.eq(giovanni[2].species, "DONPHAN", "Giovanni gym Dugtrio swapped for Donphan")
   T.eq(giovanni[#giovanni - 1].species, "FLYGON", "Giovanni Gen3 add is Flygon before ace")
@@ -1535,6 +1554,44 @@ return function(T, Data, run)
     "Viridian gym Blackbelt Hariyama")
   T.eq(Data.trainers.OPP_BLACKBELT.parties[1][2].species, "HITMONTOP",
     "Dojo master Hitmonchan → Hitmontop")
+  T.eq(Data.trainers.OPP_ROCKET.parties[8][1].species, "SPOINK",
+    "Hideout B1F Rocket#8 Spoink")
+  T.eq(Data.trainers.OPP_ROCKET.parties[9][2].species, "MIGHTYENA",
+    "Hideout B1F Rocket#9 Mightyena")
+  T.eq(Data.trainers.OPP_ROCKET.parties[13][5].species, "MIGHTYENA",
+    "Hideout B2F Rocket ends Mightyena")
+  T.eq(Data.trainers.OPP_ROCKET.parties[15][2].species, "MEDITITE",
+    "Hideout B3F Rocket Meditite")
+  T.eq(Data.trainers.OPP_ROCKET.parties[16][1].species, "PHANPY",
+    "Hideout B4F Rocket#16 Phanpy")
+  T.eq(Data.trainers.OPP_ROCKET.parties[17][1].species, "SEVIPER",
+    "Hideout B4F Rocket#17 Seviper")
+  T.eq(Data.trainers.OPP_ROCKET.parties[18][2].species, "SABLEYE",
+    "Hideout B4F Rocket#18 Sableye")
+  T.eq(Data.trainers.OPP_ROCKET.parties[24][1].species, "CROBAT",
+    "Silph Rocket#24 Crobat")
+  T.eq(Data.trainers.OPP_ROCKET.parties[32][2].species, "SEVIPER",
+    "Silph Rocket#32 Seviper")
+  T.eq(Data.trainers.OPP_ROCKET.parties[39][1].species, "HARIYAMA",
+    "Silph Rocket#39 Hariyama")
+  T.eq(Data.trainers.OPP_SCIENTIST.parties[3][1].species, "ELECTRIKE",
+    "Silph Scientist#3 Electrike")
+  T.eq(Data.trainers.OPP_SCIENTIST.parties[5][1].species, "MANECTRIC",
+    "Silph Scientist#5 Manectric")
+  T.eq(Data.trainers.OPP_JUGGLER.parties[1][1].species, "KIRLIA",
+    "Silph Juggler Kirlia")
+  T.eq(Data.trainers.OPP_BURGLAR.parties[8][1].species, "HOUNDOOM",
+    "Mansion Burglar Houndoom")
+  T.eq(Data.trainers.OPP_SCIENTIST.parties[12][1].species, "ELECTRIKE",
+    "Mansion Scientist Electrike")
+  T.eq(Data.trainers.OPP_COOLTRAINER_F.parties[5][1].species, "DELCATTY",
+    "Victory Road Cooltrainer F Delcatty")
+  T.eq(Data.trainers.OPP_JUGGLER.parties[5][1].species, "GARDEVOIR",
+    "Victory Road Juggler Gardevoir")
+  T.eq(Data.trainers.OPP_COOLTRAINER_M.parties[3][1].species, "CRAWDAUNT",
+    "Victory Road Cooltrainer M Crawdaunt")
+  T.eq(Data.trainers.OPP_COOLTRAINER_F.parties[3][3].species, "BLISSEY",
+    "Victory Road Cooltrainer F Blissey")
   T.eq(Data.trainers.OPP_ROCKET.parties[19][3].species, "CROBAT",
     "Tower 7F Rocket#19 Crobat")
   T.eq(Data.trainers.OPP_ROCKET.parties[21][3].species, "MIGHTYENA",

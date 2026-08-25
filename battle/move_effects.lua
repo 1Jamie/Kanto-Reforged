@@ -667,6 +667,7 @@ function MoveEffects.install(mod)
     local dealt = original_applyDamage(self, target, dmg)
     if dealt and dealt > 0 and target then
       target.expTookDamageThisTurn = true
+      target.expDamageTakenThisTurn = (target.expDamageTakenThisTurn or 0) + dealt
       if beforeHp and target.mon and target.mon.hp < beforeHp then
         MoveEffects.thawTargetFromFire(self, target, self.expCurrentMoveDef)
       end
@@ -854,6 +855,10 @@ function MoveEffects.install(mod)
       user.expDestinyBond = true
     end
     user.expActedThisTurn = true
+    if ev.move and ev.move.id then
+      user.expMovesUsedThisBattle = user.expMovesUsedThisBattle or {}
+      user.expMovesUsedThisBattle[ev.move.id] = true
+    end
     if user.expEncoreTurns and user.expEncoreTurns > 0 then
       user.expEncoreTurns = user.expEncoreTurns - 1
       if user.expEncoreTurns <= 0 then
@@ -869,9 +874,20 @@ function MoveEffects.install(mod)
 
   mod.events:on("battle.turn_started", function(ev)
     if not ev.battle then return end
+    -- Stash both sides' chosen moves so Sucker Punch / Me First can see
+    -- the foe's selection before either battler acts.
+    local function stash(battler, action)
+      if not battler or not action or action.special then return end
+      local id = action.id or action.move
+      if id then battler.expPendingMove = id end
+    end
+    stash(ev.battle.player, ev.playerAction)
+    stash(ev.battle.enemy, ev.enemyAction)
+
     for _, b in ipairs({ ev.battle.player, ev.battle.enemy }) do
       if b then
         b.expTookDamageThisTurn = nil
+        b.expDamageTakenThisTurn = nil
         b.expActedThisTurn = nil
         b.expMagicCoat = nil
         -- Inner Focus: clear flinch

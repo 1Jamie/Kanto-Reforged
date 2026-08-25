@@ -79,13 +79,25 @@ function Calls.naturePower(_ec, _raw)
 end
 
 function Calls.meFirst(ec, _raw)
-  local last = H.lastMove(ec, ec.target)
-  if not last or ME_FIRST_BLOCK[last] then
+  local MoveEffects = require("mods.Kanto-Reforged.battle.move_effects")
+  if ec.target and ec.target.expActedThisTurn then
+    ec.adapter:sayFail()
+    return nil
+  end
+  local pending = MoveEffects.pendingMoveOf(ec.target)
+  if not pending or ME_FIRST_BLOCK[pending] then
+    ec.adapter:sayFail()
+    return nil
+  end
+  local data = (ec.opts and ec.opts.data)
+      or (ec.adapter and ec.adapter.battle and ec.adapter.battle.data)
+  local def = data and data.moves and data.moves[pending]
+  if not def or (def.power or 0) <= 0 then
     ec.adapter:sayFail()
     return nil
   end
   ec.user.expMeFirst = true
-  return last
+  return pending
 end
 
 return Calls

@@ -201,6 +201,9 @@ function HeldItems.consume(mon, battler)
   mon.item = nil
   if battler then
     battler.expLastConsumedItem = id
+    if HeldItems.isBerry(id) then
+      battler.expAteBerry = true
+    end
   end
   return id
 end

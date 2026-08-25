@@ -90,8 +90,9 @@ reg("EXP_SPEED_SWAP_EFFECT", Stats.speedSwap)
 reg("EXP_CHARGE_EFFECT", Stats.charge)
 reg("EXP_MEMENTO_EFFECT", Stats.memento)
 reg("EXP_CONVERSION_2_EFFECT", Stats.conversion2)
-reg("EXP_FOLLOW_ME_EFFECT", Stats.followMe)
-reg("EXP_ALLY_SWITCH_EFFECT", Setup.allySwitch)
+reg("EXP_FOLLOW_ME_EFFECT", Setup.helpingHand) -- singles: fail (was evasion stand-in)
+reg("EXP_ALLY_SWITCH_EFFECT", Setup.helpingHand) -- singles: fail (was Protect stand-in)
+reg("EXP_HELPING_HAND_EFFECT", Setup.helpingHand)
 reg("EXP_BATON_PASS_EFFECT", Setup.batonPass)
 reg("EXP_TRICK_EFFECT", Items.trick)
 reg("EXP_RECYCLE_EFFECT", Items.recycle)
@@ -119,6 +120,22 @@ hook("EXP_FAKE_OUT_EFFECT", {
   kind = "full",
   gate = Damaging.fakeOutGate,
   afterDamage = Damaging.fakeOutAfter,
+})
+hook("EXP_SUCKER_PUNCH_EFFECT", { kind = "full", gate = Damaging.suckerPunchGate })
+hook("EXP_WAKE_UP_SLAP_EFFECT", { kind = "full", afterDamage = Damaging.wakeUpSlapAfter })
+hook("EXP_METAL_BURST_EFFECT", { kind = "full", chooseDamage = Damaging.metalBurstChoose })
+hook("EXP_FINAL_GAMBIT_EFFECT", { kind = "full", chooseDamage = Damaging.finalGambitChoose })
+hook("EXP_LAST_RESORT_EFFECT", { kind = "full", gate = Damaging.lastResortGate })
+hook("EXP_BELCH_EFFECT", { kind = "full", gate = Damaging.belchGate })
+hook("EXP_NATURAL_GIFT_EFFECT", {
+  kind = "full",
+  gate = Damaging.naturalGiftGate,
+  afterDamage = Damaging.naturalGiftAfter,
+})
+hook("EXP_FLING_EFFECT", {
+  kind = "full",
+  gate = Damaging.flingGate,
+  afterDamage = Damaging.flingAfter,
 })
 hook("EXP_ENDEAVOR_EFFECT", { kind = "full", chooseDamage = Damaging.endeavorChoose })
 hook("EXP_VARIABLE_POWER_EFFECT", { kind = "full" })

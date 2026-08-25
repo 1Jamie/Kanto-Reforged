@@ -158,13 +158,13 @@ P.moves = {
   },
   BEAT_UP = {
     id = "BEAT_UP", name = "BEAT UP", type = "DARK",
-    power = 0, accuracy = 100, pp = 10,
-    category = "physical", effect = "TWO_TO_FIVE_ATTACKS_EFFECT"
+    power = 10, accuracy = 100, pp = 10,
+    category = "physical", effect = "NO_ADDITIONAL_EFFECT"
   },
   BELCH = {
     id = "BELCH", name = "BELCH", type = "POISON",
     power = 120, accuracy = 90, pp = 10,
-    category = "special", effect = "NO_ADDITIONAL_EFFECT"
+    category = "special", effect = "EXP_BELCH_EFFECT"
   },
   BELLY_DRUM = {
     id = "BELLY_DRUM", name = "BELLY DRUM", type = "NORMAL",
@@ -737,6 +737,11 @@ P.moves = {
       { stat = "attack", change = -2 },
     }
   },
+  FINAL_GAMBIT = {
+    id = "FINAL_GAMBIT", name = "FINAL GAMBIT", type = "FIGHTING",
+    power = 0, accuracy = 100, pp = 5,
+    category = "special", effect = "EXP_FINAL_GAMBIT_EFFECT"
+  },
   FEINT = {
     id = "FEINT", name = "FEINT", type = "NORMAL",
     power = 30, accuracy = 100, pp = 10,
@@ -806,12 +811,12 @@ P.moves = {
   FLING = {
     id = "FLING", name = "FLING", type = "DARK",
     power = 0, accuracy = 100, pp = 10,
-    category = "physical", effect = "NO_ADDITIONAL_EFFECT"
+    category = "physical", effect = "EXP_FLING_EFFECT"
   },
   FLIP_TURN = {
     id = "FLIP_TURN", name = "FLIP TURN", type = "WATER",
     power = 60, accuracy = 100, pp = 20,
-    category = "physical", effect = "NO_ADDITIONAL_EFFECT"
+    category = "physical", effect = "EXP_U_TURN_EFFECT"
   },
   FLOWER_SHIELD = {
     id = "FLOWER_SHIELD", name = "FLOWER SHIELD", type = "FAIRY",
@@ -1023,7 +1028,9 @@ P.moves = {
   HELPING_HAND = {
     id = "HELPING_HAND", name = "HELPING HAND", type = "NORMAL",
     power = 0, accuracy = 100, pp = 20,
-    category = "status", effect = "NO_ADDITIONAL_EFFECT",
+    -- Singles-only: no ally to boost. Kept registered so old party slots
+    -- still resolve; learnsets strip it (disabled_moves.lua).
+    category = "status", effect = "EXP_HELPING_HAND_EFFECT",
     priority = 5
   },
   HEX = {
@@ -1181,7 +1188,7 @@ P.moves = {
   LAST_RESORT = {
     id = "LAST_RESORT", name = "LAST RESORT", type = "NORMAL",
     power = 140, accuracy = 100, pp = 5,
-    category = "physical", effect = "NO_ADDITIONAL_EFFECT"
+    category = "physical", effect = "EXP_LAST_RESORT_EFFECT"
   },
   LAVA_PLUME = {
     id = "LAVA_PLUME", name = "LAVA PLUME", type = "FIRE",
@@ -1323,7 +1330,7 @@ P.moves = {
   METAL_BURST = {
     id = "METAL_BURST", name = "METAL BURST", type = "STEEL",
     power = 0, accuracy = 100, pp = 10,
-    category = "physical", effect = "NO_ADDITIONAL_EFFECT"
+    category = "physical", effect = "EXP_METAL_BURST_EFFECT"
   },
   METAL_CLAW = {
     id = "METAL_CLAW", name = "METAL CLAW", type = "STEEL",
@@ -1488,7 +1495,7 @@ P.moves = {
   NATURAL_GIFT = {
     id = "NATURAL_GIFT", name = "NATURAL GIFT", type = "NORMAL",
     power = 0, accuracy = 100, pp = 15,
-    category = "physical", effect = "NO_ADDITIONAL_EFFECT"
+    category = "physical", effect = "EXP_NATURAL_GIFT_EFFECT"
   },
   NATURE_POWER = {
     id = "NATURE_POWER", name = "NATURE POWER", type = "NORMAL",
@@ -2222,7 +2229,7 @@ P.moves = {
   SUCKER_PUNCH = {
     id = "SUCKER_PUNCH", name = "SUCKER PUNCH", type = "DARK",
     power = 70, accuracy = 100, pp = 5,
-    category = "physical", effect = "NO_ADDITIONAL_EFFECT",
+    category = "physical", effect = "EXP_SUCKER_PUNCH_EFFECT",
     priority = 1
   },
   SUNNY_DAY = {
@@ -2482,7 +2489,7 @@ P.moves = {
   WAKE_UP_SLAP = {
     id = "WAKE_UP_SLAP", name = "WAKE UP SLAP", type = "FIGHTING",
     power = 70, accuracy = 100, pp = 10,
-    category = "physical", effect = "NO_ADDITIONAL_EFFECT"
+    category = "physical", effect = "EXP_WAKE_UP_SLAP_EFFECT"
   },
   WATER_PLEDGE = {
     id = "WATER_PLEDGE", name = "WATER PLEDGE", type = "WATER",

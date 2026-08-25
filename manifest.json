@@ -1,7 +1,7 @@
 {
   "id": "Kanto-Reforged",
   "name": "Kanto Reforged",
-  "version": "1.5.2",
+  "version": "1.5.3",
   "api": 2,
   "entry": "main.lua",
   "profile": "content",
@@ -28,6 +28,7 @@
     }
   ],
   "optional_dependencies": [
+    "gen1_bag_pockets",
     "gen1_modern_ui"
   ],
   "conflicts": [

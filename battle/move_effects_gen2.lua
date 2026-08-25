@@ -192,6 +192,7 @@ function MoveEffectsGen2.install(mod)
     local damage = ev.damage or ev.amount or 0
     if target and damage > 0 then
       target.expTookDamageThisTurn = true
+      target.expDamageTakenThisTurn = (target.expDamageTakenThisTurn or 0) + damage
     end
     if ev.move then
       applyDamageStats(ev.battle, ev.user or ev.attacker, target, ev.move, damage)
@@ -200,13 +201,33 @@ function MoveEffectsGen2.install(mod)
 
   mod.events:on("battle.turn_started", function(ev)
     if not ev.battle then return end
+    local function stash(battler, action)
+      if not battler or not action or action.special then return end
+      local id = action.id or action.move
+      if id then
+        battler.expPendingMove = id
+        local mon = BattleCompat.mon(battler)
+        if mon then mon.expPendingMove = id end
+      end
+    end
+    stash(ev.battle.player, ev.playerAction)
+    stash(ev.battle.enemy, ev.enemyAction)
     for _, mon in ipairs({ ev.battle.player, ev.battle.enemy }) do
-      if mon then mon.expTookDamageThisTurn = nil end
+      if mon then
+        mon.expTookDamageThisTurn = nil
+        mon.expDamageTakenThisTurn = nil
+        mon.expActedThisTurn = nil
+      end
     end
   end)
 
   mod.events:on("battle.move_used", function(ev)
     if not ev.user then return end
+    ev.user.expActedThisTurn = true
+    if ev.move and ev.move.id then
+      ev.user.expMovesUsedThisBattle = ev.user.expMovesUsedThisBattle or {}
+      ev.user.expMovesUsedThisBattle[ev.move.id] = true
+    end
     -- Destiny Bond lasts only until the user moves again.
     if not (ev.move and ev.move.id == "DESTINY_BOND") then
       ev.user.expDestinyBond = nil

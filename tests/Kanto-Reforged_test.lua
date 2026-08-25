@@ -2263,10 +2263,12 @@ T.eq(Data.moves.CHARGE.effect, "EXP_CHARGE_EFFECT", "Charge effect id")
 T.eq(Data.moves.TRICK_ROOM.effect, "EXP_TRICK_ROOM_EFFECT", "Trick Room effect id")
 T.eq(Data.moves.HEALING_WISH.effect, "EXP_HEALING_WISH_EFFECT", "Healing Wish effect id")
 T.eq(Data.moves.MEMENTO.effect, "EXP_MEMENTO_EFFECT", "Memento effect id")
-T.eq(Data.moves.FOLLOW_ME.effect, "EXP_FOLLOW_ME_EFFECT", "Follow Me stand-in")
-T.eq(Data.moves.ALLY_SWITCH.effect, "EXP_ALLY_SWITCH_EFFECT", "Ally Switch stand-in")
+T.eq(Data.moves.FOLLOW_ME.effect, "EXP_FOLLOW_ME_EFFECT", "Follow Me effect id")
+T.eq(Data.moves.ALLY_SWITCH.effect, "EXP_ALLY_SWITCH_EFFECT", "Ally Switch effect id")
+T.eq(Data.moves.SUCKER_PUNCH.effect, "EXP_SUCKER_PUNCH_EFFECT", "Sucker Punch gate effect")
 T.check(Data.move_effects.EXP_SKETCH_EFFECT ~= nil, "Sketch registered")
 T.check(Data.move_effects.EXP_TRICK_ROOM_EFFECT ~= nil, "Trick Room registered")
+T.check(Data.move_effects.EXP_SUCKER_PUNCH_EFFECT ~= nil, "Sucker Punch registered")
 
 local sketchUser = {
   name = "User", isPlayer = true, curMoves = { { id = "SKETCH", pp = 1 } },
@@ -2335,18 +2337,22 @@ T.eq(wishSide.expHealingWish, true, "Healing Wish queues heal")
 T.eq(wishUser.mon.hp, 0, "Healing Wish faints user")
 
 local allyUser = { name = "User", isPlayer = true }
-Data.move_effects.EXP_ALLY_SWITCH_EFFECT.run({ user = allyUser })
-T.eq(allyUser.expProtected, true, "Ally Switch stand-in Protects")
+local allyFailed = false
+Data.move_effects.EXP_ALLY_SWITCH_EFFECT.run({
+  user = allyUser,
+  adapter = { sayFail = function() allyFailed = true end },
+})
+-- Via CtxShim the adapter is rebuilt; assert core handler fails instead.
+do
+  local Setup = require("mods.Kanto-Reforged.battle.core.effects.setup")
+  local failed = false
+  Setup.helpingHand({ adapter = { sayFail = function() failed = true end } })
+  T.check(failed, "Ally Switch / Follow Me fail in singles")
+end
 
 local followUser = { name = "User", isPlayer = true, stages = { evasion = 0 } }
-Data.move_effects.EXP_FOLLOW_ME_EFFECT.run({
-  user = followUser,
-  changeStage = function(who, stat, delta)
-    who.stages[stat] = (who.stages[stat] or 0) + delta
-    return { "ok" }
-  end,
-})
-T.eq(followUser.stages.evasion, 2, "Follow Me stand-in raises evasion")
+-- Follow Me no longer raises evasion (doubles-only; stripped + fails).
+T.eq(followUser.stages.evasion, 0, "Follow Me does not raise evasion")
 
 -- ------- Held items
 
@@ -2485,6 +2491,8 @@ require("mods.Kanto-Reforged.tests.dexnav_test")(T, Data, run)
 require("mods.Kanto-Reforged.tests.quarantine_recover_test")(T, Data, run)
 require("mods.Kanto-Reforged.tests.ai_switch_retarget_test")(T, Data, run)
 require("mods.Kanto-Reforged.tests.ai_switch_lock_pre_test")(T, Data, run)
+require("mods.Kanto-Reforged.tests.pursuit_switch_test")(T, Data, run)
+require("mods.Kanto-Reforged.tests.special_moves_test")(T, Data, run)
 require("mods.Kanto-Reforged.tests.bag_pockets_test")(T, Data, run)
   require("mods.Kanto-Reforged.tests.bag_give_test")(T, Data, run)
   require("mods.Kanto-Reforged.tests.gen1_modern_ui_adapter_test")(T, Data, run)

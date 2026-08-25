@@ -1,10 +1,9 @@
--- Bag pockets + larger capacity for Kanto Reforged.
--- Keeps flat save.inventory; filters Bag.order while the bag is open so the
--- stock BagMenu USE/TOSS flows keep working.
+-- Bag pockets + larger capacity for Kanto Reforged (fallback when
+-- gen1_bag_pockets is not installed). Keeps flat save.inventory; filters
+-- Bag.order while the bag is open so stock BagMenu USE/TOSS flows keep working.
 --
--- Also stamps Useful Bag–compatible public fields (__pocketIndex, __pocketIds,
--- gen1ModernUi) so Gen1 Modern UI can present the bag without changing native
--- draw/input when that mod is absent.
+-- When gen1_bag_pockets is present, main.lua skips register and only applies
+-- capacity on Gen2 plus a BAG GIVE decorator on the bag mod's export.
 
 local ItemEffects = require("src.inventory.ItemEffects")
 local HeldItems = require("mods.Kanto-Reforged.items.held_items")
@@ -54,8 +53,6 @@ local function drawCycleArrow(code, x, y, flip)
   end
 end
 
--- Pocket plaque for standard UI: white strip above the item list, name plus
--- mirrored ▶ glyphs (ASCII "<"/">" are box-border tiles in the GB font).
 function BagPockets.drawNativeHeader()
   local Font = require("src.render.Font")
   local Theme = require("src.ui.Theme")
@@ -109,12 +106,14 @@ local function rebuildRows(game)
   local items = {}
   for _, id in ipairs(Bag.order(game.save)) do
     local def = game.data.items[id]
+    local unsellable = (def and def.keyItem) or (type(id) == "string" and id:find("^HM_") ~= nil)
     items[#items + 1] = {
       value = id,
       label = def and def.name or id,
-      right = "x" .. tostring(game.save.inventory[id]),
+      right = (not unsellable) and ("x" .. tostring(game.save.inventory[id])) or nil,
     }
   end
+  items[#items + 1] = { cancel = true, label = Strings("CANCEL") }
   return items
 end
 
@@ -128,6 +127,72 @@ local function syncScroll(list)
   end
 end
 
+local function realBagOrder(save)
+  local was = filterActive
+  filterActive = false
+  local order = originalOrder and originalOrder(save) or Bag.order(save)
+  filterActive = was
+  return order
+end
+
+local function completeSwap(game, list)
+  local iA, iB = list.swapIndex, list.index
+  list.swapIndex = nil
+  if not iA or not iB or iA == iB then return end
+  local itemA = list.items[iA]
+  local itemB = list.items[iB]
+  if not itemA or itemA.cancel or not itemB or itemB.cancel then return end
+  local idA, idB = itemA.value, itemB.value
+  if not idA or not idB then return end
+
+  local order = realBagOrder(game.save)
+  local posA, posB
+  for i, id in ipairs(order) do
+    if id == idA then posA = i end
+    if id == idB then posB = i end
+  end
+  if not posA or not posB or posA == posB then return end
+  order[posA], order[posB] = order[posB], order[posA]
+  require("src.core.Sound").play(game.data, "Swap")
+  list.items = rebuildRows(game)
+end
+
+local function installSelectKey(list, game)
+  if BagPockets.current().id == "tmhm" then
+    list.onSelectKey = nil
+    return
+  end
+  list.onSelectKey = function(item, l)
+    if BagPockets.current().id == "tmhm" then return end
+    if not item or item.cancel then return end
+    if not l.swapIndex then
+      l.swapIndex = l.index
+      return
+    end
+    completeSwap(game, l)
+  end
+end
+
+local function installSwapOnChoose(list, game)
+  if list.__bagPocketsSwapWrapped then return end
+  list.__bagPocketsSwapWrapped = true
+  local baseOnChoose = list.onChoose
+  list.onChoose = function(item, ...)
+    if list.swapIndex then
+      if item and item.cancel then
+        if baseOnChoose then return baseOnChoose(item, ...) end
+        return
+      end
+      if BagPockets.current().id ~= "tmhm" then
+        completeSwap(game, list)
+        return
+      end
+      list.swapIndex = nil
+    end
+    if baseOnChoose then return baseOnChoose(item, ...) end
+  end
+end
+
 local function applyPocket(list, game, delta)
   BagPockets.cycle(delta or 0)
   list.title = BagPockets.current().label
@@ -137,6 +202,7 @@ local function applyPocket(list, game, delta)
   list.swapIndex = nil
   list.__pocketIndex = pocketIndex
   list.__pocketIds = pocketIds()
+  installSelectKey(list, game)
 end
 
 local function getTmHmSortInfo(id, def)
@@ -187,16 +253,19 @@ local function getTmHmSortInfo(id, def)
   return groupOrder, number
 end
 
-function BagPockets.register(mod)
+function BagPockets.applyCapacity(mod)
   Bag.CAPACITY = BagPockets.CAPACITY
   mod.content.constants:patch("bagSize", BagPockets.CAPACITY)
+end
+
+function BagPockets.register(mod)
+  BagPockets.applyCapacity(mod)
 
   if not originalOrder then
     originalOrder = Bag.order
     Bag.order = function(save)
       local order = originalOrder(save)
       if not filterActive then return order end
-      -- game pointer is stashed on the wrap so we can read item defs
       local data = BagPockets._data
       local pocketId = BagPockets.current().id
       local filtered = {}
@@ -235,11 +304,10 @@ function BagPockets.register(mod)
       local Builtin = require("src.ui.BagMenu")
       local list = Builtin.new(game, opts)
       list.title = BagPockets.current().label
-      -- SELECT reorder is ambiguous across filtered views; leave unused.
-      list.onSelectKey = nil
+      installSwapOnChoose(list, game)
+      installSelectKey(list, game)
       HeldItems.decorateBagMenu(mod, game, list, opts)
 
-      -- Public projection for Gen1 Modern UI (ignored when that mod is absent).
       list.__pocketIndex = pocketIndex
       list.__pocketIds = pocketIds()
       list.gen1ModernUi = {
@@ -262,7 +330,6 @@ function BagPockets.register(mod)
           return false
         end,
         back = function(_)
-          -- Match ListMenu B: pop, then onCancel (clears pocket filter).
           if list.game.stack:top() == list then
             list.game.stack:pop()
           end
@@ -291,7 +358,6 @@ function BagPockets.register(mod)
         self.game.stack:pop()
       end
 
-      -- B / empty-list cancel path pops without close(); clear filter there too.
       local baseOnCancel = list.onCancel
       list.onCancel = function()
         filterActive = false
@@ -311,7 +377,6 @@ function BagPockets.register(mod)
   mod.log:info("Bag pockets enabled (capacity %d)", BagPockets.CAPACITY)
 end
 
--- Tests / callers can force the filter off.
 function BagPockets._resetFilter()
   filterActive = false
 end

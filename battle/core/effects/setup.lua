@@ -261,4 +261,9 @@ function Setup.allySwitch(ctx)
     H.displayName(ctx, ctx.user)))
 end
 
+-- Singles-only KR: Helping Hand needs an ally. Always fail.
+function Setup.helpingHand(ctx)
+  return H.sayFail(ctx)
+end
+
 return Setup

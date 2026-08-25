@@ -123,6 +123,15 @@ return function(T)
           speciesOnGen1Map(place.map, place.kind, sp),
           vid .. " has " .. sp .. " on " .. place.map)
       end
+      -- Red's classic Pinsir home is Safari Center slot 9 (Scyther). Inject
+      -- must not erase Scyther — both exclusives stay catchable.
+      if vid == "red" then
+        T.check(speciesOnGen1Map("SAFARI_ZONE_CENTER", "grass", "SCYTHER")
+            or speciesOnGen1Map("SAFARI_ZONE_EAST", "grass", "SCYTHER"),
+          "red Pinsir inject keeps wild Scyther")
+        T.check(speciesOnGen1Map("SAFARI_ZONE_CENTER", "grass", "PINSIR"),
+          "red still gains Pinsir")
+      end
     end
   else
     T.check(true, "G1 exclusive inject skipped (no encounter cache)")

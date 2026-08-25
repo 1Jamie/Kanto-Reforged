@@ -86,12 +86,33 @@ local function slotHas(slots, species)
   return false
 end
 
+-- Vanilla Safari / late rares must not be clobbered when cross-injecting
+-- the counterpart exclusive (Red Pinsir must not erase Scyther, etc.).
+local PROTECTED = {
+  CHANSEY = true, DRAGONAIR = true, DRAGONITE = true,
+  SCYTHER = true, PINSIR = true, KANGASKHAN = true, TAUROS = true,
+}
+
 local function writeSlot(slots, index, species)
   if not slots or #slots == 0 then return false end
-  local idx = math.min(math.max(index or #slots, 1), #slots)
-  local level = slots[idx].level or 5
-  slots[idx] = { species = species, level = level }
-  return true
+  local function canOverwrite(slot)
+    if not slot or not slot.species then return true end
+    if slot.species == species then return true end
+    return not PROTECTED[slot.species]
+  end
+  local preferred = math.min(math.max(index or #slots, 1), #slots)
+  local candidates = { preferred }
+  for i = #slots, 1, -1 do
+    if i ~= preferred then candidates[#candidates + 1] = i end
+  end
+  for _, idx in ipairs(candidates) do
+    if canOverwrite(slots[idx]) then
+      local level = slots[idx].level or 5
+      slots[idx] = { species = species, level = level }
+      return true
+    end
+  end
+  return false
 end
 
 -- ------- Gen1 (flat map → grass/water) --------------------------------------

@@ -63,7 +63,7 @@ On **Red / Blue / Yellow**, you can swap battle pics for dex **1–251** between
 ## Features
 
 - Johto and Hoenn species (dex 152 through 386), with sprites, learnsets, and Gen 3 abilities. All dex #1–386 use Gen 3 Emerald-first learnsets from `tools/gen3_learnsets.py` (runtime `learnset_gen3.lua`); original 151 also get Gen 3 abilities.
-- Dark, Steel, and Fairy types, and a big Gen 2/3 move list (Rollout, weather, hazards, status berries, that kind of thing). Damaging moves use Gen 3 type categories (not Gen 4 per-move split).
+- Dark, Steel, and Fairy types, and a big Gen 2/3 move list (Rollout, weather, hazards, status berries, that kind of thing). Damaging moves use Gen 3 type categories (not Gen 4 per-move split). Pursuit hits switch-outs for double damage. Sucker Punch / Me First read the foe’s selected move. Variable-power moves (Natural Gift, Gyro Ball, etc.) scale properly. Doubles-only moves are stripped.
 - Curated Gen 2/3 mixes in wilds, gyms, Elite Four, and the rival. Optional **FULL SPAWN MIX** / **PURE RANDOM SPAWN** reshuffle from the Gen 1–3 pool (Gold density pass keeps Kanto full; **LEGENDS IN MIX** can open the legendary pool).
 - **Gold Kanto restored dungeons:** Gen 1 layouts for Viridian Forest, Mt. Moon, Diglett's Cave, Rock Tunnel, Safari Zone, Seafoam (+ Blaine gym), and Cerulean Cave, with postgame-scaled encounters, trainers, Articuno / Mewtwo, and the Mt. Moon Silver fight.
 - **Gold Kanto level curve:** gyms, routes, Dojo, Nugget Bridge, and restored dungeon parties retuned as one postgame band (leaders ~52–72; Blue / Silver / Red sit at the top). Opt-in level caps follow the same milestones (Kanto: 58 / 64 / 72 / 85 / 100).
@@ -84,7 +84,7 @@ On **Red / Blue / Yellow**, you can swap battle pics for dex **1–251** between
 ![Summary page with ability text](screen-shots/summary-ability.png)
 
 - Gender on every mon from Gen 2 DV rules.
-- Bag pockets on Gen 1: Items, Balls, Key Items, TMs & HMs, Berries. Capacity 60. (Conflicts with `modern_bag`.)
+- Bag pockets on Gen 1 via optional `gen1_bag_pockets` (Items, Balls, Key Items, TMs & HMs, capacity 60). KR adds the Berries pocket and **BAG GIVE** when both are enabled; KR alone still ships the full five-pocket fallback.
 
 ![Berries pocket](screen-shots/bag-berries.png)
 ![TMs & HMs pocket](screen-shots/bag-tms.png)
