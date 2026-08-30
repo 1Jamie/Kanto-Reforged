@@ -8,8 +8,7 @@ from tkinter import ttk
 
 from PIL import Image, ImageDraw, ImageTk
 
-from block_mapper.session import preview_tilesets_for_profile
-from map_layout_loader import list_maps_for_tilesets, load_map_by_id
+from map_layout_loader import list_preview_maps_for_profile, load_map_by_id
 from tileset_block_rebuild import draw_collision_overlay
 from block_mapper_profiles.common import COLLISION_COLOR_BY_VAL
 from block_mapper import cv as cvmod
@@ -70,8 +69,10 @@ class PreviewView(ttk.Frame):
         self.session = session
         if mapper_view is not None:
             self.mapper = mapper_view
-        tilesets = preview_tilesets_for_profile(session.profile)
-        maps = list_maps_for_tilesets(tilesets)
+        tilesets = list(session.profile.get("preview_tilesets") or [])
+        if not tilesets and session.profile.get("g1_tileset_id"):
+            tilesets = [session.profile["g1_tileset_id"]]
+        maps = list_preview_maps_for_profile(session.profile)
         labels = [f"{m['map_id']} ({m['width']}x{m['height']})" for m in maps]
         self._map_list = maps
         self.cbo_maps["values"] = labels
@@ -174,11 +175,26 @@ class PreviewView(ttk.Frame):
                 if proj is None:
                     tile2 = Image.new("RGB", (cell, cell), (30, 30, 36))
                 elif isinstance(proj, tuple) and proj[0] == "assembled":
-                    quads = self.mapper.assembled_quads[proj[1]]
-                    assembled = cvmod.assemble_quadrants_image(
-                        quads[0]["img_np"], quads[1]["img_np"], quads[2]["img_np"], quads[3]["img_np"]
-                    )
-                    tile2 = Image.fromarray(assembled).resize((cell, cell), Image.NEAREST)
+                    hitl = getattr(self.mapper, "hitl", None)
+                    tile2 = None
+                    if hitl:
+                        try:
+                            tiles16 = hitl.get_assembled_tiles(proj[1])
+                            tile2 = hitl.render_block_from_tile_ids(tiles16).resize(
+                                (cell, cell), Image.NEAREST
+                            )
+                        except Exception:
+                            tile2 = None
+                    if tile2 is None:
+                        quads_raw = self.mapper.assembled_quads[proj[1]]
+                        if hitl:
+                            quads = [hitl._hydrate_quad_entry(q) for q in quads_raw]
+                        else:
+                            quads = quads_raw
+                        assembled = cvmod.assemble_quadrants_image(
+                            quads[0]["img_np"], quads[1]["img_np"], quads[2]["img_np"], quads[3]["img_np"]
+                        )
+                        tile2 = Image.fromarray(assembled).resize((cell, cell), Image.NEAREST)
                     if self.show_collision.get():
                         tile2 = draw_collision_overlay(
                             tile2, [q.get("coll", 0) for q in quads], colors, alpha=100

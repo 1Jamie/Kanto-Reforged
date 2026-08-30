@@ -14,24 +14,25 @@ Mod id: `Kanto-Reforged`. Enable it in the launcher Mods tab or the F10 manager.
 4. [Trade Evolution Bypasses (Moon Stone)](#trade-evolution-bypasses-moon-stone)
 5. [Abilities and Battle Mechanics](#abilities-and-battle-mechanics)
 6. [Wild encounters and trainers](#wild-encounters-and-trainers)
-7. [Restored Gen 2 Kanto dungeons](#restored-gen-2-kanto-dungeons)
-8. [Gender](#gender)
-9. [Day Care and breeding](#day-care-and-breeding)
-10. [Held items](#held-items)
-11. [Berry Farm and berry economy](#berry-farm-and-berry-economy)
-12. [Bag and party QoL](#bag-and-party-qol)
-13. [Level caps](#level-caps)
-14. [XP Share (slot 2)](#xp-share-slot-2)
-15. [Smarter AI](#smarter-ai)
-16. [House NPCs and utility](#house-npcs-and-utility)
-17. [Move Hub](#move-hub)
-18. [Blacksmith](#blacksmith)
-19. [Gen 3 fossils](#gen-3-fossils)
-20. [Roaming legendaries](#roaming-legendaries)
-21. [Static legendaries and mythicals](#static-legendaries-and-mythicals)
-22. [Custom maps](#custom-maps)
-23. [Caveats and save notes](#caveats-and-save-notes)
-24. [Module map (for modders)](#module-map-for-modders)
+7. [Gen 2 Kanto Rocket campaign](#gen-2-kanto-rocket-campaign)
+8. [Restored Gen 2 Kanto dungeons](#restored-gen-2-kanto-dungeons)
+9. [Gender](#gender)
+10. [Day Care and breeding](#day-care-and-breeding)
+11. [Held items](#held-items)
+12. [Berry Farm and berry economy](#berry-farm-and-berry-economy)
+13. [Bag and party QoL](#bag-and-party-qol)
+14. [Level caps](#level-caps)
+15. [XP Share (slot 2)](#xp-share-slot-2)
+16. [Smarter AI](#smarter-ai)
+17. [House NPCs and utility](#house-npcs-and-utility)
+18. [Move Hub](#move-hub)
+19. [Blacksmith](#blacksmith)
+20. [Gen 3 fossils](#gen-3-fossils)
+21. [Roaming legendaries](#roaming-legendaries)
+22. [Static legendaries and mythicals](#static-legendaries-and-mythicals)
+23. [Custom maps](#custom-maps)
+24. [Caveats and save notes](#caveats-and-save-notes)
+25. [Module map (for modders)](#module-map-for-modders)
 
 ---
 
@@ -69,6 +70,7 @@ Configured in the mod manager / F10 options:
 
 - Dex **152–386** (Johto + Hoenn) with sprites, learnsets, and Gen 3 abilities.
 - Original 151 receive Gen 3 abilities and Emerald-first level-up learnsets / TM/HM from `learnset_gen3.lua` (runtime apply on Red and Gold). Pragmatic L30 TM backports for AI when not naturally level-up.
+- On **Gold/Silver/Crystal**, Gen2 **HM06 Whirlpool** compatibility is restored after Gen3 TM/HM apply (Gen3 dropped it as an HM): stock Johto/Kanto learners keep it; Hoenn Water-types that can Surf also gain it.
 - Pokédex size extended to **386**.
 - Special evolution methods for branching lines (e.g. Tyrogue ATK/DEF/BAL, Wurmple A/B).
 - Friendship / time / location evolutions are approximated to fit classic triggers.
@@ -162,21 +164,38 @@ To eliminate the need for link trading to evolve certain species, several trade 
   - **Blue (Viridian):** Levels 70–72 (Ace Arcanine holding Cheri Berry).
   - **Fighting Dojo (Saffron):** Levels 60–64 Blackbelts (Hariyama, Breloom, Medicham, Primeape, Hitmons).
   - **Nugget Bridge Circuit (Route 24/25):** Levels 56–60.
-  - **Mt. Moon Silver Rematch:** Levels 75–78 (Ace Tyranitar holding Lum Berry), on the restored Mt. Moon 1F entrance.
+  - **Mt. Moon Silver Rematch:** Levels 75–78 (Ace Tyranitar holding Lum Berry), tucked on **Mt. Moon B2F** after Safari clear + 8 Kanto badges.
+
+---
+
+## Gen 2 Kanto Rocket campaign
+
+On Gold/Silver/Crystal, Kanto postgame has a Johto-shaped story spine (layouts stay generated; story is runtime overlays in `world/kanto_campaign.lua`):
+
+1. **Blue (Route 22 + Pokégear)** — Former Champ drafts you; phone calls after gym/chapter milestones.
+2. **Mt. Moon** — Rocket **toll racket / training camp** (not Gen1 fossil theft). Clear the checkpoint admin.
+3. **Rock Tunnel** — Rocket **supply line** toward Fuchsia + Blue at the south exit.
+4. **Safari Zone** — Door in Fuchsia stays **closed** until Moon **and** Tunnel are cleared; then a full Rocket occupation dungeon (Secret House = industry boss). No Game Corner hideout revival.
+5. **Silver (Mt. Moon B2F)** — Personal climax after Safari + 8 badges (cap 85).
+6. **Red (Mt. Silver)** — Summit (cap 100).
+
+Campaign dialogue is formatted for Gen2's 18×2 overworld box (`Dialogue.overworld` / `\f` page breaks) so text pages with A instead of soft-scrolling past the player.
+
+Fossils in Mt. Moon remain optional loot. Layout regenerations do not wipe campaign overlays.
 
 ---
 
 ## Restored Gen 2 Kanto dungeons
 
-On **Gold/Silver/Crystal**, Gen 1 Kanto dungeon layouts (blocks, warps, NPCs, items, signs) are injected as `*_KR` maps and overworld mouths are redirected into them. Trainers and wilds are scaled for the postgame curve.
+On **Gold/Silver/Crystal**, Gen 1 Kanto dungeon layouts (blocks, warps, NPCs, items, signs) are injected as `*_KR` maps and overworld mouths are redirected into them. Trainers and wilds are scaled for the postgame curve. **Campaign NPCs/dialogue** live in hand-authored overlays, not the generated data file.
 
 | Area | Notes |
 |---|---|
 | **Viridian Forest** | Full Gen 1 maze + bug catchers; wilds ~Lv 43–49. |
-| **Mt. Moon** | 1F / B1F / B2F; fossils + Rockets; **Silver rematch** on 1F entrance corridor (~Lv 58 story object / 75–78 rematch roster). Wilds ~Lv 46–50. |
+| **Mt. Moon** | 1F / B1F / B2F; optional fossils; Rocket racket chapter; **Silver** on B2F (gated). Wilds ~Lv 46–50. |
 | **Diglett's Cave** | Full tunnel + Route 2 / Route 11 mouths. |
-| **Rock Tunnel** | 1F / B1F + linked Poké Center; hikers/pokémaniacs retuned. |
-| **Safari Zone** | Gate + Center / East / West / North + rest houses + Secret House; postgame preserve framing. |
+| **Rock Tunnel** | 1F / B1F + linked Poké Center; Rocket supply-line overlay + Blue reveal. |
+| **Safari Zone** | Gated from Fuchsia until Moon+Tunnel clear; Rocket occupation; Secret House boss. |
 | **Seafoam Islands** | 1F–B4F boulder puzzles; **Blaine's gym** as a dedicated room off 1F; **Articuno** on B4F (Lv 60). |
 | **Cerulean Cave** | 1F / 2F / B1F; **Mewtwo** on B1F (Lv 70); wilds ~Lv 59–65 on B1F. |
 
@@ -449,6 +468,12 @@ Four rungs: **natural** (common wilds), **soft** (route trash + threat wilds), *
 
 All short classic-style dialogues. The judge reads DVs / Hidden Power / statExp.
 
+### Celadon living district (Gen 1 ambient)
+
+A **district orchestrator** drives Celadon’s commercial strip: NPCs are classified from map data + dialog text ids (lexicon tags), then scheduled into trip/wander slots (roughly a handful concurrent, with multi-start decision beats) with venue activity packs (Dept. Store floors 2–5 + roof, Game Corner, diner, street, plus kitbashed hollow interiors). Safe **WALK** natives are adopted as ambient twins (vanilla body hidden while out); protected/rockets, the diner cook, and KR utility NPCs stay frozen. Active movers walk **arrival-gated** itineraries (live position advances each door/walk segment — the clock never teleports them home mid-aisle). **Doors** use the same approach tiles players do, then handoff-despawn (hide/remove body) and land on the far approach — never idle-camping the mat after. Game Corner gamblers path onto **machine seats** (one exclusive seat each; frozen staff seats reserved). Off-screen segments simulate by duration; on-screen bodies only `stepNow` / spawn-on-enter — no `placeAt` catch-up. **Stay** ends park the twin on the venue map (home stays hidden); only **home** ends reveal the seat and drop the twin. A short boot grace avoids door rushes on load. House/island seats always return home; scatter ambient may relocate and stay. Talk pauses that NPC’s job clock. Aisle columns stay path-forbidden except as a seat goal; maps mark door/clerk/exit **no-idle** tiles so campers get stepped aside. A slow **failsafe** beat recovers stalls and compound door camps without warping. Rare **occasions** pair idle wanderers (café coffee / dates, street spars): spars path to exact fighter marks, spawn OW mon props only once both trainers arrive, despawn those props when the fight dwell ends, then home-end back into normal ambiance.
+
+**Hollow façades (Gen 1 only):** decorative solid bottoms get real doors and kitbashed interiors. The **tall building immediately west of Celadon Mansion** becomes multi-floor apartments (mansion 1F–3F + roof + penthouse kitbash, stairs linked inside the building). The smaller east-row façades are little houses (chief-house kitbash). Café west of the diner, shop on the hotel strip, and a boutique near the prize room round out the row. Hollow NPCs are in the district orch with **personality profiles** (home vs away/work lines, less copy-paste chatter) and a light **friend graph** (named pairs, visit-friend trips, gossip lines). Café / strip shop / boutique **clerks sell** (CELADON BLEND / HOUSE LATTE, corner kit, SCENTED BALM). The café also sells a refillable **THERMOS** (3 sips; cheap top-up when empty — a reason to come back). Chalkboards and hours notes rotate with playtime. Each public hollow keeps one fixture **regular**. Residents linger and run errands in roughly equal measure; street wanderers prefer **cafe / shop** trips, with rarer apartment or friend-house visits. Rooftop view-seekers favor the Dept. Store and mansion roofs. Gold leaves those façades solid.
+
 ### Celadon Circuit (Celadon Mansion 2F)
 
 Rematchable battle club. 4 rotating teams by streak. First win → **Choice Band**. Rematches → money (`ace × 40`) and a flat **30%** chance at a Heart Scale. Same floor: **Beast Tracker** (roamers / Radar after Silph).
@@ -581,9 +606,11 @@ The codebase is organized into domain-specific subdirectories:
 | `battle/trainer_ai.lua` / `battle/trainers.lua` | Smarter AI system, Gen 1 & Gen 2 Gym / Trainer mix overhauls |
 | `battle/abilities.lua` / `battle/move_effects.lua` / `battle/move_type_patches.lua` | Gen 3 ability runners, custom move effects, type alignment |
 | `world/encounters.lua` / `world/encounters_gen2.lua` | Wild encounter tables for Gen 1 Kanto, Gen 2 Johto, and Gen 2 Kanto postgame |
-| `world/restored_dungeons.lua` / `world/restored_dungeons_data.lua` | Restored Gen 1 Kanto dungeons for Gold (layouts, warps, trainers, items, scaled wilds) |
+| `world/restored_dungeons.lua` / `world/restored_dungeons_data.lua` | Restored Gen 1 Kanto dungeon layouts for Gold (generated data + runtime glue) |
+| `world/kanto_campaign.lua` / `world/kanto_campaign_content.lua` | Gen2 Kanto Rocket campaign overlays (Blue phone, Moon/Tunnel/Safari, Silver gate) |
 | `world/berry_farm.lua` / `world/berry_quests.lua` | Berry Farm map, Pokecenter warps, Soil Expert badge unlocks, Blender |
 | `world/house_npcs.lua` / `world/move_hub.lua` / `world/item_smith.lua` | House NPCs, Move Relearner/Tutor hub, Cinnabar Blacksmith |
+| `world/ambient/` | Gen1 Celadon living-district orch (venues, classify, timeline pathing) |
 | `world/roamers.lua` / `world/roaming_radar.lua` | Roaming beasts / Eon duo mechanics, radar item |
 | `world/legend_shrines.lua` / `world/legend_regis.lua` / `world/legend_mythicals.lua` | Custom static encounters (Ho-Oh, Lugia, Regis, Rayquaza, Deoxys, etc.) |
 | `items/held_items.lua` / `items/competitive_items.lua` / `items/bag_pockets.lua` | Held item effects, battle items (Choice Band/Life Orb/Focus Sash), Gen1 bag pockets fallback (companion: `gen1_bag_pockets`) |

@@ -10,47 +10,25 @@ from .common import (
 
 
 def synthesize(g1_raw_blocks, g2_raw_blocks):
-    """Mt. Moon wooden stairs (#158/#159) + Gen1 forest wooden sign (#160)."""
+    """Shipped wood_stair.png (#158/#159) + Gen1 forest wooden sign (#160)."""
     from PIL import Image
 
-    if len(g1_raw_blocks) <= 83 or len(g2_raw_blocks) <= 36:
+    from tileset_quad_patches import render_stair_block_previews
+
+    if not g2_raw_blocks:
         return
 
-    g1_83 = g1_raw_blocks[83]
-    gw, gh = g1_83.size
-    wood_stair_right = g1_83.crop((gw // 2, gh // 2, gw, gh))
-    wood_stair_left = wood_stair_right.transpose(Image.FLIP_LEFT_RIGHT)
+    render_stair_block_previews(g2_raw_blocks)
 
-    b36 = g2_raw_blocks[36]
-    bw, bh = b36.size
-    cliff_top_left = b36.crop((0, 0, bw // 2, bh // 2))
-    cliff_top_right = b36.crop((bw // 2, 0, bw, bh // 2))
-    target_qw, target_qh = bw // 2, bh // 2
-    wood_stair_left = wood_stair_left.resize((target_qw, target_qh), Image.NEAREST)
-    wood_stair_right = wood_stair_right.resize((target_qw, target_qh), Image.NEAREST)
-
-    b158 = Image.new("RGB", (bw, bh))
-    b158.paste(cliff_top_left, (0, 0))
-    b158.paste(cliff_top_right, (target_qw, 0))
-    b158.paste(wood_stair_left, (0, target_qh))
-    b158.paste(wood_stair_right, (target_qw, target_qh))
-
-    b159 = Image.new("RGB", (bw, bh))
-    b159.paste(wood_stair_left, (0, 0))
-    b159.paste(wood_stair_right, (target_qw, 0))
-    b159.paste(cliff_top_left, (0, target_qh))
-    b159.paste(cliff_top_right, (target_qw, target_qh))
-
+    bw, bh = g2_raw_blocks[0].size
     while len(g2_raw_blocks) <= 160:
         g2_raw_blocks.append(Image.new("RGB", (bw, bh), (0, 0, 0)))
-    g2_raw_blocks[158] = b158
-    g2_raw_blocks[159] = b159
 
     # Prefer Gen1 FOREST sign metatile (#33) for outdoor wooden sign thumbnails.
     sign_src = 33 if len(g1_raw_blocks) > 33 else (21 if len(g1_raw_blocks) > 21 else None)
     if sign_src is not None:
         g2_raw_blocks[160] = g1_raw_blocks[sign_src].resize((bw, bh), Image.NEAREST)
-    print("Synthesized Mt. Moon stairs (#158/#159) + Gen1 forest sign (#160) into Gen 2 pool.")
+    print("Loaded custom stairs (#158/#159) + Gen1 forest sign (#160) into Gen 2 pool.")
 
 
 PROFILE = base_profile(
@@ -64,6 +42,7 @@ PROFILE = base_profile(
     g2_max_blocks=161,
     g2_tileset_id="TILESET_KANTO",
     g2_palette_env="ROUTE",
+    g2_tile_palette_overrides={77: 1, 78: 1, 83: 1, 84: 1, 96: 1, 97: 1, 98: 1, 99: 1},
     dict_name="SAFARI_G1_TO_G2",
     custom_blocks_name="CUSTOM_KANTO_BLOCKS_GENERATED",
     out="safari_g1_to_g2.py",

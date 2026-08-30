@@ -204,6 +204,8 @@ return function(mod)
 
     local RestoredDungeons = require("mods.Kanto-Reforged.world.restored_dungeons")
     RestoredDungeons.apply(mod)
+    local LegendMapsApply = require("mods.Kanto-Reforged.world.legend_maps_apply")
+    pcall(function() LegendMapsApply.apply(mod) end)
   end
 
   -- Manager / card options (host-aware labels / visibility).
@@ -260,6 +262,9 @@ return function(mod)
   HouseNpcs.resetClaims()
   if Host.isGen2() then
     HouseNpcs.installTalkDispatch(mod)
+    pcall(function()
+      require("mods.Kanto-Reforged.world.kanto_campaign").install(mod)
+    end)
   end
 
   local LevelCaps = require("mods.Kanto-Reforged.ui.level_caps")
@@ -586,6 +591,7 @@ return function(mod)
       mod.log:info("Gen2 overworld trainer parties mixed (%d classes)", nTrainersG2)
       local TrainersGen2 = require("mods.Kanto-Reforged.battle.trainers_gen2")
       TrainersGen2.install(mod)
+      require("mods.Kanto-Reforged.world.e4_kanto_dialogue").install(mod)
       mod.events:on("mod.options_changed", function(ev)
         if not (ev and ev.mod == mod.id) then return end
         Host.persistModOptions(mod)

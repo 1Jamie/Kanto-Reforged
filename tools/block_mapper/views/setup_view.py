@@ -102,7 +102,8 @@ class SetupView(ttk.Frame):
         except Exception as exc:  # noqa: BLE001
             self.status.config(text=f"Profile error: {exc}", foreground="#E57373")
             return
-        tools = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        # setup_view.py lives in tools/block_mapper/views/ → tools/
+        tools = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
         self.g1_var.set(profile.get("g1_sheet") or "")
         self.g2_var.set(profile.get("g2_sheet") or "")
         self.g1_card.set(bool(profile.get("g1_card_sheet")))
@@ -138,11 +139,17 @@ class SetupView(ttk.Frame):
         }
 
     def set_busy(self, busy: bool, message: str | None = None):
-        state = "disabled" if busy else "normal"
-        self.btn_run.config(state=state)
+        if busy:
+            self.btn_run.config(state="disabled")
+        else:
+            self.set_run_enabled(self.shell.mode == "setup")
         self.cbo_profile.config(state="disabled" if busy else "readonly")
         if message:
             self.status.config(text=message, foreground="#FFB74D" if busy else "#A5D6A7")
+
+    def set_run_enabled(self, enabled: bool):
+        if not self.shell._run_in_flight:
+            self.btn_run.config(state="normal" if enabled else "disabled")
 
     def _on_run(self):
         self.shell.start_process_run(self.gather_run_args())

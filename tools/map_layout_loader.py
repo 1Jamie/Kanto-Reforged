@@ -11,6 +11,9 @@ from typing import Any
 _MAPS_CACHE: dict[str, Any] | None = None
 _MAPS_CACHE_PATH: str | None = None
 
+_TOOLS_DIR = os.path.dirname(os.path.abspath(__file__))
+LEGEND_MAPS_DIR = os.path.join(_TOOLS_DIR, "legend_maps")
+
 
 def _repo_roots() -> list[str]:
     here = os.path.dirname(os.path.abspath(__file__))
@@ -94,12 +97,79 @@ def _validate_map_entry(map_id: str, mdef: dict[str, Any]) -> dict[str, Any] | N
     }
 
 
-def list_maps_for_tilesets(tileset_ids) -> list[dict[str, Any]]:
+def _legend_map_json_path(map_id: str) -> str:
+    return os.path.join(LEGEND_MAPS_DIR, f"{map_id}.json")
+
+
+def load_legend_map_json(map_id: str) -> dict[str, Any] | None:
+    """Load a mod custom legendary room from tools/legend_maps/<id>.json."""
+    if not map_id:
+        return None
+    path = _legend_map_json_path(map_id)
+    if not os.path.isfile(path):
+        return None
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+    except Exception as exc:  # noqa: BLE001
+        print(f"[map_layout_loader] legend map load failed ({map_id}): {exc}")
+        return None
+    if not isinstance(data, dict):
+        return None
+    data.setdefault("map_id", map_id)
+    return _validate_map_entry(str(data.get("map_id") or map_id), data)
+
+
+def list_legend_maps_for_tilesets(tileset_ids) -> list[dict[str, Any]]:
+    """Return sorted summaries for JSON legendary rooms matching tileset_ids."""
+    wanted = {str(t) for t in (tileset_ids or []) if t}
+    if not wanted or not os.path.isdir(LEGEND_MAPS_DIR):
+        return []
+    out: list[dict[str, Any]] = []
+    for fname in sorted(os.listdir(LEGEND_MAPS_DIR)):
+        if not fname.endswith(".json"):
+            continue
+        map_id = fname[:-5]
+        validated = load_legend_map_json(map_id)
+        if not validated:
+            continue
+        if validated.get("tileset") not in wanted:
+            continue
+        out.append(
+            {
+                "map_id": validated["map_id"],
+                "width": validated["width"],
+                "height": validated["height"],
+                "tileset": validated["tileset"],
+                "source": "legend_json",
+            }
+        )
+    return out
+
+
+def list_maps_for_tilesets(tileset_ids, *, profile: dict[str, Any] | None = None) -> list[dict[str, Any]]:
     """Return sorted map summaries whose tileset is in tileset_ids."""
     wanted = {str(t) for t in (tileset_ids or []) if t}
     if not wanted:
         return []
-    out = []
+    seen: set[str] = set()
+    out: list[dict[str, Any]] = []
+
+    extra_ids = list((profile or {}).get("preview_map_ids") or [])
+    for map_id in extra_ids:
+        validated = load_legend_map_json(map_id) or load_map_by_id(map_id)
+        if validated and validated["map_id"] not in seen:
+            seen.add(validated["map_id"])
+            out.append(
+                {
+                    "map_id": validated["map_id"],
+                    "width": validated["width"],
+                    "height": validated["height"],
+                    "tileset": validated.get("tileset"),
+                    "source": "profile",
+                }
+            )
+
     for map_id, mdef in sorted(get_all_maps().items()):
         if not isinstance(mdef, dict):
             continue
@@ -107,22 +177,42 @@ def list_maps_for_tilesets(tileset_ids) -> list[dict[str, Any]]:
         if ts not in wanted:
             continue
         validated = _validate_map_entry(map_id, mdef)
-        if validated:
+        if validated and validated["map_id"] not in seen:
+            seen.add(validated["map_id"])
             out.append(
                 {
                     "map_id": validated["map_id"],
                     "width": validated["width"],
                     "height": validated["height"],
                     "tileset": validated["tileset"],
+                    "source": "maps_lua",
                 }
             )
-    return out
+
+    for row in list_legend_maps_for_tilesets(wanted):
+        if row["map_id"] in seen:
+            continue
+        seen.add(row["map_id"])
+        out.append(row)
+
+    return sorted(out, key=lambda r: r["map_id"])
+
+
+def list_preview_maps_for_profile(profile: dict[str, Any]) -> list[dict[str, Any]]:
+    """Maps available in Map Preview for a block mapper profile."""
+    pts = list(profile.get("preview_tilesets") or [])
+    if not pts and profile.get("g1_tileset_id"):
+        pts = [profile["g1_tileset_id"]]
+    return list_maps_for_tilesets(pts, profile=profile)
 
 
 def load_map_by_id(map_id: str) -> dict[str, Any] | None:
-    """Load canonical width/height/blocks for a Gen1 map id."""
+    """Load width/height/blocks for a map id (legend JSON, then host maps.lua)."""
     if not map_id:
         return None
+    legend = load_legend_map_json(map_id)
+    if legend:
+        return legend
     maps = get_all_maps()
     mdef = maps.get(map_id)
     if not isinstance(mdef, dict):

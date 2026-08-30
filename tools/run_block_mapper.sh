@@ -15,7 +15,8 @@ Usage: $(basename "$0") [options] [-- mapper-args...]
 
 Options:
   --profile NAME   Pre-select profile in Setup (default: safari_kanto)
-                   Known: safari_kanto, forest_kanto, cavern_cave
+                   Known: safari_kanto, forest_kanto, cavern_cave,
+                          legend_mythical_overworld
   --restore-only   Skip GUI; only run restore_kanto_dungeons.py
   --with-restore   After GUI exits, also run restore_kanto_dungeons.py
   -h, --help       Show this help

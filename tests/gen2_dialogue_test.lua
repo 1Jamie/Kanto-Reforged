@@ -28,4 +28,16 @@ return function(T)
     local BS = require("src.ui.gen2.BattleState")
     T.check(BS._krGen2Dialogue, "Gen2 BattleState dialogue patch installed")
   end
+
+  local E4Dialogue = require("mods.Kanto-Reforged.world.e4_kanto_dialogue")
+  local saveChamp = { flags = { EVENT_BEAT_CHAMPION_LANCE = true } }
+  local saveFresh = { flags = {} }
+  local stock = "Welcome to POKéMON\nLEAGUE."
+  local textTable = { [E4Dialogue.KEYS.WILL.intro] = stock }
+  T.eq(E4Dialogue.resolve(E4Dialogue.KEYS.WILL.intro, textTable, saveFresh), stock,
+    "Johto-first Will intro stays stock")
+  T.check(E4Dialogue.resolve(E4Dialogue.KEYS.WILL.intro, textTable, saveChamp) ~= stock,
+    "Rematch Will intro swaps text")
+  T.check(E4Dialogue.resolve(E4Dialogue.KEYS.KAREN.intro, textTable, saveChamp):find("LANCE", 1, true),
+    "Karen slot rematch mentions Lance")
 end

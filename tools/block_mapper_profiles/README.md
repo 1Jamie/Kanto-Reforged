@@ -25,7 +25,21 @@ Package layout: `tools/block_mapper/{shell,session,cv,views/…}`. Entry: [`../b
 |----|--------|--------|--------|------------------|
 | `safari_kanto` | Gen1 Safari / FOREST | `TILESET_KANTO` | `safari_g1_to_g2.py` | `FOREST` |
 | `forest_kanto` | Gen1 forest sheet | `TILESET_KANTO` | `forest_g1_to_g2.py` | `FOREST` |
-| `cavern_cave` | Gen1 `CAVERN` | Gold `TILESET_CAVE` | `cave_g1_to_g2.py` | `CAVERN` |
+| `cavern_cave` | Gen1 `CAVERN` | Gold `TILESET_CAVE` | `cave_g1_to_g2.py` | `CAVERN`, `REGIROCK_CHAMBER`, `ROCK_TUNNEL_B1F` |
+| `legend_mythical_overworld` | Gen1 `OVERWORLD` | Gold `TILESET_KANTO` | `legend_mythical_g1_to_g2.py` | `SKY_PILLAR_KANT`, `ILEX_SHRINE_KANT`, `BIRTH_ISLAND_KANT` |
+
+### Gen1 vs Gen2 runtime
+
+- **Gen1 play** (`legend_regis.register` / `legend_mythicals.register`): unchanged native tilesets — `CAVERN` and `OVERWORLD` with original block IDs.
+- **Regirock chamber** reuses the same `cave_g1_to_g2.py` cast as restored dungeons (floor `#1`→162, wall `#3`→163, ladder `#62`→222). Map preview includes `REGIROCK_CHAMBER`. The only extra block is synthetic **#128** (Rock Tunnel ladder niche metatile).
+- **Block mapper**: left pane = Gen1 source art; export = Gen1 block id → Gen2 block id only.
+- **Gen2 apply** (`legend_maps_apply.lua`): reads `world/legend_maps_data.lua` from `apply_legend_mappings.py`. Returns `false` on Gen1.
+
+```bash
+./run_block_mapper.sh --profile cavern_cave          # map block #128 ladder niche if not done
+./run_block_mapper.sh --profile legend_mythical_overworld
+python3 tools/apply_legend_mappings.py
+```
 
 ## Profile schema (`PROFILE` dict)
 
@@ -54,18 +68,23 @@ Block atlases under `tools/blocksets/` (gitignored). Cave profile rebuilds from 
 
 ## Restore integration
 
-[`../restore_kanto_dungeons.py`](../restore_kanto_dungeons.py) loads `*_g1_to_g2.py` exports. Caves stay `keep_gen1` until ids are added to `CAVE_REMAP_MAPS`.
+[`../restore_kanto_dungeons.py`](../restore_kanto_dungeons.py) loads `*_g1_to_g2.py` exports. Caves use Gold `TILESET_CAVE`. Gen1 tilesets still shipped for unmigrated interiors: `POKECENTER` (Rock Tunnel PC), `GYM` (Blaine). `CAVERN` is not distributed.
 
 ### Custom graphics missing from Gold sheets
 
-Gold `TILESET_CAVE` has no wooden-sign tiles; `TILESET_KANTO` has stairs but no Gen1 forest/cave-style signs. Overrides mirror the Safari wooden-stairs pattern:
+Gold `TILESET_CAVE` has no wooden-sign tiles; `TILESET_KANTO` has stairs but no Gen1 forest/cave-style signs. Ship **16×16 metatile quads** (or optional 16×8 row halves for stairs); restore pastes them onto VRAM tiles from stock Gold PNGs.
 
-| Override | Patched tiles | Source | Custom blocks |
-|----------|---------------|--------|---------------|
-| `overrides/tilesets/cave.png` | 90–93 | Gen1 `CAVERN` 14/15/30/31 | `#120` floor+sign, `#121` water+sign |
-| `overrides/tilesets/kanto.png` | 77–84 stairs; **96–99** sign (extra row, 128×56) | Gen1 `FOREST` 33/34/49/50 | `#158`/`#159` stairs, `#160` outdoor sign |
+| Sources (`overrides/tileset_quads/`) | VRAM tiles | Custom blocks |
+|--------------------------------------|------------|---------------|
+| `cave_wooden_sign.png` (16×16) | 90–93 | `#120` / `#121` cave signs |
+| `wood_stair.png` (16×16; two 16×8 step rows) | 77, 78, 83, 84 | `#158` / `#159` stairs |
+| `forest_wooden_sign.png` (16×16) | 96–99 | `#160` outdoor sign |
 
-Reference crops: `tools/exact_stair_16x16.png`, `tools/exact_sign_16x16.png`, `tools/exact_outdoor_sign_16x16.png`.
+`tools/tileset_quad_patches.py` splits each 16×16 quad into four 8×8 VRAM tiles (TL, TR, BL, BR) and writes gitignored `overrides/tilesets/{cave,kanto}.png`.
+
+Refresh sign quads from Red ROM art (skips existing hand-made PNGs): `python3 tools/tileset_quad_patches.py extract`
+
+`wood_stair.png` is hand-authored; `extract` will not overwrite it.
 
 Mapper profiles auto-detect Gen1 sign blocks (`42`/`117` cavern; `21`/`22`/`33`/`51` forest) via `gen1_feature_blocks` and expose them on the special bar + F-key favorites.
 

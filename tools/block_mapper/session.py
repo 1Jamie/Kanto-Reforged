@@ -23,7 +23,7 @@ from block_mapper_profiles.common import (  # noqa: E402
     COLLISION_PRESETS as _DEFAULT_COLLISION_PRESETS,
 )
 from map_layout_loader import load_map_by_id, load_test_map  # noqa: E402
-from tileset_block_rebuild import rebuild_blocks_from_tileset  # noqa: E402
+from tileset_block_rebuild import rebuild_blocks_from_tileset, render_block_from_tile_ids  # noqa: E402
 
 
 @dataclass
@@ -40,6 +40,9 @@ class MappingSession:
     dict_name: str
     custom_blocks_name: str
     exclude_buildings: bool
+    g2_ts_rec: dict | None = None
+    g2_sheet_path: str | None = None
+    g2_palette_bake: dict | None = None
     preview_map: dict[str, Any] | None = None
     g1_block_px: int = 32
     g2_block_px: int = 32
@@ -103,6 +106,39 @@ def load_lua_json_optional(lua_path: str):
     return None
 
 
+def _enrich_g2_tileset_rec(
+    rec: dict | None,
+    profile: dict,
+    g2_tiles_raw: list,
+) -> dict | None:
+    """Extend PalMap + apply profile overrides so mapper bake matches restored dungeons."""
+    if not rec:
+        return rec
+    rec = dict(rec)
+    pals = list(rec.get("tilePalettes") or [])
+    base_len = max(1, len(pals))
+
+    max_tid = 0
+    for row in g2_tiles_raw or []:
+        for tid in row or []:
+            try:
+                max_tid = max(max_tid, int(tid))
+            except (TypeError, ValueError):
+                pass
+    need = max(base_len, max_tid + 1, 100)
+    while len(pals) < need:
+        idx = len(pals)
+        pals.append(pals[idx % base_len] if base_len else 1)
+    rec["tilePalettes"] = pals
+
+    for tid, slot in (profile.get("g2_tile_palette_overrides") or {}).items():
+        idx = int(tid)
+        if 0 <= idx < len(pals):
+            pals[idx] = int(slot)
+
+    return rec
+
+
 def _load_restore_custom_blocks(attr_name: str | None) -> dict:
     if not attr_name:
         return {}
@@ -136,33 +172,110 @@ def _find_tilesets_lua(game: str) -> str | None:
     return None
 
 
-def _rebuild_blocks_for_tileset(tileset_id: str, game: str, tile_size: int, max_blocks=None):
+def _palette_bake_for_profile(profile: dict, side: str) -> dict | None:
+    if side == "g1":
+        tileset_id = profile.get("g1_palette_env") or profile.get("g1_tileset_id")
+        if tileset_id and not str(tileset_id).startswith("TILESET_"):
+            return {"kind": "gen1", "tileset_id": str(tileset_id)}
+        return None
+    env = (profile.get("g2_palette_env") or "").upper()
+    if not env or env == "NONE":
+        return None
+    return {
+        "kind": "gen2",
+        "environment": env,
+        "daytime": profile.get("g2_palette_daytime") or "DAY",
+        "game": profile.get("g2_game") or profile.get("game") or "gold",
+    }
+
+
+def _rebuild_blocks_for_tileset(
+    tileset_id: str,
+    game: str,
+    tile_size: int,
+    max_blocks=None,
+    palette_bake: dict | None = None,
+):
     from tileset_block_rebuild import find_tileset_image
 
     ts_path = _find_tilesets_lua(game)
     if not ts_path:
-        return None, None, None
+        return None, None, None, None, None
     ts_data = load_lua_json_optional(ts_path)
     if not ts_data or tileset_id not in ts_data:
-        return None, None, None
+        return None, None, None, None, None
     rec = ts_data[tileset_id]
     img = find_tileset_image(rec.get("image") or f"{tileset_id.lower()}.png", game=game)
     rebuilt = rebuild_blocks_from_tileset(
-        rec, image_path=img, tile_size=tile_size, max_blocks=max_blocks
+        rec,
+        image_path=img,
+        tile_size=tile_size,
+        max_blocks=max_blocks,
+        game=game,
+        palette_bake=palette_bake,
     )
     tiles = list(rec.get("blocks") or [])
     coll = list(rec.get("collision") or [])
-    return tiles, coll, rebuilt
+    return tiles, coll, rebuilt, rec, img
+
+
+def _append_synthetic_g1_blocks(
+    g1_raw: list,
+    profile: dict,
+    *,
+    g1_ts_rec: dict | None,
+    g1_sheet_path: str | None,
+    g1_palette_bake: dict | None,
+    g1_tiles_raw: list | None = None,
+) -> list:
+    """Append profile-defined synthetic Gen1 metatiles (e.g. ladder niche)."""
+    synth_defs = profile.get("synthetic_g1_blocks") or []
+    if not synth_defs:
+        return g1_raw
+    if not g1_ts_rec or not g1_sheet_path:
+        print("[block_mapper] synthetic_g1_blocks skipped (no G1 tileset rebuild metadata)")
+        return g1_raw
+    block_px = int(profile.get("g1_block_size") or 32)
+    tile_size = int(profile.get("g1_tile_size") or 8)
+    out = list(g1_raw)
+    tiles_out = list(g1_tiles_raw) if g1_tiles_raw is not None else None
+    for spec in synth_defs:
+        tiles = list(spec.get("tiles") or [])
+        if len(tiles) != 16:
+            print(f"[block_mapper] synthetic block '{spec.get('name', '?')}' needs 16 tiles")
+            continue
+        img = render_block_from_tile_ids(
+            tiles,
+            g1_ts_rec,
+            g1_sheet_path,
+            block_px=block_px,
+            tile_size=tile_size,
+            palette_bake=g1_palette_bake,
+            game="red",
+        )
+        out.append(img)
+        if tiles_out is not None:
+            tiles_out.append(list(tiles))
+        print(f"[block_mapper] Synthetic G1 block #{len(out) - 1}: {spec.get('name', 'custom')}")
+    if g1_tiles_raw is not None and tiles_out is not None:
+        g1_tiles_raw[:] = tiles_out
+    return out
 
 
 def _load_g2_tileset_data(profile: dict):
     tileset_id = profile.get("g2_tileset_id") or "TILESET_KANTO"
     tile_size = int(profile.get("g2_tile_size") or 8)
     g2_game = profile.get("g2_game") or profile.get("game") or "gold"
+    g2_palette_bake = _palette_bake_for_profile(profile, "g2")
     g2_tiles_raw, g2_coll_raw, rebuilt = None, None, None
+    g2_ts_rec, g2_sheet_path = None, None
     for game in (g2_game, "gold", "silver", "crystal"):
-        g2_tiles_raw, g2_coll_raw, rebuilt = _rebuild_blocks_for_tileset(
-            tileset_id, game, tile_size, profile.get("g2_max_blocks")
+        g2_tiles_raw, g2_coll_raw, rebuilt, g2_ts_rec, g2_sheet_path = _rebuild_blocks_for_tileset(
+            tileset_id,
+            game,
+            tile_size,
+            profile.get("g2_max_blocks"),
+            palette_bake=g2_palette_bake,
         )
         if g2_tiles_raw:
             break
@@ -177,9 +290,10 @@ def _load_g2_tileset_data(profile: dict):
         for idx, c_def in custom.items():
             g2_tiles_raw[idx] = list(c_def["tiles"])
             g2_coll_raw[idx] = list(c_def["collision"])
+    g2_ts_rec = _enrich_g2_tileset_rec(g2_ts_rec, profile, g2_tiles_raw)
     if rebuilt:
         print(f"[block_mapper] Rebuilt {len(rebuilt)} G2 blocks from Gold '{tileset_id}'")
-    return g2_tiles_raw, g2_coll_raw, rebuilt
+    return g2_tiles_raw, g2_coll_raw, rebuilt, g2_ts_rec, g2_sheet_path, g2_palette_bake
 
 
 def prepare_mapping_session(
@@ -202,6 +316,9 @@ def prepare_mapping_session(
 
     slice_g1_w = profile.get("g1_block_size") or 32
     slice_g2_w = profile.get("g2_block_size") or 32
+    g1_ts_rec = None
+    g1_palette_bake = _palette_bake_for_profile(profile, "g1")
+    g1_tiles_raw = None
 
     if g1_sheet_path and os.path.isfile(g1_sheet_path):
         g1_raw = cvmod.slice_sheet(
@@ -213,11 +330,12 @@ def prepare_mapping_session(
             max_blocks=profile.get("g1_max_blocks") or 128,
         )
     elif profile.get("g1_tileset_id"):
-        _, _, g1_raw = _rebuild_blocks_for_tileset(
+        g1_tiles_raw, _, g1_raw, g1_ts_rec, g1_sheet_path = _rebuild_blocks_for_tileset(
             profile["g1_tileset_id"],
             "red",
             int(profile.get("g1_tile_size") or 8),
             profile.get("g1_max_blocks"),
+            palette_bake=g1_palette_bake,
         )
         if not g1_raw:
             raise FileNotFoundError(
@@ -227,11 +345,22 @@ def prepare_mapping_session(
     else:
         raise FileNotFoundError(f"Gen 1 sheet not found: {profile.get('g1_sheet')}")
 
-    g2_tiles_raw, g2_coll_raw, rebuilt_g2 = _load_g2_tileset_data(profile)
+    g1_raw = _append_synthetic_g1_blocks(
+        g1_raw,
+        profile,
+        g1_ts_rec=g1_ts_rec,
+        g1_sheet_path=g1_sheet_path,
+        g1_palette_bake=g1_palette_bake,
+        g1_tiles_raw=g1_tiles_raw,
+    )
 
-    if g2_sheet_path and os.path.isfile(g2_sheet_path):
+    g2_tiles_raw, g2_coll_raw, rebuilt_g2, g2_ts_rec, g2_sheet_path, g2_palette_bake = _load_g2_tileset_data(profile)
+
+    # g2_sheet_path is the per-tile atlas (e.g. cave.png) — never slice it as a block sheet.
+    g2_block_sheet = g2_sheet_path or resolve_sheet_path(profile.get("g2_sheet"))
+    if g2_block_sheet and os.path.isfile(g2_block_sheet) and g2_block_sheet != g2_sheet_path:
         g2_raw = cvmod.slice_sheet(
-            g2_sheet_path,
+            g2_block_sheet,
             cols=16,
             block_w=slice_g2_w,
             block_h=slice_g2_w,
@@ -243,15 +372,8 @@ def prepare_mapping_session(
         print(f"[block_mapper] Using Gold tileset rebuild for G2 ({len(g2_raw)} blocks)")
     else:
         raise FileNotFoundError(
-            f"Gen 2 sheet '{profile.get('g2_sheet')}' not found and tileset rebuild failed"
+            f"Gen 2 block sheet '{profile.get('g2_sheet')}' not found and tileset rebuild failed"
         )
-
-    if rebuilt_g2 and (profile.get("g2_palette_env") or "").upper() in ("CAVE", "CAVERN"):
-        for i, img in enumerate(rebuilt_g2):
-            if i < len(g2_raw):
-                g2_raw[i] = img
-            else:
-                g2_raw.append(img)
 
     synth = profile.get("synthesize")
     if callable(synth):
@@ -272,10 +394,20 @@ def prepare_mapping_session(
     g2_np = [np.array(b) for b in g2_norm]
 
     unique_pool = cvmod.build_unique_quadrant_pool(
-        g2_np, g2_coll_raw, exclude_buildings=exclude_buildings
+        g2_np,
+        g2_coll_raw,
+        exclude_buildings=exclude_buildings,
+        g2_tiles_raw=g2_tiles_raw,
+        uniform_tiles=profile.get("g2_pool_uniform_tiles"),
+        extra_tile_keys=profile.get("g2_pool_extra_tile_keys"),
+        g2_ts_rec=g2_ts_rec,
+        g2_sheet_path=g2_sheet_path,
+        g2_palette_bake=g2_palette_bake,
+        g2_game=profile.get("g2_game") or profile.get("game") or "gold",
+        g2_tile_size=int(profile.get("g2_tile_size") or 8),
     )
     print(f"[block_mapper] Unique quads: {len(unique_pool)}")
-    base_quad = cvmod.compute_base_quadrant_rankings(g1_np, unique_pool)
+    base_quad = cvmod.compute_base_quadrant_rankings(g1_np, unique_pool, g1_tiles_raw=g1_tiles_raw)
     block_rank = cvmod.compute_all_block_rankings(g1_np, g2_np)
 
     preview = load_test_map(profile)
@@ -291,6 +423,9 @@ def prepare_mapping_session(
         unique_quad_pool=unique_pool,
         g2_tiles_raw=g2_tiles_raw,
         g2_coll_raw=g2_coll_raw,
+        g2_ts_rec=g2_ts_rec,
+        g2_sheet_path=g2_sheet_path,
+        g2_palette_bake=g2_palette_bake,
         out_path=out_file,
         dict_name=profile.get("dict_name") or "G1_TO_G2",
         custom_blocks_name=profile.get("custom_blocks_name") or "CUSTOM_BLOCKS_GENERATED",

@@ -66,4 +66,45 @@ return function(T, Data)
     learnset = { { level = 10, move = "SLASH" } },
   })
   T.eq(g2[1].move, "BITE", "toLevelMoves puts evolution move first at L1")
+
+  -- Gen2 HM06 Whirlpool restore (Gen3 stripped machine compatibility)
+  local restored = ApplyGen3.ensureGen2Whirlpool(
+    { "SURF", "WATERFALL" },
+    { dex = 7, types = { "WATER" }, tmhm = { "SURF", "WHIRLPOOL" } }
+  )
+  local hasWhirl = false
+  for _, mv in ipairs(restored) do
+    if mv == "WHIRLPOOL" then hasWhirl = true end
+  end
+  T.check(hasWhirl, "Gen2 stock Whirlpool learner keeps HM06 after Gen3 tmhm")
+
+  local slow = ApplyGen3.ensureGen2Whirlpool(
+    { "SURF", "WATERFALL" },
+    { dex = 79, types = { "WATER", "PSYCHIC_TYPE" }, tmhm = { "SURF" } }
+  )
+  local slowWhirl = false
+  for _, mv in ipairs(slow) do
+    if mv == "WHIRLPOOL" then slowWhirl = true end
+  end
+  T.check(not slowWhirl, "Gen2 Surf-only Water types stay without Whirlpool")
+
+  local mudkip = ApplyGen3.ensureGen2Whirlpool(
+    { "SURF", "WATERFALL", "DIVE" },
+    { dex = 258, types = { "WATER" }, tmhm = { "SURF" } }
+  )
+  local mudWhirl = false
+  for _, mv in ipairs(mudkip) do
+    if mv == "WHIRLPOOL" then mudWhirl = true end
+  end
+  T.check(mudWhirl, "Hoenn Water+Surf gets Gen2 Whirlpool HM compatibility")
+
+  local furret = ApplyGen3.ensureGen2Whirlpool(
+    { "SURF", "CUT" },
+    { dex = 162, types = { "NORMAL" }, tmhm = { "SURF" } }
+  )
+  local furWhirl = false
+  for _, mv in ipairs(furret) do
+    if mv == "WHIRLPOOL" then furWhirl = true end
+  end
+  T.check(not furWhirl, "non-Water Gen2 Surf users do not gain Whirlpool")
 end

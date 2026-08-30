@@ -15,6 +15,7 @@ KNOWN_PROFILES = (
     "safari_kanto",
     "forest_kanto",
     "cavern_cave",
+    "legend_mythical_overworld",
 )
 
 

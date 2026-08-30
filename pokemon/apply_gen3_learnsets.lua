@@ -16,6 +16,47 @@ local function appendUnique(list, id)
   list[#list + 1] = id
 end
 
+local function listHas(list, id)
+  for _, existing in ipairs(list or {}) do
+    if existing == id then return true end
+  end
+  return false
+end
+
+local function isWaterType(species)
+  local t = species and species.types
+  if type(t) ~= "table" then return false end
+  for _, id in ipairs(t) do
+    if id == "WATER" then return true end
+  end
+  -- Gen2 host sometimes stores type1/type2
+  if species.type1 == "WATER" or species.type2 == "WATER" then return true end
+  if species.type == "WATER" then return true end
+  return false
+end
+
+-- Gen3 removed Whirlpool as an HM (tutor-only / tiny level-up set). On a Gen2
+-- host HM06 is still required for Johto progression, so restore compatibility:
+--   1) Kanto/Johto: keep anyone who already had WHIRLPOOL on the stock Gen2 sheet
+--   2) Hoenn (dex 252+): grant it to Water-types that received SURF (Gen2-style
+--      water HM companion — Gen3 never put Whirlpool on their machine list)
+function ApplyGen3Learnsets.ensureGen2Whirlpool(tmhm, existing)
+  local out = copyList(tmhm)
+  if listHas(out, "WHIRLPOOL") then
+    table.sort(out)
+    return out
+  end
+  local stockHad = listHas(existing and existing.tmhm, "WHIRLPOOL")
+  local dex = existing and tonumber(existing.dex) or 0
+  if stockHad then
+    appendUnique(out, "WHIRLPOOL")
+  elseif dex >= 252 and listHas(out, "SURF") and isWaterType(existing) then
+    appendUnique(out, "WHIRLPOOL")
+  end
+  table.sort(out)
+  return out
+end
+
 function ApplyGen3Learnsets.filterRow(row, knownMove)
   local out = {
     level1Moves = {},
@@ -94,6 +135,9 @@ function ApplyGen3Learnsets.apply(mod, Host, gen3Table)
       local dex = existing.dex or 0
       if dex >= 1 and dex <= 386 then
         local filtered = ApplyGen3Learnsets.filterRow(row, knownMove)
+        if Host.isGen2() then
+          filtered.tmhm = ApplyGen3Learnsets.ensureGen2Whirlpool(filtered.tmhm, existing)
+        end
         local ok = pcall(function()
           if Host.isGen2() then
             mod.content.pokemon:patch(speciesId, {

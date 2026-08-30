@@ -92,26 +92,11 @@ local function staticBattle(species, level, flag)
   end
 end
 
-function LegendMythicals.register(mod)
-  local Host = require("mods.Kanto-Reforged.core.host")
-  if Host.isGen2() then return end
-  mod.content.items:register("DNA_KEY", {
-    id = "DNA_KEY", name = "DNA KEY", price = 0, keyItem = true, tossable = false,
-  })
-
-  -- SKY_PILLAR_KANT (Rayquaza) — index 1101
-  local sw, sh = 10, 8
-  mod.content.maps:register("SKY_PILLAR_KANT", {
-    id = "SKY_PILLAR_KANT",
-    label = "SkyPillarKant",
+local MYTHICAL_MAP_META = {
+  SKY_PILLAR_KANT = {
     index = 1101,
-    tileset = "OVERWORLD",
-    width = sw, height = sh,
-    blocks = skyPillarBlocks(sw, sh),
-    borderBlock = WALL,
-    warps = {
-      { x = 9, y = 12, destMap = "ROUTE_23", destWarp = 1 },
-    },
+    label = "SkyPillarKant",
+    warps = { { x = 9, y = 12, destMap = "ROUTE_23", destWarp = 1 } },
     objects = {
       {
         index = 1, name = "SKYPILLARKANT_RAYQUAZA",
@@ -120,28 +105,11 @@ function LegendMythicals.register(mod)
         x = 9, y = 7, pokemon = "RAYQUAZA", level = 70,
       },
     },
-    signs = {},
-  })
-
-  -- Patch Route 23 with a warp object / talk NPC to enter after Kyogre+Groudon
-  HouseNpcs.appendNpc(mod, "ROUTE_23", {
-    index = 8, name = "ROUTE23_SKY_GATE",
-    sprite = "SPRITE_HIKER", text = "TEXT_ROUTE23_SKY_GATE",
-    x = 10, y = 20,
-  }, LegendMythicals.OWNER)
-
-  -- ILEX_SHRINE_KANT — index 1102
-  mod.content.maps:register("ILEX_SHRINE_KANT", {
-    id = "ILEX_SHRINE_KANT",
-    label = "IlexShrineKant",
+  },
+  ILEX_SHRINE_KANT = {
     index = 1102,
-    tileset = "OVERWORLD",
-    width = sw, height = sh,
-    blocks = ilexBlocks(sw, sh),
-    borderBlock = WALL,
-    warps = {
-      { x = 9, y = 12, destMap = "VIRIDIAN_FOREST", destWarp = 1 },
-    },
+    label = "IlexShrineKant",
+    warps = { { x = 9, y = 12, destMap = "VIRIDIAN_FOREST", destWarp = 1 } },
     objects = {
       {
         index = 1, name = "ILEXSHRINEKANT_CELEBI",
@@ -150,27 +118,11 @@ function LegendMythicals.register(mod)
         x = 9, y = 7, pokemon = "CELEBI", level = 30,
       },
     },
-    signs = {},
-  })
-
-  HouseNpcs.appendNpc(mod, "VIRIDIAN_FOREST", {
-    index = 9, name = "VIRIDIANFOREST_SHRINE_GATE",
-    sprite = "SPRITE_CHANNELER", text = "TEXT_VIRIDIANFOREST_SHRINE_GATE",
-    x = 16, y = 20,
-  }, LegendMythicals.OWNER)
-
-  -- BIRTH_ISLAND_KANT — index 1103
-  mod.content.maps:register("BIRTH_ISLAND_KANT", {
-    id = "BIRTH_ISLAND_KANT",
-    label = "BirthIslandKant",
+  },
+  BIRTH_ISLAND_KANT = {
     index = 1103,
-    tileset = "OVERWORLD",
-    width = sw, height = sh,
-    blocks = birthIslandBlocks(sw, sh),
-    borderBlock = WALL,
-    warps = {
-      { x = 9, y = 10, destMap = "VERMILION_DOCK", destWarp = 1 },
-    },
+    label = "BirthIslandKant",
+    warps = { { x = 9, y = 10, destMap = "VERMILION_DOCK", destWarp = 1 } },
     objects = {
       {
         index = 1, name = "BIRTHISLANDKANT_DEOXYS",
@@ -179,8 +131,74 @@ function LegendMythicals.register(mod)
         x = 9, y = 7, pokemon = "DEOXYS_NORMAL", level = 70,
       },
     },
+  },
+}
+
+local function registerMythicalMap(mod, mapId, tileset, blocks, borderBlock, width, height)
+  local meta = MYTHICAL_MAP_META[mapId]
+  if not meta or not blocks then return end
+  mod.content.maps:register(mapId, {
+    id = mapId,
+    label = meta.label,
+    index = meta.index,
+    tileset = tileset,
+    width = width or meta.width or 10,
+    height = height or meta.height or 8,
+    blocks = blocks,
+    borderBlock = borderBlock,
+    warps = meta.warps,
+    objects = meta.objects,
     signs = {},
   })
+end
+
+local function registerGen1MythicalMaps(mod)
+  local sw, sh = 10, 8
+  MYTHICAL_MAP_META.SKY_PILLAR_KANT.width = sw
+  MYTHICAL_MAP_META.SKY_PILLAR_KANT.height = sh
+  MYTHICAL_MAP_META.ILEX_SHRINE_KANT.width = sw
+  MYTHICAL_MAP_META.ILEX_SHRINE_KANT.height = sh
+  MYTHICAL_MAP_META.BIRTH_ISLAND_KANT.width = sw
+  MYTHICAL_MAP_META.BIRTH_ISLAND_KANT.height = sh
+  registerMythicalMap(mod, "SKY_PILLAR_KANT", "OVERWORLD", skyPillarBlocks(sw, sh), WALL, sw, sh)
+  registerMythicalMap(mod, "ILEX_SHRINE_KANT", "OVERWORLD", ilexBlocks(sw, sh), WALL, sw, sh)
+  registerMythicalMap(mod, "BIRTH_ISLAND_KANT", "OVERWORLD", birthIslandBlocks(sw, sh), WALL, sw, sh)
+end
+
+local function registerGen2MythicalMaps(mod, mythicalData)
+  local tileset = mythicalData.tileset or "TILESET_KANTO"
+  local maps = mythicalData.maps or {}
+  for mapId, src in pairs(maps) do
+    local meta = MYTHICAL_MAP_META[mapId]
+    if meta and src.blocks then
+      meta.width = src.width or meta.width or 10
+      meta.height = src.height or meta.height or 8
+      registerMythicalMap(
+        mod,
+        mapId,
+        tileset,
+        src.blocks,
+        src.borderBlock or (mythicalData.blocks and mythicalData.blocks.WALL),
+        src.width,
+        src.height
+      )
+    end
+  end
+end
+
+local function registerMythicalWorldContent(mod)
+  -- Patch Route 23 with a warp object / talk NPC to enter after Kyogre+Groudon
+  HouseNpcs.appendNpc(mod, "ROUTE_23", {
+    index = 8, name = "ROUTE23_SKY_GATE",
+    sprite = "SPRITE_HIKER", text = "TEXT_ROUTE23_SKY_GATE",
+    x = 10, y = 20,
+  }, LegendMythicals.OWNER)
+
+  HouseNpcs.appendNpc(mod, "VIRIDIAN_FOREST", {
+    index = 9, name = "VIRIDIANFOREST_SHRINE_GATE",
+    sprite = "SPRITE_CHANNELER", text = "TEXT_VIRIDIANFOREST_SHRINE_GATE",
+    x = 16, y = 20,
+  }, LegendMythicals.OWNER)
 
   HouseNpcs.appendNpc(mod, "VERMILION_DOCK", {
     index = 1, name = "VERMILIONDOCK_SAILOR",
@@ -325,6 +343,27 @@ function LegendMythicals.register(mod)
       end,
     },
   })
+end
+
+-- Gen2-only: remapped TILESET_KANTO blocks from legend_maps_data.lua (mapper export).
+function LegendMythicals.applyGen2(mod, mythicalData)
+  if not mythicalData or not mythicalData.maps then return false end
+  mod.content.items:register("DNA_KEY", {
+    id = "DNA_KEY", name = "DNA KEY", price = 0, keyItem = true, tossable = false,
+  })
+  registerGen2MythicalMaps(mod, mythicalData)
+  registerMythicalWorldContent(mod)
+  return true
+end
+
+function LegendMythicals.register(mod)
+  local Host = require("mods.Kanto-Reforged.core.host")
+  if Host.isGen2() then return end
+  mod.content.items:register("DNA_KEY", {
+    id = "DNA_KEY", name = "DNA KEY", price = 0, keyItem = true, tossable = false,
+  })
+  registerGen1MythicalMaps(mod)
+  registerMythicalWorldContent(mod)
 end
 
 LegendMythicals.CUSTOM_MAPS = {

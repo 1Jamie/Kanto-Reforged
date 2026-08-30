@@ -7,6 +7,12 @@ local RestoredDungeons = {}
 
 RestoredDungeons.APPLIED = false
 
+local function kantoCampaign()
+  local ok, C = pcall(require, "mods.Kanto-Reforged.world.kanto_campaign")
+  if ok then return C end
+  return nil
+end
+
 -- Item index mapping for Gold / Gen 2 item compatibility
 local ITEM_INDEX_MAP = {
   MASTER_BALL = 1, ULTRA_BALL = 2, GREAT_BALL = 3, POKE_BALL = 4,
@@ -283,7 +289,18 @@ local MT_MOON_RIVAL_RIGHT_SCRIPT = {
 
 local MT_MOON_RIVAL_SCENE_SCRIPT = MT_MOON_RIVAL_LEFT_SCRIPT
 
--- Gen 2 Mount Moon Silver, relocated onto restored MT_MOON_1F_KR entrance.
+-- Final Kanto rival lives on B2F (tucked away), not the 1F entrance ambush.
+local KANTO_BADGE_FLAGS = {
+  "ENGINE_BOULDERBADGE",
+  "ENGINE_CASCADEBADGE",
+  "ENGINE_THUNDERBADGE",
+  "ENGINE_RAINBOWBADGE",
+  "ENGINE_SOULBADGE",
+  "ENGINE_MARSHBADGE",
+  "ENGINE_VOLCANOBADGE",
+  "ENGINE_EARTHBADGE",
+}
+
 local function isMtMoon1fMapId(mapId)
   return mapId == "MT_MOON_1F_KR"
     or mapId == "MT_MOON_1F"
@@ -292,73 +309,139 @@ local function isMtMoon1fMapId(mapId)
     or mapId == "MT_MOON"
 end
 
-local function ensureMtMoonSilverRival(mdef)
+local function isMtMoonB2fMapId(mapId)
+  return mapId == "MT_MOON_B2F_KR"
+    or mapId == "MT_MOON_B2F"
+    or mapId == "MOUNT_MOON_B2F"
+    or mapId == "MTMOON_B2F"
+end
+
+-- Strip legacy 1F coord-event ambush (wrong level, sets cap flag too early).
+local function stripMtMoon1fSilverAmbush(mdef)
+  if not mdef then return end
+  local kept = {}
+  for _, obj in ipairs(mdef.objects or {}) do
+    if obj.name ~= "MT_MOON_1F_SILVER_RIVAL" and not obj.isRivalEvent then
+      kept[#kept + 1] = obj
+    end
+  end
+  mdef.objects = kept
+  mdef.coordEvents = {}
+end
+
+local function buildKantoBadgeGateScript(rejectText, bodyScript)
+  local script = {}
+  for _, flag in ipairs(KANTO_BADGE_FLAGS) do
+    script[#script + 1] = { op = "checkflag", flag = flag }
+    script[#script + 1] = {
+      op = "iffalse",
+      script = {
+        { op = "faceplayer" },
+        { op = "opentext" },
+        { op = "rawtext", text = rejectText },
+        { op = "waitbutton" },
+        { op = "closetext" },
+        { op = "end" },
+      },
+    }
+  end
+  for _, cmd in ipairs(bodyScript) do
+    script[#script + 1] = cmd
+  end
+  return script
+end
+
+local MT_MOON_B2F_SILVER_BATTLE_SCRIPT = {
+  { op = "faceplayer" },
+  { op = "opentext" },
+  { op = "rawtext", text = DUNGEON_TEXT.TEXT_MT_MOON_SILVER_RIVAL_SEEN },
+  { op = "waitbutton" },
+  { op = "closetext" },
+  { op = "winlosstext", winText = DUNGEON_TEXT.TEXT_MT_MOON_SILVER_RIVAL_DEFEAT, lossText = "Humph! As expected." },
+  { op = "loadtrainer", class = 42, member = 210 },
+  { op = "startbattle" },
+  { op = "dontrestartmapmusic" },
+  { op = "reloadmapafterbattle" },
+  { op = "playmusic", id = 32 },
+  { op = "opentext" },
+  { op = "rawtext", text = DUNGEON_TEXT.TEXT_MT_MOON_SILVER_RIVAL_AFTER },
+  { op = "waitbutton" },
+  { op = "closetext" },
+  { op = "setevent", event = 793 },
+  { op = "setevent", event = 1914 },
+  { op = "setevent", event = 2998 },
+  { op = "playmapmusic" },
+  { op = "end" },
+}
+
+local MT_MOON_B2F_SILVER_SCRIPT = buildKantoBadgeGateScript(
+  "…You again?\n\nI've been training in the depths of MT. MOON.\nBut you're not ready yet.\n\nBeat all eight KANTO GYM LEADERS first!",
+  MT_MOON_B2F_SILVER_BATTLE_SCRIPT
+)
+
+table.insert(MT_MOON_B2F_SILVER_SCRIPT, 1, {
+  op = "iftrue",
+  script = {
+    { op = "faceplayer" },
+    { op = "opentext" },
+    { op = "rawtext", text = "…Don't get in my way.\nI'm still training to surpass RED." },
+    { op = "waitbutton" },
+    { op = "closetext" },
+    { op = "end" },
+  },
+})
+table.insert(MT_MOON_B2F_SILVER_SCRIPT, 1, { op = "checkevent", event = 793 })
+
+local function ensureMtMoonB2fSilverRival(mdef)
   if not mdef then return end
   mdef.objects = mdef.objects or {}
 
   local rival = nil
-  local rivalPos = nil
-  for i, obj in ipairs(mdef.objects) do
-    if obj.name == "MT_MOON_1F_SILVER_RIVAL" or obj.isRivalEvent then
+  for _, obj in ipairs(mdef.objects) do
+    if obj.name == "MTMOONB2F_SILVER_RIVAL"
+        or obj.name == "MT_MOON_B2F_SILVER_RIVAL"
+        or obj.isRivalEvent then
       rival = obj
-      rivalPos = i
       break
     end
   end
 
   if not rival then
-    -- applymovement/disappear use cart object id 15 → objects[14]. Append so
-    -- Silver lands in that slot when the restored 1F still has 13 NPCs/items.
     rival = {
-      index = 14,
-      name = "MT_MOON_1F_SILVER_RIVAL",
+      index = 10,
+      name = "MTMOONB2F_SILVER_RIVAL",
       sprite = "SPRITE_RIVAL",
-      x = 14,
-      y = 28,
+      x = 3,
+      y = 2,
       range = "DOWN",
       movement = 6,
       sight = 0,
-      event = 793,
-      eventFlag = 793,
+      event = 2998,
+      eventFlag = 2998,
       isRivalEvent = true,
-      level = 58,
+      level = 78,
       trainerClass = "RIVAL2",
-      trainerParty = 201,
+      trainerParty = 210,
       text = "TEXT_MT_MOON_SILVER_RIVAL_SEEN",
     }
-    table.insert(mdef.objects, rival)
-    rivalPos = #mdef.objects
+    mdef.objects[#mdef.objects + 1] = rival
   end
 
-  rival.x = 14
-  rival.y = 28
+  rival.name = "MTMOONB2F_SILVER_RIVAL"
+  rival.x = 3
+  rival.y = 2
   rival.sight = 0
   rival.range = "DOWN"
   rival.movement = 6
   rival.sprite = "SPRITE_RIVAL"
-  rival.event = 793
-  rival.eventFlag = 793
+  rival.event = 2998
+  rival.eventFlag = 2998
   rival.isRivalEvent = true
-  rival.level = 58
+  rival.level = 78
   rival.trainerClass = "RIVAL2"
-  rival.trainerParty = rival.trainerParty or 201
-  rival.name = "MT_MOON_1F_SILVER_RIVAL"
-  -- Cart object id 15 reads objects[14]; pin index to array slot when possible.
-  if rivalPos == 14 then
-    rival.index = 14
-  elseif not rival.index then
-    rival.index = rivalPos
-  end
-
-  -- Coord triggers just inside the Route 3 entrance carpets (14/15, 35).
-  -- Must key off MT_MOON_1F_KR (legacy names alone never matched after _KR rename).
-  mdef.sceneScripts = mdef.sceneScripts or {}
-  mdef.coordEvents = {
-    { sceneId = 0, x = 14, y = 34, scriptKey = MT_MOON_RIVAL_LEFT_SCRIPT },
-    { sceneId = 0, x = 14, y = 33, scriptKey = MT_MOON_RIVAL_LEFT_SCRIPT },
-    { sceneId = 0, x = 15, y = 34, scriptKey = MT_MOON_RIVAL_RIGHT_SCRIPT },
-    { sceneId = 0, x = 15, y = 33, scriptKey = MT_MOON_RIVAL_RIGHT_SCRIPT },
-  }
+  rival.trainerParty = 210
+  rival.scriptKey = MT_MOON_B2F_SILVER_SCRIPT
+  rival.trainer = nil
 end
 
 -- Curated Gen 2 / Gen 3 post-game rosters (Lv 46–50) for restored Kanto dungeons
@@ -483,8 +566,9 @@ local DUNGEON_ROSTERS = {
     classNum = 30,
     member = 1,
     event = 2202,
-    className = "GRUNT",
-    name = "EXECUTIVE",
+    -- Gen2 HUD is class display + trainer name → "ROCKET GRUNT".
+    className = "ROCKET",
+    name = "GRUNT",
     baseMoney = 40,
     roster = {
       { species = "GOLBAT", level = 48 },
@@ -497,8 +581,9 @@ local DUNGEON_ROSTERS = {
     classNum = 30,
     member = 2,
     event = 2203,
-    className = "GRUNT",
-    name = "EXECUTIVE",
+    -- Gen2 HUD is class display + trainer name → "ROCKET GRUNT".
+    className = "ROCKET",
+    name = "GRUNT",
     baseMoney = 40,
     roster = {
       { species = "HOUNDOOM", level = 49 },
@@ -511,8 +596,9 @@ local DUNGEON_ROSTERS = {
     classNum = 30,
     member = 3,
     event = 2204,
-    className = "GRUNT",
-    name = "EXECUTIVE",
+    -- Gen2 HUD is class display + trainer name → "ROCKET GRUNT".
+    className = "ROCKET",
+    name = "GRUNT",
     baseMoney = 40,
     roster = {
       { species = "WEEZING", level = 49 },
@@ -525,8 +611,9 @@ local DUNGEON_ROSTERS = {
     classNum = 30,
     member = 4,
     event = 2205,
-    className = "GRUNT",
-    name = "EXECUTIVE",
+    -- Gen2 HUD is class display + trainer name → "ROCKET GRUNT".
+    className = "ROCKET",
+    name = "GRUNT",
     baseMoney = 40,
     roster = {
       { species = "MACHAMP", level = 50 },
@@ -655,11 +742,45 @@ local DUNGEON_ROSTERS = {
     baseMoney = 65,
     roster = {
       { species = "SNEASEL", level = 75, item = "FOCUS_BAND" },
-      { species = "ALAKAZAM", level = 75, item = "TWISTEDSPOON" },
-      { species = "MAGNEZONE", level = 76, item = "MAGNET" },
+      { species = "MAGNETON", level = 76, item = "MAGNET" },
       { species = "GENGAR", level = 76, item = "SPELL_TAG" },
+      { species = "ALAKAZAM", level = 77, item = "TWISTEDSPOON" },
       { species = "CROBAT", level = 77, item = "SHARP_BEAK" },
-      { species = "FERALIGATR", level = 78, item = "MYSTIC_WATER" },
+      { species = "TYRANITAR", level = 78, item = "LUM_BERRY" },
+    }
+  },
+  MTMOONB2F_SILVER_RIVAL_2 = {
+    classId = "OPP_RIVAL2",
+    classNum = 42,
+    member = 11,
+    event = 2998,
+    className = "RIVAL",
+    name = "SILVER",
+    baseMoney = 65,
+    roster = {
+      { species = "SNEASEL", level = 75, item = "FOCUS_BAND" },
+      { species = "MAGNETON", level = 76, item = "MAGNET" },
+      { species = "GENGAR", level = 76, item = "SPELL_TAG" },
+      { species = "ALAKAZAM", level = 77, item = "TWISTEDSPOON" },
+      { species = "CROBAT", level = 77, item = "SHARP_BEAK" },
+      { species = "TYPHLOSION", level = 78, item = "LUM_BERRY" },
+    }
+  },
+  MTMOONB2F_SILVER_RIVAL_3 = {
+    classId = "OPP_RIVAL2",
+    classNum = 42,
+    member = 12,
+    event = 2998,
+    className = "RIVAL",
+    name = "SILVER",
+    baseMoney = 65,
+    roster = {
+      { species = "SNEASEL", level = 75, item = "FOCUS_BAND" },
+      { species = "MAGNETON", level = 76, item = "MAGNET" },
+      { species = "GENGAR", level = 76, item = "SPELL_TAG" },
+      { species = "ALAKAZAM", level = 77, item = "TWISTEDSPOON" },
+      { species = "CROBAT", level = 77, item = "SHARP_BEAK" },
+      { species = "FERALIGATR", level = 78, item = "LUM_BERRY" },
     }
   },
   SEAFOAM_GYM_BLAINE = {
@@ -932,6 +1053,8 @@ local GOLD_MEMBERS = {
   MT_MOON_1F_SILVER_RIVAL_2 = 202,
   MT_MOON_1F_SILVER_RIVAL_3 = 203,
   MTMOONB2F_SILVER_RIVAL = 210,
+  MTMOONB2F_SILVER_RIVAL_2 = 211,
+  MTMOONB2F_SILVER_RIVAL_3 = 212,
   SEAFOAM_GYM_BLAINE = 201,
   ROCKTUNNEL1F_HIKER1 = 202,
   ROCKTUNNEL1F_HIKER2 = 203,
@@ -1077,6 +1200,11 @@ local function normalizeDungeonData(Data)
   -- Do not short-circuit with a normalized guard: the eventFlag sync below
   -- must run on every apply() so it catches already-cached module data.
 
+  local Campaign = kantoCampaign()
+  if Campaign and Campaign.mergeTexts then
+    Campaign.mergeTexts(DUNGEON_TEXT)
+  end
+
   bindGen1TilesetOverrideImages(Data)
 
   if Data.maps.SEAFOAM_GYM then
@@ -1097,9 +1225,11 @@ local function normalizeDungeonData(Data)
 
   -- 3. Rewrite all objects, signs, and bgEvents to native rawtext scripts
   for mapId, mdef in pairs(Data.maps) do
-    -- Inject Gen 2 Silver onto KR 1F before object rewrite (legacy names missed _KR).
     if isMtMoon1fMapId(mapId) then
-      ensureMtMoonSilverRival(mdef)
+      stripMtMoon1fSilverAmbush(mdef)
+    end
+    if isMtMoonB2fMapId(mapId) then
+      ensureMtMoonB2fSilverRival(mdef)
     end
 
     if mdef.objects then
@@ -1123,29 +1253,8 @@ local function normalizeDungeonData(Data)
           obj.itemball.quantity = obj.itemball.quantity or 1
         end
 
-        if obj.name == "MT_MOON_1F_SILVER_RIVAL" or obj.isRivalEvent then
-          -- Coord-event Silver: not a talk-to trainer; battle is the scene script.
-          obj.x = 14
-          obj.y = 28
-          obj.sight = 0
-          obj.range = "DOWN"
-          obj.movement = 6
-          obj.sprite = "SPRITE_RIVAL"
-          obj.event = 793
-          obj.eventFlag = 793
-          obj.isRivalEvent = true
-          obj.level = 58
-          obj.trainerClass = "RIVAL2"
-          obj.trainerParty = obj.trainerParty or 201
-          obj.trainer = nil
-          obj.scriptKey = {
-            { op = "faceplayer" },
-            { op = "opentext" },
-            { op = "rawtext", text = DUNGEON_TEXT.TEXT_MT_MOON_SILVER_RIVAL_SEEN },
-            { op = "waitbutton" },
-            { op = "closetext" },
-            { op = "end" },
-          }
+        if obj.name == "MTMOONB2F_SILVER_RIVAL" or obj.name == "MT_MOON_B2F_SILVER_RIVAL" or obj.isRivalEvent then
+          ensureMtMoonB2fSilverRival(mdef)
         elseif not obj.trainer and not obj.itemball and not isBoulder then
           if obj.name == "CERULEANCAVEB1F_MEWTWO" or obj.name == "CERULEAN_CAVE_MEWTWO" then
             obj.scriptKey = {
@@ -1158,32 +1267,6 @@ local function normalizeDungeonData(Data)
               { op = "startbattle" },
               { op = "disappear", object = 254 },
               { op = "reloadmapafterbattle" },
-              { op = "end" },
-            }
-          elseif obj.name == "MTMOONB2F_SILVER_RIVAL" or obj.name == "MT_MOON_B2F_SILVER_RIVAL" then
-            obj.x = 5
-            obj.y = 3
-            obj.sight = 0
-            obj.range = "DOWN"
-            obj.event = 2998
-            obj.eventFlag = 2998
-            obj.scriptKey = {
-              { op = "faceplayer" },
-              { op = "opentext" },
-              { op = "rawtext", text = "What? You again?\n...I've been training here in the depths of MT. MOON to surpass RED and the CHAMPION.\n\nYou want to test my strength? Don't hold back!" },
-              { op = "waitbutton" },
-              { op = "closetext" },
-              { op = "winloss", win = "Defeated!", loss = "Humph! As expected." },
-              { op = "loadtrainer", class = 42, member = 210 },
-              { op = "startbattle" },
-              { op = "reloadmapafterbattle" },
-              { op = "opentext" },
-              { op = "rawtext", text = "I lost again...\nI will keep training until I become the greatest trainer in the world!" },
-              { op = "waitbutton" },
-              { op = "closetext" },
-              { op = "applymovementlasttalked", movement = "MT_MOON_SILVER_EXIT" },
-              { op = "disappear", object = 254 },
-              { op = "setevent", event = 2998 },
               { op = "end" },
             }
           elseif obj.name == "SEAFOAMISLANDSB4F_ARTICUNO" or obj.name == "SEAFOAM_ARTICUNO" then
@@ -1220,11 +1303,12 @@ local function normalizeDungeonData(Data)
               { op = "end" },
             }
           elseif obj.name == "SAFARIZONESECRETHOUSE_FISHING_GURU" then
+            -- Campaign overlay replaces this with the Rocket industry boss.
+            -- Keep a non-HM fallback if campaign failed to load.
             obj.scriptKey = {
               { op = "faceplayer" },
               { op = "opentext" },
-              { op = "rawtext", text = "Ah! Finally! You're the first\nperson to reach the Secret House!" },
-              { op = "verbosegiveitem", item = 246 },
+              { op = "rawtext", text = authenticText },
               { op = "waitbutton" },
               { op = "closetext" },
               { op = "end" },
@@ -1250,7 +1334,9 @@ local function normalizeDungeonData(Data)
             tr.party = customDef.roster
             tr.trainerName = customDef.name
             tr.name = customDef.name
+            -- className = HUD display ("ROCKET"); classId = art/palette key ("GRUNTM").
             tr.className = customDef.className
+            tr.classId = customDef.goldClass or customDef.classId
             tr.class = customDef.goldIndex or customDef.classNum or tr.class
             tr.member = customDef.member or tr.member
             tr.baseMoney = customDef.baseMoney
@@ -1276,8 +1362,8 @@ local function normalizeDungeonData(Data)
       end
     end
 
-    if isMtMoon1fMapId(mapId) then
-      ensureMtMoonSilverRival(mdef)
+    if isMtMoonB2fMapId(mapId) then
+      ensureMtMoonB2fSilverRival(mdef)
     end
 
     for _, sign in ipairs(mdef.signs or {}) do
@@ -1319,6 +1405,15 @@ function RestoredDungeons.apply(mod)
 
   -- Normalize data tables unconditionally
   normalizeDungeonData(Data)
+
+  do
+    local Campaign = kantoCampaign()
+    local save = (mod and mod.game and mod.game.save)
+      or (_G.game and _G.game.save)
+    if Campaign and Campaign.applyToData then
+      Campaign.applyToData(Data, DUNGEON_TEXT, DUNGEON_ROSTERS, DUNGEON_BY_KEY, save)
+    end
+  end
 
   local game = _G.game or (mod and mod.game)
   local data = (mod and mod.data)
@@ -1661,6 +1756,13 @@ function RestoredDungeons.apply(mod)
     local origTrainerParty = World.trainerParty
     function World:trainerParty(class, member)
       member = tonumber(member) or member or 1
+      -- Mt. Moon B2F Silver: member 210 is the Chikorita line slot; remap by rival starter.
+      if (class == 42 or class == "RIVAL2") and member == 210 then
+        local rs = tonumber(self.save and self.save.rivalStarter) or 1
+        if rs >= 1 and rs <= 3 then
+          member = 209 + rs
+        end
+      end
       -- Prefer embedded roster on the engaged trainer object (normalize stamps it).
       local engaged = self.vm and self.vm.trainerObject
       if engaged and type(engaged.roster) == "table" and #engaged.roster > 0 then
@@ -1676,6 +1778,8 @@ function RestoredDungeons.apply(mod)
               heldItem = slot.item or slot.heldItem,
             }
           end
+          local custom = DUNGEON_BY_KEY[string.format("%s_%s", tostring(class), tostring(member))]
+            or DUNGEON_BY_KEY[string.format("%s_%s", tostring(engaged.classId or ""), tostring(member))]
           return {
             class = class,
             classId = engaged.classId or (type(class) == "string" and class) or tostring(class),
@@ -1683,9 +1787,13 @@ function RestoredDungeons.apply(mod)
             name = engaged.name or engaged.trainerName or "TRAINER",
             member = member,
             roster = roster,
-            trainerType = "normal",
-            attributes = {},
-            items = {},
+            trainerType = "TRAINERTYPE_NORMAL",
+            -- Prize.reward(nil) → $0; must carry TRNATTR_BASE_REWARD.
+            baseMoney = engaged.baseMoney
+              or (custom and custom.baseMoney)
+              or 30,
+            attributes = engaged.attributes or {},
+            items = engaged.items or {},
           }
         end
       end
@@ -1709,7 +1817,8 @@ function RestoredDungeons.apply(mod)
           name = custom.name or "TRAINER",
           member = member,
           roster = roster,
-          trainerType = "normal",
+          trainerType = "TRAINERTYPE_NORMAL",
+          baseMoney = custom.baseMoney or 30,
           attributes = {},
           items = {},
         }
@@ -1753,8 +1862,15 @@ function RestoredDungeons.apply(mod)
             if mapsContainer.ROUTE_20 then self.maps.ROUTE_20 = mapsContainer.ROUTE_20 end
             if mapsContainer.FUCHSIA_CITY then self.maps.FUCHSIA_CITY = mapsContainer.FUCHSIA_CITY end
           end
-          if self.maps.FUCHSIA_CITY and self.maps.FUCHSIA_CITY.blocks then
-            self.maps.FUCHSIA_CITY.blocks[1 * (self.maps.FUCHSIA_CITY.width or 20) + 9 + 1] = 58
+          do
+            local Camp = kantoCampaign()
+            local save = self.save or (self.game and self.game.save)
+            if Camp and Camp.applyToData and Data then
+              Camp.applyToData(Data, DUNGEON_TEXT, DUNGEON_ROSTERS, DUNGEON_BY_KEY, save)
+            end
+            if Camp and Camp.syncFuchsiaSafariDoor and self.maps.FUCHSIA_CITY then
+              Camp.syncFuchsiaSafariDoor(self.maps.FUCHSIA_CITY, save)
+            end
           end
         end
         if self.sprites then
@@ -1780,31 +1896,20 @@ function RestoredDungeons.apply(mod)
         -- Keep Silver coordEvents on the shared KR table (aliases point here).
         -- Do not clear sceneScripts here — that used to wipe the KR map after rename.
         if self.maps then
-          local moon = self.maps.MT_MOON_1F_KR or self.maps.MT_MOON_1F or self.maps.MOUNT_MOON
-          if moon then ensureMtMoonSilverRival(moon) end
+          local moon1f = self.maps.MT_MOON_1F_KR or self.maps.MT_MOON_1F or self.maps.MOUNT_MOON
+          if moon1f then stripMtMoon1fSilverAmbush(moon1f) end
+          local moonB2f = self.maps.MT_MOON_B2F_KR or self.maps.MT_MOON_B2F or self.maps.MOUNT_MOON_B2F
+          if moonB2f then ensureMtMoonB2fSilverRival(moonB2f) end
         end
         if mapId == "FUCHSIA_CITY" and self.dropMapImages then
           self:dropMapImages("FUCHSIA_CITY")
         end
         local res = origSetMap(self, mapId, cx, cy, facing, opts)
         if self.map and mapId == "FUCHSIA_CITY" then
-          if self.map.blocks then
-            self.map.blocks[1 * (self.map.width or 20) + 9 + 1] = 58
-          end
-          self.map.warps = self.map.warps or {}
-          local foundW5, foundW10 = false, false
-          for _, w in ipairs(self.map.warps) do
-            if w.x == 18 and w.y == 3 then
-              w.destMap = "SAFARI_ZONE_GATE_KR"; w.destWarp = 1; foundW5 = true
-            elseif w.x == 19 and w.y == 3 then
-              w.destMap = "SAFARI_ZONE_GATE_KR"; w.destWarp = 2; foundW10 = true
-            end
-          end
-          if not foundW5 then
-            table.insert(self.map.warps, { x = 18, y = 3, destMap = "SAFARI_ZONE_GATE_KR", destWarp = 1 })
-          end
-          if not foundW10 then
-            table.insert(self.map.warps, { x = 19, y = 3, destMap = "SAFARI_ZONE_GATE_KR", destWarp = 2 })
+          local Camp = kantoCampaign()
+          local save = self.save or (self.game and self.game.save)
+          if Camp and Camp.syncFuchsiaSafariDoor then
+            Camp.syncFuchsiaSafariDoor(self.map, save)
           end
           rebuildWarpAt(self.map)
         end
@@ -1904,23 +2009,10 @@ function RestoredDungeons.apply(mod)
             patchMtMoonEntranceWarps(self.maps.ROUTE_3.warps, "ROUTE_3")
           end
           if self.maps.FUCHSIA_CITY then
-            if self.maps.FUCHSIA_CITY.blocks then
-              self.maps.FUCHSIA_CITY.blocks[1 * (self.maps.FUCHSIA_CITY.width or 20) + 9 + 1] = 58
-            end
-            self.maps.FUCHSIA_CITY.warps = self.maps.FUCHSIA_CITY.warps or {}
-            local foundW5, foundW10 = false, false
-            for _, w in ipairs(self.maps.FUCHSIA_CITY.warps) do
-              if w.x == 18 and w.y == 3 then
-                w.destMap = "SAFARI_ZONE_GATE_KR"; w.destWarp = 1; foundW5 = true
-              elseif w.x == 19 and w.y == 3 then
-                w.destMap = "SAFARI_ZONE_GATE_KR"; w.destWarp = 2; foundW10 = true
-              end
-            end
-            if not foundW5 then
-              table.insert(self.maps.FUCHSIA_CITY.warps, { x = 18, y = 3, destMap = "SAFARI_ZONE_GATE_KR", destWarp = 1 })
-            end
-            if not foundW10 then
-              table.insert(self.maps.FUCHSIA_CITY.warps, { x = 19, y = 3, destMap = "SAFARI_ZONE_GATE_KR", destWarp = 2 })
+            local Camp = kantoCampaign()
+            local save = self.save or (self.game and self.game.save)
+            if Camp and Camp.syncFuchsiaSafariDoor then
+              Camp.syncFuchsiaSafariDoor(self.maps.FUCHSIA_CITY, save)
             end
           end
 
@@ -2103,8 +2195,16 @@ function RestoredDungeons.apply(mod)
           end
           if type(classId) == "number" then
             local classDef = (gt._byIndex and gt._byIndex[classId]) or gt[classId]
-            if classDef and type(classDef) == "table" and classDef.pic then
-              return classDef.pic, (classDef.trueColor and true or false)
+            if classDef and type(classDef) == "table" then
+              if classDef.pic then
+                return classDef.pic, (classDef.trueColor and true or false)
+              end
+              -- Class tables often have no .pic; resolve via menu_gfx trainerPics[id].
+              local hud = data and data.gen2MenuGfx and data.gen2MenuGfx.battleHud
+              local pics = hud and hud.trainerPics
+              if pics and classDef.id and pics[classDef.id] then
+                return pics[classDef.id], false
+              end
             end
           end
           local normTarget = strId:gsub("^OPP_", ""):gsub("_", ""):gsub("%.", ""):lower()
@@ -2381,29 +2481,10 @@ function RestoredDungeons.apply(mod)
           end
         end
         if cont.FUCHSIA_CITY then
-          local fc = cont.FUCHSIA_CITY
-          if fc.blocks then
-            fc.blocks[1 * fc.width + 9 + 1] = 58
-          end
-          if fc.warps then
-            local foundW5, foundW10 = false, false
-            for _, w in ipairs(fc.warps) do
-              if w.x == 18 and w.y == 3 then
-                w.destMap = "SAFARI_ZONE_GATE_KR"
-                w.destWarp = 1
-                foundW5 = true
-              elseif w.x == 19 and w.y == 3 then
-                w.destMap = "SAFARI_ZONE_GATE_KR"
-                w.destWarp = 2
-                foundW10 = true
-              end
-            end
-            if not foundW5 then
-              table.insert(fc.warps, { x = 18, y = 3, destMap = "SAFARI_ZONE_GATE_KR", destWarp = 1 })
-            end
-            if not foundW10 then
-              table.insert(fc.warps, { x = 19, y = 3, destMap = "SAFARI_ZONE_GATE_KR", destWarp = 2 })
-            end
+          local Camp = kantoCampaign()
+          local save = (_G.game and _G.game.save) or (mod and mod.game and mod.game.save)
+          if Camp and Camp.syncFuchsiaSafariDoor then
+            Camp.syncFuchsiaSafariDoor(cont.FUCHSIA_CITY, save)
           end
         end
       end
@@ -2438,7 +2519,7 @@ function RestoredDungeons.apply(mod)
       [153] = { tiles = {35, 84, 20, 20, 35, 84, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20}, collision = {0x00, 0x07, 0x29, 0x29} },
       [158] = { tiles = {17, 17, 17, 17, 17, 17, 17, 17, 77, 78, 77, 78, 83, 84, 83, 84}, collision = {0x00, 0x00, 0x00, 0x00} },
       [159] = { tiles = {77, 78, 77, 78, 83, 84, 83, 84, 17, 17, 17, 17, 17, 17, 17, 17}, collision = {0x00, 0x00, 0x00, 0x00} },
-      -- Gen1 FOREST wooden sign (tiles 96–99 on extended overrides/tilesets/kanto.png)
+      -- Gen1 FOREST wooden sign (forest_wooden_sign.png → tiles 96–99)
       [160] = { tiles = {96, 97, 35, 35, 98, 99, 35, 35, 35, 35, 35, 35, 35, 35, 35, 35}, collision = {0x82, 0x00, 0x00, 0x00} },
     }
 
@@ -2464,39 +2545,10 @@ function RestoredDungeons.apply(mod)
           ts.tilePalettes[99] = 1
           ts.tilePalettes[100] = 1
         end
-        -- overrides/tilesets/kanto.png is 128×56 (sign row)
+        -- overrides/tileset_quads/forest_wooden_sign.png → composed kanto.png (128×56)
         ts.imageHeight = 56
       end
     end
-
-    -- Gen1 CAVERN wooden signs into Gold TILESET_CAVE (tiles 90–93 on overrides/tilesets/cave.png)
-    local customCaveBlocks = {
-      [120] = { tiles = {1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 90, 91, 1, 1, 92, 93}, collision = {0x00, 0x00, 0x00, 0x82} },
-      [121] = { tiles = {20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 90, 91, 20, 20, 92, 93}, collision = {0x29, 0x29, 0x29, 0x82} },
-    }
-    for _, tsKey in ipairs({"TILESET_CAVE", "CAVE"}) do
-      local ts = (Data.tilesets and Data.tilesets[tsKey]) or (data and data.gen2Tilesets and data.gen2Tilesets[tsKey]) or (data and data.tilesets and data.tilesets[tsKey])
-      if ts then
-        ts.blocks = ts.blocks or {}
-        ts.collision = ts.collision or {}
-        for bId, bDef in pairs(customCaveBlocks) do
-          ts.blocks[bId + 1] = bDef.tiles
-          ts.collision[bId + 1] = bDef.collision
-        end
-        if ts.tilePalettes then
-          while #ts.tilePalettes < 94 do
-            table.insert(ts.tilePalettes, 6)
-          end
-          -- Cave-grey palette for patched Gen1 sign tiles
-          ts.tilePalettes[91] = 6
-          ts.tilePalettes[92] = 6
-          ts.tilePalettes[93] = 6
-          ts.tilePalettes[94] = 6
-        end
-        ts.image = "assets/generated/tilesets/cave.png"
-      end
-    end
-
 
     -- Force atlas re-resolve so kr_* override sheets win after registration.
     if Assets and Assets.flush then

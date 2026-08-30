@@ -4,6 +4,9 @@
 Writes pokemon/learnset_gen3.lua for runtime apply on both Red and Gold hosts.
 Does NOT touch sprites, palettes, or stats.
 
+Note: Gen3 dropped Whirlpool as an HM. Gold/Silver/Crystal HM06 compatibility
+is restored at runtime in pokemon/apply_gen3_learnsets.lua (not in this file).
+
 Usage (from repo root or mod tools/):
   python3 mods/Kanto-Reforged/tools/gen3_learnsets.py
   python3 mods/Kanto-Reforged/tools/gen3_learnsets.py --check

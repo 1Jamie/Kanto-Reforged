@@ -140,17 +140,22 @@ function LegendRegis.patchRockTunnelLadder(mod)
   return nicheId, blockIndex
 end
 
-function LegendRegis.registerChamber(mod)
-  local cw, ch = 8, 6
+function LegendRegis.registerChamber(mod, opts)
+  opts = opts or {}
+  local cw = opts.width or 8
+  local ch = opts.height or 6
+  local tileset = opts.tileset or "CAVERN"
+  local blocks = opts.blocks or chamberBlocks(cw, ch)
+  local border = opts.borderBlock or CAVERN_WALL
   mod.content.maps:register(LegendRegis.CHAMBER, {
     id = LegendRegis.CHAMBER,
     label = "RegirockChamber",
     index = LegendRegis.CHAMBER_INDEX,
-    tileset = "CAVERN",
+    tileset = tileset,
     width = cw,
     height = ch,
-    blocks = chamberBlocks(cw, ch),
-    borderBlock = CAVERN_WALL,
+    blocks = blocks,
+    borderBlock = border,
     warps = {
       {
         x = 7,
@@ -178,17 +183,12 @@ function LegendRegis.registerChamber(mod)
   })
 end
 
-function LegendRegis.register(mod)
-  local Host = require("mods.Kanto-Reforged.core.host")
-  if Host.isGen2() then return end
+function LegendRegis.registerNpcsAndScripts(mod)
   HouseNpcs.appendNpc(mod, "PEWTER_SPEECH_HOUSE", {
     index = 3, name = "PEWTERSPEECHHOUSE_REGI_SCHOLAR",
     sprite = "SPRITE_SCIENTIST", text = "TEXT_PEWTERSPEECHHOUSE_REGI_SCHOLAR",
     x = 5, y = 4,
   }, LegendRegis.OWNER)
-
-  LegendRegis.patchRockTunnelLadder(mod)
-  LegendRegis.registerChamber(mod)
 
   HouseNpcs.appendNpc(mod, "SEAFOAM_ISLANDS_B2F", {
     index = 3, name = "SEAFOAMISLANDSB2F_REGICE",
@@ -249,6 +249,53 @@ function LegendRegis.register(mod)
       TEXT_POWERPLANT_REGISTEEL = sealTalk("REGISTEEL", 50, "MOD_EVENT_BEAT_REGISTEEL", "STEEL", 1),
     },
   })
+end
+
+-- Gen2-only: remapped TILESET_CAVE blocks from legend_maps_data.lua (mapper export).
+-- Gen1 register() below keeps native CAVERN art unchanged.
+function LegendRegis.applyGen2(mod, regiData)
+  if not regiData or not regiData.chamber then return false end
+  local tileset = regiData.tileset or "TILESET_CAVE"
+  if regiData.ladderNicheTiles and regiData.ladderNicheBlock then
+    mod.content.tilesets:patch(tileset, {
+      blocks = { __append = { regiData.ladderNicheTiles } },
+    })
+  end
+  local patch = regiData.rockTunnelPatch
+  if patch and patch.map and patch.blockIndex and regiData.ladderNicheBlock then
+    mod.content.maps:patch(patch.map, {
+      blocks = { [patch.blockIndex] = regiData.ladderNicheBlock },
+      warps = {
+        __append = {
+          {
+            x = LegendRegis.LADDER_X,
+            y = LegendRegis.LADDER_Y,
+            destMap = LegendRegis.CHAMBER,
+            destWarp = 1,
+          },
+        },
+      },
+    })
+  end
+  local chamber = regiData.chamber
+  LegendRegis.registerChamber(mod, {
+    tileset = tileset,
+    width = chamber.width,
+    height = chamber.height,
+    blocks = chamber.blocks,
+    borderBlock = chamber.borderBlock,
+  })
+  LegendRegis.registerNpcsAndScripts(mod)
+  return true
+end
+
+function LegendRegis.register(mod)
+  local Host = require("mods.Kanto-Reforged.core.host")
+  if Host.isGen2() then return end
+
+  LegendRegis.patchRockTunnelLadder(mod)
+  LegendRegis.registerChamber(mod)
+  LegendRegis.registerNpcsAndScripts(mod)
 end
 
 return LegendRegis

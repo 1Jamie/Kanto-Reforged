@@ -117,10 +117,13 @@ class BlockMapperShell:
 
         self.mode = mode
         if mode == "setup":
+            self.setup_view.set_run_enabled(True)
             self.setup_view.pack(fill="both", expand=True)
         elif mode == "mapper":
+            self.setup_view.set_run_enabled(False)
             self.mapper_view.pack(fill="both", expand=True)
         elif mode == "preview":
+            self.setup_view.set_run_enabled(False)
             self.preview_view.pack(fill="both", expand=True)
             self.preview_view.rebuild_composites()
 
@@ -146,6 +149,14 @@ class BlockMapperShell:
     def start_process_run(self, args: dict):
         if self._run_in_flight:
             return
+        if self.session and self.mode != "setup":
+            if not messagebox.askyesno(
+                "Reprocess CV rankings?",
+                "This rebuilds all CV rankings and reloads the mapper UI.\n"
+                "Unsaved work is kept via session.json, but the window will blank briefly.\n\n"
+                "Continue?",
+            ):
+                return
         if self.session and self.session.is_dirty:
             if not self._confirm_leave_dirty():
                 return

@@ -705,6 +705,70 @@ local GEN2_FULL_PARTIES = {
   },
 }
 
+-- Indigo rematch after Johto Champion (EVENT_BEAT_CHAMPION_LANCE). Johto-first
+-- E4 stays vanilla; these apply only via installGen2 lookup when that flag is set.
+-- Lorelei/Agatha intro art is not in Gen2 — Will/Karen slots stay, but Karen
+-- carries Lance's postgame dragon team + champion frontpic; CHAMPION is Blue.
+local GEN2_KANTO_E4_REMATCH = {
+  WILL = {
+    [1] = {
+      { species = "XATU", level = 78 },
+      { species = "JYNX", level = 79 },
+      { species = "CLAYDOL", level = 80 },
+      { species = "SLOWBRO", level = 80 },
+      { species = "GARDEVOIR", level = 81 },
+      { species = "EXEGGUTOR", level = 82, item = "CHERI_BERRY" },
+    },
+  },
+  KOGA = {
+    [1] = {
+      { species = "ARIADOS", level = 79 },
+      { species = "SWALOT", level = 80 },
+      { species = "WEEZING", level = 81 },
+      { species = "SEVIPER", level = 81 },
+      { species = "CROBAT", level = 82 },
+      { species = "VENOMOTH", level = 83, item = "PERSIM_BERRY" },
+    },
+  },
+  BRUNO = {
+    [1] = {
+      { species = "STEELIX", level = 80 },
+      { species = "HITMONLEE", level = 81 },
+      { species = "HITMONCHAN", level = 81 },
+      { species = "HARIYAMA", level = 82 },
+      { species = "HITMONTOP", level = 83 },
+      { species = "MACHAMP", level = 84, item = "CHESTO_BERRY" },
+    },
+  },
+  -- Gen1 E4 slot 4 (Lance): Gen2 has no LANCE class — reuse KAREN map slot.
+  KAREN = {
+    [1] = {
+      { species = "GYARADOS", level = 81 },
+      { species = "DRAGONITE", level = 82 },
+      { species = "KINGDRA", level = 83 },
+      { species = "AERODACTYL", level = 83 },
+      { species = "SALAMENCE", level = 84 },
+      { species = "DRAGONITE", level = 85, item = "LUM_BERRY" },
+    },
+  },
+  -- Gen1 Champion Blue (Gen2 stock CHAMPION is Lance).
+  CHAMPION = {
+    [1] = {
+      { species = "PIDGEOT", level = 83 },
+      { species = "ALAKAZAM", level = 84 },
+      { species = "TYRANITAR", level = 85 },
+      { species = "GYARADOS", level = 85 },
+      { species = "EXEGGUTOR", level = 86 },
+      { species = "ARCANINE", level = 88, item = "CHERI_BERRY" },
+    },
+  },
+}
+
+local GEN2_KANTO_E4_REMATCH_META = {
+  KAREN = { [1] = { displayName = "LANCE", picClass = "CHAMPION" } },
+  CHAMPION = { [1] = { displayName = "BLUE", picClass = "BLUE" } },
+}
+
 -- Gold Kanto gym *trainee* members (class index + member from gym maps).
 -- Do not use Gen1 party indexes — those collide with Johto trainers.
 local GEN2_GYM_TRAINER_PARTIES = {
@@ -1318,6 +1382,7 @@ Trainers.ACE_BERRIES_GEN2 = ACE_BERRIES_GEN2
 Trainers.GEN2_FULL_PARTIES = GEN2_FULL_PARTIES
 Trainers.GEN2_GYM_TRAINER_PARTIES = GEN2_GYM_TRAINER_PARTIES
 Trainers.GEN2_KANTO_ROUTE_PARTIES = GEN2_KANTO_ROUTE_PARTIES
+Trainers.GEN2_KANTO_E4_REMATCH = GEN2_KANTO_E4_REMATCH
 
 -- Stock engine schemas only allow { level, species } on trainer party slots.
 -- Ace berries (and optional custom moves) need heldItem/moves accepted at
@@ -1516,7 +1581,7 @@ local function gen2TrainerTables(data)
   return out
 end
 
-local function indexGen2Rosters(rosterMap)
+local function indexGen2Rosters(rosterMap, meta)
   local byKey = {}
   for classId, members in pairs(rosterMap or {}) do
     for member, party in pairs(members) do
@@ -1524,14 +1589,91 @@ local function indexGen2Rosters(rosterMap)
       for si, slot in ipairs(party) do
         roster[si] = copySlotGen2(slot)
       end
-      byKey[string.format("%s_%s", classId, tostring(member))] = {
+      local key = string.format("%s_%s", classId, tostring(member))
+      local row = {
         classId = classId,
         member = tonumber(member) or member,
         roster = roster,
       }
+      local m = meta and meta[classId] and meta[classId][member]
+      if m then
+        row.displayName = m.displayName
+        row.picClass = m.picClass
+      end
+      byKey[key] = row
     end
   end
   return byKey
+end
+
+function Trainers.isGen2E4Rematch(save)
+  if not save then return false end
+  if save.flags and save.flags.EVENT_BEAT_CHAMPION_LANCE then return true end
+  local ok, FlagNames = pcall(require, "src.core.gen2.FlagNames")
+  if ok and FlagNames and FlagNames.events and save.events then
+    local id = FlagNames.events.EVENT_BEAT_CHAMPION_LANCE
+    if id and type(save.events.get) == "function" then
+      return save.events:get(id) and true or false
+    end
+    if id and save.events[id] then return true end
+  end
+  return false
+end
+
+function Trainers.gen2E4RematchTrainerPic(data, classId)
+  if classId == "KAREN" then classId = "CHAMPION" end
+  if classId == "CHAMPION" then classId = "BLUE" end
+  local hud = data and data.gen2MenuGfx and data.gen2MenuGfx.battleHud
+  local pics = hud and hud.trainerPics
+  return pics and pics[classId]
+end
+
+local function gen2LookupSave()
+  local ok, Host = pcall(require, "mods.Kanto-Reforged.core.host")
+  if ok and Host and Host.liveGame then
+    local game = Host.liveGame()
+    if game and game.save then return game.save end
+  end
+  local game = _G.game
+  return game and game.save
+end
+
+local function resolveGen2ClassId(trainerData, class)
+  if type(class) == "string" then
+    return class:gsub("^OPP_", "")
+  end
+  local ok, G2Trainers = pcall(require, "src.world.gen2.Trainers")
+  local cache = nil
+  if ok and G2Trainers and G2Trainers.classIndex and trainerData then
+    cache = G2Trainers.classIndex(trainerData)
+  end
+  local entry = cache and cache[class]
+  if type(entry) == "table" then
+    return entry.id or entry.name
+  end
+  return tostring(class)
+end
+
+local function resolveGen2CustomRoster(trainerData, class, member)
+  member = tonumber(member) or 1
+  local classId = resolveGen2ClassId(trainerData, class)
+  local save = gen2LookupSave()
+  if Trainers.isGen2E4Rematch(save) and Trainers._gen2RematchRosterByKey then
+    local rematch = Trainers._gen2RematchRosterByKey[string.format("%s_%s", tostring(classId), tostring(member))]
+      or Trainers._gen2RematchRosterByKey[string.format("%s_%s", tostring(class), tostring(member))]
+    if rematch and rematch.roster then
+      return rematch, classId
+    end
+  end
+  local byKey = Trainers._gen2RosterByKey
+  if byKey then
+    local custom = byKey[string.format("%s_%s", tostring(classId), tostring(member))]
+      or byKey[string.format("%s_%s", tostring(class), tostring(member))]
+    if custom and custom.roster then
+      return custom, classId
+    end
+  end
+  return nil, classId
 end
 
 -- Write curated Gold parties into live trainer tables (same contract as
@@ -1633,6 +1775,8 @@ function Trainers.apply(mod)
     end
 
     Trainers._gen2RosterByKey = indexGen2Rosters(rosterMap)
+    Trainers._gen2RematchRosterByKey = indexGen2Rosters(
+      GEN2_KANTO_E4_REMATCH, GEN2_KANTO_E4_REMATCH_META)
     applyGen2Rosters(mod, rosterMap)
     local classes = 0
     for _ in pairs(rosterMap) do classes = classes + 1 end
@@ -1730,22 +1874,6 @@ function Trainers.apply(mod)
   return n
 end
 
-local function resolveGen2ClassId(trainerData, class)
-  if type(class) == "string" then
-    return class:gsub("^OPP_", "")
-  end
-  local ok, G2Trainers = pcall(require, "src.world.gen2.Trainers")
-  local cache = nil
-  if ok and G2Trainers and G2Trainers.classIndex and trainerData then
-    cache = G2Trainers.classIndex(trainerData)
-  end
-  local entry = cache and cache[class]
-  if type(entry) == "table" then
-    return entry.id or entry.name
-  end
-  return tostring(class)
-end
-
 -- Mirror restored_dungeons: own Trainers.lookup / World:trainerParty so curated
 -- overworld rosters win even if something reloads stock trainer tables.
 function Trainers.installGen2(mod)
@@ -1753,42 +1881,46 @@ function Trainers.installGen2(mod)
   Trainers._gen2Installed = true
 
   local okTrainers, G2Trainers = pcall(require, "src.world.gen2.Trainers")
+  local function classEntry(trainerData, class, classId)
+    if not (trainerData and G2Trainers and G2Trainers.classIndex) then return nil end
+    local cache = G2Trainers.classIndex(trainerData)
+    return cache and (cache[class] or cache[classId])
+  end
+
+  local function buildGen2CustomRecord(trainerData, class, member, custom, classId)
+    local entry = classEntry(trainerData, class, classId)
+    local memberRow = entry and entry.trainers and entry.trainers[member]
+    local displayName = custom.displayName
+      or (memberRow and memberRow.name)
+      or (entry and entry.name)
+      or tostring(custom.classId or classId or class)
+    return {
+      class = class,
+      classId = custom.classId or classId or tostring(class),
+      className = (entry and entry.name) or tostring(custom.classId or class),
+      member = member,
+      id = (memberRow and memberRow.id)
+        or string.format("%s_%s", tostring(custom.classId or class), tostring(member)),
+      name = displayName,
+      trainerType = partyHasItem(custom.roster) and "TRAINERTYPE_ITEM" or "TRAINERTYPE_NORMAL",
+      roster = custom.roster,
+      attributes = entry and entry.attributes or {},
+      items = (function()
+        local out = {}
+        for _, id in ipairs((entry and entry.items) or {}) do out[#out + 1] = id end
+        return out
+      end)(),
+      baseMoney = entry and entry.baseMoney or 25,
+    }
+  end
+
   if okTrainers and G2Trainers and G2Trainers.lookup then
     local origLookup = G2Trainers.lookup
     function G2Trainers.lookup(trainerData, class, member)
       member = tonumber(member) or 1
-      local byKey = Trainers._gen2RosterByKey
-      if byKey then
-        local classId = resolveGen2ClassId(trainerData, class)
-        local custom = byKey[string.format("%s_%s", tostring(classId), tostring(member))]
-          or byKey[string.format("%s_%s", tostring(class), tostring(member))]
-        if custom and custom.roster then
-          local entry = nil
-          if trainerData then
-            local cache = G2Trainers.classIndex and G2Trainers.classIndex(trainerData)
-            entry = cache and (cache[class] or cache[classId])
-          end
-          local memberRow = entry and entry.trainers and entry.trainers[member]
-          return {
-            class = class,
-            classId = custom.classId or classId or tostring(class),
-            className = (entry and entry.name) or tostring(custom.classId or class),
-            member = member,
-            id = (memberRow and memberRow.id)
-              or string.format("%s_%s", tostring(custom.classId or class), tostring(member)),
-            name = (memberRow and memberRow.name)
-              or (entry and entry.name) or tostring(custom.classId or class),
-            trainerType = partyHasItem(custom.roster) and "TRAINERTYPE_ITEM" or "TRAINERTYPE_NORMAL",
-            roster = custom.roster,
-            attributes = entry and entry.attributes or {},
-            items = (function()
-              local out = {}
-              for _, id in ipairs((entry and entry.items) or {}) do out[#out + 1] = id end
-              return out
-            end)(),
-            baseMoney = entry and entry.baseMoney or 25,
-          }
-        end
+      local custom, classId = resolveGen2CustomRoster(trainerData, class, member)
+      if custom and custom.roster then
+        return buildGen2CustomRecord(trainerData, class, member, custom, classId)
       end
       return origLookup(trainerData, class, member)
     end
@@ -1799,35 +1931,36 @@ function Trainers.installGen2(mod)
     local origTrainerParty = World.trainerParty
     function World:trainerParty(class, member)
       member = tonumber(member) or 1
-      local byKey = Trainers._gen2RosterByKey
-      if byKey then
-        local trainerData = self.game and self.game.data and self.game.data.trainers
-        local classId = resolveGen2ClassId(trainerData, class)
-        local custom = byKey[string.format("%s_%s", tostring(classId), tostring(member))]
-          or byKey[string.format("%s_%s", tostring(class), tostring(member))]
-        if custom and custom.roster then
-          local roster = {}
-          for si, slot in ipairs(custom.roster) do
-            roster[si] = {
-              species = slot.species,
-              level = slot.level,
-              item = slot.item,
-            }
-          end
-          return {
-            class = class,
-            classId = custom.classId or classId,
-            className = custom.classId or classId,
-            name = custom.classId or classId,
-            member = member,
-            roster = roster,
-            trainerType = partyHasItem(roster) and "TRAINERTYPE_ITEM" or "TRAINERTYPE_NORMAL",
-            attributes = {},
-            items = {},
+      local trainerData = self.game and self.game.data and self.game.data.trainers
+      local custom, classId = resolveGen2CustomRoster(trainerData, class, member)
+      if custom and custom.roster then
+        local rec = buildGen2CustomRecord(trainerData, class, member, custom, classId)
+        local roster = {}
+        for si, slot in ipairs(custom.roster) do
+          roster[si] = {
+            species = slot.species,
+            level = slot.level,
+            item = slot.item,
           }
         end
+        rec.roster = roster
+        return rec
       end
       return origTrainerParty(self, class, member)
+    end
+  end
+
+  local okBS, BattleState = pcall(require, "src.ui.gen2.BattleState")
+  if okBS and BattleState and not BattleState._krE4RematchPicPatched then
+    BattleState._krE4RematchPicPatched = true
+    local origTrainerArt = BattleState.trainerArt
+    function BattleState.trainerArt(data, classId)
+      local path, tc = origTrainerArt(data, classId)
+      if Trainers.isGen2E4Rematch(gen2LookupSave()) then
+        local rematchPic = Trainers.gen2E4RematchTrainerPic(data, classId)
+        if rematchPic then return rematchPic, tc end
+      end
+      return path, tc
     end
   end
 

@@ -112,7 +112,7 @@ CUSTOM_KANTO_BLOCKS = {
     158: {"tiles": [17, 17, 17, 17, 17, 17, 17, 17, 77, 78, 77, 78, 83, 84, 83, 84], "collision": [0x00, 0x00, 0x00, 0x00]},
     # Authentic 4-step wooden stairs up into cliff
     159: {"tiles": [77, 78, 77, 78, 83, 84, 83, 84, 17, 17, 17, 17, 17, 17, 17, 17], "collision": [0x00, 0x00, 0x00, 0x00]},
-    # Gen1 FOREST wooden sign (tiles 96–99 patched into overrides/tilesets/kanto.png)
+    # Gen1 FOREST wooden sign (tiles 96–99 from overrides/tileset_quads/forest_wooden_sign.png)
     160: {"tiles": [96, 97, 35, 35, 98, 99, 35, 35, 35, 35, 35, 35, 35, 35, 35, 35], "collision": [0x82, 0x00, 0x00, 0x00]},
 }
 
@@ -214,14 +214,13 @@ CAVE_G1_TO_G2 = {
     26: 8,   # Right wall
     28: 17,  # Wall corner
     29: 2,   # Bottom wall
-    42: 120, # Cave floor + Gen1 wooden sign (Mt. Moon / Rock Tunnel)
     43: 43,  # Ladder (0x2B)
     44: 43,  # Ladder
     62: 25,  # Floor
     117: 121, # Water + Gen1 wooden sign (Seafoam B4F)
 }
 
-# Custom blocks injected into Gold TILESET_CAVE (tiles 90–93 from Gen1 CAVERN sign).
+# Custom blocks injected into Gold TILESET_CAVE (tiles 90–93 from overrides/tileset_quads/cave_wooden_sign.png).
 # Extra assemblies from cave_g1_to_g2.py export are merged on top.
 CUSTOM_CAVE_BLOCKS = {
     # Floor surround + sign in BR quadrant (Gen1 CAVERN #42)
@@ -293,7 +292,7 @@ _merge_mapping_exports()
 _CANONICAL_KANTO_BLOCKS = {
     158: {"tiles": [17, 17, 17, 17, 17, 17, 17, 17, 77, 78, 77, 78, 83, 84, 83, 84], "collision": [0x00, 0x00, 0x00, 0x00]},
     159: {"tiles": [77, 78, 77, 78, 83, 84, 83, 84, 17, 17, 17, 17, 17, 17, 17, 17], "collision": [0x00, 0x00, 0x00, 0x00]},
-    # Gen1 FOREST wooden sign → tiles 96–99 on overrides/tilesets/kanto.png
+    # Gen1 FOREST wooden sign → tiles 96–99 from overrides/tileset_quads/forest_wooden_sign.png
     160: {"tiles": [96, 97, 35, 35, 98, 99, 35, 35, 35, 35, 35, 35, 35, 35, 35, 35], "collision": [0x82, 0x00, 0x00, 0x00]},
 }
 CUSTOM_KANTO_BLOCKS.update(_CANONICAL_KANTO_BLOCKS)
@@ -309,7 +308,7 @@ for _sign_g1 in (21, 22, 33, 51):
     FOREST_G1_TO_G2[_sign_g1] = 160
     SAFARI_G1_TO_G2[_sign_g1] = 160
 
-# Gen1 CAVERN wooden signs → custom cave blocks
+# Gen1 CAVERN wooden signs → custom cave blocks (override HITL export 202/277).
 CAVE_G1_TO_G2[42] = 120
 CAVE_G1_TO_G2[117] = 121
 
@@ -367,9 +366,13 @@ def _strat_stamp_house():
     }
 
 
-# Maps that use Gold TILESET_CAVE via CAVE_G1_TO_G2. Empty = all caves keep Gen1 art.
-# Example after HITL mapping: CAVE_REMAP_MAPS = {"DIGLETTS_CAVE_ROUTE_2"}
-CAVE_REMAP_MAPS = set()
+# Cave maps still on Gen1 CAVERN art (everything else uses TILESET_CAVE + CAVE_G1_TO_G2).
+CAVE_KEEP_GEN1_MAPS = frozenset({"ROCK_TUNNEL_POKECENTER"})
+
+# Gen1 tilesets kept in Data.tilesets for maps/features that still need them.
+# Everything else from the Red extract is pruned before export.
+# CAVERN omitted: restored caves use TILESET_CAVE; Regirock Gen2 uses legend_maps_data.
+KEEP_GEN1_TILESETS = frozenset({"POKECENTER", "GYM"})
 
 
 def _build_map_strategies():
@@ -426,8 +429,7 @@ def _build_map_strategies():
             default_block=1, patches=patches,
         )
 
-    # Caves: keep Gen1 CAVERN art until cave_g1_to_g2.py mappings are accepted.
-    # Add map ids to CAVE_REMAP_MAPS to flip them onto Gold TILESET_CAVE.
+    # Caves: Gold TILESET_CAVE via cave_g1_to_g2.py (128/128 HITL mapping).
     cave_maps = [
         "DIGLETTS_CAVE", "DIGLETTS_CAVE_ROUTE_2", "DIGLETTS_CAVE_ROUTE_11",
         "MT_MOON_1F", "MT_MOON_B1F", "MT_MOON_B2F",
@@ -437,13 +439,20 @@ def _build_map_strategies():
         "ROCK_TUNNEL_1F", "ROCK_TUNNEL_B1F",
     ]
     for mid in cave_maps:
-        if mid in CAVE_REMAP_MAPS:
+        if mid in CAVE_KEEP_GEN1_MAPS:
+            strategies[mid] = _strat_keep_gen1()
+        elif mid.startswith("ROCK_TUNNEL"):
+            # Gold Rock Tunnel uses PALETTE_DARK (flash-lit cave).
             strategies[mid] = _strat_remap(
                 "CAVE_G1_TO_G2", "TILESET_CAVE", "CAVE",
-                palette="PALETTE_DAY", border=1, default_block=25,
+                palette="PALETTE_DARK", border=1, default_block=25,
             )
         else:
-            strategies[mid] = _strat_keep_gen1()
+            # Gold cave interiors (Diglett's, Mt. Moon, Seafoam, Cerulean, etc.).
+            strategies[mid] = _strat_remap(
+                "CAVE_G1_TO_G2", "TILESET_CAVE", "CAVE",
+                palette="PALETTE_NITE", border=1, default_block=25,
+            )
 
     strategies["ROCK_TUNNEL_POKECENTER"] = _strat_keep_gen1()
     return strategies
@@ -520,6 +529,35 @@ def apply_map_strategy(map_id, mdef, restored_tilesets):
             mdef["collision"] = restored_tilesets[ts_gen1]["collision"]
 
     return mdef
+
+
+def _prune_unused_gen1_tilesets(restored_tilesets):
+    """Drop Red tileset blobs that restored maps no longer reference."""
+    drop = [
+        ts_id for ts_id in restored_tilesets
+        if not str(ts_id).startswith("TILESET_") and ts_id not in KEEP_GEN1_TILESETS
+    ]
+    for ts_id in drop:
+        del restored_tilesets[ts_id]
+    if drop:
+        print(f"[restore_kanto_dungeons] Pruned {len(drop)} unused Gen1 tilesets: {', '.join(sorted(drop)[:12])}{'…' if len(drop) > 12 else ''}")
+
+
+def _attach_gold_tileset(restored_tilesets, gold_tilesets, name):
+    """Copy a native Gen2 tileset record (with collision) into the export blob."""
+    if name in restored_tilesets or name not in gold_tilesets:
+        return
+    rec = dict(gold_tilesets[name])
+    if rec.get("collision"):
+        restored_tilesets[name] = rec
+        return
+    blocks = rec.get("blocks") or []
+    coll_raw = rec.get("collision") or []
+    if blocks and coll_raw and isinstance(coll_raw[0], list):
+        restored_tilesets[name] = rec
+        return
+    if blocks:
+        restored_tilesets[name] = rec
 
 
 # Fixed Gen2 stamp layouts (must be defined before apply_map_strategy is called at runtime)
@@ -1218,9 +1256,6 @@ def main():
             copied += 1
         print(f"Copied {copied} Gen1 tileset overrides into {dst_dir}")
 
-    kr_needed = bind_kr_tileset_images(restored_tilesets)
-    copy_kr_tileset_overrides(kr_needed)
-
     gen2_ts_path = None
     home = os.path.expanduser("~/.local/share/love/pokemon-love2d")
     for game in (gen2_game, "gold", "silver", "crystal"):
@@ -1231,6 +1266,16 @@ def main():
                 print(f"NOTE: --game {gen2_game} cache missing; using {game} tilesets")
             break
     if gen2_ts_path:
+        tools_dir = os.path.dirname(os.path.abspath(__file__))
+        if tools_dir not in sys.path:
+            sys.path.insert(0, tools_dir)
+        try:
+            from tileset_quad_patches import write_mod_tileset_overrides
+
+            write_mod_tileset_overrides(game=gen2_game)
+        except Exception as exc:  # noqa: BLE001
+            print(f"[restore_kanto_dungeons] WARN: tileset quad overrides: {exc}")
+
         gold_tilesets = load_lua_json(gen2_ts_path)
         if "TILESET_KANTO" in gold_tilesets:
             kanto_rec = dict(gold_tilesets["TILESET_KANTO"])
@@ -1248,21 +1293,22 @@ def main():
             kanto_rec["blocks"] = kanto_blocks
             kanto_rec["collision"] = kanto_coll
             kanto_pals = list(kanto_rec.get("tilePalettes", []))
-            # Stair tiles (77/78/83) + outdoor sign tiles (96–99) on extended override sheet
+            # wood_stair + forest_wooden_sign quads → tiles 77–84 / 96–99 on composed kanto.png
             while len(kanto_pals) < 100:
                 kanto_pals.append(1)
             if len(kanto_pals) >= 84:
                 kanto_pals[77] = 1
                 kanto_pals[78] = 1
                 kanto_pals[83] = 1
+                kanto_pals[84] = 1
             for t in (96, 97, 98, 99):
                 kanto_pals[t] = 1
             kanto_rec["tilePalettes"] = kanto_pals
-            # overrides/tilesets/kanto.png is 128×56 (extra row for sign tiles 96–99)
+            # overrides/tileset_quads/forest_wooden_sign.png → tiles 96–99 on composed kanto.png
             kanto_rec["imageHeight"] = 56
             restored_tilesets["TILESET_KANTO"] = kanto_rec
 
-        # Inject custom cave blocks into Gold TILESET_CAVE (cavern_cave profile + Gen1 signs)
+        # Inject HITL custom cave blocks into Gold TILESET_CAVE (stock ROM sheet).
         if "TILESET_CAVE" in gold_tilesets:
             cave_rec = dict(gold_tilesets["TILESET_CAVE"])
             cave_blocks = list(cave_rec.get("blocks", []))
@@ -1281,15 +1327,20 @@ def main():
                 cave_pals.append(6)
             for t in (90, 91, 92, 93):
                 cave_pals[t] = 6
+            # Dark floor clone (t1 2bpp darkened @ tile 62, same palette slot 6 as light floor).
+            while len(cave_pals) <= 62:
+                cave_pals.append(6)
+            cave_pals[62] = 6
             cave_rec["tilePalettes"] = cave_pals
             cave_rec["blocks"] = cave_blocks
             cave_rec["collision"] = cave_coll
-            # overrides/tilesets/cave.png shadows assets/generated/tilesets/cave.png
+            # Composed overrides/tilesets/cave.png (stock Gold + cave_wooden_sign quad → tiles 90–93)
             cave_rec["image"] = "assets/generated/tilesets/cave.png"
             restored_tilesets["TILESET_CAVE"] = cave_rec
             print(f"[restore_kanto_dungeons] TILESET_CAVE ready ({len(CUSTOM_CAVE_BLOCKS)} custom blocks)")
 
-
+        for ts_name in ("TILESET_GATE", "TILESET_HOUSE"):
+            _attach_gold_tileset(restored_tilesets, gold_tilesets, ts_name)
 
     for map_idx, map_id in enumerate(TARGET_MAPS, 1):
         if map_id in maps_data:
@@ -1576,6 +1627,10 @@ def main():
         blaine_gym["collision"] = restored_tilesets[blaine_gym["tileset"]]["collision"]
     blaine_gym["id"] = "SEAFOAM_GYM_KR"
     restored_maps["SEAFOAM_GYM_KR"] = blaine_gym
+
+    _prune_unused_gen1_tilesets(restored_tilesets)
+    kr_needed = bind_kr_tileset_images(restored_tilesets)
+    copy_kr_tileset_overrides(kr_needed)
 
     seafoam_patches = {
         "SEAFOAM_ISLANDS_B3F": [

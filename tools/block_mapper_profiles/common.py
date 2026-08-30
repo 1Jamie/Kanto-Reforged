@@ -9,9 +9,12 @@ COLLISION_PRESETS = [
     {"label": "0x29: Water / Surf", "val": 0x29, "color": "#64B5F6"},
     {"label": "0x2B: Ladder / Cave Warp", "val": 0x2B, "color": "#FF8A65"},
     {"label": "0x82: Sign / Readable", "val": 0x82, "color": "#FFB74D"},
-    {"label": "0xA0: Ledge Down (Hop)", "val": 0xA0, "color": "#BA68C8"},
-    {"label": "0xA1: Ledge Left", "val": 0xA1, "color": "#BA68C8"},
-    {"label": "0xA2: Ledge Right", "val": 0xA2, "color": "#BA68C8"},
+    # Gold HI_NYBBLE_LEDGES: $a0=HOP_RIGHT, $a1=LEFT, $a2=UP, $a3=DOWN (see Permissions.lua).
+    {"label": "0xA0: Ledge Hop Right", "val": 0xA0, "color": "#BA68C8"},
+    {"label": "0xA1: Ledge Hop Left", "val": 0xA1, "color": "#BA68C8"},
+    {"label": "0xA2: Ledge Hop Up", "val": 0xA2, "color": "#BA68C8"},
+    {"label": "0xA3: Ledge Hop Down", "val": 0xA3, "color": "#BA68C8"},
+    {"label": "0xA4: Ledge Hop Down-Right", "val": 0xA4, "color": "#BA68C8"},
     {"label": "0x70: Door / Warp Carpet Down", "val": 0x70, "color": "#4DB6AC"},
     {"label": "0x71: Gate Entrance Door", "val": 0x71, "color": "#4DB6AC"},
     {"label": "0x78: Warp Carpet Up", "val": 0x78, "color": "#4DB6AC"},
@@ -60,7 +63,13 @@ def base_profile(**overrides):
         "g2_tile_size": DEFAULT_TILE_SIZE,
         "g1_tileset_id": None,  # optional Gen1 host tileset for sheet rebuild
         "g2_tileset_id": "TILESET_KANTO",
+        "g1_palette_env": None,
         "g2_palette_env": "ROUTE",
+        "g2_palette_daytime": "DAY",
+        # Gen2 tile indices that render as water/animated surf in-game (penalized unless
+        # the quadrant collision is a water type). Cave: tile 20 on TILESET_CAVE.
+        "g2_water_tiles": set(),
+        "g2_water_collisions": {0x29, 0x14, 0x32, 0x48},
         "dict_name": "G1_TO_G2",
         "custom_blocks_name": "CUSTOM_BLOCKS_GENERATED",
         "out": "g1_to_g2.py",
@@ -79,8 +88,15 @@ def base_profile(**overrides):
         "test_map_height": None,
         "test_map_json": None,
         "preview_tilesets": [],  # Gen1 tileset ids for Map Preview picker
+        "preview_map_ids": [],  # extra preview maps (e.g. tools/legend_maps/*.json)
+        "synthetic_g1_blocks": [],  # append synthetic Gen1 metatiles after tileset rebuild
+        "prefill_from": None,  # (module_stem, dict_name[, custom_name]) seed mapper
+        "restore_script": None,  # default restore_kanto_dungeons.py; legends use apply_legend_mappings.py
         "synthesize": None,  # callable(g1_raw_blocks, g2_raw_blocks) or None
         "custom_blocks_source": None,  # attribute name on restore module to seed tiles
+        # Inject tN×4 / explicit tile quads missing from ROM metatile scans (e.g. cave t29 dark floor).
+        "g2_pool_uniform_tiles": None,
+        "g2_pool_extra_tile_keys": None,
     }
     profile.update(overrides)
     if not profile.get("preview_tilesets") and profile.get("g1_tileset_id"):

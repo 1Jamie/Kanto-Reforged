@@ -16,7 +16,7 @@ OverworldLoot.BLACK_BELT_GIFT_KEY = "got_black_belt_gift"
 -- Coords verified walkable via Map.defIsWalkableCell; not overlapping
 -- existing objects or hidden items.
 OverworldLoot.HIDDEN = {
-  -- Soft path north of Celadon Mansion (warps ~24,3 / 24,9).
+  -- Soft path north of Celadon Mansion (warps ~24,3 / 24,9 in base, +12 when expanded).
   { map = "CELADON_CITY", x = 20, y = 5, item = "LEFTOVERS" },
   -- Grass near Pewter Gym / Mart strip.
   { map = "PEWTER_CITY", x = 19, y = 18, item = "HARD_STONE" },
@@ -163,6 +163,9 @@ local TALK_BY_KIND = {
 function OverworldLoot.register(mod)
   OverworldLoot._mod = mod
 
+  local Data = require("src.core.Data")
+  local celadonYShift = (Data.maps and Data.maps.CELADON_CITY and (Data.maps.CELADON_CITY.height or 18) >= 24) and 12 or 0
+
   -- Hidden items: one field patch, grouped by map.
   local hiddenByMap = {}
   for _, h in ipairs(OverworldLoot.HIDDEN) do
@@ -171,7 +174,8 @@ function OverworldLoot.register(mod)
       list = {}
       hiddenByMap[h.map] = list
     end
-    list[#list + 1] = { x = h.x, y = h.y, item = h.item }
+    local y = (h.map == "CELADON_CITY") and (h.y + celadonYShift) or h.y
+    list[#list + 1] = { x = h.x, y = y, item = h.item }
   end
   mod.content.field:patch("hiddenItems", hiddenByMap)
 
@@ -187,10 +191,14 @@ function OverworldLoot.register(mod)
   end
 
   for _, row in ipairs(OverworldLoot.BALLS) do
-    appendObj(row.map, ballObject(row))
+    local b = ballObject(row)
+    if row.map == "CELADON_CITY" then b.y = b.y + celadonYShift end
+    appendObj(row.map, b)
   end
   for _, row in ipairs(OverworldLoot.NPCS) do
-    appendObj(row.map, npcObject(row))
+    local n = npcObject(row)
+    if row.map == "CELADON_CITY" then n.y = n.y + celadonYShift end
+    appendObj(row.map, n)
   end
 
   for mapId, objs in pairs(objectsByMap) do

@@ -22,7 +22,7 @@ if _TOOLS_DIR not in sys.path:
 
 from block_mapper import cv as cvmod
 from block_mapper_profiles.common import COLLISION_COLOR_BY_VAL, COLLISION_PRESETS as _DEFAULT_COLLISION_PRESETS
-from tileset_block_rebuild import draw_collision_overlay
+from tileset_block_rebuild import draw_collision_overlay, render_quad_from_tile_ids
 
 # Profile-driven chrome (set via apply_chrome)
 COLLISION_PRESETS = list(_DEFAULT_COLLISION_PRESETS)
@@ -72,6 +72,9 @@ class _HitlMapper:
         unique_quad_pool,
         g2_tiles_raw=None,
         g2_coll_raw=None,
+        g2_ts_rec=None,
+        g2_sheet_path=None,
+        g2_palette_bake=None,
         out_path="SAFARI_G1_TO_G2_mapping.py",
         session_path=None,
         dict_name="SAFARI_G1_TO_G2",
@@ -99,6 +102,9 @@ class _HitlMapper:
         self.unique_quad_pool = unique_quad_pool
         self.g2_tiles_raw = g2_tiles_raw or []
         self.g2_coll_raw = g2_coll_raw or []
+        self.g2_ts_rec = g2_ts_rec
+        self.g2_sheet_path = g2_sheet_path
+        self.g2_palette_bake = g2_palette_bake
         self.out_path = out_path
         self.session_path = session_path or (os.path.splitext(out_path)[0] + ".session.json")
         self.dict_name = dict_name
@@ -113,6 +119,8 @@ class _HitlMapper:
         self.total_g1 = len(g1_images)
         self.total_g2 = len(g2_images)
         self.total_unique_quads = len(unique_quad_pool)
+        self.water_tile_ids = set(self.profile.get("g2_water_tiles") or ())
+        self.water_collisions = set(self.profile.get("g2_water_collisions") or (0x29,))
 
         self.favorites = self.load_favorites()
         self.learned_memory = {}
@@ -141,6 +149,10 @@ class _HitlMapper:
 
         self.g1_quad_keys = [[extract_quadrants(b)[q].tobytes() for q in range(4)] for b in self.g1_np]
         self.quad_user_modified = {i: set() for i in range(self.total_g1)}
+        # Per-quad collision locks: once the user sets collision (combobox / favorite
+        # with coll / feature preset), it sticks across candidate browsing and
+        # update_view refreshes until cleared or overwritten by another explicit set.
+        self.quad_coll_lock = {i: {} for i in range(self.total_g1)}
 
         self.assembled_quads = {
             i: [
@@ -154,47 +166,518 @@ class _HitlMapper:
         self.quad_shortlists = {i: {q: [] for q in range(4)} for i in range(self.total_g1)}
 
         self.load_session()
+        self._apply_prefill_from_export()
 
         self.build_styles()
         self.build_ui()
         self.bind_events()
         self.update_view()
 
+    def _candidate_tile_key(self, cand):
+        if cand.get("tile_key") or cand.get("palette_slot") is not None:
+            return cvmod.quad_pool_identity(cand)
+        key = cvmod.quad_tile_key(
+            self.g2_tiles_raw,
+            int(cand.get("g2_id", 0)),
+            int(cand.get("src_q", 0)),
+        )
+        if key is not None:
+            return key
+        return (
+            int(cand.get("g2_id", 0)),
+            int(cand.get("src_q", 0)),
+        )
+
+    def _quad_tiles_for(self, quad_or_cand):
+        export_tile = quad_or_cand.get("export_tile")
+        if export_tile is not None:
+            t = int(export_tile)
+            return [t, t, t, t]
+        if quad_or_cand.get("tile_key"):
+            return [int(t) for t in quad_or_cand["tile_key"]]
+        g2_id = int(quad_or_cand.get("g2_id", 0))
+        src_q = int(quad_or_cand.get("src_q", 0))
+        if g2_id == 158:
+            if src_q in (0, 1):
+                return [17, 17, 17, 17]
+            return [77, 78, 83, 84]
+        if g2_id == 159:
+            if src_q in (0, 1):
+                return [77, 78, 83, 84]
+            return [17, 17, 17, 17]
+        if g2_id == 160:
+            if src_q == 0:
+                return [96, 97, 98, 99]
+            return [35, 35, 35, 35]
+        if g2_id < len(self.g2_tiles_raw):
+            return cvmod.extract_quad_tile_ids(self.g2_tiles_raw[g2_id], src_q)
+        return [0, 0, 0, 0]
+
+    def _pool_entry_for(self, g2_id, src_q, tile_key=None, palette_slot=None, export_tile=None):
+        g2_id = int(g2_id)
+        src_q = int(src_q)
+        if tile_key is not None or palette_slot is not None or export_tile is not None:
+            want = cvmod.quad_pool_identity(
+                {
+                    "tile_key": tile_key,
+                    "palette_slot": palette_slot,
+                    "export_tile": export_tile,
+                }
+            )
+            for u in self.unique_quad_pool:
+                if cvmod.quad_pool_identity(u) == want:
+                    return u
+        for u in self.unique_quad_pool:
+            if u.get("g2_id") == g2_id and u.get("src_q") == src_q:
+                return u
+        key = cvmod.quad_tile_key(self.g2_tiles_raw, g2_id, src_q)
+        if key:
+            for u in self.unique_quad_pool:
+                if tuple(u.get("tile_key") or ()) == key and u.get("palette_slot") is None:
+                    return u
+        return None
+
+    def _chosen_from_g2_quad(self, g2_id, src_q, coll, tile_key=None, palette_slot=None, export_tile=None):
+        pool_u = self._pool_entry_for(
+            g2_id,
+            src_q,
+            tile_key=tile_key,
+            palette_slot=palette_slot,
+            export_tile=export_tile,
+        )
+        if pool_u:
+            chosen = dict(pool_u)
+            chosen["coll"] = int(coll) & 0xFF
+            chosen["img_np"] = self._cand_preview_np(chosen)
+            chosen["score"] = 1.0
+            return chosen
+        stub = {"g2_id": int(g2_id), "src_q": int(src_q), "coll": int(coll) & 0xFF}
+        if tile_key is not None:
+            stub["tile_key"] = tuple(int(t) for t in tile_key)
+        if palette_slot is not None:
+            stub["palette_slot"] = int(palette_slot)
+        if export_tile is not None:
+            stub["export_tile"] = int(export_tile)
+        stub["img_np"] = self._cand_preview_np(stub)
+        stub["score"] = 1.0
+        return stub
+
+    def _dedupe_ranked_candidates(self, cands):
+        """One row per baked tile quad; keep best score (matches on-screen preview)."""
+        best_by_key = {}
+        order = []
+        for c in cands:
+            key = self._candidate_tile_key(c)
+            prev = best_by_key.get(key)
+            if prev is None or float(c.get("score", 0)) > float(prev.get("score", 0)):
+                best_by_key[key] = c
+                if prev is None:
+                    order.append(key)
+        return [best_by_key[k] for k in order]
+
+    def _g1_quad_luma_stats(self, g1_id, q_pos):
+        g1q = cvmod.extract_quadrants(self.g1_np[g1_id])[q_pos]
+        gray = g1q[:, :, 0] if len(g1q.shape) == 3 else g1q
+        return float(np.mean(gray)), float(np.std(gray))
+
+    def _learned_rule_for_quad(self, g1_id, q_pos):
+        """Return a validated learned {uid, g2_id, src_q, coll, tile_key?} for this G1 quad pixels."""
+        q_key = self.g1_quad_keys[g1_id][q_pos]
+        raw = self.learned_memory.get(q_key)
+        if raw is None:
+            return None
+        if isinstance(raw, int):
+            rule = {"uid": int(raw), "g2_id": 0, "src_q": 0, "coll": 0x00}
+        else:
+            rule = {
+                "g2_id": int(raw.get("g2_id", 0)),
+                "src_q": int(raw.get("src_q", 0)),
+                "coll": int(raw.get("coll", 0x00)) & 0xFF,
+            }
+            if raw.get("uid") is not None:
+                rule["uid"] = int(raw["uid"])
+            if raw.get("tile_key"):
+                rule["tile_key"] = [int(t) for t in raw["tile_key"]]
+            if raw.get("palette_slot") is not None:
+                rule["palette_slot"] = int(raw["palette_slot"])
+            if raw.get("export_tile") is not None:
+                rule["export_tile"] = int(raw["export_tile"])
+
+        # User-taught rules carry tile_key — trust them over CV luma gates (e.g. t22
+        # wall for fuzzy G1 dither reads ~23 lum units off but is intentional).
+        if isinstance(raw, dict) and rule.get("tile_key"):
+            return rule
+
+        g1_mean, g1_std = self._g1_quad_luma_stats(g1_id, q_pos)
+        match_item = None
+        uid = rule.get("uid")
+        for item in self.base_quad_rankings[g1_id][q_pos]:
+            if uid is not None and item.get("uid") == uid:
+                match_item = item
+                break
+            if rule.get("g2_id") == item.get("g2_id") and rule.get("src_q") == item.get("src_q"):
+                match_item = item
+                if uid is None and item.get("uid") is not None:
+                    rule["uid"] = int(item["uid"])
+                break
+
+        if match_item is not None and match_item.get("img_np") is not None:
+            cand_mean = float(np.mean(match_item["img_np"]))
+            if abs(g1_mean - cand_mean) > 22.0:
+                return None
+            if g1_std < cvmod.TEXTURED_QUAD_STD:
+                ident = cvmod.quad_pool_identity(match_item)
+                wrong_floor = (
+                    (g1_mean < 68 and ident == cvmod.FLAT_CAVE_FLOOR_LIGHT)
+                    or (g1_mean >= 68 and ident == cvmod.FLAT_CAVE_FLOOR_DARK)
+                )
+                if wrong_floor:
+                    return None
+        elif not rule.get("g2_id") and uid is None:
+            return None
+        return rule
+
+    def _chosen_from_learned_rule(self, g1_id, q_pos, rule):
+        coll = int(rule.get("coll", 0x00)) & 0xFF
+        tile_key = rule.get("tile_key")
+        return self._chosen_from_g2_quad(
+            int(rule.get("g2_id", 0)),
+            int(rule.get("src_q", 0)),
+            coll,
+            tile_key=tuple(tile_key) if tile_key else None,
+            palette_slot=rule.get("palette_slot"),
+            export_tile=rule.get("export_tile"),
+        )
+
+    def _save_learned_rule(self, g1_id, q_pos, chosen_cand, *, coll=None):
+        """Remember tile + collision for this exact G1 quad pixel pattern (all blocks)."""
+        q_key = self.g1_quad_keys[g1_id][q_pos]
+        if coll is None:
+            coll = self.quad_coll_lock[g1_id].get(q_pos, chosen_cand.get("coll", 0x00))
+        rule = {
+            "g2_id": int(chosen_cand.get("g2_id", 0)),
+            "src_q": int(chosen_cand.get("src_q", 0)),
+            "coll": int(coll) & 0xFF,
+        }
+        uid = chosen_cand.get("uid")
+        if uid is not None:
+            rule["uid"] = int(uid)
+        if chosen_cand.get("tile_key"):
+            rule["tile_key"] = [int(t) for t in chosen_cand["tile_key"]]
+        if chosen_cand.get("palette_slot") is not None:
+            rule["palette_slot"] = int(chosen_cand["palette_slot"])
+        if chosen_cand.get("export_tile") is not None:
+            rule["export_tile"] = int(chosen_cand["export_tile"])
+        self.learned_memory[q_key] = rule
+
+    def _ensure_learned_present(self, cands, g1_id, q_pos):
+        """Keep the learned mapping at rank #1 even when dedupe dropped its uid row."""
+        rule = self._learned_rule_for_quad(g1_id, q_pos)
+        if not rule:
+            return cands
+        learned = self._chosen_from_learned_rule(g1_id, q_pos, rule)
+        learned["is_learned"] = True
+        learned["score"] = float(learned.get("score", 1.0)) + 3.0
+        rest = [
+            c
+            for c in cands
+            if not (
+                c.get("g2_id") == learned.get("g2_id")
+                and c.get("src_q") == learned.get("src_q")
+            )
+        ]
+        return [learned] + rest
+
+    def _ensure_flat_floors_present(self, cands, g1_id, q_pos):
+        """Guarantee light/dark t1 floor quads are always in the browse list."""
+        if self.profile.get("id") != "cavern_cave":
+            return cands
+        present = {self._candidate_tile_key(c) for c in cands}
+        prepend = []
+        for fk in cvmod.FLAT_CAVE_FLOOR_IDENTITIES:
+            if fk in present:
+                continue
+            for u in self.unique_quad_pool:
+                if cvmod.quad_pool_identity(u) == fk:
+                    entry = dict(u)
+                    for c in self.base_quad_rankings[g1_id][q_pos]:
+                        if c.get("uid") == u.get("uid"):
+                            for key in ("base_score", "ssim", "edge", "color", "pixel"):
+                                if key in c:
+                                    entry[key] = c[key]
+                            break
+                    entry.setdefault("base_score", 0.0)
+                    entry.setdefault("score", entry["base_score"])
+                    entry.setdefault("ssim", 0.0)
+                    entry.setdefault("color", 0.0)
+                    entry.setdefault("pixel", entry.get("ssim", 0.0))
+                    prepend.append(entry)
+                    present.add(fk)
+                    break
+        if not prepend:
+            return cands
+        tail = [c for c in cands if self._candidate_tile_key(c) not in {self._candidate_tile_key(p) for p in prepend}]
+        return prepend + tail
+
+    def _pin_flat_cave_floors(self, cands, g1_id, q_pos):
+        if self.profile.get("id") != "cavern_cave" or not cands:
+            return cands
+        g1_mean, g1_std = self._g1_quad_luma_stats(g1_id, q_pos)
+        if g1_std > cvmod.TEXTURED_QUAD_STD:
+            return cands
+        floor_keys = sorted(
+            cvmod.FLAT_CAVE_FLOOR_IDENTITIES,
+            key=lambda fk: abs(cvmod.FLAT_CAVE_FLOOR_LUMA.get(fk, g1_mean) - g1_mean),
+        )
+        pinned = []
+        rest = list(cands)
+        for fk in floor_keys:
+            for idx, cand in enumerate(rest):
+                if self._candidate_tile_key(cand) == fk:
+                    pinned.append(rest.pop(idx))
+                    break
+        if not pinned:
+            return cands
+        seen = {self._candidate_tile_key(c) for c in pinned}
+        tail = [c for c in rest if self._candidate_tile_key(c) not in seen]
+        return pinned + tail
+
     def get_ranked_candidates(self, g1_id, q_pos):
         base_list = self.base_quad_rankings[g1_id][q_pos]
-        q_key = self.g1_quad_keys[g1_id][q_pos]
-        learned_uid = self.learned_memory.get(q_key)
+        learned_rule = self._learned_rule_for_quad(g1_id, q_pos)
+        learned_uid = learned_rule.get("uid") if learned_rule else None
 
-        if learned_uid is None:
+        if learned_uid is None and learned_rule is None:
             sorted_cands = sorted(base_list, key=lambda x: x["base_score"], reverse=True)
             res = []
             for c in sorted_cands:
                 item = dict(c)
                 item["score"] = item["base_score"]
                 item["is_learned"] = False
+                if self._candidate_has_hidden_water(item):
+                    item["has_water_tiles"] = True
+                    item["score"] -= 2.0
+                else:
+                    item["has_water_tiles"] = False
                 res.append(item)
-            return res
+            res.sort(key=lambda x: x["score"], reverse=True)
+            out = self._pin_flat_cave_floors(self._dedupe_ranked_candidates(res), g1_id, q_pos)
+            out = self._ensure_flat_floors_present(out, g1_id, q_pos)
+            return self._ensure_learned_present(out, g1_id, q_pos)
 
         cands = []
         for item in base_list:
             c = dict(item)
-            if c["uid"] == learned_uid:
+            learned_hit = learned_rule and (
+                (learned_uid is not None and c.get("uid") == learned_uid)
+                or (
+                    c.get("g2_id") == learned_rule.get("g2_id")
+                    and c.get("src_q") == learned_rule.get("src_q")
+                )
+            )
+            if learned_hit:
                 c["score"] = c["base_score"] + 2.0
                 c["is_learned"] = True
             else:
                 c["score"] = c["base_score"]
                 c["is_learned"] = False
+            if self._candidate_has_hidden_water(c):
+                c["has_water_tiles"] = True
+                c["score"] -= 2.0
+            else:
+                c["has_water_tiles"] = False
             cands.append(c)
 
         cands.sort(key=lambda x: x["score"], reverse=True)
-        return cands
+        out = self._pin_flat_cave_floors(self._dedupe_ranked_candidates(cands), g1_id, q_pos)
+        out = self._ensure_flat_floors_present(out, g1_id, q_pos)
+        return self._ensure_learned_present(out, g1_id, q_pos)
+
+    def _candidate_has_hidden_water(self, cand, coll=None):
+        if not self.water_tile_ids:
+            return False
+        coll = self.water_collisions if coll is None else coll
+        if int(cand.get("coll", 0)) & 0xFF in coll:
+            return False
+        tiles = self._quad_tiles_for(cand)
+        return any(int(t) in self.water_tile_ids for t in tiles)
+
+    def _serialize_assembled_quads(self):
+        out = {}
+        for g1, quads in self.assembled_quads.items():
+            out[str(g1)] = [
+                {
+                    "g2_id": int(q.get("g2_id", 0)),
+                    "src_q": int(q.get("src_q", 0)),
+                    "coll": int(q.get("coll", 0)) & 0xFF,
+                    "uid": q.get("uid"),
+                    **(
+                        {"tile_key": [int(t) for t in q["tile_key"]]}
+                        if q.get("tile_key")
+                        else {}
+                    ),
+                    **(
+                        {"palette_slot": int(q["palette_slot"])}
+                        if q.get("palette_slot") is not None
+                        else {}
+                    ),
+                    **(
+                        {"export_tile": int(q["export_tile"])}
+                        if q.get("export_tile") is not None
+                        else {}
+                    ),
+                }
+                for q in quads
+            ]
+        return out
+
+    def _restore_assembled_quads(self, data):
+        if not isinstance(data, dict):
+            return
+        for g1s, quads in data.items():
+            try:
+                g1 = int(g1s)
+            except (TypeError, ValueError):
+                continue
+            if g1 < 0 or g1 >= self.total_g1 or not isinstance(quads, list) or len(quads) != 4:
+                continue
+            restored = []
+            for q in quads:
+                if not isinstance(q, dict):
+                    break
+                entry = {
+                    "g2_id": int(q.get("g2_id", 0)),
+                    "src_q": int(q.get("src_q", 0)),
+                    "coll": int(q.get("coll", 0)) & 0xFF,
+                    "uid": q.get("uid"),
+                    "score": 1.0,
+                }
+                if q.get("tile_key"):
+                    entry["tile_key"] = tuple(int(t) for t in q["tile_key"])
+                if q.get("palette_slot") is not None:
+                    entry["palette_slot"] = int(q["palette_slot"])
+                if q.get("export_tile") is not None:
+                    entry["export_tile"] = int(q["export_tile"])
+                if entry["uid"] is not None:
+                    try:
+                        entry["uid"] = int(entry["uid"])
+                    except (TypeError, ValueError):
+                        entry["uid"] = None
+                restored.append(entry)
+            if len(restored) == 4:
+                self.assembled_quads[g1] = [self._hydrate_quad_entry(q) for q in restored]
+
+    def _hydrate_quad_entry(self, entry):
+        """Ensure a quadrant dict has img_np (session JSON omits it)."""
+        out = dict(entry)
+        uid = out.get("uid")
+        if uid is not None:
+            for u in self.unique_quad_pool:
+                if u.get("uid") != uid:
+                    continue
+                out["g2_id"] = int(u["g2_id"])
+                out["src_q"] = int(u["src_q"])
+                if u.get("tile_key") and not out.get("tile_key"):
+                    out["tile_key"] = tuple(int(t) for t in u["tile_key"])
+                if u.get("palette_slot") is not None and out.get("palette_slot") is None:
+                    out["palette_slot"] = int(u["palette_slot"])
+                if u.get("export_tile") is not None and out.get("export_tile") is None:
+                    out["export_tile"] = int(u["export_tile"])
+                if u.get("occurrences"):
+                    out["occurrences"] = list(u["occurrences"])
+                break
+        img = out.get("img_np")
+        if img is None:
+            out["img_np"] = self._cand_preview_np(out)
+        return out
+
+    def _resolve_quad_assembly(self, g1_id, q_pos):
+        """Pick assembled quad: user pin > learned rule > CV rank #1."""
+        if q_pos in self.quad_user_modified[g1_id]:
+            return self._hydrate_quad_entry(
+                self.apply_locked_collision(g1_id, q_pos, self.assembled_quads[g1_id][q_pos])
+            )
+        learned_rule = self._learned_rule_for_quad(g1_id, q_pos)
+        if learned_rule:
+            if learned_rule.get("coll") is not None:
+                self.lock_quad_collision(g1_id, q_pos, learned_rule["coll"])
+            chosen = self._chosen_from_learned_rule(g1_id, q_pos, learned_rule)
+            return self._hydrate_quad_entry(
+                self.apply_locked_collision(g1_id, q_pos, chosen)
+            )
+        cands = self.get_ranked_candidates(g1_id, q_pos)
+        if cands:
+            return self._hydrate_quad_entry(
+                self.apply_locked_collision(g1_id, q_pos, cands[0])
+            )
+        return self._hydrate_quad_entry(self.assembled_quads[g1_id][q_pos])
 
     def record_learned_choice(self, g1_id, q_pos, chosen_cand):
-        q_key = self.g1_quad_keys[g1_id][q_pos]
-        uid = chosen_cand.get("uid")
-        if uid is not None:
-            self.learned_memory[q_key] = uid
+        self._save_learned_rule(g1_id, q_pos, chosen_cand)
         self.quad_user_modified[g1_id].add(q_pos)
+        self.auto_save_session()
+
+    def lock_quad_collision(self, g1_id, q_pos, coll):
+        """Pin collision for a quadrant so refreshes / candidate swaps cannot wipe it."""
+        self.quad_coll_lock[g1_id][q_pos] = int(coll) & 0xFF
+        # Do NOT mark user_modified here — that freezes the piece graphic.
+        # Collision lock alone is enough to survive candidate browsing.
+
+    def apply_locked_collision(self, g1_id, q_pos, chosen):
+        """Return a copy of chosen with locked collision applied when present."""
+        out = dict(chosen)
+        locked = self.quad_coll_lock[g1_id].get(q_pos)
+        if locked is not None:
+            out["coll"] = locked
+        return out
+
+    def find_cand_index(self, cands, chosen):
+        """Index of chosen in the ranked list for thumb highlight sync.
+
+        Match uid or (g2_id, src_q) only — not bare tile_key, because deduped
+        candidates collapse many blocks onto one row and would highlight the
+        wrong block while the pinned preview shows another source block.
+        """
+        if not cands or not chosen:
+            return None
+        uid = chosen.get("uid")
+        g2 = chosen.get("g2_id")
+        sq = chosen.get("src_q")
+        if uid is not None:
+            for i, c in enumerate(cands):
+                if c.get("uid") != uid:
+                    continue
+                if g2 is not None and sq is not None:
+                    if c.get("g2_id") == g2 and c.get("src_q") == sq:
+                        return i
+                else:
+                    return i
+        if g2 is not None and sq is not None:
+            for i, c in enumerate(cands):
+                if c.get("g2_id") == g2 and c.get("src_q") == sq:
+                    return i
+        return None
+
+    def set_assembled_quad(self, g1_id, q_pos, chosen, *, lock_coll=False):
+        """Install a quadrant choice; optionally lock its collision as authoritative."""
+        chosen = dict(chosen)
+        if lock_coll:
+            self.lock_quad_collision(g1_id, q_pos, chosen.get("coll", 0x00))
+        else:
+            chosen = self.apply_locked_collision(g1_id, q_pos, chosen)
+            self.quad_user_modified[g1_id].add(q_pos)
+        self.assembled_quads[g1_id][q_pos] = self._hydrate_quad_entry(chosen)
+
+    def browse_candidate_to(self, idx):
+        """Move the candidate cursor. Does not learn / freeze — preview follows idx."""
+        cands = self.get_ranked_candidates(self.current_g1_idx, self.active_quad_pos)
+        if not cands:
+            return
+        self.current_quad_cand_idx = idx % len(cands)
+        # Leave piece-sticky so update_view syncs graphics from the cursor again.
+        # Collision locks (if any) still apply on top.
+        self.quad_user_modified[self.current_g1_idx].discard(self.active_quad_pos)
+        self.update_view()
 
     def load_favorites(self):
         fav_path = os.path.expanduser("~/.block_mapper_favorites.json")
@@ -216,6 +699,65 @@ class _HitlMapper:
         except Exception:
             pass
 
+    def _apply_prefill_from_export(self):
+        """Seed simple 1:1 mappings from an existing export (e.g. cave → legend regi)."""
+        spec = self.profile.get("prefill_from")
+        if not spec:
+            return
+        if isinstance(spec, (list, tuple)):
+            if len(spec) < 2:
+                return
+            module_stem, dict_name = spec[0], spec[1]
+            custom_name = spec[2] if len(spec) > 2 else None
+        else:
+            return
+        tools_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+        path = os.path.join(tools_dir, f"{module_stem}.py")
+        if not os.path.isfile(path):
+            print(f"[block_mapper] prefill export not found: {path}")
+            return
+        try:
+            import importlib.util
+
+            spec_mod = importlib.util.spec_from_file_location(module_stem, path)
+            if not spec_mod or not spec_mod.loader:
+                return
+            mod = importlib.util.module_from_spec(spec_mod)
+            spec_mod.loader.exec_module(mod)
+            exported = getattr(mod, dict_name, None) or {}
+            custom = getattr(mod, custom_name, None) if custom_name else None
+            for g1_id, g2_id in exported.items():
+                g1 = int(g1_id)
+                if g1 >= self.total_g1 or g1 in self.mapping:
+                    continue
+                self.mapping[g1] = int(g2_id)
+            if isinstance(custom, dict):
+                for cid, info in custom.items():
+                    self.custom_blocks[int(cid)] = dict(info)
+            print(f"[block_mapper] Prefilled {len(self.mapping)} mappings from {module_stem}")
+        except Exception as exc:  # noqa: BLE001
+            print(f"[block_mapper] prefill failed: {exc}")
+
+    def _sanitize_restored_pin_state(self):
+        """Drop pin flags where assembled matches rank #1 (session restore used to pin all four)."""
+        for g1 in range(self.total_g1):
+            pinned = self.quad_user_modified.get(g1)
+            if not pinned:
+                continue
+            for q in list(pinned):
+                cands = self.get_ranked_candidates(g1, q)
+                if not cands:
+                    continue
+                assembled = self._hydrate_quad_entry(self.assembled_quads[g1][q])
+                top = cands[0]
+                same_tiles = self._candidate_tile_key(assembled) == self._candidate_tile_key(top)
+                same_src = (
+                    assembled.get("g2_id") == top.get("g2_id")
+                    and assembled.get("src_q") == top.get("src_q")
+                )
+                if same_tiles and same_src:
+                    pinned.discard(q)
+
     def load_session(self):
         if os.path.exists(self.session_path):
             try:
@@ -228,13 +770,72 @@ class _HitlMapper:
                     if "next_custom_id" in data:
                         self.next_custom_id = data["next_custom_id"]
                     if "learned_memory" in data:
-                        self.learned_memory = {bytes.fromhex(k): v for k, v in data["learned_memory"].items() if v < len(self.unique_quad_pool)}
+                        pool_len = len(self.unique_quad_pool)
+                        loaded_rules = {}
+                        for k, v in data["learned_memory"].items():
+                            try:
+                                q_key = bytes.fromhex(k)
+                            except ValueError:
+                                continue
+                            if isinstance(v, int):
+                                if v < pool_len:
+                                    loaded_rules[q_key] = {"uid": int(v), "g2_id": 0, "src_q": 0, "coll": 0x00}
+                            elif isinstance(v, dict):
+                                uid = v.get("uid")
+                                if uid is not None and int(uid) >= pool_len:
+                                    continue
+                                rule = {
+                                    "g2_id": int(v.get("g2_id", 0)),
+                                    "src_q": int(v.get("src_q", 0)),
+                                    "coll": int(v.get("coll", 0x00)) & 0xFF,
+                                }
+                                if uid is not None:
+                                    rule["uid"] = int(uid)
+                                if v.get("tile_key"):
+                                    rule["tile_key"] = [int(t) for t in v["tile_key"]]
+                                if v.get("palette_slot") is not None:
+                                    rule["palette_slot"] = int(v["palette_slot"])
+                                if v.get("export_tile") is not None:
+                                    rule["export_tile"] = int(v["export_tile"])
+                                loaded_rules[q_key] = rule
+                        self.learned_memory = loaded_rules
                     if "last_g1_idx" in data:
                         self.current_g1_idx = min(self.total_g1 - 1, data["last_g1_idx"])
+                    if "quad_coll_lock" in data:
+                        for gk, locks in data["quad_coll_lock"].items():
+                            g1 = int(gk)
+                            if g1 in self.quad_coll_lock:
+                                self.quad_coll_lock[g1] = {int(q): int(c) & 0xFF for q, c in locks.items()}
+                                # Collision locks alone — do not freeze piece graphics.
+                    if "quad_user_modified" in data:
+                        for gk, qs in data["quad_user_modified"].items():
+                            g1 = int(gk)
+                            if g1 in self.quad_user_modified:
+                                self.quad_user_modified[g1] = {int(q) for q in qs}
+                    if "assembled_quads" in data:
+                        self._restore_assembled_quads(data["assembled_quads"])
+                    self._sanitize_restored_pin_state()
                     for i in range(self.total_g1):
                         if i not in self.mapping:
                             self.current_g1_idx = i
                             break
+                    self.current_quad_cand_idx = 0
+                    cands = self.get_ranked_candidates(
+                        self.current_g1_idx, self.active_quad_pos
+                    )
+                    if self.active_quad_pos in self.quad_user_modified[self.current_g1_idx]:
+                        sync_idx = self.find_cand_index(
+                            cands,
+                            self.assembled_quads[self.current_g1_idx][self.active_quad_pos],
+                        )
+                        if sync_idx is not None:
+                            self.current_quad_cand_idx = sync_idx
+                    # Re-apply locks onto current assembled defaults
+                    for g1, locks in self.quad_coll_lock.items():
+                        for q, coll in locks.items():
+                            if g1 < len(self.assembled_quads) and q < 4:
+                                self.assembled_quads[g1][q] = dict(self.assembled_quads[g1][q])
+                                self.assembled_quads[g1][q]["coll"] = coll
                     print(f"Resumed session: {len(self.mapping)} / {self.total_g1} blocks mapped. ({len(self.learned_memory)} learned quad rules). Starting at Block #{self.current_g1_idx}.")
             except Exception as e:
                 print(f"Session load warning: {e}")
@@ -246,7 +847,16 @@ class _HitlMapper:
                 "custom_blocks": {int(k): v for k, v in self.custom_blocks.items()},
                 "next_custom_id": self.next_custom_id,
                 "last_g1_idx": self.current_g1_idx,
-                "learned_memory": {k.hex(): v for k, v in self.learned_memory.items()}
+                "learned_memory": {k.hex(): v for k, v in self.learned_memory.items()},
+                "quad_coll_lock": {
+                    str(g1): {str(q): c for q, c in locks.items()}
+                    for g1, locks in self.quad_coll_lock.items()
+                    if locks
+                },
+                "assembled_quads": self._serialize_assembled_quads(),
+                "quad_user_modified": {
+                    str(g1): sorted(qs) for g1, qs in self.quad_user_modified.items() if qs
+                },
             }
             with open(self.session_path, "w") as f:
                 json.dump(export_data, f, indent=2, sort_keys=True)
@@ -300,9 +910,11 @@ class _HitlMapper:
         self.progress_bar = ttk.Progressbar(top_frame, orient="horizontal", length=200, mode="determinate")
         self.progress_bar.pack(side="left", padx=8)
 
+        pal_env = self.profile.get("g2_palette_env") or "?"
+        pal_time = self.profile.get("g2_palette_daytime") or "DAY"
         self.lbl_unique_badge = ttk.Label(
             top_frame,
-            text=f"{self.total_unique_quads} Unique Quads | profile={self.profile.get('id', '?')}",
+            text=f"{self.total_unique_quads} Unique Quads | profile={self.profile.get('id', '?')} | bake={pal_env}/{pal_time}",
             font=("Helvetica", 9, "bold"),
             foreground="#A5D6A7",
         )
@@ -332,7 +944,9 @@ class _HitlMapper:
         btn_save.pack(side="right")
 
         # 2. ⭐ Quick Favorites Palette (F1–F8)
-        fav_bar = ttk.Frame(self.root, style="Fav.TFrame", padding=4)
+        # Must parent under self.ui (MapperView), not the Tk root — otherwise shell
+        # re-runs leave orphan strips on root that never receive update_view().
+        fav_bar = ttk.Frame(self.ui, style="Fav.TFrame", padding=4)
         fav_bar.pack(fill="x", padx=16, pady=2)
 
         fb_header = ttk.Frame(fav_bar, style="Fav.TFrame")
@@ -369,7 +983,7 @@ class _HitlMapper:
             self.fav_slots.append({"frame": ff, "canvas": fc, "label": fl})
 
         # 3. 🏛️ Building & 🪜 Mt. Moon Wooden Ladder Stairs Visual Drop-In Bar
-        self.building_bar = ttk.Frame(self.root, style="Building.TFrame", padding=4)
+        self.building_bar = ttk.Frame(self.ui, style="Building.TFrame", padding=4)
         bb_header = ttk.Frame(self.building_bar, style="Building.TFrame")
         bb_header.pack(fill="x")
         self.lbl_building_notice = ttk.Label(bb_header, text="🏛️ Gen 1 Building Block Detected (Click visual card for Direct Drop-In):", style="BuildingHeader.TLabel")
@@ -396,7 +1010,7 @@ class _HitlMapper:
             bl.bind("<Button-1>", make_bdrop_action(drop["g2_id"]))
             self.building_cards.append({"frame": bf, "canvas": bc, "label": bl, "g2_id": drop["g2_id"]})
 
-        self.special_bar = ttk.Frame(self.root, style="Special.TFrame", padding=4)
+        self.special_bar = ttk.Frame(self.ui, style="Special.TFrame", padding=4)
         sb_header = ttk.Frame(self.special_bar, style="Special.TFrame")
         sb_header.pack(fill="x")
         self.lbl_special_notice = ttk.Label(sb_header, text=FEATURE_BAR_TITLE, style="SpecialHeader.TLabel")
@@ -416,12 +1030,26 @@ class _HitlMapper:
             ql = tk.Label(qf, text=f"{q_drop['label']}\n#{q_drop['g2_id']} ({QUAD_SHORT[q_drop['src_q']]})", bg="#191F14", fg="#C5E1A5", font=("Helvetica", 7, "bold"), justify="center")
             ql.pack(pady=1)
 
-            def make_qdrop_action(gid=q_drop["g2_id"], sq=q_drop["src_q"], col=q_drop["coll"]):
-                return lambda e: self.apply_quad_feature_preset(gid, sq, col)
+            def make_qdrop_action(
+                gid=q_drop["g2_id"],
+                sq=q_drop["src_q"],
+                col=q_drop["coll"],
+                tkey=q_drop.get("tile_key"),
+                pslot=q_drop.get("palette_slot"),
+                etile=q_drop.get("export_tile"),
+            ):
+                return lambda e: self.apply_quad_feature_preset(
+                    gid,
+                    sq,
+                    col,
+                    tile_key=tkey,
+                    palette_slot=pslot,
+                    export_tile=etile,
+                )
 
-            qf.bind("<Button-1>", make_qdrop_action(q_drop["g2_id"], q_drop["src_q"], q_drop["coll"]))
-            qc.bind("<Button-1>", make_qdrop_action(q_drop["g2_id"], q_drop["src_q"], q_drop["coll"]))
-            ql.bind("<Button-1>", make_qdrop_action(q_drop["g2_id"], q_drop["src_q"], q_drop["coll"]))
+            qf.bind("<Button-1>", make_qdrop_action())
+            qc.bind("<Button-1>", make_qdrop_action())
+            ql.bind("<Button-1>", make_qdrop_action())
 
             self.special_quad_cards.append({"frame": qf, "canvas": qc, "label": ql, "data": q_drop})
 
@@ -502,7 +1130,7 @@ class _HitlMapper:
         coll_box = ttk.Frame(center_card, style="Card.TFrame")
         coll_box.pack(fill="x", pady=4)
 
-        ttk.Label(coll_box, text="Quadrant Collision Semantics:", font=("Helvetica", 10, "bold"), foreground="#FFD54F", background="#222530").pack(anchor="w")
+        ttk.Label(coll_box, text="Quadrant Collision (locks on change — survives candidate swaps):", font=("Helvetica", 10, "bold"), foreground="#FFD54F", background="#222530").pack(anchor="w")
         self.cbo_collision = ttk.Combobox(coll_box, values=[p["label"] for p in COLLISION_PRESETS], state="readonly", font=("Helvetica", 9))
         self.cbo_collision.pack(fill="x", pady=2)
         self.cbo_collision.bind("<<ComboboxSelected>>", self.on_collision_selected)
@@ -529,7 +1157,7 @@ class _HitlMapper:
         self.lbl_assembled_coll_summary.pack(pady=2)
 
         # 5. Shortlist Strip (Per Quadrant)
-        self.shortlist_frame = ttk.Frame(self.root, style="Shortlist.TFrame", padding=4)
+        self.shortlist_frame = ttk.Frame(self.ui, style="Shortlist.TFrame", padding=4)
         self.shortlist_frame.pack(fill="x", padx=16, pady=2)
 
         sl_header = ttk.Frame(self.shortlist_frame, style="Shortlist.TFrame")
@@ -557,10 +1185,10 @@ class _HitlMapper:
             self.shortlist_slots.append({"frame": sf, "canvas": sc, "label": sl, "cand": None})
 
         # 6. Sliding Window Candidates Thumbnails
-        thumb_bar = ttk.Frame(self.root, style="Card.TFrame", padding=4)
-        thumb_bar.pack(fill="x", padx=16, pady=2)
+        self.thumb_bar = ttk.Frame(self.ui, style="Card.TFrame", padding=4)
+        self.thumb_bar.pack(fill="x", padx=16, pady=2)
 
-        th_header = ttk.Frame(thumb_bar, style="Card.TFrame")
+        th_header = ttk.Frame(self.thumb_bar, style="Card.TFrame")
         th_header.pack(fill="x")
         self.lbl_thumb_title = ttk.Label(th_header, text="Unique Candidate Window (Click to preview):", style="CardSub.TLabel")
         self.lbl_thumb_title.pack(side="left", padx=4)
@@ -569,8 +1197,9 @@ class _HitlMapper:
         th_nav.pack(side="right")
         ttk.Button(th_nav, text="◀ Prev 8", style="Nav.TButton", command=self.jump_prev_8).pack(side="left", padx=2)
         ttk.Button(th_nav, text="Next 8 ▶", style="Nav.TButton", command=self.jump_next_8).pack(side="left", padx=2)
+        ttk.Button(th_nav, text="⏮ First", style="Nav.TButton", command=self.jump_first_candidate).pack(side="left", padx=2)
 
-        self.thumb_container = ttk.Frame(thumb_bar, style="Card.TFrame")
+        self.thumb_container = ttk.Frame(self.thumb_bar, style="Card.TFrame")
         self.thumb_container.pack(fill="x", pady=2)
 
         self.thumb_buttons = []
@@ -636,12 +1265,32 @@ class _HitlMapper:
                     pass
             self._map_preview_job = self.root.after(40, self.on_mapping_changed)
 
+    def render_block_from_tile_ids(self, tiles16):
+        """Bake export-accurate block art from 16 tile indices (what the game loads)."""
+        from tileset_block_rebuild import render_block_from_tile_ids
+
+        if not (self.g2_ts_rec and self.g2_sheet_path):
+            return Image.new("RGB", (self.g2_block_px, self.g2_block_px), (32, 32, 32))
+        return render_block_from_tile_ids(
+            list(tiles16)[:16],
+            self.g2_ts_rec,
+            self.g2_sheet_path,
+            block_px=self.g2_block_px,
+            tile_size=int(self.profile.get("g2_tile_size") or 8),
+            palette_bake=self.g2_palette_bake,
+            game=self.profile.get("g2_game") or self.profile.get("game") or "gold",
+        )
+
     def resolve_g2_block_image(self, g2_id):
         if g2_id in self.custom_blocks:
-            # Custom blocks: assemble from source quads if we still have the g1 source
-            src = self.custom_blocks[g2_id].get("source_g1")
+            cdef = self.custom_blocks[g2_id]
+            tiles = cdef.get("tiles")
+            if tiles and len(tiles) >= 16:
+                return self.render_block_from_tile_ids(tiles)
+            # In-progress block: fall back to quadrant thumbnails
+            src = cdef.get("source_g1")
             if src is not None and src in self.assembled_quads:
-                quads = self.assembled_quads[src]
+                quads = [self._hydrate_quad_entry(q) for q in self.assembled_quads[src]]
                 try:
                     assembled = assemble_quadrants_image(
                         quads[0]["img_np"], quads[1]["img_np"], quads[2]["img_np"], quads[3]["img_np"]
@@ -706,6 +1355,7 @@ class _HitlMapper:
                         src_g1 = -1 - g2_id
                         quads = self.assembled_quads.get(src_g1)
                         if quads:
+                            quads = [self._hydrate_quad_entry(q) for q in quads]
                             assembled = assemble_quadrants_image(
                                 quads[0]["img_np"], quads[1]["img_np"], quads[2]["img_np"], quads[3]["img_np"]
                             )
@@ -806,7 +1456,7 @@ class _HitlMapper:
                     if u["g2_id"] == g2_id and u["src_q"] == self.active_quad_pos:
                         chosen["uid"] = u["uid"]
                         break
-                self.assembled_quads[self.current_g1_idx][self.active_quad_pos] = chosen
+                self.set_assembled_quad(self.current_g1_idx, self.active_quad_pos, chosen)
                 self.record_learned_choice(self.current_g1_idx, self.active_quad_pos, chosen)
                 self.advance_quad_or_block()
 
@@ -822,12 +1472,27 @@ class _HitlMapper:
             messagebox.showinfo("Session Loaded", f"Resumed progress: {len(self.mapping)} blocks mapped.\nStarting at Block #{self.current_g1_idx}.")
 
     def apply_direct_block_dropin(self, g2_id):
-        self.mapping[self.current_g1_idx] = g2_id
+        """Map the whole Gen1 block to a stock Gen2 block (tiles + stock collision)."""
         for q in range(4):
+            q_img = self.get_quad_image(g2_id, q)
+            c_byte = self.g2_coll_raw[g2_id][q] if g2_id < len(self.g2_coll_raw) else 0x00
+            chosen = {
+                "uid": None,
+                "g2_id": g2_id,
+                "src_q": q,
+                "coll": c_byte,
+                "img_np": np.array(q_img),
+                "score": 1.0,
+            }
             for u in self.unique_quad_pool:
                 if u["g2_id"] == g2_id and u["src_q"] == q:
-                    self.record_learned_choice(self.current_g1_idx, q, u)
+                    chosen["uid"] = u["uid"]
+                    chosen["coll"] = u.get("coll", c_byte)
                     break
+            # Direct drop-in locks stock collision so later export cannot drift.
+            self.set_assembled_quad(self.current_g1_idx, q, chosen, lock_coll=True)
+            self.record_learned_choice(self.current_g1_idx, q, chosen)
+        self.finalize_block_mapping(self.current_g1_idx)
         self.auto_save_session()
         if self.current_g1_idx < self.total_g1 - 1:
             self.current_g1_idx += 1
@@ -839,22 +1504,25 @@ class _HitlMapper:
             if messagebox.askyesno("Complete!", f"Finished all {self.total_g1} blocks!\nWould you like to export now?"):
                 self.save_mapping()
 
-    def apply_quad_feature_preset(self, g2_id, src_q, coll=0x00):
+    def apply_quad_feature_preset(
+        self,
+        g2_id,
+        src_q,
+        coll=0x00,
+        tile_key=None,
+        palette_slot=None,
+        export_tile=None,
+    ):
         """Applies a single quadrant feature preset (e.g. Stair step, cliff top) to active quad and advances."""
-        q_img = self.get_quad_image(g2_id, src_q)
-        chosen = {
-            "uid": None,
-            "g2_id": g2_id,
-            "src_q": src_q,
-            "coll": coll,
-            "img_np": np.array(q_img),
-            "score": 1.0
-        }
-        for u in self.unique_quad_pool:
-            if u["g2_id"] == g2_id and u["src_q"] == src_q:
-                chosen["uid"] = u["uid"]
-                break
-        self.assembled_quads[self.current_g1_idx][self.active_quad_pos] = chosen
+        chosen = self._chosen_from_g2_quad(
+            g2_id,
+            src_q,
+            coll,
+            tile_key=tile_key,
+            palette_slot=palette_slot,
+            export_tile=export_tile,
+        )
+        self.set_assembled_quad(self.current_g1_idx, self.active_quad_pos, chosen, lock_coll=True)
         self.record_learned_choice(self.current_g1_idx, self.active_quad_pos, chosen)
         self.advance_quad_or_block()
 
@@ -864,59 +1532,72 @@ class _HitlMapper:
             g2_id = fav["g2_id"]
             src_q = fav.get("src_q", 0)
             coll = fav.get("coll", 0x00)
-
-            q_img = self.get_quad_image(g2_id, src_q)
-            chosen = {
-                "uid": None,
-                "g2_id": g2_id,
-                "src_q": src_q,
-                "coll": coll,
-                "img_np": np.array(q_img),
-                "score": 1.0
-            }
-            for u in self.unique_quad_pool:
-                if u["g2_id"] == g2_id and u["src_q"] == src_q:
-                    chosen["uid"] = u["uid"]
-                    break
-            self.assembled_quads[self.current_g1_idx][self.active_quad_pos] = chosen
+            chosen = self._chosen_from_g2_quad(
+                g2_id,
+                src_q,
+                coll,
+                tile_key=fav.get("tile_key"),
+                palette_slot=fav.get("palette_slot"),
+                export_tile=fav.get("export_tile"),
+            )
+            self.set_assembled_quad(self.current_g1_idx, self.active_quad_pos, chosen, lock_coll=True)
             self.record_learned_choice(self.current_g1_idx, self.active_quad_pos, chosen)
             self.advance_quad_or_block()
 
     def pin_current_to_favorite(self, target_slot=None):
-        cands = self.get_ranked_candidates(self.current_g1_idx, self.active_quad_pos)
-        if not cands:
-            return
-        cur_cand = cands[self.current_quad_cand_idx]
-        g2_id = cur_cand["g2_id"]
-        src_q = cur_cand["src_q"]
-        coll = cur_cand.get("coll", 0x00)
+        g1 = self.current_g1_idx
+        q = self.active_quad_pos
+        cur = self.assembled_quads[g1][q]
+        g2_id = cur["g2_id"]
+        src_q = cur["src_q"]
+        coll = self.quad_coll_lock[g1].get(q, cur.get("coll", 0x00))
 
         if target_slot is None:
-            slot_str = simpledialog.askstring("Pin Favorite", f"Pin G2 #{g2_id} ({QUAD_SHORT[src_q]}) to which Favorite Slot (1-8)?", parent=self.root)
+            slot_str = simpledialog.askstring("Pin Favorite", f"Pin G2 #{g2_id} ({QUAD_SHORT[src_q]}) coll=0x{coll:02X} to Favorite Slot (1-8)?", parent=self.root)
             if not slot_str or not slot_str.isdigit():
                 return
             target_slot = int(slot_str) - 1
 
         if 0 <= target_slot < 8:
             name = f"B#{g2_id}"
-            self.favorites[target_slot] = {
+            fav_entry = {
                 "g2_id": g2_id,
                 "src_q": src_q,
                 "name": name,
-                "coll": coll
+                "coll": coll,
             }
+            if cur.get("tile_key"):
+                fav_entry["tile_key"] = tuple(int(t) for t in cur["tile_key"])
+            if cur.get("palette_slot") is not None:
+                fav_entry["palette_slot"] = int(cur["palette_slot"])
+            if cur.get("export_tile") is not None:
+                fav_entry["export_tile"] = int(cur["export_tile"])
+            self.favorites[target_slot] = fav_entry
             self.save_favorites_to_disk()
             self.update_view()
 
     def set_active_quad(self, pos):
         self.active_quad_pos = pos
+        g1 = self.current_g1_idx
+        cands = self.get_ranked_candidates(g1, pos)
         self.current_quad_cand_idx = 0
+        if pos in self.quad_user_modified[g1]:
+            sync_idx = self.find_cand_index(
+                cands, self.assembled_quads[g1][pos]
+            )
+            if sync_idx is not None:
+                self.current_quad_cand_idx = sync_idx
+        else:
+            learned_rule = self._learned_rule_for_quad(g1, pos)
+            if learned_rule:
+                chosen = self._chosen_from_learned_rule(g1, pos, learned_rule)
+                sync_idx = self.find_cand_index(cands, chosen)
+                if sync_idx is not None:
+                    self.current_quad_cand_idx = sync_idx
         self.update_view()
 
     def next_quad_tab(self):
-        self.active_quad_pos = (self.active_quad_pos + 1) % 4
-        self.current_quad_cand_idx = 0
-        self.update_view()
+        self.set_active_quad((self.active_quad_pos + 1) % 4)
 
     def on_number_key(self, slot):
         sl = self.quad_shortlists[self.current_g1_idx][self.active_quad_pos]
@@ -929,8 +1610,14 @@ class _HitlMapper:
         idx = self.cbo_collision.current()
         if idx >= 0:
             val = COLLISION_PRESETS[idx]["val"]
-            self.assembled_quads[self.current_g1_idx][self.active_quad_pos]["coll"] = val
-            self.quad_user_modified[self.current_g1_idx].add(self.active_quad_pos)
+            g1 = self.current_g1_idx
+            q = self.active_quad_pos
+            self.lock_quad_collision(g1, q, val)
+            self.assembled_quads[g1][q] = dict(self.assembled_quads[g1][q])
+            self.assembled_quads[g1][q]["coll"] = val
+            self._save_learned_rule(g1, q, self.assembled_quads[g1][q], coll=val)
+            self._notify_dirty()
+            self.auto_save_session()
             self.update_view()
 
     def toggle_current_as_candidate(self):
@@ -956,7 +1643,7 @@ class _HitlMapper:
         sl = self.quad_shortlists[self.current_g1_idx][self.active_quad_pos]
         if slot < len(sl):
             chosen = dict(sl[slot])
-            self.assembled_quads[self.current_g1_idx][self.active_quad_pos] = chosen
+            self.set_assembled_quad(self.current_g1_idx, self.active_quad_pos, chosen)
             self.record_learned_choice(self.current_g1_idx, self.active_quad_pos, chosen)
             self.advance_quad_or_block()
 
@@ -968,10 +1655,10 @@ class _HitlMapper:
             if sl:
                 chosen = dict(sl[0])
             else:
-                cands = self.get_ranked_candidates(self.current_g1_idx, self.active_quad_pos)
-                chosen = dict(cands[self.current_quad_cand_idx]) if cands else None
+                # Confirm what is on screen (assembled preview), not a mismatched thumb index.
+                chosen = dict(self.assembled_quads[self.current_g1_idx][self.active_quad_pos])
             if chosen:
-                self.assembled_quads[self.current_g1_idx][self.active_quad_pos] = chosen
+                self.set_assembled_quad(self.current_g1_idx, self.active_quad_pos, chosen)
                 self.record_learned_choice(self.current_g1_idx, self.active_quad_pos, chosen)
             self.advance_quad_or_block()
 
@@ -994,7 +1681,7 @@ class _HitlMapper:
             cf = tk.Frame(cand_box, bg="#222530", bd=2, relief="ridge", cursor="hand2")
             cf.pack(side="left", padx=4, expand=True)
 
-            q_img = Image.fromarray(item["img_np"]).resize((60, 60), Image.NEAREST)
+            q_img = Image.fromarray(self._cand_preview_np(item)).resize((60, 60), Image.NEAREST)
             tk_c = ImageTk.PhotoImage(q_img)
             self.tk_cache[f"modal_{idx}"] = tk_c
 
@@ -1007,7 +1694,7 @@ class _HitlMapper:
 
             def select_fn(cand=item):
                 top.destroy()
-                self.assembled_quads[self.current_g1_idx][self.active_quad_pos] = dict(cand)
+                self.set_assembled_quad(self.current_g1_idx, self.active_quad_pos, cand)
                 self.record_learned_choice(self.current_g1_idx, self.active_quad_pos, cand)
                 self.advance_quad_or_block()
 
@@ -1020,9 +1707,7 @@ class _HitlMapper:
 
     def advance_quad_or_block(self):
         if self.active_quad_pos < 3:
-            self.active_quad_pos += 1
-            self.current_quad_cand_idx = 0
-            self.update_view()
+            self.set_active_quad(self.active_quad_pos + 1)
         else:
             self.finalize_block_mapping(self.current_g1_idx)
             self.auto_save_session()
@@ -1038,65 +1723,99 @@ class _HitlMapper:
 
     def finalize_block_mapping(self, g1_id):
         quads = self.assembled_quads[g1_id]
-        if quads[0]["g2_id"] == quads[1]["g2_id"] == quads[2]["g2_id"] == quads[3]["g2_id"] and \
-           quads[0]["src_q"] == 0 and quads[1]["src_q"] == 1 and quads[2]["src_q"] == 2 and quads[3]["src_q"] == 3:
-            self.mapping[g1_id] = quads[0]["g2_id"]
-        else:
-            cid = self.next_custom_id
-            self.next_custom_id += 1
-            self.mapping[g1_id] = cid
+        # Honor collision locks one last time before committing.
+        for q in range(4):
+            quads[q] = self.apply_locked_collision(g1_id, q, quads[q])
+        coll_4 = [int(q["coll"]) & 0xFF for q in quads]
 
-            tiles_16 = self.get_assembled_tiles(g1_id)
-            coll_4 = [q["coll"] for q in quads]
-            self.custom_blocks[cid] = {
-                "tiles": tiles_16,
-                "collision": coll_4,
-                "source_g1": g1_id
-            }
+        same_block = (
+            quads[0]["g2_id"] == quads[1]["g2_id"] == quads[2]["g2_id"] == quads[3]["g2_id"]
+            and quads[0]["src_q"] == 0
+            and quads[1]["src_q"] == 1
+            and quads[2]["src_q"] == 2
+            and quads[3]["src_q"] == 3
+        )
+        if same_block:
+            g2_id = int(quads[0]["g2_id"])
+            vanilla = (
+                [int(x) & 0xFF for x in self.g2_coll_raw[g2_id]]
+                if g2_id < len(self.g2_coll_raw)
+                else [0x00, 0x00, 0x00, 0x00]
+            )
+            # Only reuse the stock Gen2 block when collision matches exactly.
+            # User-marked impassable / grass / etc. must become a custom block.
+            if coll_4 == vanilla:
+                self.mapping[g1_id] = g2_id
+                self._notify_dirty()
+                return
+
+        cid = self.next_custom_id
+        self.next_custom_id += 1
+        self.mapping[g1_id] = cid
+
+        tiles_16 = self.get_assembled_tiles(g1_id)
+        self.custom_blocks[cid] = {
+            "tiles": tiles_16,
+            "collision": coll_4,
+            "source_g1": g1_id,
+        }
         self._notify_dirty()
 
     def get_assembled_tiles(self, g1_id):
         quads = self.assembled_quads[g1_id]
-        def extract_quad_tiles(b_id, q_pos):
-            if b_id == 158:
-                if q_pos in (0, 1): return [17, 17, 17, 17]
-                else: return [77, 78, 83, 84]
-            elif b_id == 159:
-                if q_pos in (0, 1): return [77, 78, 83, 84]
-                else: return [17, 17, 17, 17]
-            elif b_id == 160:
-                # Outdoor Gen1 forest sign (tiles 96–99) on Kanto grass (35)
-                if q_pos == 0: return [96, 97, 98, 99]
-                else: return [35, 35, 35, 35]
-            elif b_id == 120:
-                # Cave floor + Gen1 cavern sign (tiles 90–93)
-                if q_pos == 3: return [90, 91, 92, 93]
-                else: return [1, 1, 1, 1]
-            elif b_id == 121:
-                # Cave water + Gen1 cavern sign
-                if q_pos == 3: return [90, 91, 92, 93]
-                else: return [20, 20, 20, 20]
-            if b_id < len(self.g2_tiles_raw):
-                b = self.g2_tiles_raw[b_id]
-                if q_pos == 0: return [b[0], b[1], b[4], b[5]]
-                elif q_pos == 1: return [b[2], b[3], b[6], b[7]]
-                elif q_pos == 2: return [b[8], b[9], b[12], b[13]]
-                elif q_pos == 3: return [b[10], b[11], b[14], b[15]]
-            return [0, 0, 0, 0]
-
-
-        tl = extract_quad_tiles(quads[0]["g2_id"], quads[0]["src_q"])
-        tr = extract_quad_tiles(quads[1]["g2_id"], quads[1]["src_q"])
-        bl = extract_quad_tiles(quads[2]["g2_id"], quads[2]["src_q"])
-        br = extract_quad_tiles(quads[3]["g2_id"], quads[3]["src_q"])
+        tl = self._quad_tiles_for(quads[0])
+        tr = self._quad_tiles_for(quads[1])
+        bl = self._quad_tiles_for(quads[2])
+        br = self._quad_tiles_for(quads[3])
         return assemble_16_tiles(tl, tr, bl, br)
 
-    def get_quad_image(self, g2_id, q_pos):
+    def get_quad_image(self, g2_id, q_pos, quad_or_cand=None):
+        palette_slot_override = None
+        if quad_or_cand is not None:
+            tiles = self._quad_tiles_for(quad_or_cand)
+            if quad_or_cand.get("palette_slot") is not None and quad_or_cand.get("export_tile") is None:
+                palette_slot_override = int(quad_or_cand["palette_slot"])
+        elif self.g2_ts_rec and self.g2_sheet_path and g2_id < len(self.g2_tiles_raw):
+            tiles = cvmod.extract_quad_tile_ids(self.g2_tiles_raw[g2_id], q_pos)
+        else:
+            tiles = None
+        if tiles and self.g2_ts_rec and self.g2_sheet_path:
+            quad_px = max(8, self.g2_block_px // 2)
+            return render_quad_from_tile_ids(
+                tiles,
+                self.g2_ts_rec,
+                self.g2_sheet_path,
+                quad_px=quad_px,
+                tile_size=int(self.profile.get("g2_tile_size") or 8),
+                palette_bake=self.g2_palette_bake,
+                game=self.profile.get("g2_game") or self.profile.get("game") or "gold",
+                palette_slot_override=palette_slot_override,
+            )
         if g2_id < len(self.g2_images):
             g2_np = np.array(self.g2_images[g2_id])
             q_np = extract_quadrants(g2_np)[q_pos]
             return Image.fromarray(q_np)
         return Image.new("RGB", (48, 48), (0, 0, 0))
+
+    def _cand_preview_np(self, cand):
+        """Tile-index bake for UI — matches live assembled / in-game, not CV cache."""
+        g2_id = int(cand.get("g2_id", 0))
+        src_q = int(cand.get("src_q", 0))
+        img = self.get_quad_image(g2_id, src_q, quad_or_cand=cand)
+        return np.array(img.resize((16, 16), Image.NEAREST))
+
+    def _cand_tile_summary(self, cand):
+        tiles = self._quad_tiles_for(cand)
+        uniq = sorted(set(int(t) for t in tiles))
+        if len(uniq) == 1:
+            if uniq[0] == cvmod.FLAT_CAVE_FLOOR_DARK_EXPORT:
+                return "t62↓dark"
+            return f"t{uniq[0]}"
+        if uniq == [12, 13, 28, 29]:
+            return "t12-29↑"
+        if tiles == [1, 1, 1, 1]:
+            return "t1↓"
+        return "t" + "/".join(str(t) for t in tiles)
 
     def get_block_image(self, g2_id):
         if g2_id < len(self.g2_images):
@@ -1132,7 +1851,7 @@ class _HitlMapper:
             # Render special quadrant cards
             for idx, card in enumerate(self.special_quad_cards):
                 d = card["data"]
-                q_img = self.get_quad_image(d["g2_id"], d["src_q"]).resize((self.dropin_thumb_size, self.dropin_thumb_size), Image.NEAREST)
+                q_img = self.get_quad_image(d["g2_id"], d["src_q"], quad_or_cand=d).resize((self.dropin_thumb_size, self.dropin_thumb_size), Image.NEAREST)
                 tk_sq = ImageTk.PhotoImage(q_img)
                 self.tk_cache[f"sqdrop_{idx}"] = tk_sq
                 card["canvas"].delete("all")
@@ -1153,12 +1872,12 @@ class _HitlMapper:
             f_obj = self.fav_slots[s]
             if s < len(self.favorites):
                 fav = self.favorites[s]
-                f_img = self.get_quad_image(fav["g2_id"], fav.get("src_q", 0)).resize((self.fav_thumb_size, self.fav_thumb_size), Image.NEAREST)
+                f_img = self.get_quad_image(fav["g2_id"], fav.get("src_q", 0), quad_or_cand=fav).resize((self.fav_thumb_size, self.fav_thumb_size), Image.NEAREST)
                 tk_f = ImageTk.PhotoImage(f_img)
                 self.tk_cache[f"fav_{s}"] = tk_f
                 f_obj["canvas"].delete("all")
                 f_obj["canvas"].create_image(self.fav_thumb_size // 2, self.fav_thumb_size // 2, image=tk_f)
-                f_obj["label"].config(text=f"F{s+1}: #{fav['g2_id']}")
+                f_obj["label"].config(text=f"F{s+1}: {self._cand_tile_summary(fav)}")
 
         # 2. Target Gen 1 Preview with Active Quadrant Highlight Border
         g1_base = self.g1_images[self.current_g1_idx].resize((self.preview_size, self.preview_size), Image.NEAREST)
@@ -1191,45 +1910,97 @@ class _HitlMapper:
         # 4. Active Quadrant Candidate Preview (Instant Lookups)
         cands = self.get_ranked_candidates(self.current_g1_idx, self.active_quad_pos)
         if not cands:
-            cands = [{"g2_id": 0, "src_q": 0, "score": 0.0, "coll": 0x00, "ssim": 0.0, "color": 0.0, "occurrences": []}]
+            cands = [{"g2_id": 0, "src_q": 0, "score": 0.0, "coll": 0x00, "ssim": 0.0, "color": 0.0, "occurrences": [], "img_np": np.zeros((16, 16, 3), dtype=np.uint8)}]
         if self.current_quad_cand_idx >= len(cands):
             self.current_quad_cand_idx = 0
 
-        cur_cand = cands[self.current_quad_cand_idx]
+        g1 = self.current_g1_idx
+        aq = self.active_quad_pos
+        highlight_idx = self.current_quad_cand_idx
+        # Active quadrant: cursor index is source of truth while browsing.
+        # Piece-sticky (user_modified) only freezes after Enter/favorite/shortlist —
+        # then we snap the highlight to that piece instead of overwriting it.
+        if aq in self.quad_user_modified[g1]:
+            cur_cand = self._hydrate_quad_entry(
+                self.apply_locked_collision(g1, aq, self.assembled_quads[g1][aq])
+            )
+            self.assembled_quads[g1][aq] = cur_cand
+            sync_idx = self.find_cand_index(cands, cur_cand)
+            if sync_idx is not None:
+                self.current_quad_cand_idx = sync_idx
+                highlight_idx = sync_idx
+            else:
+                highlight_idx = None
+        else:
+            # Active tab follows the candidate cursor so ←/→ can override a learned default.
+            cur_cand = self._hydrate_quad_entry(
+                self.apply_locked_collision(g1, aq, cands[self.current_quad_cand_idx])
+            )
+            self.assembled_quads[g1][aq] = cur_cand
+            highlight_idx = self.current_quad_cand_idx
 
-        # Sync active assembled quad choice with current candidate
-        self.assembled_quads[self.current_g1_idx][self.active_quad_pos] = dict(cur_cand)
-
-        # For any untouched/unmodified quadrants on this block, also keep them synced with latest Rank #1 learned candidates
+        # Other quadrants: learned rules and user pins beat blind rank #1 refresh.
         for q in range(4):
-            if q != self.active_quad_pos and q not in self.quad_user_modified[self.current_g1_idx]:
-                q_top = self.get_ranked_candidates(self.current_g1_idx, q)
-                if q_top:
-                    self.assembled_quads[self.current_g1_idx][q] = dict(q_top[0])
+            if q == aq:
+                continue
+            self.assembled_quads[g1][q] = self._resolve_quad_assembly(g1, q)
 
-        q_img = Image.fromarray(cur_cand["img_np"]).resize((self.quad_size, self.quad_size), Image.NEAREST)
+        if "img_np" not in cur_cand or cur_cand["img_np"] is None:
+            cur_cand["img_np"] = self._cand_preview_np(cur_cand)
+
+        q_img = Image.fromarray(self._cand_preview_np(cur_cand)).resize((self.quad_size, self.quad_size), Image.NEAREST)
         tk_q = ImageTk.PhotoImage(q_img)
         self.tk_cache["active_quad"] = tk_q
         self.canvas_quad_active.delete("all")
         self.canvas_quad_active.create_image(self.quad_size // 2, self.quad_size // 2, image=tk_q)
 
-        if cur_cand.get("is_learned"):
-            self.lbl_quad_rank.config(text=f"Candidate #{self.current_quad_cand_idx + 1} of {len(cands)}  🧠 Learned Preference!", foreground="#81C784")
+        if aq in self.quad_user_modified[g1] and highlight_idx is None:
+            self.lbl_quad_rank.config(
+                text="Confirmed selection  (←/→ to browse alternatives)",
+                foreground="#81C784",
+            )
+        elif cur_cand.get("is_learned"):
+            rank_n = (highlight_idx if highlight_idx is not None else self.current_quad_cand_idx) + 1
+            self.lbl_quad_rank.config(
+                text=f"Candidate #{rank_n} of {len(cands)}  🧠 Learned Preference!",
+                foreground="#81C784",
+            )
         else:
-            self.lbl_quad_rank.config(text=f"Candidate #{self.current_quad_cand_idx + 1} of {len(cands)}", foreground="#FFB74D")
+            rank_n = (highlight_idx if highlight_idx is not None else self.current_quad_cand_idx) + 1
+            self.lbl_quad_rank.config(
+                text=f"Candidate #{rank_n} of {len(cands)}",
+                foreground="#FFB74D",
+            )
 
-        self.lbl_quad_src.config(text=f"Primary: G2 Block #{cur_cand['g2_id']} ({QUAD_SHORT[cur_cand['src_q']]})")
+        self.lbl_quad_src.config(
+            text=f"Primary: G2 Block #{cur_cand['g2_id']} ({QUAD_SHORT[cur_cand['src_q']]})  [{self._cand_tile_summary(cur_cand)}]"
+        )
 
         occs = cur_cand.get("occurrences", [])
-        if len(occs) > 1:
+        if cur_cand.get("has_water_tiles"):
+            self.lbl_quad_also.config(
+                text="⚠ Contains water tile(s) — renders as surf in-game unless collision is water",
+                foreground="#64B5F6",
+            )
+        elif len(occs) > 1:
             other_blocks = [f"#{b}({QUAD_SHORT[q]})" for b, q in occs[1:6]]
             extra_count = len(occs) - 6
             extra_txt = f" +{extra_count} more" if extra_count > 0 else ""
-            self.lbl_quad_also.config(text=f"Also in: {', '.join(other_blocks)}{extra_txt}")
+            coll_note = ""
+            variants = cur_cand.get("coll_variants")
+            if variants and len(variants) > 1:
+                coll_note = f"  coll variants: {', '.join(f'0x{c:02X}' for c in sorted(variants))}"
+            self.lbl_quad_also.config(text=f"Also in: {', '.join(other_blocks)}{extra_txt}{coll_note}")
         else:
             self.lbl_quad_also.config(text="Unique to this block only")
 
-        self.lbl_quad_score.config(text=f"Score: {cur_cand['score']:.3f} (SSIM: {cur_cand.get('ssim', 0):.2f}, Col: {cur_cand.get('color', 0):.2f})")
+        self.lbl_quad_score.config(
+            text=(
+                f"Score: {cur_cand.get('score', cur_cand.get('base_score', 0.0)):.3f} "
+                f"(Px: {cur_cand.get('pixel', cur_cand.get('ssim', 0)):.2f}, "
+                f"Col: {cur_cand.get('color', 0):.2f})"
+            )
+        )
 
         coll_val = self.assembled_quads[self.current_g1_idx][self.active_quad_pos]["coll"]
         matched_cbo_idx = 0
@@ -1239,15 +2010,23 @@ class _HitlMapper:
                 break
         self.cbo_collision.current(matched_cbo_idx)
 
-        # 5. Live Assembled Block Preview
-        quads = self.assembled_quads[self.current_g1_idx]
-        q0_img = quads[0]["img_np"]
-        q1_img = quads[1]["img_np"]
-        q2_img = quads[2]["img_np"]
-        q3_img = quads[3]["img_np"]
-        assembled_np = assemble_quadrants_image(q0_img, q1_img, q2_img, q3_img)
-
-        assembled_pil = Image.fromarray(assembled_np).resize((self.preview_size, self.preview_size), Image.NEAREST)
+        # 5. Live Assembled Block Preview (tile-index bake = export / in-game)
+        quads = [self._hydrate_quad_entry(q) for q in self.assembled_quads[self.current_g1_idx]]
+        self.assembled_quads[self.current_g1_idx] = quads
+        try:
+            tiles16 = self.get_assembled_tiles(self.current_g1_idx)
+            assembled_pil = self.render_block_from_tile_ids(tiles16).resize(
+                (self.preview_size, self.preview_size), Image.NEAREST
+            )
+        except Exception:
+            q0_img = quads[0]["img_np"]
+            q1_img = quads[1]["img_np"]
+            q2_img = quads[2]["img_np"]
+            q3_img = quads[3]["img_np"]
+            assembled_np = assemble_quadrants_image(q0_img, q1_img, q2_img, q3_img)
+            assembled_pil = Image.fromarray(assembled_np).resize(
+                (self.preview_size, self.preview_size), Image.NEAREST
+            )
         if self.show_collision_overlay.get():
             coll_for_overlay = [q["coll"] for q in quads]
             assembled_pil = draw_collision_overlay(
@@ -1260,7 +2039,11 @@ class _HitlMapper:
         draw_as.line([(0, half_p), (self.preview_size, half_p)], fill="#444856", width=1)
 
         coll_str = [f"0x{q['coll']:02X}" for q in quads]
-        self.lbl_assembled_coll_summary.config(text=f"Collision: [{', '.join(coll_str)}]")
+        locks = self.quad_coll_lock[g1]
+        lock_marks = "".join("L" if q in locks else "-" for q in range(4))
+        self.lbl_assembled_coll_summary.config(
+            text=f"Collision: [{', '.join(coll_str)}]  locks[{lock_marks}]"
+        )
 
         if quads[0]["g2_id"] == quads[1]["g2_id"] == quads[2]["g2_id"] == quads[3]["g2_id"] and \
            quads[0]["src_q"] == 0 and quads[1]["src_q"] == 1 and quads[2]["src_q"] == 2 and quads[3]["src_q"] == 3:
@@ -1284,7 +2067,7 @@ class _HitlMapper:
             s_obj = self.shortlist_slots[s]
             if s < len(sl):
                 cand = sl[s]
-                s_img = Image.fromarray(cand["img_np"]).resize((40, 40), Image.NEAREST)
+                s_img = Image.fromarray(self._cand_preview_np(cand)).resize((40, 40), Image.NEAREST)
                 tk_s = ImageTk.PhotoImage(s_img)
                 self.tk_cache[f"sl_{s}"] = tk_s
                 s_obj["canvas"].delete("all")
@@ -1309,14 +2092,17 @@ class _HitlMapper:
             t_obj = self.thumb_buttons[slot]
             if cand_pos < total_cands:
                 cand = cands[cand_pos]
-                t_img = Image.fromarray(cand["img_np"]).resize((self.thumb_size, self.thumb_size), Image.NEAREST)
+                t_img = Image.fromarray(self._cand_preview_np(cand)).resize((self.thumb_size, self.thumb_size), Image.NEAREST)
                 tk_t = ImageTk.PhotoImage(t_img)
                 self.tk_cache[f"thumb_{slot}"] = tk_t
                 t_obj["canvas"].delete("all")
                 t_obj["canvas"].create_image(self.thumb_size // 2, self.thumb_size // 2, image=tk_t)
 
-                t_obj["label"].config(text=f"#{cand_pos + 1}: #{cand['g2_id']}({QUAD_SHORT[cand['src_q']]})")
-                if cand_pos == self.current_quad_cand_idx:
+                t_obj["label"].config(
+                    text=f"#{cand_pos + 1}: #{cand['g2_id']}({QUAD_SHORT[cand['src_q']]}) {self._cand_tile_summary(cand)}"
+                    + (" 💧" if cand.get("has_water_tiles") else "")
+                )
+                if highlight_idx is not None and cand_pos == highlight_idx:
                     t_obj["frame"].config(bg="#FFB74D", bd=2)
                 else:
                     t_obj["frame"].config(bg="#222530", bd=1)
@@ -1329,7 +2115,10 @@ class _HitlMapper:
 
     def get_window_start(self, total_cands):
         half = self.thumb_window_size // 2
-        start = max(0, self.current_quad_cand_idx - half)
+        anchor = self.current_quad_cand_idx
+        if anchor < 0:
+            anchor = 0
+        start = max(0, anchor - half)
         if start + self.thumb_window_size > total_cands:
             start = max(0, total_cands - self.thumb_window_size)
         return start
@@ -1339,42 +2128,32 @@ class _HitlMapper:
         win_start = self.get_window_start(len(cands))
         target_idx = win_start + slot
         if target_idx < len(cands):
-            self.current_quad_cand_idx = target_idx
-            self.assembled_quads[self.current_g1_idx][self.active_quad_pos] = dict(cands[target_idx])
-            self.quad_user_modified[self.current_g1_idx].add(self.active_quad_pos)
-            self.update_view()
+            self.browse_candidate_to(target_idx)
 
     def next_candidate(self):
         cands = self.get_ranked_candidates(self.current_g1_idx, self.active_quad_pos)
         if cands:
-            self.current_quad_cand_idx = (self.current_quad_cand_idx + 1) % len(cands)
-            self.assembled_quads[self.current_g1_idx][self.active_quad_pos] = dict(cands[self.current_quad_cand_idx])
-            self.quad_user_modified[self.current_g1_idx].add(self.active_quad_pos)
-            self.update_view()
+            self.browse_candidate_to((self.current_quad_cand_idx + 1) % len(cands))
 
     def prev_candidate(self):
         cands = self.get_ranked_candidates(self.current_g1_idx, self.active_quad_pos)
         if cands:
-            self.current_quad_cand_idx = (self.current_quad_cand_idx - 1 + len(cands)) % len(cands)
-            self.assembled_quads[self.current_g1_idx][self.active_quad_pos] = dict(cands[self.current_quad_cand_idx])
-            self.quad_user_modified[self.current_g1_idx].add(self.active_quad_pos)
-            self.update_view()
+            self.browse_candidate_to((self.current_quad_cand_idx - 1 + len(cands)) % len(cands))
 
     def jump_next_8(self):
         cands = self.get_ranked_candidates(self.current_g1_idx, self.active_quad_pos)
         if cands:
-            self.current_quad_cand_idx = min(len(cands) - 1, self.current_quad_cand_idx + 8)
-            self.assembled_quads[self.current_g1_idx][self.active_quad_pos] = dict(cands[self.current_quad_cand_idx])
-            self.quad_user_modified[self.current_g1_idx].add(self.active_quad_pos)
-            self.update_view()
+            self.browse_candidate_to(min(len(cands) - 1, self.current_quad_cand_idx + 8))
 
     def jump_prev_8(self):
         cands = self.get_ranked_candidates(self.current_g1_idx, self.active_quad_pos)
         if cands:
-            self.current_quad_cand_idx = max(0, self.current_quad_cand_idx - 8)
-            self.assembled_quads[self.current_g1_idx][self.active_quad_pos] = dict(cands[self.current_quad_cand_idx])
-            self.quad_user_modified[self.current_g1_idx].add(self.active_quad_pos)
-            self.update_view()
+            self.browse_candidate_to(max(0, self.current_quad_cand_idx - 8))
+
+    def jump_first_candidate(self):
+        cands = self.get_ranked_candidates(self.current_g1_idx, self.active_quad_pos)
+        if cands:
+            self.browse_candidate_to(0)
 
     def prev_g1_block(self):
         if self.current_g1_idx > 0:
@@ -1401,12 +2180,42 @@ class _HitlMapper:
         if not file_path:
             return
 
+        # Rebuild mapping/customs from live assembled quads so collision locks win.
+        # Prior mapping entries are discarded — assembled_quads + locks are source of truth.
+        self.custom_blocks = {}
+        self.mapping = {}
+        self.next_custom_id = max(161, self.total_g2)
         for i in range(self.total_g1):
-            if i not in self.mapping:
-                self.finalize_block_mapping(i)
+            self.finalize_block_mapping(i)
+
+        if self.water_tile_ids:
+            leaks = []
+            for cid, info in self.custom_blocks.items():
+                tiles = info.get("tiles") or []
+                if not any(t in self.water_tile_ids for t in tiles):
+                    continue
+                coll = [int(c) & 0xFF for c in (info.get("collision") or [])]
+                if coll and all(c in self.water_collisions for c in coll):
+                    continue
+                leaks.append(int(info.get("source_g1", cid)))
+            if leaks:
+                preview = ", ".join(f"#{x}" for x in sorted(set(leaks))[:12])
+                extra = f" (+{len(set(leaks)) - 12} more)" if len(set(leaks)) > 12 else ""
+                if not messagebox.askyesno(
+                    "Water tile index in wall/floor blocks",
+                    "The map preview now shows export-accurate art. These Gen1 blocks "
+                    "still include TILESET_CAVE tile #20 (the water index). Under CAVE/NITE "
+                    "baking it can look like dark rock, but the game always animates #20 "
+                    "as surf:\n"
+                    f"{preview}{extra}\n\n"
+                    "Re-pick those blocks (avoid 💧 candidates) or export anyway?",
+                    parent=self.root,
+                ):
+                    return
 
         lines = [
             f"# Generated Block Translation Dictionary ({len(self.mapping)} / {self.total_g1} blocks mapped)",
+            f"# Collision bytes are taken from the mapper (locks / combobox / favorites); not re-inferred.",
             f"{self.dict_name} = {{"
         ]
 
@@ -1430,6 +2239,8 @@ class _HitlMapper:
 
         with open(file_path, "w") as f:
             f.write("\n".join(lines))
+            f.flush()
+            os.fsync(f.fileno())
 
         self.auto_save_session()
 
@@ -1440,22 +2251,45 @@ class _HitlMapper:
         }
         with open(json_path, "w") as f:
             json.dump(export_data, f, indent=2, sort_keys=True)
+            f.flush()
+            os.fsync(f.fileno())
 
         if self.session_obj:
             self.session_obj.mapping = self.mapping
             self.session_obj.custom_blocks = self.custom_blocks
             self.session_obj.clear_dirty()
-        if getattr(self, "run_restore_after_export", None) and self.run_restore_after_export.get():
-            self._run_restore_script()
-        messagebox.showinfo("Export Successful", f"Saved {len(self.mapping)} mappings & {len(self.custom_blocks)} custom blocks to:\n{file_path}\n({json_path})")
 
-    def _run_restore_script(self):
+        export_summary = (
+            f"Saved {len(self.mapping)} mappings & {len(self.custom_blocks)} custom blocks to:\n"
+            f"{file_path}\n({json_path})"
+        )
+        run_restore = (
+            getattr(self, "run_restore_after_export", None)
+            and self.run_restore_after_export.get()
+        )
+        if run_restore:
+            try:
+                self._run_restore_script(show_dialog=False)
+                messagebox.showinfo(
+                    "Export & Restore",
+                    export_summary + f"\n\n{os.path.basename(self.profile.get('restore_script') or 'restore_kanto_dungeons.py')} completed.",
+                )
+            except Exception as exc:  # noqa: BLE001
+                messagebox.showerror(
+                    "Restore failed",
+                    export_summary + f"\n\nExport was saved, but restore failed:\n{exc}",
+                )
+        else:
+            messagebox.showinfo("Export Successful", export_summary)
+
+    def _run_restore_script(self, *, show_dialog=True):
         import subprocess
-        restore = os.path.join(_TOOLS_DIR, "restore_kanto_dungeons.py")
+
+        restore_name = self.profile.get("restore_script") or "restore_kanto_dungeons.py"
+        restore = os.path.join(_TOOLS_DIR, restore_name)
         recomp = os.path.dirname(os.path.dirname(_TOOLS_DIR))
-        try:
-            subprocess.run(["python3", restore], cwd=recomp, check=True)
-            messagebox.showinfo("Restore", "restore_kanto_dungeons.py completed.")
-        except Exception as exc:  # noqa: BLE001
-            messagebox.showerror("Restore failed", str(exc))
+        subprocess.run(["python3", restore], cwd=recomp, check=True)
+        label = os.path.basename(restore_name)
+        if show_dialog:
+            messagebox.showinfo("Restore", f"{label} completed.")
 

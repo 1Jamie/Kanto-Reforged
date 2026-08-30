@@ -87,6 +87,15 @@ local brockIndex = classes.BROCK.index
 T.check(type(brockIndex) == "number", "Brock has numeric class index")
 local recNum = G2Trainers.lookup(goldTrainers, brockIndex, 1)
 T.eq(recNum.roster[1].species, "SUDOWOODO", "numeric class lookup hits curated roster")
+T.check((recNum.baseMoney or 0) > 0, "lookup overlay keeps class baseMoney")
+
+local World = require("src.world.gen2.World")
+local world = setmetatable({
+  game = { data = Data, save = { player = { money = 0, name = "TEST" } } },
+}, { __index = World })
+local partyRec = world:trainerParty(brockIndex, 1)
+T.check(partyRec and partyRec.baseMoney and partyRec.baseMoney > 0,
+  "trainerParty path pays Kanto gym leaders (loadtrainer/startbattle)")
 
 -- Johto rival parties must stay vanilla Indigo stock (Mt Moon Silver is member 201+).
 local rival = classes.RIVAL2.trainers[1].party
@@ -97,4 +106,29 @@ T.check(classes.RIVAL2.trainers[201] == nil or classes.RIVAL2.trainers[201].name
 
 Host.clearForce()
 GameVersion.set("red")
+
+-- E4 rematch: post-Champion only; Johto-first league stays vanilla stock.
+_G.game = {
+  data = Data,
+  save = { flags = { EVENT_BEAT_CHAMPION_LANCE = true }, player = { money = 0, name = "TEST" } },
+}
+local brunoRematch = G2Trainers.lookup(goldTrainers, "BRUNO", 1)
+T.eq(brunoRematch.roster[1].species, "STEELIX", "E4 rematch Bruno opens on Steelix")
+T.eq(brunoRematch.roster[1].level, 80, "E4 rematch Bruno postgame level")
+T.eq(brunoRematch.roster[#brunoRematch.roster].item, "CHESTO_BERRY", "E4 rematch Bruno ace berry")
+
+local karenRematch = G2Trainers.lookup(goldTrainers, "KAREN", 1)
+T.eq(karenRematch.name, "LANCE", "Karen slot shows Lance on rematch")
+T.eq(karenRematch.roster[#karenRematch.roster].species, "DRAGONITE", "Karen slot runs Lance dragon ace")
+
+local champRematch = G2Trainers.lookup(goldTrainers, "CHAMPION", 1)
+T.eq(champRematch.name, "BLUE", "Champion slot is Blue on rematch")
+T.eq(champRematch.roster[#champRematch.roster].species, "ARCANINE", "Champion Blue ace Arcanine")
+
+local willFirst = classes.WILL.trainers[1].party
+T.eq(willFirst[1].level, 40, "Johto-first Will stays vanilla in trainer table")
+_G.game.save.flags.EVENT_BEAT_CHAMPION_LANCE = nil
+local willNoRematch = G2Trainers.lookup(goldTrainers, classes.WILL.index, 1)
+T.eq(willNoRematch.roster[1].level, 40, "Without champion flag Will lookup stays stock")
+
 T.finish("trainers_gen2_overworld")

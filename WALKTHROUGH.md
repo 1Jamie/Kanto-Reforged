@@ -280,8 +280,18 @@ Kanto in Gold is famously known for having flat level 30-40 wild mons and pushov
 | Kanto Arrival / First Gyms | 58 | Routes 5–11, Lt. Surge, Janine, Erika |
 | 3 Kanto Badges | 64 | Routes 12–19, Misty, Sabrina, Brock, Blaine |
 | 7 Kanto Badges | 72 | Viridian Gym, Blue |
-| 8 Kanto Badges / Beat Mt. Moon Rival | 85 | Nugget Bridge circuit, Fighting Dojo, Mt. Moon Rival |
+| 8 Kanto Badges / Beat Mt. Moon Rival | 85 | Safari clear → Silver → prep for Red |
 | Post-Red (Mt. Silver) | 100 | True Endgame |
+
+#### 1b. Rocket campaign spine
+
+TEAM ROCKET fled Johto and dug into soft Kanto. **Blue** (Route 22 + Pokégear calls) drafts you to smash their operation:
+
+1. **Mt. Moon** — toll racket / training camp. Clear the checkpoint.
+2. **Rock Tunnel** — supply line to Fuchsia; Blue waits near the south exit.
+3. **Safari Zone** — Fuchsia door stays sealed until both caves are clear; Rockets turned the preserve into a rare-mon industry (Secret House boss).
+4. **Silver (Mt. Moon B2F)** — personal rival fight after Safari + 8 badges (Lv 75–78, Tyranitar ace).
+5. **Red** — Mt. Silver summit.
 
 #### 2. Kanto Berry Farm Access
 
@@ -321,7 +331,8 @@ Every Gym Leader brings a fully re-leveled team with Gen 2/3 additions and compe
 
 - **Saffron Fighting Dojo (Levels 60–64):** Re-opened with intense Black Belt battles featuring Hariyama, Breloom, Medicham, Primeape, Hitmonlee, and Hitmonchan.
 - **Nugget Bridge Circuit (Route 24/25, Levels 56–60):** Rematch the gauntlet across Route 24 and 25 against Volbeat, Illumise, Zangoose, Seviper, Corphish, and Golduck.
-- **Mt. Moon Rival Rematch (Levels 75–78):** Face your rival at Mt. Moon featuring Sneasel (75), Magneton (76), Gengar (76), Alakazam (77), Golbat (77), and Tyranitar (78, holds **Lum Berry**).
+- **Mt. Moon Rival Rematch (Levels 75–78):** After clearing the Safari Rocket occupation and earning 8 Kanto badges, find Silver tucked on **Mt. Moon B2F** — Sneasel, Magneton, Gengar, Alakazam, Crobat, and Tyranitar (78, **Lum Berry**).
+- **Safari Rocket dungeon:** Unlocks in Fuchsia only after Mt. Moon + Rock Tunnel Rocket chapters.
 
 #### 6. Relocated Utility NPCs in Gold Kanto
 

@@ -52,6 +52,17 @@ __pycache__/
 *.ups
 *.xdelta
 
+# Composed at restore time from overrides/tileset_quads/ + stock Gold sheets
+overrides/tilesets/cave.png
+overrides/tilesets/kanto.png
+
+# Quad patch scratch dumps (only ship final PNG sources under tileset_quads/)
+overrides/tileset_quads/_debug/
+overrides/tileset_quads/_debug2/
+
+# HITL mapper session state (profiles + .json mappings are source of truth)
+tools/block_mapper/*.session.json
+
 # OS / editor noise
 .DS_Store
 Thumbs.db

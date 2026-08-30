@@ -14,6 +14,7 @@ PROFILE = base_profile(
     g2_max_blocks=161,
     g2_tileset_id="TILESET_KANTO",
     g2_palette_env="ROUTE",
+    g2_tile_palette_overrides={77: 1, 78: 1, 83: 1, 84: 1, 96: 1, 97: 1, 98: 1, 99: 1},
     dict_name="FOREST_G1_TO_G2",
     custom_blocks_name="CUSTOM_KANTO_BLOCKS_GENERATED",
     out="forest_g1_to_g2.py",
