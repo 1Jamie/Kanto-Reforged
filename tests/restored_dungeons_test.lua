@@ -553,6 +553,24 @@ local function runTests()
     print("  Gen 1 mode safety isolation verified.")
   end
 
+  -- 13. Pre-KR save map IDs migrate to restored *_KR layouts
+  local Migration = require("mods.Kanto-Reforged.core.restored_dungeon_save_migration")
+  assert(Migration.remapMapId("VIRIDIAN_FOREST") == "VIRIDIAN_FOREST_KR")
+  assert(Migration.remapMapId("CERULEAN_CAVE") == "CERULEAN_CAVE_1F_KR")
+  assert(Migration.remapMapId("MOUNT_MOON") == "MT_MOON_1F_KR")
+  assert(Migration.remapMapId("VIRIDIAN_FOREST_KR") == "VIRIDIAN_FOREST_KR")
+  local legacySave = {
+    position = { map = "VIRIDIAN_FOREST", x = 4, y = 8 },
+    backupWarp = { map = "CERULEAN_CAVE_1F", warp = 2 },
+    mapScenes = { CERULEAN_CAVE_B1F = { done = true } },
+  }
+  assert(Migration.migrate(legacySave))
+  assert(legacySave.position.map == "VIRIDIAN_FOREST_KR")
+  assert(legacySave.backupWarp.map == "CERULEAN_CAVE_1F_KR")
+  assert(legacySave.mapScenes.CERULEAN_CAVE_B1F == nil)
+  assert(legacySave.mapScenes.CERULEAN_CAVE_B1F_KR ~= nil)
+  print("  Pre-KR save map migration verified.")
+
   print("All restored_dungeons_test.lua assertions passed cleanly!")
   return true
 end

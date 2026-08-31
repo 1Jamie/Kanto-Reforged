@@ -219,6 +219,10 @@ return function(mod)
   SpeciesScope._refreshContent = refreshScopeContent
   SpeciesScope.install(mod)
 
+  local RestoredDungeonSaveMigration =
+    require("mods.Kanto-Reforged.core.restored_dungeon_save_migration")
+  RestoredDungeonSaveMigration.install(mod)
+
   local BattleCompat = require("mods.Kanto-Reforged.battle.battle_compat")
   BattleCompat.install(mod)
 
