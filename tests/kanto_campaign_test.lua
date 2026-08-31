@@ -148,6 +148,23 @@ local function runTests()
     end
   end
   assert(hasSz, "Safari Center must overlay Rockets")
+  local expectedRockets = {
+    SAFARIZONE_ROCKET1 = { map = "SAFARI_ZONE_CENTER_KR", x = 12, y = 24, range = "RIGHT" },
+    SAFARIZONE_ROCKET2 = { map = "SAFARI_ZONE_CENTER_KR", x = 14, y = 1, range = "UP" },
+    SAFARIZONE_ROCKET3 = { map = "SAFARI_ZONE_EAST_KR", x = 0, y = 21, range = "DOWN" },
+    SAFARIZONE_ROCKET4 = { map = "SAFARI_ZONE_WEST_KR", x = 28, y = 22, range = "RIGHT" },
+    SAFARIZONE_ROCKET5 = { map = "SAFARI_ZONE_NORTH_KR", x = 18, y = 35, range = "RIGHT" },
+  }
+  for name, exp in pairs(expectedRockets) do
+    local mdef = Data.maps[exp.map]
+    local found
+    for _, o in ipairs(mdef and mdef.objects or {}) do
+      if o.name == name then found = o break end
+    end
+    assert(found, name .. " must be overlaid on " .. exp.map)
+    assert(found.x == exp.x and found.y == exp.y and found.range == exp.range,
+      string.format("%s must guard zone entrance at (%d,%d) %s", name, exp.x, exp.y, exp.range))
+  end
 
   local secret = Data.maps.SAFARI_ZONE_SECRET_HOUSE_KR
   local boss
@@ -205,8 +222,6 @@ local function runTests()
   end
 
   local saveClosed = { events = {} }
-  function saveClosed.events:get(id) return self[id] end
-  function saveClosed.events:set(id, v) self[id] = v and true or nil end
 
   Campaign.syncFuchsiaSafariDoor(fuchsia, saveClosed)
   local width = fuchsia.width or 20
@@ -232,6 +247,12 @@ local function runTests()
     end
   end
   assert(warpHits >= 2, "Unlocked Fuchsia must warp to SAFARI_ZONE_GATE_KR")
+
+  local preSafari = dofile("mods/Kanto-Reforged/test_saves/gold/03_pre_safari.lua")
+  assert(Campaign.isSafariUnlocked(preSafari),
+    "03_pre_safari save must carry Moon+Tunnel unlock flags")
+  Campaign.syncFuchsiaSafariDoor(fuchsia, preSafari)
+  assert(fuchsia.blocks[idx] == 58, "pre-Safari test save must open Fuchsia door")
   print("  Safari door opens after Moon+Tunnel clears.")
 
   -- Rosters registered + installed under correct battle classes

@@ -29,27 +29,47 @@ local KANTO_BADGE_FLAGS = {
   "ENGINE_EARTHBADGE",
 }
 
+local FLAGS_PER_BYTE = 8
+
 local function eventsOf(save)
   return save and save.events
 end
 
-function Campaign.hasEvent(save, id)
-  local ev = eventsOf(save)
+local function eventBitGet(ev, id)
   if not ev or not id then return false end
   if type(ev.get) == "function" then
     return ev:get(id) and true or false
   end
-  return ev[id] and true or false
+  local byte = math.floor(id / FLAGS_PER_BYTE)
+  local bitn = id % FLAGS_PER_BYTE
+  local row = ev[byte] or 0
+  return math.floor(row / (2 ^ bitn)) % 2 == 1
 end
 
-function Campaign.setEvent(save, id, value)
-  local ev = eventsOf(save)
+local function eventBitSet(ev, id, value)
   if not ev or not id then return end
   if type(ev.set) == "function" then
     ev:set(id, value ~= false)
-  else
-    ev[id] = value ~= false or nil
+    return
   end
+  local byte = math.floor(id / FLAGS_PER_BYTE)
+  local bitn = id % FLAGS_PER_BYTE
+  local mask = 2 ^ bitn
+  local row = ev[byte] or 0
+  local has = math.floor(row / mask) % 2 == 1
+  if value ~= false then
+    if not has then ev[byte] = row + mask end
+  elseif has then
+    ev[byte] = row - mask
+  end
+end
+
+function Campaign.hasEvent(save, id)
+  return eventBitGet(eventsOf(save), id)
+end
+
+function Campaign.setEvent(save, id, value)
+  eventBitSet(eventsOf(save), id, value)
 end
 
 local function engineFlag(save, name)

@@ -23,6 +23,8 @@ local EXTRA_ALIASES = {
   SEAFOAM_ISLANDS = "SEAFOAM_ISLANDS_1F_KR",
 }
 
+Migration.EXTRA_ALIASES = EXTRA_ALIASES
+
 local function ensureLookup()
   if LEGACY_TO_KR then return LEGACY_TO_KR end
   local ok, Data = pcall(require, "mods.Kanto-Reforged.world.restored_dungeons_data")

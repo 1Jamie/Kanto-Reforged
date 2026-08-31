@@ -56,7 +56,7 @@ local DUNGEON_TEXT = {
   TEXT_VIRIDIANFOREST_TRAINER_TIPS2 = "TRAINER TIPS\nContact PROF.OAK via PC to get\nyour POKéDEX evaluated!",
   TEXT_VIRIDIANFOREST_TRAINER_TIPS3 = "TRAINER TIPS\nNo stealing POKéMON from other\ntrainers! Catch only wild ones!",
   TEXT_VIRIDIANFOREST_TRAINER_TIPS4 = "TRAINER TIPS\nWeaken POKéMON before catching!\nWhen healthy, they may escape!",
-  TEXT_VIRIDIANFOREST_USE_ANTIDOTE_SIGN = "For poison, use ANTIDOTE!\nGet it at POKéMON MARTs!",
+  TEXT_VIRIDIANFOREST_USE_ANTIDOTE_SIGN = "For status problems, use\nFULL HEAL! Get it at MARTs!",
   TEXT_VIRIDIANFOREST_LEAVING_SIGN = "LEAVING VIRIDIAN FOREST\nPEWTER CITY AHEAD",
 
   -- Route 2 & Gatehouses
@@ -622,12 +622,13 @@ local DUNGEON_ROSTERS = {
     }
   },
 
-  -- VIRIDIAN FOREST
+  -- VIRIDIAN FOREST (trainer events must match restore_kanto_dungeons.py:
+  -- 2000 + map_idx*50 + object index; items are indices 5–7 → 2055–2057)
   VIRIDIANFOREST_YOUNGSTER1 = {
     classId = "OPP_BUG_CATCHER",
     classNum = 2,
     member = 1,
-    event = 2052,
+    event = 2051,
     className = "BUG CATCHER",
     name = "DOUG",
     baseMoney = 16,
@@ -669,7 +670,7 @@ local DUNGEON_ROSTERS = {
     classId = "OPP_BUG_CATCHER",
     classNum = 2,
     member = 4,
-    event = 2055,
+    event = 2052,
     className = "BUG CATCHER",
     name = "DOUG",
     baseMoney = 16,
@@ -1115,8 +1116,20 @@ end
 
 -- Digletts/Safari pattern: rewrite overworld entrance destMaps to restored *_KR
 -- maps in place (never replace the whole warps table), then rebuild _warpAt.
-local function aliasRestoredMoonMaps(maps, Data)
+local SaveMigration =
+  require("mods.Kanto-Reforged.core.restored_dungeon_save_migration")
+
+local function aliasRestoredDungeonMaps(maps, Data)
   if not (maps and Data and Data.maps) then return end
+  for mapId, mdef in pairs(Data.maps) do
+    if type(mapId) == "string" and mapId:find("_KR$") and type(mdef) == "table" then
+      maps[mapId:sub(1, -4)] = mdef
+    end
+  end
+  for legacy, krId in pairs(SaveMigration.EXTRA_ALIASES) do
+    local kr = Data.maps[krId]
+    if kr then maps[legacy] = kr end
+  end
   local m1 = Data.maps.MT_MOON_1F_KR or Data.maps.MT_MOON_1F
   local mb1 = Data.maps.MT_MOON_B1F_KR or Data.maps.MT_MOON_B1F
   local mb2 = Data.maps.MT_MOON_B2F_KR or Data.maps.MT_MOON_B2F
@@ -1167,6 +1180,22 @@ local function patchMtMoonEntranceWarps(warps, fromMapId)
   end
 end
 
+local function patchRestoredDungeonWarps(warps, fromMapId)
+  if type(warps) ~= "table" then return end
+  for _, w in ipairs(warps) do
+    if not (w and type(w.destMap) == "string") then
+      -- skip
+    elseif fromMapId == "ROUTE_3" or fromMapId == "ROUTE_4" then
+      redirectMtMoonEntranceWarp(w, fromMapId)
+    else
+      local remapped = SaveMigration.remapMapId(w.destMap)
+      if remapped ~= w.destMap then
+        w.destMap = remapped
+      end
+    end
+  end
+end
+
 local function rebuildWarpAt(map)
   if not map or type(map.warps) ~= "table" then return end
   map._warpAt = {}
@@ -1195,6 +1224,68 @@ end
 
 RestoredDungeons.bindGen1TilesetOverrideImages = bindGen1TilesetOverrideImages
 
+-- Gen 1 floor pickups → postgame equivalents on maps that still carry
+-- early-route loot. Mt Moon / Cerulean / Safari items are authored in
+-- restored_dungeons_data.lua (Rare Candy, Moon Stone, Full Restore, etc.).
+local POSTGAME_ITEM_SWAPS = {
+  ANTIDOTE = "FULL_HEAL",
+  POTION = "MAX_POTION",
+  SUPER_POTION = "HYPER_POTION",
+  POKE_BALL = "ULTRA_BALL",
+  GREAT_BALL = "ULTRA_BALL",
+}
+
+local POSTGAME_ITEM_SWAP_MAPS = {
+  VIRIDIAN_FOREST_KR = true,
+}
+
+-- Gen2 map headers carry a landmark byte (see RomExtractorGen2:readMapHeader).
+-- World:region() treats index >= 46 as Kanto; restored *_KR maps ship without
+-- that field, so FLY and other region checks default to Johto.
+local RESTORED_DUNGEON_LANDMARK_RULES = {
+  { prefix = "VIRIDIAN_FOREST", landmark = 49 }, -- LANDMARK_ROUTE_2
+  { prefix = "ROUTE_2", landmark = 49 },
+  { prefix = "MT_MOON", landmark = 52 }, -- LANDMARK_MT_MOON
+  { prefix = "MOUNT_MOON", landmark = 52 },
+  { prefix = "CERULEAN_CAVE", landmark = 54 }, -- LANDMARK_CERULEAN_CITY
+  { prefix = "ROCK_TUNNEL", landmark = 65 }, -- LANDMARK_ROCK_TUNNEL
+  { prefix = "DIGLETTS_CAVE", landmark = 61 }, -- LANDMARK_DIGLETTS_CAVE
+  { prefix = "SAFARI_ZONE", landmark = 80 }, -- LANDMARK_FUCHSIA_CITY
+  { prefix = "SEAFOAM", landmark = 83 }, -- LANDMARK_SEAFOAM_ISLANDS
+}
+
+local function restoredDungeonLandmark(mapId)
+  if type(mapId) ~= "string" then return nil end
+  local base = mapId:gsub("_KR$", "")
+  for _, rule in ipairs(RESTORED_DUNGEON_LANDMARK_RULES) do
+    if base:sub(1, #rule.prefix) == rule.prefix then
+      return rule.landmark
+    end
+  end
+  return nil
+end
+
+local function applyRestoredDungeonLandmarks(Data)
+  if not (Data and Data.maps) then return end
+  for mapId, mdef in pairs(Data.maps) do
+    if type(mdef) == "table" and mapId:find("_KR$") then
+      local landmark = restoredDungeonLandmark(mapId)
+      if landmark then
+        mdef.landmark = landmark
+      end
+    end
+  end
+end
+
+RestoredDungeons.restoredDungeonLandmark = restoredDungeonLandmark
+
+local function postgameItemId(mapId, item)
+  if type(item) ~= "string" or not POSTGAME_ITEM_SWAP_MAPS[mapId] then
+    return item
+  end
+  return POSTGAME_ITEM_SWAPS[item] or item
+end
+
 local function normalizeDungeonData(Data)
   if not Data or not Data.maps then return end
   -- Do not short-circuit with a normalized guard: the eventFlag sync below
@@ -1206,6 +1297,7 @@ local function normalizeDungeonData(Data)
   end
 
   bindGen1TilesetOverrideImages(Data)
+  applyRestoredDungeonLandmarks(Data)
 
   if Data.maps.SEAFOAM_GYM then
     local gym = Data.maps.SEAFOAM_GYM
@@ -1246,7 +1338,8 @@ local function normalizeDungeonData(Data)
         local authenticText = DUNGEON_TEXT[textKey] or obj.text or "Hello!"
 
         if obj.itemball then
-          local rawItem = obj.itemball.item or obj.item or "POKE_BALL"
+          local rawItem = postgameItemId(mapId, obj.itemball.item or obj.item or "POKE_BALL")
+          obj.item = rawItem
           local num = ITEM_INDEX_MAP[rawItem] or (tonumber(rawItem))
           obj.itemball.item = num or rawItem
           obj.itemball.itemId = tostring(rawItem)
@@ -1848,7 +1941,7 @@ function RestoredDungeons.apply(mod)
           for mid, mdef in pairs(Data.maps) do
             self.maps[mid] = mdef
           end
-          aliasRestoredMoonMaps(self.maps, Data)
+          aliasRestoredDungeonMaps(self.maps, Data)
           self.maps.SEAFOAM_ISLANDS = Data.maps["SEAFOAM_ISLANDS_1F_KR"] or Data.maps["SEAFOAM_ISLANDS_1F"]
           self.maps.CERULEAN_CAVE = Data.maps["CERULEAN_CAVE_1F_KR"] or Data.maps["CERULEAN_CAVE_1F"]
           self.maps.SAFARI_ZONE = Data.maps["SAFARI_ZONE_GATE_KR"] or Data.maps["SAFARI_ZONE_GATE"]
@@ -1916,23 +2009,13 @@ function RestoredDungeons.apply(mod)
 
         if self.map and mapId == "VERMILION_CITY" then
           self.map.warps = self.map.warps or {}
-          for _, w in ipairs(self.map.warps) do
-            if w.destMap == "DIGLETTS_CAVE" or (w.x == 34 and w.y == 7) then
-              w.destMap = "DIGLETTS_CAVE_ROUTE_11_KR"
-              w.destWarp = 1
-            end
-          end
+          patchRestoredDungeonWarps(self.map.warps, mapId)
           rebuildWarpAt(self.map)
         end
 
         if self.map and (mapId == "ROUTE_2" or mapId == "ROUTE_2_KR") then
           self.map.warps = self.map.warps or {}
-          for _, w in ipairs(self.map.warps) do
-            if w.destMap == "DIGLETTS_CAVE" then
-              w.destMap = "DIGLETTS_CAVE_ROUTE_2_KR"
-              w.destWarp = 1
-            end
-          end
+          patchRestoredDungeonWarps(self.map.warps, mapId)
           rebuildWarpAt(self.map)
         end
 
@@ -1997,7 +2080,7 @@ function RestoredDungeons.apply(mod)
           for mid, mdef in pairs(Data.maps) do
             self.maps[mid] = mdef
           end
-          aliasRestoredMoonMaps(self.maps, Data)
+          aliasRestoredDungeonMaps(self.maps, Data)
           self.maps.SEAFOAM_ISLANDS = Data.maps["SEAFOAM_ISLANDS_1F_KR"] or Data.maps["SEAFOAM_ISLANDS_1F"]
           self.maps.CERULEAN_CAVE = Data.maps["CERULEAN_CAVE_1F_KR"] or Data.maps["CERULEAN_CAVE_1F"]
           self.maps.SAFARI_ZONE = Data.maps["SAFARI_ZONE_GATE_KR"] or Data.maps["SAFARI_ZONE_GATE"]
@@ -2159,6 +2242,46 @@ function RestoredDungeons.apply(mod)
       Save.EVENT_BYTES = math.max(Save.EVENT_BYTES or 256, 4096)
     end
 
+    -- Restored *_KR maps carry Kanto landmark bytes, so World:region() is "kanto"
+    -- even before SPAWN_INDIGO is set. Stock flyPoints only switches to the Kanto
+    -- table after Indigo; match map + names to any visited Kanto fly destination.
+    local okFly, FieldMoves = pcall(require, "src.world.gen2.FieldMoves")
+    if okFly and FieldMoves and not FieldMoves._krFlyPointsPatched then
+      FieldMoves._krFlyPointsPatched = true
+      local origFlyPoints = FieldMoves.flyPoints
+      function FieldMoves.flyPoints(save, landmarks, region)
+        if region == "kanto" and save then
+          local useKanto = FieldMoves.hasVisitedSpawn(save, "SPAWN_INDIGO")
+          if not useKanto then
+            for i = FieldMoves.KANTO_FLYPOINT, #FieldMoves.FLYPOINTS do
+              local row = FieldMoves.FLYPOINTS[i]
+              if FieldMoves.hasVisitedSpawn(save, row.spawn) then
+                useKanto = true
+                break
+              end
+            end
+          end
+          if useKanto then
+            local out = {}
+            local table_ = landmarks and landmarks.landmarks
+            for i = FieldMoves.KANTO_FLYPOINT, #FieldMoves.FLYPOINTS do
+              local row = FieldMoves.FLYPOINTS[i]
+              if FieldMoves.hasVisitedSpawn(save, row.spawn) then
+                local entry = table_ and table_[row.landmark]
+                out[#out + 1] = {
+                  landmark = row.landmark,
+                  spawn = row.spawn,
+                  index = entry and entry.index or nil,
+                  name = entry and entry.name or row.landmark,
+                }
+              end
+            end
+            return out
+          end
+        end
+        return origFlyPoints(save, landmarks, region)
+      end
+    end
 
 
     -- Monkey-patch Permissions.doorForcedDirection so interior warp panels (0x7c) never force downward movement
@@ -2425,59 +2548,33 @@ function RestoredDungeons.apply(mod)
     end
 
     if mapsContainer.CERULEAN_CITY and mapsContainer.CERULEAN_CITY.warps then
-      for _, w in ipairs(mapsContainer.CERULEAN_CITY.warps) do
-        if w.destMap == "CERULEAN_CAVE" or w.destMap == "CERULEAN_CAVE_1F" then
-          w.destMap = "CERULEAN_CAVE_1F"
-          w.destWarp = 1
-        end
-      end
+      patchRestoredDungeonWarps(mapsContainer.CERULEAN_CITY.warps, "CERULEAN_CITY")
     end
 
     if mapsContainer.ROUTE_20 and mapsContainer.ROUTE_20.warps then
       for idx, w in ipairs(mapsContainer.ROUTE_20.warps) do
         if w.destMap == "SEAFOAM" or w.destMap == "SEAFOAM_ISLANDS" or w.destMap == "SEAFOAM_ISLANDS_1F" then
-          w.destMap = "SEAFOAM_ISLANDS_1F"
+          w.destMap = SaveMigration.remapMapId("SEAFOAM_ISLANDS_1F")
           w.destWarp = (idx == 1) and 1 or 3
         end
       end
     end
 
     if mapsContainer.VERMILION_CITY and mapsContainer.VERMILION_CITY.warps then
-      for _, w in ipairs(mapsContainer.VERMILION_CITY.warps) do
-        if w.destMap == "DIGLETTS_CAVE" or w.destMap == "DIGLETTS_CAVE_ROUTE_11" or (w.x == 34 and w.y == 7) then
-          w.destMap = "DIGLETTS_CAVE_ROUTE_11_KR"
-          w.destWarp = 1
-        end
-      end
+      patchRestoredDungeonWarps(mapsContainer.VERMILION_CITY.warps, "VERMILION_CITY")
     end
 
     if mapsContainer.ROUTE_2 and mapsContainer.ROUTE_2.warps then
-      for _, w in ipairs(mapsContainer.ROUTE_2.warps) do
-        if w.destMap == "DIGLETTS_CAVE" or w.destMap == "DIGLETTS_CAVE_ROUTE_2" then
-          w.destMap = "DIGLETTS_CAVE_ROUTE_2_KR"
-          w.destWarp = 1
-        end
-      end
+      patchRestoredDungeonWarps(mapsContainer.ROUTE_2.warps, "ROUTE_2")
     end
 
 
     local allContainers = { mapsContainer, coreData and coreData.maps, coreData and coreData.gen2Maps, data and data.maps, data and data.gen2Maps, game and game.data and game.data.maps, game and game.data and game.data.gen2Maps, game and game.world and game.world.maps }
     for _, cont in ipairs(allContainers) do
       if type(cont) == "table" then
-        if cont.VERMILION_CITY and cont.VERMILION_CITY.warps then
-          for _, w in ipairs(cont.VERMILION_CITY.warps) do
-            if w.destMap == "DIGLETTS_CAVE" or (w.x == 34 and w.y == 7) then
-              w.destMap = "DIGLETTS_CAVE_ROUTE_11_KR"
-              w.destWarp = 1
-            end
-          end
-        end
-        if cont.ROUTE_2 and cont.ROUTE_2.warps then
-          for _, w in ipairs(cont.ROUTE_2.warps) do
-            if w.destMap == "DIGLETTS_CAVE" then
-              w.destMap = "DIGLETTS_CAVE_ROUTE_2_KR"
-              w.destWarp = 1
-            end
+        for mapId, mdef in pairs(cont) do
+          if type(mdef) == "table" and type(mdef.warps) == "table" then
+            patchRestoredDungeonWarps(mdef.warps, mapId)
           end
         end
         if cont.FUCHSIA_CITY then
@@ -2566,7 +2663,7 @@ function RestoredDungeons.apply(mod)
 
 
     -- Map aliases so any warp or save state using legacy or Gen2 names maps to restored maps
-    aliasRestoredMoonMaps(mapsContainer, Data)
+    aliasRestoredDungeonMaps(mapsContainer, Data)
 
     mapsContainer.SEAFOAM_ISLANDS = Data.maps["SEAFOAM_ISLANDS_1F_KR"] or Data.maps["SEAFOAM_ISLANDS_1F"]
     mapsContainer.CERULEAN_CAVE = Data.maps["CERULEAN_CAVE_1F_KR"] or Data.maps["CERULEAN_CAVE_1F"]
@@ -2588,11 +2685,7 @@ function RestoredDungeons.apply(mod)
     mapsContainer.ROCK_TUNNEL_POKECENTER = Data.maps["ROCK_TUNNEL_POKECENTER_KR"] or Data.maps["ROCK_TUNNEL_POKECENTER"]
 
     if mapsContainer.ROUTE_10 and mapsContainer.ROUTE_10.warps then
-      for _, w in ipairs(mapsContainer.ROUTE_10.warps) do
-        if w.destMap == "ROCK_TUNNEL" or w.destMap == "ROCK_TUNNEL_1F" then
-          w.destMap = "ROCK_TUNNEL_1F"
-        end
-      end
+      patchRestoredDungeonWarps(mapsContainer.ROUTE_10.warps, "ROUTE_10")
     end
 
     -- Normalize connections on all maps to ensure mapId is populated for Gen 2 seamless transitions
@@ -2615,7 +2708,7 @@ function RestoredDungeons.apply(mod)
         if cont.ROUTE_3 and cont.ROUTE_3.warps then
           patchMtMoonEntranceWarps(cont.ROUTE_3.warps, "ROUTE_3")
         end
-        aliasRestoredMoonMaps(cont, Data)
+        aliasRestoredDungeonMaps(cont, Data)
       end
     end
 
@@ -2632,7 +2725,7 @@ function RestoredDungeons.apply(mod)
       for mapId, mdef in pairs(Data.maps) do
         game.world.maps[mapId] = mdef
       end
-      aliasRestoredMoonMaps(game.world.maps, Data)
+      aliasRestoredDungeonMaps(game.world.maps, Data)
     end
   end
 
@@ -2672,17 +2765,18 @@ function RestoredDungeons.apply(mod)
           return "ROUTE_4", 18, 6
         end
         return "ROUTE_4", 24, 6
-      elseif mapId == "CERULEAN_CAVE" then
-        return "CERULEAN_CAVE_1F", 24, 16
+      elseif mapId == "CERULEAN_CAVE" or mapId == "CERULEAN_CAVE_1F" then
+        return SaveMigration.remapMapId("CERULEAN_CAVE_1F"), 24, 16
       elseif mapId == "SEAFOAM" or mapId == "SEAFOAM_ISLANDS" then
         local w = ctx and ctx.warp
+        local seafoam = SaveMigration.remapMapId("SEAFOAM_ISLANDS_1F")
         if w and (w.destWarp == 3 or w.destWarp == 4 or (w.x and w.x >= 40)) then
-          return "SEAFOAM_ISLANDS_1F", 26, 3
+          return seafoam, 26, 3
         else
-          return "SEAFOAM_ISLANDS_1F", 4, 3
+          return seafoam, 4, 3
         end
       elseif mapId == "SAFARI" or mapId == "SAFARI_ZONE" then
-        return "SAFARI_ZONE_GATE", 3, 4
+        return SaveMigration.remapMapId("SAFARI_ZONE_GATE"), 3, 4
       end
       return next_(mapId, x, y, ctx)
     end)

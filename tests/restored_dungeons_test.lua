@@ -74,6 +74,67 @@ local function runTests()
     "MT_MOON_B1F_KR warp 8 must be the Route 4 exit pad at (27,3)")
   print("  Route 4 -> MT_MOON_B1F_KR exit-pad warps verified.")
 
+  -- 1c. Legacy map IDs alias to restored KR layouts (any entry path)
+  assert(fakeMod.data.gen2Maps.VIRIDIAN_FOREST == Data.maps.VIRIDIAN_FOREST_KR,
+    "VIRIDIAN_FOREST must alias restored layout")
+  assert(fakeMod.data.gen2Maps.CERULEAN_CAVE_1F == Data.maps.CERULEAN_CAVE_1F_KR,
+    "CERULEAN_CAVE_1F must alias restored layout")
+  assert(fakeMod.data.gen2Maps.CERULEAN_CAVE == Data.maps.CERULEAN_CAVE_1F_KR,
+    "CERULEAN_CAVE shorthand must alias restored 1F")
+  local r2 = fakeMod.data.gen2Maps.ROUTE_2
+  assert(r2 and r2.warps, "ROUTE_2 warps must exist after apply")
+  for _, w in ipairs(r2.warps) do
+    if w.destMap and w.destMap:find("VIRIDIAN_FOREST") then
+      assert(w.destMap:find("_KR$"),
+        string.format("Route 2 forest warp must target *_KR, got %s", w.destMap))
+    end
+  end
+  print("  Legacy dungeon map aliases and Route 2 forest warps verified.")
+
+  -- 1d. Restored maps must carry Kanto landmark bytes (World:region / FLY)
+  local function regionForLandmark(landmark)
+    local index = landmark or 0
+    if index == 94 then return "johto" end
+    return index >= 46 and "kanto" or "johto"
+  end
+  local landmarkSamples = {
+    VIRIDIAN_FOREST_KR = 49,
+    MT_MOON_1F_KR = 52,
+    CERULEAN_CAVE_1F_KR = 54,
+    ROCK_TUNNEL_1F_KR = 65,
+    DIGLETTS_CAVE_KR = 61,
+    SAFARI_ZONE_CENTER_KR = 80,
+    SEAFOAM_ISLANDS_1F_KR = 83,
+  }
+  for mapId, expected in pairs(landmarkSamples) do
+    local mdef = Data.maps[mapId]
+    assert(mdef and mdef.landmark == expected,
+      string.format("%s landmark must be %d after apply, got %s",
+        mapId, expected, tostring(mdef and mdef.landmark)))
+    assert(regionForLandmark(mdef.landmark) == "kanto", mapId .. " must register as Kanto")
+  end
+  assert(fakeMod.data.gen2Maps.VIRIDIAN_FOREST.landmark == 49,
+    "aliased VIRIDIAN_FOREST must inherit restored landmark")
+  print("  Restored dungeon Kanto landmarks verified.")
+
+  -- 1e. Kanto region fly list must match Kanto map (not Johto names/cursor)
+  local FieldMoves = require("src.world.gen2.FieldMoves")
+  local landmarks = CachePaths.loadGenerated("landmarks.lua", "gold") or {}
+  local preSafari = dofile("mods/Kanto-Reforged/test_saves/gold/03_pre_safari.lua")
+  local flyPts = FieldMoves.flyPoints(preSafari, landmarks, "kanto")
+  assert(#flyPts >= 1, "Kanto fly must list visited Kanto destinations")
+  for _, row in ipairs(flyPts) do
+    assert(row.index and row.index >= 46,
+      string.format("Kanto fly row %s must use Kanto landmark index, got %s",
+        tostring(row.landmark), tostring(row.index)))
+  end
+  local hasFuchsia = false
+  for _, row in ipairs(flyPts) do
+    if row.landmark == "LANDMARK_FUCHSIA_CITY" then hasFuchsia = true end
+  end
+  assert(hasFuchsia, "pre-Safari save must offer FUCHSIA on Kanto fly map")
+  print("  Kanto fly point list matches Kanto region.")
+
   -- 2. Verify key restored maps exist in generated data
   local expectedMaps = {
     "VIRIDIAN_FOREST_KR",
@@ -570,6 +631,47 @@ local function runTests()
   assert(legacySave.mapScenes.CERULEAN_CAVE_B1F == nil)
   assert(legacySave.mapScenes.CERULEAN_CAVE_B1F_KR ~= nil)
   print("  Pre-KR save map migration verified.")
+
+  -- 14. Itemball event flags must not collide with trainer defeat flags
+  local vf = Data.maps.VIRIDIAN_FOREST_KR
+  assert(vf and vf.objects, "VIRIDIAN_FOREST_KR objects required")
+  local itemEvents, trainerEvents = {}, {}
+  for _, obj in ipairs(vf.objects) do
+    if obj.itemball and obj.eventFlag then
+      itemEvents[obj.eventFlag] = obj.name
+    end
+    if obj.trainer and obj.trainer.event then
+      trainerEvents[obj.trainer.event] = obj.name
+    end
+  end
+  for flag, itemName in pairs(itemEvents) do
+    assert(not trainerEvents[flag],
+      string.format("VIRIDIAN_FOREST item %s shares event %d with trainer %s",
+        itemName, flag, trainerEvents[flag]))
+  end
+  assert(itemEvents[2055] == "VIRIDIANFOREST_ANTIDOTE")
+  assert(trainerEvents[2052] == "VIRIDIANFOREST_YOUNGSTER2")
+  for _, obj in ipairs(vf.objects) do
+    if obj.name == "VIRIDIANFOREST_ANTIDOTE" then
+      assert(obj.itemball and obj.itemball.itemId == "FULL_HEAL",
+        "Viridian Forest antidote ball must upgrade to FULL_HEAL")
+    elseif obj.name == "VIRIDIANFOREST_POTION" then
+      assert(obj.itemball and obj.itemball.itemId == "MAX_POTION",
+        "Viridian Forest potion ball must upgrade to MAX_POTION")
+    elseif obj.name == "VIRIDIANFOREST_POKE_BALL" then
+      assert(obj.itemball and obj.itemball.itemId == "ULTRA_BALL",
+        "Viridian Forest ball must upgrade to ULTRA_BALL")
+    end
+  end
+  local mm1f = Data.maps.MT_MOON_1F_KR
+  assert(mm1f and mm1f.objects, "MT_MOON_1F_KR objects required")
+  for _, obj in ipairs(mm1f.objects) do
+    if obj.name == "MTMOON1F_POTION1" or obj.name == "MTMOON1F_POTION2" then
+      assert(obj.itemball and obj.itemball.itemId == "POTION",
+        "Mt Moon potions must stay as generated data (no duplicate runtime swap)")
+    end
+  end
+  print("  Viridian Forest item/trainer event flags verified.")
 
   print("All restored_dungeons_test.lua assertions passed cleanly!")
   return true

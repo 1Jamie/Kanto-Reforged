@@ -226,7 +226,8 @@ Content.OVERLAYS = {
   SAFARI_ZONE_CENTER_KR = {
     trainerObj({
       name = "SAFARIZONE_ROCKET1",
-      x = 14, y = 20,
+      x = 12, y = 24,
+      range = "RIGHT",
       event = 3020,
       member = 230,
       text = "TEXT_SAFARIZONE_ROCKET1",
@@ -234,7 +235,8 @@ Content.OVERLAYS = {
     }),
     trainerObj({
       name = "SAFARIZONE_ROCKET2",
-      x = 20, y = 12,
+      x = 14, y = 1,
+      range = "UP",
       event = 3021,
       member = 231,
       text = "TEXT_SAFARIZONE_ROCKET2",
@@ -244,7 +246,8 @@ Content.OVERLAYS = {
   SAFARI_ZONE_EAST_KR = {
     trainerObj({
       name = "SAFARIZONE_ROCKET3",
-      x = 10, y = 14,
+      x = 0, y = 21,
+      range = "DOWN",
       event = 3022,
       member = 232,
       text = "TEXT_SAFARIZONE_ROCKET3",
@@ -254,7 +257,8 @@ Content.OVERLAYS = {
   SAFARI_ZONE_WEST_KR = {
     trainerObj({
       name = "SAFARIZONE_ROCKET4",
-      x = 12, y = 16,
+      x = 28, y = 22,
+      range = "RIGHT",
       event = 3023,
       member = 233,
       text = "TEXT_SAFARIZONE_ROCKET4",
@@ -264,7 +268,8 @@ Content.OVERLAYS = {
   SAFARI_ZONE_NORTH_KR = {
     trainerObj({
       name = "SAFARIZONE_ROCKET5",
-      x = 15, y = 18,
+      x = 18, y = 35,
+      range = "RIGHT",
       event = 3024,
       member = 234,
       text = "TEXT_SAFARIZONE_ROCKET5",
