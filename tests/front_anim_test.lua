@@ -105,6 +105,12 @@ T.check(
   "Gen1 plays after grow-in lands"
 )
 
+-- Gen1 anim must not replace battler.sprite (keeps path scale + slot placement).
+enemy.sprite = "STATIC_SPRITE_HANDLE"
+FrontAnim.tickBattler(battle, enemy, mod)
+T.eq(enemy.sprite, "STATIC_SPRITE_HANDLE",
+  "Gen1 tickBattler does not swap battler.sprite")
+
 local AnimView = require("src.ui.gen2.BattleAnimView")
 local view = {
   slideFrame = 0,

@@ -52,7 +52,6 @@ function FrontAnim.syncGen1Hold(battle, battler)
   local was = battler._krFrontAnimHeld
   if was and not holding and battler._krFrontAnim then
     FrontAnim.resetState(battler._krFrontAnim)
-    battler._krFrontAnim.bakedFrame = nil
   end
   battler._krFrontAnimHeld = holding
   return holding
@@ -219,26 +218,47 @@ local function bakeStrip(path, colors)
   return love.graphics.newImage(id)
 end
 
-local frameCache = {}
+function FrontAnim.quadFor(strip, meta, frame, quads, animId)
+  if not strip or not meta or not frame then return nil end
+  local iw, ih = strip:getDimensions()
+  local layout = FrontAnim.stripLayout(meta, iw, ih)
+  local idx = frame
+  quads = quads or {}
+  local qkey = (animId or "anim") .. ":" .. layout .. ":" .. idx
+  local quad = quads[qkey]
+  if not quad and love and love.graphics then
+    local x, y = FrontAnim.frameOffset(meta, idx, iw, ih)
+    local fw, fh = meta.frontW, meta.frontH
+    if fw and fh and x + fw <= iw and y + fh <= ih then
+      quad = love.graphics.newQuad(x, y, fw, fh, iw, ih)
+      quads[qkey] = quad
+    end
+  end
+  return quad, meta.frontW, meta.frontH
+end
 
-function FrontAnim.frameImage(stripImg, meta, frame)
-  if not stripImg or not meta or not frame then return nil end
-  local key = tostring(stripImg) .. "#" .. tostring(frame)
-  if frameCache[key] then return frameCache[key] end
-  if not love or not love.graphics then return stripImg end
-  local fw, fh = meta.frontW, meta.frontH
-  local iw, ih = stripImg:getDimensions()
-  local x, y = FrontAnim.frameOffset(meta, frame, iw, ih)
-  if x + fw > iw or y + fh > ih then return stripImg end
-  local canvas = love.graphics.newCanvas(fw, fh)
-  love.graphics.setCanvas(canvas)
-  love.graphics.clear(0, 0, 0, 0)
-  local quad = love.graphics.newQuad(x, y, fw, fh, iw, ih)
-  love.graphics.draw(stripImg, quad, 0, 0)
-  love.graphics.setCanvas()
-  local img = love.graphics.newImage(canvas:newImageData())
-  frameCache[key] = img
-  return img
+--- Gen1 draw path: strip + quad for the current frame (never replaces battler.sprite).
+function FrontAnim.gen1Frame(battle, battler, mod)
+  mod = mod or FrontAnim._mod
+  if not battler or battler.isPlayer then return nil end
+  if FrontAnim.presentationHoldsEnemyGen1(battle, battler) then return nil end
+  if not FrontAnim.shouldAnimateBattler(battle, battler, mod) then return nil end
+  local cache = battler._krFrontAnim
+  if not cache or not cache.strip or not cache.meta then return nil end
+  cache.quads = cache.quads or {}
+  local quad, fw, fh = FrontAnim.quadFor(
+    cache.strip, cache.meta, cache.frame or 1, cache.quads, cache.animId)
+  if not quad then return nil end
+  return cache.strip, quad, fw, fh
+end
+
+local function drawPic(img, quad, x, y, scale, xscale)
+  xscale = xscale or 1
+  if quad then
+    love.graphics.draw(img, quad, x, y, 0, scale * xscale, scale)
+  else
+    love.graphics.draw(img, x, y, 0, scale * xscale, scale)
+  end
 end
 
 local function battlerSpecies(battler)
@@ -282,7 +302,7 @@ function FrontAnim.ensureCache(battle, battler, mod)
       timer = 0,
       cycles = 0,
       done = false,
-      bakedFrame = nil,
+      quads = {},
     }
     FrontAnim.resetState(cache)
     battler._krFrontAnim = cache
@@ -292,21 +312,10 @@ end
 
 function FrontAnim.tickBattler(battle, battler, mod)
   if FrontAnim.syncGen1Hold(battle, battler) then return end
-  local cache = battler._krFrontAnim
-  if cache and cache.done then return end
   if not FrontAnim.shouldAnimateBattler(battle, battler, mod) then return end
-  cache = FrontAnim.ensureCache(battle, battler, mod)
+  local cache = FrontAnim.ensureCache(battle, battler, mod)
   if not cache or cache.done then return end
-  local frameChanged = FrontAnim.stepState(cache, cache.meta)
-  if frameChanged or not cache.bakedFrame then
-    cache.bakedFrame = FrontAnim.frameImage(cache.strip, cache.meta, cache.frame)
-    if cache.bakedFrame then
-      battler.sprite = cache.bakedFrame
-    end
-  end
-  if cache.done and cache.bakedFrame then
-    battler.sprite = cache.bakedFrame
-  end
+  FrontAnim.stepState(cache, cache.meta)
 end
 
 function FrontAnim.tickBattle(battle, mod)
@@ -363,19 +372,10 @@ function FrontAnim.gen2Frame(view, mon, mod)
   if st.done then return nil end
   local sheet, meta, animId = FrontAnim.gen2Strip(view, mon, mod)
   if not sheet then return nil end
-  local fw, fh = meta.frontW, meta.frontH
-  local iw, ih = sheet:getDimensions()
-  local layout = FrontAnim.stripLayout(meta, iw, ih)
-  local idx = (st.frame or 1) - 1
   view._krFrontAnimQuads = view._krFrontAnimQuads or {}
-  local qkey = animId .. ":" .. layout .. ":" .. idx
-  local quad = view._krFrontAnimQuads[qkey]
-  if not quad then
-    local x, y = FrontAnim.frameOffset(meta, st.frame or 1, iw, ih)
-    quad = love.graphics.newQuad(x, y, fw, fh, iw, ih)
-    view._krFrontAnimQuads[qkey] = quad
-  end
-  return sheet, quad, fw
+  local quad = FrontAnim.quadFor(
+    sheet, meta, st.frame or 1, view._krFrontAnimQuads, animId)
+  return sheet, quad, meta.frontW
 end
 
 function FrontAnim.tickGen2Mon(view, mon, mod)
@@ -404,6 +404,40 @@ local function installGen1(mod)
       FrontAnim.tickBattle(self, mod)
       return origUpdateFx(self)
     end
+
+    -- Gen1: draw anim frames as quads from the strip (same as Gen2).  Never
+    -- replace battler.sprite — that drops imageMeta path scale and can bake
+    -- the whole strip at full width.
+    local origDrawBattlerPic = BattleState.drawBattlerPic
+    BattleState.drawBattlerPic = function(self, battler, x, y, scale, shakeX, shakeY)
+      local sheet, frameQuad = FrontAnim.gen1Frame(self, battler, mod)
+      if sheet and frameQuad and not self:fxFaintActive(battler) then
+        shakeX, shakeY = shakeX or 0, shakeY or 0
+        if battler.substituteHP and not battler.fainted then
+          self:drawSubstituteDoll(battler, shakeX, shakeY)
+          return
+        end
+        if battler.fainted then return end
+
+        local fadePf = self.picFx and self.picFx[battler]
+        if fadePf and fadePf.fade then
+          local cr, cg, cb, ca = love.graphics.getColor()
+          love.graphics.setColor(cr, cg, cb, ca * fadePf.fade)
+          drawPic(sheet, frameQuad, x, y, scale)
+          love.graphics.setColor(cr, cg, cb, ca)
+          return
+        end
+
+        local pf = self.picFx and self.picFx[battler]
+        if not pf or (not pf.kind and not pf.hidden and not pf.minimized
+                      and (pf.ox or 0) == 0 and (pf.oy or 0) == 0) then
+          drawPic(sheet, frameQuad, x, y, scale)
+          return
+        end
+      end
+      return origDrawBattlerPic(self, battler, x, y, scale, shakeX, shakeY)
+    end
+
     BattleState._krFrontAnimInstalled = true
   end)
 end
