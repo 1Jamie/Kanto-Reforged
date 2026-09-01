@@ -35,6 +35,20 @@ local function isWaterType(species)
   return false
 end
 
+-- Host TM/HM items still teach that generation's machine moves. Crystal TM31
+-- is Mud-Slap and TM02 is Headbutt; Red TM01 is Mega Punch. Emerald's machine
+-- list is a different set (Focus Punch, Facade, …). The engine's teach check
+-- is "is this item's move in species.tmhm?", so replacing the ROM list with
+-- Gen3-only names made every host TM refuse. Keep both.
+function ApplyGen3Learnsets.unionHostTmhm(tmhm, existing)
+  local out = copyList(tmhm)
+  for _, mv in ipairs(existing and existing.tmhm or {}) do
+    if mv then appendUnique(out, mv) end
+  end
+  table.sort(out)
+  return out
+end
+
 -- Gen3 removed Whirlpool as an HM (tutor-only / tiny level-up set). On a Gen2
 -- host HM06 is still required for Johto progression, so restore compatibility:
 --   1) Kanto/Johto: keep anyone who already had WHIRLPOOL on the stock Gen2 sheet
@@ -135,6 +149,10 @@ function ApplyGen3Learnsets.apply(mod, Host, gen3Table)
       local dex = existing.dex or 0
       if dex >= 1 and dex <= 386 then
         local filtered = ApplyGen3Learnsets.filterRow(row, knownMove)
+        filtered.tmhm = ApplyGen3Learnsets.unionHostTmhm(filtered.tmhm, existing)
+        -- Gold, Silver, and Crystal share this TM/HM table and this branch.
+        -- Gen3 dropped HM06 Whirlpool; union restores ROM learners, and the
+        -- extra grant covers Hoenn Water-types that never had a Gen2 sheet.
         if Host.isGen2() then
           filtered.tmhm = ApplyGen3Learnsets.ensureGen2Whirlpool(filtered.tmhm, existing)
         end

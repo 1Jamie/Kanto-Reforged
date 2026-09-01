@@ -840,7 +840,8 @@ return function(mod)
       SpeciesScope.applyEvoScope(mod, SpeciesScope.mode(mod))
     end
 
-    -- Gen3 learnsets (#1–386): replace ROM/Gold tables from learnset_gen3.lua.
+    -- Gen3 learnsets (#1–386): Emerald level-up tables, unioned with the
+    -- host's TM/HM list so Crystal/Red machines still teach.
     local ApplyGen3 = require("mods.Kanto-Reforged.pokemon.apply_gen3_learnsets")
     local okGen3, learnset_gen3 = pcall(require, "mods.Kanto-Reforged.pokemon.learnset_gen3")
     if okGen3 and learnset_gen3 then
@@ -974,6 +975,15 @@ return function(mod)
       local DisabledMoves = require("mods.Kanto-Reforged.pokemon.disabled_moves")
       local nStrip = DisabledMoves.stripAllSpecies(mod)
       mod.log:info("Scrubbed disabled moves from %d species learnsets", nStrip)
+    end
+
+    -- Emerald TMs the host does not already teach: register items, then
+    -- append them to existing dept-store / city-mart clerks (no extra NPCs).
+    do
+      local Gen3Tms = require("mods.Kanto-Reforged.items.gen3_tms")
+      Gen3Tms.register(mod)
+      local Gen3TmSources = require("mods.Kanto-Reforged.world.gen3_tm_sources")
+      Gen3TmSources.register(mod)
     end
   else
     mod.log:warn("pokemon_data.lua not found or failed to load: " .. tostring(pokemon_data))

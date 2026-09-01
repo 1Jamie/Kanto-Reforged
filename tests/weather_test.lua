@@ -518,23 +518,28 @@ return function(T, Data, run)
     T.eq(CastformFx.paletteName(nil), "CASTFORM", "clear palette name")
 
     -- Hoenn battleScaleBack 1.5 must not resize the trainer intro pic when
-    -- Castform (or any KR mon) is the lead.
+    -- Treecko, Castform, or any KR mon is the lead.
     do
       local ok, err = xpcall(function()
         Host.force(2)
         local Scale = require("mods.Kanto-Reforged.battle.battle_sprite_scale")
         Scale.install({ loader = { generation = 2 } })
         local BS = require("src.ui.gen2.BattleState")
-        T.check(BS._krTrainerPicScaleVersion == 4,
+        T.check(BS._krTrainerPicScaleVersion == 5,
           "Gen2 trainer intro ignores lead mon battleScale*")
         local view = {
           showPlayerTrainer = true,
           showEnemyTrainer = false,
-          -- Forecast backs are 48×48 → Gold scale 1 (not 32→1.5).
-          pokemon = { CASTFORM = { battleScaleBack = 1, battleScaleFront = 1 } },
+          pokemon = {
+            TREECKO = { battleScaleBack = 1.5, battleScaleFront = 1 },
+            CASTFORM = { battleScaleBack = 1, battleScaleFront = 1 },
+            RATTATA = { battleScaleFront = 1.4 },
+          },
           imageScale = function() return nil end,
         }
         setmetatable(view, { __index = BS })
+        T.eq(view:picScale("assets/chris_back.png", { species = "TREECKO" }, true),
+          1, "Treecko lead (scale 1.5) does not scale the player trainer back")
         T.eq(view:picScale("assets/chris_back.png", { species = "CASTFORM" }, true),
           1, "Castform lead does not scale the player trainer back")
         view.showPlayerTrainer = false
@@ -543,7 +548,7 @@ return function(T, Data, run)
           1, "Castform 48px back uses native Gold battleScaleBack after send-out")
         view.showEnemyTrainer = true
         T.eq(view:picScale("assets/youngster.png", { species = "RATTATA" }, false),
-          1, "enemy trainer front ignores foe mon battleScale*")
+          1, "enemy trainer front ignores foe mon battleScale* (scale 1.4)")
       end, debug.traceback)
       Host.clearForce()
       if not ok then error(err) end

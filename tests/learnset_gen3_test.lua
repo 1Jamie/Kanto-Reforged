@@ -22,6 +22,13 @@ return function(T, Data)
     end
   end
 
+  local function tmhmHas(species, move)
+    for _, mv in ipairs(Data.pokemon[species].tmhm or {}) do
+      if mv == move then return true end
+    end
+    return false
+  end
+
   -- Emerald timing (not ROM L19 Dig / L15 Growl)
   T.eq(learnsetLevel("DIGLETT", "GROWL"), 5, "Diglett Growl L5 (Gen3)")
   T.eq(learnsetLevel("DIGLETT", "MAGNITUDE"), 9, "Diglett Magnitude L9")
@@ -46,6 +53,15 @@ return function(T, Data)
 
   tmhmKnown("DIGLETT")
   tmhmKnown("PIKACHU")
+
+  -- Host TM items teach that generation's moves. Overlaying Emerald's machine
+  -- list must not drop them (Crystal TM31 Mud-Slap / Red TM01 Mega Punch).
+  if Data.moves.MEGA_PUNCH then
+    T.check(tmhmHas("PIKACHU", "MEGA_PUNCH"),
+      "Pikachu keeps Red TM01 Mega Punch after Gen3 tmhm overlay")
+  end
+  T.check(tmhmHas("PIKACHU", "THUNDERBOLT") or tmhmHas("PIKACHU", "THUNDER"),
+    "Pikachu still has Gen3 electric TM compatibility")
 
   -- ApplyGen3 folds evolutionMoves into Gen1 level1Moves when present
   local ApplyGen3 = require("mods.Kanto-Reforged.pokemon.apply_gen3_learnsets")
@@ -107,4 +123,128 @@ return function(T, Data)
     if mv == "WHIRLPOOL" then furWhirl = true end
   end
   T.check(not furWhirl, "non-Water Gen2 Surf users do not gain Whirlpool")
+
+  local unioned = ApplyGen3.unionHostTmhm(
+    { "FACADE", "PROTECT", "TOXIC" },
+    { tmhm = { "HEADBUTT", "MUD_SLAP", "PROTECT", "TOXIC" } }
+  )
+  local hasHead, hasMud, hasFacade, hasProtect = false, false, false, false
+  for _, mv in ipairs(unioned) do
+    if mv == "HEADBUTT" then hasHead = true end
+    if mv == "MUD_SLAP" then hasMud = true end
+    if mv == "FACADE" then hasFacade = true end
+    if mv == "PROTECT" then hasProtect = true end
+  end
+  T.check(hasHead and hasMud, "union keeps Crystal TM02 Headbutt and TM31 Mud-Slap")
+  T.check(hasFacade and hasProtect, "union keeps Gen3 TMs alongside host TMs")
+
+  local function tmSet(list)
+    local got = {}
+    for _, mv in ipairs(list or {}) do got[mv] = true end
+    return got
+  end
+
+  local function runApply(isGen2, existingById, gen3Species)
+    local patched = {}
+    local known = { GROWL = true, TACKLE = true }
+    local function mark(list)
+      for _, mv in ipairs(list or {}) do known[mv] = true end
+    end
+    for _, row in pairs(existingById) do mark(row.tmhm) end
+    for _, row in pairs(gen3Species) do
+      mark(row.level1Moves)
+      mark(row.tmhm)
+      for _, entry in ipairs(row.learnset or {}) do mark({ entry.move }) end
+    end
+    local fakeMod = {
+      content = {
+        moves = {
+          get = function(_, id) return known[id] and { id = id } or nil end,
+        },
+        pokemon = {
+          get = function(_, id) return existingById[id] end,
+          patch = function(_, id, partial) patched[id] = partial end,
+        },
+      },
+    }
+    local n = ApplyGen3.apply(fakeMod, { isGen2 = function() return isGen2 end }, {
+      species = gen3Species,
+    })
+    return n, patched
+  end
+
+  -- Gold/Silver/Crystal: same Host.isGen2() path. Keep Gen2-only machines
+  -- (Headbutt, Mud-Slap, DynamicPunch, Whirlpool, …) plus Emerald TMs.
+  do
+    local gen3Tm = { "FACADE", "SURF", "TOXIC", "WATERFALL", "WATER_PULSE" }
+    local n, patched = runApply(true, {
+      SQUIRTLE = {
+        dex = 7, types = { "WATER" },
+        tmhm = {
+          "CURSE", "DYNAMICPUNCH", "HEADBUTT", "ICY_WIND", "MUD_SLAP",
+          "ROLLOUT", "SURF", "TOXIC", "WATERFALL", "WHIRLPOOL",
+        },
+      },
+      MUDKIP = {
+        dex = 258, types = { "WATER" },
+        tmhm = { "SURF", "WATERFALL" },
+      },
+      FURRET = {
+        dex = 162, types = { "NORMAL" },
+        tmhm = { "CUT", "HEADBUTT", "SURF" },
+      },
+    }, {
+      SQUIRTLE = {
+        level1Moves = { "TACKLE" }, learnset = {}, evolutionMoves = {},
+        tmhm = gen3Tm,
+      },
+      MUDKIP = {
+        level1Moves = { "TACKLE" }, learnset = {}, evolutionMoves = {},
+        tmhm = gen3Tm,
+      },
+      FURRET = {
+        level1Moves = { "TACKLE" }, learnset = {}, evolutionMoves = {},
+        tmhm = { "CUT", "FACADE", "SURF" },
+      },
+    })
+    T.eq(n, 3, "apply patches Squirtle/Mudkip/Furret on Gen2 host")
+    local squirtle = tmSet(patched.SQUIRTLE and patched.SQUIRTLE.tmhm)
+    T.check(squirtle.WHIRLPOOL,
+      "Gen2 apply keeps HM06 Whirlpool on stock learners (Squirtle)")
+    T.check(squirtle.HEADBUTT and squirtle.MUD_SLAP and squirtle.DYNAMICPUNCH
+        and squirtle.CURSE and squirtle.ROLLOUT and squirtle.ICY_WIND,
+      "Gen2 apply keeps Gen2-only TMs (Headbutt/Mud-Slap/DynamicPunch/…)")
+    T.check(squirtle.FACADE and squirtle.SURF,
+      "Gen2 apply still adds Gen3 TM compatibility on Squirtle")
+    local mudkip = tmSet(patched.MUDKIP and patched.MUDKIP.tmhm)
+    T.check(mudkip.WHIRLPOOL,
+      "Gen2 apply grants HM06 Whirlpool to Hoenn Water+Surf (Mudkip)")
+    local furret = tmSet(patched.FURRET and patched.FURRET.tmhm)
+    T.check(furret.HEADBUTT, "Gen2 apply keeps Furret's stock Headbutt")
+    T.check(not furret.WHIRLPOOL,
+      "Gen2 apply does not grant Whirlpool to non-Water Surf users")
+  end
+
+  -- Red/Blue: same overlay bug (TM01 Mega Punch, Body Slam, Substitute).
+  -- Whirlpool grant must not run on Gen1.
+  do
+    local n, patched = runApply(false, {
+      PIKACHU = {
+        dex = 25,
+        tmhm = { "BODY_SLAM", "MEGA_PUNCH", "SUBSTITUTE", "THUNDERBOLT", "TOXIC" },
+      },
+    }, {
+      PIKACHU = {
+        level1Moves = { "GROWL" }, learnset = {}, evolutionMoves = {},
+        tmhm = { "FACADE", "THUNDERBOLT", "TOXIC" },
+      },
+    })
+    T.eq(n, 1, "apply patches Pikachu on Gen1 host")
+    local pika = tmSet(patched.PIKACHU and patched.PIKACHU.tmhm)
+    T.check(pika.MEGA_PUNCH and pika.BODY_SLAM and pika.SUBSTITUTE,
+      "Gen1 apply keeps Red TM01 Mega Punch / Body Slam / Substitute")
+    T.check(pika.FACADE and pika.THUNDERBOLT,
+      "Gen1 apply still adds Gen3 TM compatibility")
+    T.check(not pika.WHIRLPOOL, "Gen1 apply does not inject Whirlpool")
+  end
 end

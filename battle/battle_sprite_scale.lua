@@ -163,7 +163,7 @@ function BattleSpriteScale.gen1RegisterCopy(record)
 end
 
 --- Gen2 player/enemy backs: image-level path scale, then species index.
-local KR_PIC_SCALE_VERSION = 4
+local KR_PIC_SCALE_VERSION = 5
 
 function BattleSpriteScale.install(mod)
   BattleSpriteScale._mod = mod
@@ -174,12 +174,12 @@ function BattleSpriteScale.install(mod)
     if BattleState._krTrainerPicScaleVersion == KR_PIC_SCALE_VERSION then return end
     local origPicScale = BattleState.picScale
     BattleState.picScale = function(self, path, mon, back)
-      -- Trainer intro pics: never apply mon battleScaleBack.
+      -- Trainer intro pics: never apply mon battleScaleBack / battleScaleFront.
       if back and self.showPlayerTrainer then
-        return self:imageScale(path) or origPicScale(self, path, mon, back)
+        return self:imageScale(path) or 1
       end
       if (not back) and self.showEnemyTrainer then
-        return self:imageScale(path) or origPicScale(self, path, mon, back)
+        return self:imageScale(path) or 1
       end
 
       -- Engine-native path scales (battle_sprite_scales registry).
