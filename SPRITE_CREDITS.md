@@ -6,8 +6,6 @@ If you would like to go check out the awesome creators that did the heavy liftin
 
 - [Nuukiie on X](https://x.com/nuukiie)
 - [SageDeoxys on X](https://x.com/SageDeoxys)
-- [SageDeoxys blog](https://sagedeoxys.blogspot.com/?m=1)
-- [SageDeoxys on Bluesky](https://bsky.app/profile/sagedeoxys.bsky.social)
 
 AND DO NOT FORGET THE ABSOLUTE LEGEND THAT DID THE HARD WORKING OF GETTING ALL THIS PUT TOGETHER AND GETTING PERMISSONS AND PUTING IT INTO AND ORANIZED PLACE FOR ME!!!! TTiN 
 
