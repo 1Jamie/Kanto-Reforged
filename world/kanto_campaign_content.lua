@@ -131,6 +131,17 @@ TEAM ROCKET's pulling out of KANTO... for now.
 ]]),
 }
 
+local function standingMovementForRange(range, movement)
+  if type(movement) == "number" then return movement end
+  local byRange = {
+    DOWN = 6,  -- SPRITEMOVEDATA_STANDING_DOWN
+    UP = 7,
+    LEFT = 8,
+    RIGHT = 9,
+  }
+  return byRange[range or "DOWN"] or 6
+end
+
 local function trainerObj(opts)
   local classId = opts.trainerClass or "GRUNTM"
   local classNum = opts.classNum or 31
@@ -138,13 +149,14 @@ local function trainerObj(opts)
   -- Battle frontpic / palette key off classId ("GRUNTM" / "EXECUTIVEM" / …).
   local className = opts.className or "ROCKET"
   local name = opts.trainerName or "GRUNT"
+  local range = opts.range or "DOWN"
   return {
     name = opts.name,
     sprite = opts.sprite or "SPRITE_ROCKET",
     x = opts.x,
     y = opts.y,
-    range = opts.range or "DOWN",
-    movement = opts.movement or 6,
+    range = range,
+    movement = standingMovementForRange(range, opts.movement),
     sight = opts.sight or 3,
     event = opts.event,
     eventFlag = opts.event,
@@ -226,7 +238,7 @@ Content.OVERLAYS = {
   SAFARI_ZONE_CENTER_KR = {
     trainerObj({
       name = "SAFARIZONE_ROCKET1",
-      x = 12, y = 24,
+      x = 13, y = 23,
       range = "RIGHT",
       event = 3020,
       member = 230,
@@ -246,8 +258,8 @@ Content.OVERLAYS = {
   SAFARI_ZONE_EAST_KR = {
     trainerObj({
       name = "SAFARIZONE_ROCKET3",
-      x = 0, y = 21,
-      range = "DOWN",
+      x = 3, y = 21,
+      range = "LEFT",
       event = 3022,
       member = 232,
       text = "TEXT_SAFARIZONE_ROCKET3",

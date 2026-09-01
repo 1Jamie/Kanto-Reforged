@@ -165,12 +165,15 @@ function Abilities.updateForecast(battle, battler)
       displayName(battle, battler)))
     local CastformFx = require("mods.Kanto-Reforged.battle.castform_fx")
     CastformFx.play(battle, battler, oldType)
-    -- Gen2: _krCastformForm is committed when the morph finishes.
-    if mon and not BattleCompat.isGen2(battle) then
-      mon._krCastformForm = suffix
-    end
+    -- Gen2: _krCastformForm is committed when the morph finishes; still
+    -- clear/set immediately so draws between morph frames don't keep a
+    -- stale weather sheet after fade-out.
+    if mon then mon._krCastformForm = suffix end
+    CastformFx.applyFormPalette(suffix)
   elseif mon then
     mon._krCastformForm = suffix
+    local CastformFx = require("mods.Kanto-Reforged.battle.castform_fx")
+    CastformFx.applyFormPalette(suffix)
   end
 end
 

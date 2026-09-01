@@ -99,9 +99,7 @@ local function buildOptionDefs(mod)
     defs[#defs + 1] = require("mods.Kanto-Reforged.ui.battle_exp_bar").OPTION
     -- DexNav label/off is only for the start-menu entry; Gen2 uses Pokegear.
     defs[#defs + 1] = require("mods.Kanto-Reforged.ui.dexnav").OPTION
-    local SpriteCache = require("mods.Kanto-Reforged.core.sprite_cache")
-    local spriteOpt = SpriteCache.optionDef(mod)
-    if spriteOpt then defs[#defs + 1] = spriteOpt end
+    -- SPRITES 1–251 Gold/Silver/Crystal option retired; KR assets/gs owns art.
   end
   return defs
 end
@@ -190,6 +188,7 @@ end
 
 return function(mod)
   local Host = require("mods.Kanto-Reforged.core.host")
+  Host.modLoader(mod)
   local PokemonGen2 = require("mods.Kanto-Reforged.pokemon.pokemon_gen2")
 
   ExpTrainers.extendSchemas()
@@ -197,11 +196,6 @@ return function(mod)
   pcall(function() ExpTrainers.apply(mod) end)
 
   if Host.isGen2() then
-    -- Capture static 1–251 battle pics into a per-edition sprite cache so
-    -- Gen1 can offer GOLD/SILVER/CRYSTAL sprite sets. Never copies anim sheets.
-    local SpriteCache = require("mods.Kanto-Reforged.core.sprite_cache")
-    pcall(function() SpriteCache.captureActiveEdition(mod) end)
-
     local RestoredDungeons = require("mods.Kanto-Reforged.world.restored_dungeons")
     RestoredDungeons.apply(mod)
     local LegendMapsApply = require("mods.Kanto-Reforged.world.legend_maps_apply")
@@ -225,6 +219,12 @@ return function(mod)
 
   local BattleCompat = require("mods.Kanto-Reforged.battle.battle_compat")
   BattleCompat.install(mod)
+
+  local BattleSpriteScale = require("mods.Kanto-Reforged.battle.battle_sprite_scale")
+  BattleSpriteScale.install(mod)
+
+  local FrontAnim = require("mods.Kanto-Reforged.battle.front_anim")
+  FrontAnim.install(mod)
 
   require("mods.Kanto-Reforged.battle.core.install").install(mod)
 
@@ -309,7 +309,6 @@ return function(mod)
     LegendMythicals.install(mod)
     local FossilsGen3 = require("mods.Kanto-Reforged.world.fossils_gen3")
     FossilsGen3.register(mod)
-    ModernXpShare.install(mod)
     local QuarantineRecover = require("mods.Kanto-Reforged.core.quarantine_recover")
     QuarantineRecover.install(mod)
   else
@@ -329,6 +328,9 @@ return function(mod)
     local ItemSmith = require("mods.Kanto-Reforged.world.item_smith")
     ItemSmith.register(mod)
   end
+
+  -- Slot-2 XP share via battle.exp_award (shared Gen1/Gen2 hook).
+  ModernXpShare.install(mod)
 
   local SEVII_ENABLED = false
   if SEVII_ENABLED and Host.isGen1() then
@@ -562,22 +564,43 @@ return function(mod)
     local okPals, species_palettes = pcall(require, "mods.Kanto-Reforged.pokemon.species_palettes")
     local PaletteGen2 = require("mods.Kanto-Reforged.pokemon.palette_gen2")
     if okPals and type(species_palettes) == "table" then
+      -- gs_palettes.lua (from assets/gs/palettes/*.json) overrides hand table.
+      local merged = PaletteGen2.prepare(species_palettes)
       if Host.isGen2() then
         -- Gen2: middle-two-color rows under gen2Palettes.pokemon[species].
         -- Do NOT Gen1-register named packs here — that pollutes top-level
         -- gen2Palettes keys and leaves Hoenn monColors nil (grayscale).
-        PaletteGen2.apply(mod, species_palettes, pokemon_data)
+        PaletteGen2.apply(mod, merged, pokemon_data)
       else
-        PaletteGen2.applyGen1(mod, species_palettes)
+        PaletteGen2.applyGen1(mod, merged)
       end
     else
-      mod.log:warn("species_palettes.lua missing — Gen 2/3 mons will use MEWMON / grayscale")
+      -- Still try gs-only if the hand table is missing.
+      local merged = PaletteGen2.prepare({})
+      if next(merged) then
+        if Host.isGen2() then
+          PaletteGen2.apply(mod, merged, pokemon_data)
+        else
+          PaletteGen2.applyGen1(mod, merged)
+        end
+      else
+        mod.log:warn("species_palettes.lua missing — Gen 2/3 mons will use MEWMON / grayscale")
+      end
     end
 
-    if Host.isGen2() then
+    if Host.isGen2From(mod) or Host.isGen2() then
+      -- Sprite paths + battleScaleBack must land on content.pokemon before
+      -- Loader merge freezes the registry (game.ready is too late).
+      local SpriteResolve = require("mods.Kanto-Reforged.core.sprite_resolve")
+      SpriteResolve.patchRegistry(mod)
+
       PokemonGen2.registerForGen2(mod, pokemon_data, {
         gen2DataReady = gen2DataReady,
       })
+      -- Prefer converted RawSprites on live Data (ROM 1–251 + registered Hoenn).
+      local SpriteResolve = require("mods.Kanto-Reforged.core.sprite_resolve")
+      SpriteResolve.applyLive(mod)
+      SpriteResolve.invalidateAssets()
       -- Gen2 dex UI reads gen2Pokedex.entries (not Data.text). Fill Hoenn rows.
       DexEntries.bindGen2Pokedex(mod, pokemon_data.species)
       -- Catch → NewPokedexEntry: land on OLD when species is off NEW/A–Z.
@@ -653,11 +676,6 @@ return function(mod)
           SpeciesScope.onOptionsChanged(mod, Host.liveGame(mod), ev)
           return
         end
-        if ev.key == "sprite_source" then
-          local SpriteCache = require("mods.Kanto-Reforged.core.sprite_cache")
-          SpriteCache.onSourceChanged(mod, pokemon_data)
-          return
-        end
         if Host.optionEventIs(ev.key, "pure_spawn_random") then
           if mod.options:get(Host.optionKey("pure_spawn_random")) then
             applySpawnTables(mod, pokemon_data, { rerollPure = true })
@@ -673,10 +691,10 @@ return function(mod)
       end)
       SpeciesScope.refresh(mod, nil, SpeciesScope.mode(mod))
       mod.save:set(SpeciesScope.APPLIED_KEY, SpeciesScope.mode(mod))
-      -- Apply after merge so Red natives (1–151) pick up Gen2 caches too.
-      local SpriteCache = require("mods.Kanto-Reforged.core.sprite_cache")
-      SpriteCache.applyLive(mod)
-      SpriteCache.invalidateAssets()
+      -- Prefer converted RawSprites (assets/gs) on live Data, including ROM 1–151.
+      local SpriteResolve = require("mods.Kanto-Reforged.core.sprite_resolve")
+      SpriteResolve.applyLive(mod)
+      SpriteResolve.invalidateAssets()
     end
 
     if dexTexts > 0 then
@@ -1542,9 +1560,9 @@ return function(mod)
     local CastformFx = require("mods.Kanto-Reforged.battle.castform_fx")
     local resolved = CastformFx.resolveSprite(path, ctx, mod.activeBattle, mod)
     if resolved and resolved ~= path then return resolved end
-    -- Gen1: Gold/Silver/Crystal static caches for dex 1–251.
-    local SpriteCache = require("mods.Kanto-Reforged.core.sprite_cache")
-    local alt = SpriteCache.resolvePath(mod, ctx and ctx.species, ctx and ctx.side)
+    -- KR art: assets/gs → flat assets → caller/ROM.
+    local SpriteResolve = require("mods.Kanto-Reforged.core.sprite_resolve")
+    local alt = SpriteResolve.resolvePath(mod, ctx and ctx.species, ctx and ctx.side)
     if alt then return alt end
     return next(path, ctx)
   end)
@@ -1565,7 +1583,17 @@ return function(mod)
     if ev.game then
       mod.activeGame = ev.game
       ensureTypeChart(ev.game.data)
+      local SpriteResolve = require("mods.Kanto-Reforged.core.sprite_resolve")
+      SpriteResolve.applyBackPathScales(mod, ev.game.data)
     end
+    -- Re-apply after Data / game.data are fully merged (Gen2 ROM rows included).
+    local SpriteResolve = require("mods.Kanto-Reforged.core.sprite_resolve")
+    SpriteResolve.applyLive(mod)
+    SpriteResolve.invalidateAssets()
+    local BattleSpriteScale = require("mods.Kanto-Reforged.battle.battle_sprite_scale")
+    BattleSpriteScale.install(mod)
+    local FrontAnim = require("mods.Kanto-Reforged.battle.front_anim")
+    FrontAnim.install(mod)
   end)
 
   mod.events:on("battle.started", function(ev)
@@ -1573,6 +1601,19 @@ return function(mod)
       mod.activeBattle = ev.battle
       ensureTypeChart(ev.battle.data or (ev.game and ev.game.data)
         or (mod.activeGame and mod.activeGame.data))
+      -- Gen2: stamp battleScaleBack + path scales onto live battle data.
+      local game = ev.game or (ev.battle and ev.battle.game) or mod.activeGame
+      if game and game.data then
+        local SpriteResolve = require("mods.Kanto-Reforged.core.sprite_resolve")
+        if game.data.pokemon then
+          SpriteResolve.applyGoldBackScales(mod, game.data.pokemon)
+        end
+        SpriteResolve.applyBackPathScales(mod, game.data)
+      end
+      -- Drop any Forecast form leftover from the previous fight before
+      -- send-out / onEntry Forecast runs.
+      local CastformFx = require("mods.Kanto-Reforged.battle.castform_fx")
+      CastformFx.resetOutOfBattle(mod)
       -- After send-outs, not before trainer / "Go!" dialog (sayNext would
       -- otherwise insert at the front of the intro queue on Gen1).
       Abilities.scheduleBattleStartEntries(ev.battle)
@@ -1592,6 +1633,8 @@ return function(mod)
     -- Gold battlers are party tables; wipe AI facade fields before SAVE.
     local BattleCompat = require("mods.Kanto-Reforged.battle.battle_compat")
     BattleCompat.scrubBattle(ev.battle)
+    local CastformFx = require("mods.Kanto-Reforged.battle.castform_fx")
+    CastformFx.resetOutOfBattle(mod)
     mod.activeBattle = nil
   end)
 

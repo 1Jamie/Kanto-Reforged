@@ -19,7 +19,6 @@ If you want full raw tables (recipes, internal module maps, formulas), that's [F
    - **LEGENDS IN MIX** (default off): only matters with FULL SPAWN MIX / PURE RANDOM on — lets legendaries/mythicals roll into wild grass (still level-gated).
    - **SP.ATK / SP.DEF** (Red only, default off): special damage and summary UI use separate Sp.Atk / Sp.Def instead of Gen 1 Special. Leave off for classic mechanics.
    - **DEXNAV** (Red only): start-menu label or off. (Gen 2 DexNav is automatically a card on your Pokegear).
-   - **SPRITES 1-251** (Red only): boot KR on the Gen 2 ROM whose sprites you want (Gold / Silver / Crystal) so it caches dex 1–251, then load Red and set this toggle to that edition (or **CUSTOM KR**). Hoenn (252+) always stays KR. Details: [README — Gen1 sprite sets](README.md#gen1-sprite-sets-sprites-1-251).
 ---
 
 # Part 1: Gen 1 (Red / Blue) Walkthrough

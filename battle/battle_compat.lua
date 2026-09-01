@@ -411,6 +411,8 @@ end
 local AI_EPHEMERAL = {
   "curStats", "curTypes", "curMoves", "stages",
   "expProtected", "expEnduring", "expFlashFire", "expProtectStreak",
+  -- Forecast form sheet; must not ride into the next battle on Gold party mons.
+  "_krCastformForm",
 }
 
 --- Strip AI facade fields from party mons so Gold saves stay acyclic.

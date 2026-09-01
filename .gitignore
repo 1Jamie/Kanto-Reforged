@@ -70,6 +70,9 @@ Thumbs.db
 .*.swp
 .idea/
 .vscode/
+scratch*.lua
+.pytest_cache/
+pytest-cache-files-*/
 
 # Stray assets and intermediate tools data
 screen-shots/

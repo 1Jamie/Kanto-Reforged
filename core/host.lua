@@ -93,7 +93,7 @@ end
 -- Kitchen). Prefer the loader facade; require still resolves engine modules
 -- and honors test stubs already in the engine's package.loaded.
 function Host.liveGame(mod)
-  if mod and mod.game then return mod.game end
+  if mod and (mod.game or mod.activeGame) then return mod.game or mod.activeGame end
   if Host.isGen2() then
     -- src.core.Game is the Gen1 singleton and has no Gold save. Prefer the
     -- loader-injected Game2 instance via mod.game; if missing, there is no

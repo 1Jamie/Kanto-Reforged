@@ -5,16 +5,11 @@
 --   * Slot 2 gets up to 30%, clamped to 75% of one fighter's share so the
 --     bench never outpaces actives (solo 70/30; two fighters ~35/35/26;
 --     three ~23/23/23/17).
--- If slot 2 fought, is fainted, or is missing: vanilla equal split of 100%.
--- Gen 1 EXP.ALL is ignored while the toggle is on.  Option key stays
+-- If slot 2 fought, is fainted, is an egg, or is missing: equal split of 100%
+-- among alive fighters.
+-- Gen 1 EXP.ALL / Gen 2 item EXP.SHARE double-pass are skipped while the
+-- toggle is on (we replace vanilla via battle.exp_award).  Option key stays
 -- modern_xp_share for save compatibility.
---
--- Stock BattleState has no awardExperience hook -- this module installs
--- applyExpShare at runtime and wraps enemyMonFainted so Kanto Reforged
--- needs zero engine edits.
-
-local Strings = require("src.core.Strings")
-local Runtime = require("src.mods.Runtime")
 
 local ModernXpShare = {}
 
@@ -48,91 +43,63 @@ function ModernXpShare.fractions(nAliveFighters, benchEligible)
   return fighter, bench
 end
 
--- Pay one party mon its share (and run level-up / move-learn UI).
--- Same shape as the engine's local applyShare inside enemyMonFainted.
--- `split` is Experience's numParticipants divisor (may be fractional).
-function ModernXpShare.applyExpShare(battle, mon, split, announce)
-  local Experience = require("src.battle.Experience")
-  local levels, gained = Experience.apply(battle.data, mon, battle.enemy.def,
-                                          battle.enemy.mon.level, battle.kind == "trainer",
-                                          split, mon.traded)
-  if #levels > 0 then
-    battle.leveledUp = battle.leveledUp or {}
-    battle.leveledUp[mon] = true
+-- Gen2 Battle owns `.party`; Gen1 uses playerPartyView (link-safe) / save.party.
+-- Prefer `.party` only when present so Gen1 nil does not mask the save party.
+local function partyOf(battle)
+  if battle == nil then return {} end
+  if battle.party ~= nil and type(battle.party) == "table" then
+    return battle.party
   end
-  Runtime.emit("battle.exp_gained", {
-    battle = battle, mon = mon, gained = gained, levels = levels,
-  })
-  local name = mon.nickname or battle.data.pokemon[mon.species].name
-  if announce then
-    local text = Strings.source("%s gained\n%d EXP. Points!")
-    if announce == "expAll" then
-      text = Strings.source("%s gained\nwith EXP.ALL,\v%d EXP. Points!")
-    elseif mon.traded then
-      text = Strings.source("%s gained\na boosted\v%d EXP. Points!")
-    end
-    battle:sayNext(Strings(text, name, gained))
+  if type(battle.playerPartyView) == "function" then
+    return battle:playerPartyView() or {}
   end
-  local game = battle.game
-  for _, lv in ipairs(levels) do
-    do
-      local Gen1Patch = require("mods.Kanto-Reforged.core.gen1_patch")
-      Gen1Patch.apply(require("src.world.PikachuFollower"), function(follower)
-        if type(follower.modifyHappiness) == "function" then
-          follower.modifyHappiness(game.save, "LEVELUP", mon)
-        end
-      end)
-    end
-    battle:sayNext(Strings("%s grew\nto level %d!", name, lv))
-    battle:uiNext(function()
-      require("src.core.Sound").play(game.data, "Level_Up")
-      local box
-      local Gen1Patch = require("mods.Kanto-Reforged.core.gen1_patch")
-      Gen1Patch.apply(require("src.battle.BattleState"), function(bs)
-        if bs.StatBox and type(bs.StatBox.new) == "function" then
-          box = bs.StatBox.new(game, mon)
-        end
-      end)
-      return box
-    end)
-    if mon == battle.player.mon then battle:drainNext() end
-    for _, moveId in ipairs(Experience.movesLearnedAt(
-        battle.data.pokemon[mon.species], lv)) do
-      battle:learnMove(mon, moveId)
-    end
+  if battle.game and battle.game.save and type(battle.game.save.party) == "table" then
+    return battle.game.save.party
   end
-  return gained, levels
+  return {}
 end
 
--- Pool-respecting slot-2 payout.  Returns false when the toggle is off.
-function ModernXpShare.award(mod, battle)
-  if not ModernXpShare.enabled(mod) then return false end
-
-  local party = battle.game.save.party
-  local flagged = battle.participants or {}
-  local participants, alive = {}, {}
-  for _, mon in ipairs(party) do
-    if flagged[mon] then
-      participants[#participants + 1] = mon
-      if mon.hp > 0 then alive[#alive + 1] = mon end
+-- Pay one mon through the engine helper.  Gen2's applyShare closes over
+-- `halved` from any live EXP.SHARE *item* holder; while our toggle replaces
+-- vanilla we must not keep that tax (and we also skip the holders pass).
+local function payShare(ctx, mon, split, announce)
+  local battle = ctx.battle
+  if ctx.halved and ctx.loser and battle
+      and type(battle.giveExperiencePass) == "function"
+      and type(battle.speciesDef) == "function" then
+    for index, candidate in ipairs(battle.party or {}) do
+      if candidate == mon then
+        local def = battle:speciesDef(ctx.loser)
+        return battle:giveExperiencePass(
+          ctx.loser, def, { index }, math.max(1, split or 1), false, not announce)
+      end
     end
+    return
   end
-  if #participants == 0 and battle.player.mon.hp > 0 then
-    participants = { battle.player.mon }
-    alive = { battle.player.mon }
-  end
+  return ctx.applyShare(mon, split, announce)
+end
+
+-- Pool-respecting slot-2 payout via the engine's applyShare helper.
+-- Returns true when the toggle handled the award (caller must not run vanilla).
+function ModernXpShare.awardFromCtx(mod, ctx)
+  if not ModernXpShare.enabled(mod) then return false end
+  if not ctx or type(ctx.applyShare) ~= "function" then return false end
+
+  local alive = ctx.alive or {}
   if #alive == 0 then return true end
 
   local fought = {}
   for _, mon in ipairs(alive) do fought[mon] = true end
 
-  local slot2 = party[2]
-  local benchEligible = slot2 ~= nil and slot2.hp > 0 and not fought[slot2]
+  local slot2 = partyOf(ctx.battle)[2]
+  local benchEligible = slot2 ~= nil
+    and (slot2.hp or 0) > 0
+    and not slot2.isEgg
+    and not fought[slot2]
 
   if not benchEligible then
-    -- Vanilla Gen 1: equal split of the full pool among alive fighters.
     for _, mon in ipairs(alive) do
-      battle:applyExpShare(mon, #alive, true)
+      payShare(ctx, mon, #alive, true)
     end
     return true
   end
@@ -140,83 +107,22 @@ function ModernXpShare.award(mod, battle)
   local fighterFrac, benchFrac = ModernXpShare.fractions(#alive, true)
   local fighterSplit = 1 / fighterFrac
   for _, mon in ipairs(alive) do
-    battle:applyExpShare(mon, fighterSplit, true)
+    payShare(ctx, mon, fighterSplit, true)
   end
-  battle:applyExpShare(slot2, 1 / benchFrac, true)
+  payShare(ctx, slot2, 1 / benchFrac, true)
   return true
 end
 
-local function looksLikeExpText(text)
-  if type(text) ~= "string" then return false end
-  -- GainedText / GrewLevelText from the stock applyShare path we are skipping.
-  return text:find("EXP", 1, true) ~= nil
-      or text:find("grew", 1, true) ~= nil
-end
-
--- Run stock enemyMonFainted after share award, without a second XP pass.
-local function runFaintTailWithoutExp(battle, original)
-  local Experience = require("src.battle.Experience")
-  local oldApply = Experience.apply
-  local oldSay = battle.sayNext
-  Experience.apply = function() return {}, 0 end
-  battle.sayNext = function(self, text, ...)
-    if looksLikeExpText(text) then return end
-    return oldSay(self, text, ...)
-  end
-  local ok, err = xpcall(function() original(battle) end, tostring)
-  Experience.apply = oldApply
-  battle.sayNext = oldSay
-  if not ok then error(err, 0) end
-end
-
 function ModernXpShare.install(mod)
-  local Gen1Patch = require("mods.Kanto-Reforged.core.gen1_patch")
-  Gen1Patch.apply(require("src.battle.BattleState"), function(BattleState)
-  if BattleState._expansionModernXpShare then return end
+  if ModernXpShare._installed then return end
+  ModernXpShare._installed = true
+  ModernXpShare._mod = mod
 
-  -- Live method so award() and tests can call battle:applyExpShare(...)
-  BattleState.applyExpShare = function(self, mon, split, announce)
-    return ModernXpShare.applyExpShare(self, mon, split, announce)
-  end
-
-  local originalFainted = BattleState.enemyMonFainted
-  BattleState.enemyMonFainted = function(self)
-    if ModernXpShare.award(mod, self) then
-      runFaintTailWithoutExp(self, originalFainted)
+  mod.hooks:wrap("battle.exp_award", function(next, ctx)
+    if ModernXpShare.awardFromCtx(mod, ctx) then
       return
     end
-    return originalFainted(self)
-  end
-
-  -- Test / tooling helper: payout only (no faint/send-out tail).
-  BattleState.awardExperience = function(self)
-    if ModernXpShare.award(mod, self) then return end
-    -- Vanilla Gen 1 split, using the installed applyExpShare.
-    local participants, alive = 0, {}
-    for _, mon in ipairs(self.game.save.party) do
-      if self.participants and self.participants[mon] then
-        participants = participants + 1
-        if mon.hp > 0 then table.insert(alive, mon) end
-      end
-    end
-    if participants == 0 and self.player.mon.hp > 0 then
-      participants, alive = 1, { self.player.mon }
-    end
-    local expAll = (self.game.save.inventory.EXP_ALL or 0) > 0
-    for _, mon in ipairs(alive) do
-      self:applyExpShare(mon, participants * (expAll and 2 or 1), true)
-    end
-    if expAll then
-      for _, mon in ipairs(self.game.save.party) do
-        if mon.hp > 0 then
-          self:applyExpShare(mon,
-            math.max(1, participants) * #self.game.save.party * 2, "expAll")
-        end
-      end
-    end
-  end
-
-  BattleState._expansionModernXpShare = true
+    return next(ctx)
   end)
 end
 

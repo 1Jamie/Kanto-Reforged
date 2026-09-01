@@ -1,4 +1,4 @@
--- Sprite cache helpers (edition availability + Gen1 option shape).
+-- Retired sprite cache stubs.
 -- luajit mods/Kanto-Reforged/tests/sprite_cache_test.lua
 package.path = "./?.lua;./?/init.lua;" .. package.path
 
@@ -12,32 +12,15 @@ Host.clearForce()
 
 T.eq(SpriteCache.SOURCE_CUSTOM, "custom", "custom id")
 T.eq(SpriteCache.OPTION_KEY, "sprite_source", "option key name")
+T.eq(SpriteCache.optionDef({ id = "Kanto-Reforged" }), nil,
+  "SPRITES option retired on Gen1")
+T.eq(#SpriteCache.availableEditions({ id = "Kanto-Reforged" }), 0,
+  "no edition caches exposed")
 
--- Gen1 option hidden when no caches.
-local opt = SpriteCache.optionDef({ id = "Kanto-Reforged" })
-T.check(opt == nil, "no SPRITES option without caches")
-
--- Fake a gold ready marker via love.filesystem if present; otherwise skip.
-local f = love and love.filesystem
-if f and f.createDirectory and f.write then
-  local dir = "save/mod-derived/Kanto-Reforged/sprites/gold"
-  f.createDirectory(dir)
-  f.write(dir .. "/ready.png", "ok")
-  local opt2 = SpriteCache.optionDef({ id = "Kanto-Reforged" })
-  T.check(opt2 ~= nil, "SPRITES option appears with gold cache")
-  T.eq(opt2.key, "sprite_source", "option key")
-  T.check(#opt2.choices >= 2, "custom + gold choices")
-  local eds = SpriteCache.availableEditions({ id = "Kanto-Reforged" })
-  T.check(#eds >= 1 and eds[1] == "gold", "availableEditions lists gold")
-else
-  T.check(true, "love.filesystem absent — skip ready-marker checks")
-end
-
--- Gen2 hides the option.
 GameVersion.set("gold")
 Host.clearForce()
-T.check(SpriteCache.optionDef({ id = "Kanto-Reforged" }) == nil,
-  "Gen2 boot: no SPRITES 1-251 option")
+T.eq(SpriteCache.optionDef({ id = "Kanto-Reforged" }), nil,
+  "SPRITES option retired on Gen2")
 
 GameVersion.set("red")
 Host.clearForce()

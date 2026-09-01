@@ -60,7 +60,8 @@ Configured in the mod manager / F10 options:
 | **SP.ATK / SP.DEF** | On | **Red only.** Special moves use separate Sp.Atk / Sp.Def bases (PokeAPI) instead of Gen 1 Special. Summary and Modern UI party/PC detail show both stats (`SAT` / `SDF`). Stages, DVs, and Calcium stay Gen 1 (one shared Special). Hidden on Gold (already split). |
 | **EXP BAR** | On | **Red only.** Blue EXP bar under the HP bar in battle (Gen 2 style, widescreen-aware). Hidden on Gold (native bar). |
 | **DEXNAV** | DEXNAV | **Red only.** Start-menu label / off. Gold DexNav is a Pokegear card (no rename toggle). |
-| **SPRITES 1-251** | CUSTOM KR | **Red only**, and only after at least one Gen 2 cache exists. Boot KR on **Gold / Silver / Crystal** to copy that edition’s static battle pics (dex 1–251) into `save/mod-derived/.../sprites/<edition>/` while that ROM is mounted. Return to Red and choose **CUSTOM KR**, **GOLD**, **SILVER**, and/or **CRYSTAL** (only captured editions appear). Hoenn (252+) always stays KR. Crystal anim sheets are never cached. Mid-session swaps apply live; re-boot each Gen2 column once after a KR update if the set looks incomplete. |
+
+Battle sprites resolve **assets/gs** (converted RawSprites) → flat `assets/` → ROM. The former **SPRITES 1-251** Gold/Silver/Crystal cache option is retired.
 
 ---
 

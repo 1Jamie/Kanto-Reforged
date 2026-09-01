@@ -58,6 +58,8 @@ local g2 = PokemonGen2.toGen2Record({
 })
 eq(g2.battleScaleBack, 1.5, "Hoenn back on Gold")
 eq(g2.battleScaleFront, nil, "Hoenn front default")
+eq(Scale.goldBackScaleForPx(32), 1.5, "32px back on Gold")
+eq(Scale.goldBackScaleForPx(48), 1, "48px back on Gold")
 
 local scaled = PokemonGen2.toGen2Record({
   id = "X", name = "X", dex = 252,

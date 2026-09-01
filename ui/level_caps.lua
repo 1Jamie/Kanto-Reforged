@@ -388,39 +388,55 @@ function LevelCaps.install(mod)
   if not Experience._expansionLevelCaps then
     local Growth = require("src.pokemon.Growth")
     local original = Experience.apply
+    -- Forward opts and the deferred `steps` third return so awardExp's
+    -- applyShare (`#steps`) does not crash under the soft cap wrap.
     Experience.apply = function(data, mon, defeatedDef, level, isTrainer,
-                                  numParticipants, traded)
+                                  numParticipants, traded, opts)
       local preLevel = mon and mon.level or 0
-      local levels, gained = original(data, mon, defeatedDef, level, isTrainer,
-                                      numParticipants, traded)
+      local levels, gained, steps = original(data, mon, defeatedDef, level,
+        isTrainer, numParticipants, traded, opts)
+      steps = steps or {}
       local m = LevelCaps._mod
       if not m or not LevelCaps.enabled(m) then
-        return levels, gained
+        return levels, gained, steps
       end
       local save = currentSave()
-      if not save or not mon then return levels, gained end
+      if not save or not mon then return levels, gained, steps end
       local cap = LevelCaps.capFor(data, save)
       local speciesDef = data.pokemon[mon.species]
-      if not speciesDef then return levels, gained end
+      if not speciesDef then return levels, gained, steps end
 
+      local defer = opts and opts.defer
       if preLevel > cap then
-        mon.level = preLevel
+        if not defer then mon.level = preLevel end
         pinExpAtLevel(data, mon, preLevel)
-        return {}, gained
+        return {}, gained, {}
       end
 
-      if mon.level > cap then
-        mon.level = cap
-        mon.exp = Growth.expForLevel(speciesDef.growthRate, cap)
-        local kept = {}
-        for _, lv in ipairs(levels) do
-          if lv <= cap then kept[#kept + 1] = lv end
+      local kept, keptSteps = {}, {}
+      for i, lv in ipairs(levels) do
+        if lv <= cap then
+          kept[#kept + 1] = lv
+          if steps[i] then keptSteps[#keptSteps + 1] = steps[i] end
         end
-        levels = kept
-      elseif mon.level == cap then
-        pinExpAtLevel(data, mon, cap)
       end
-      return levels, gained
+
+      if not defer then
+        if mon.level > cap then
+          mon.level = cap
+          mon.exp = Growth.expForLevel(speciesDef.growthRate, cap)
+          if #keptSteps > 0 then
+            local last = keptSteps[#keptSteps]
+            mon.stats, mon.hp = last.stats, last.hp
+          end
+        elseif mon.level == cap then
+          pinExpAtLevel(data, mon, cap)
+        end
+      elseif #kept < #levels or preLevel == cap
+          or (#kept > 0 and kept[#kept] == cap) then
+        pinExpAtLevel(data, mon, (#kept > 0 and kept[#kept]) or cap)
+      end
+      return kept, gained, keptSteps
     end
     Experience._expansionLevelCaps = true
   end

@@ -148,10 +148,16 @@ local function runTests()
     end
   end
   assert(hasSz, "Safari Center must overlay Rockets")
+  for _, o in ipairs(sc.objects or {}) do
+    if o.name == "SAFARIZONE_ROCKET1" then
+      assert(o.movement == 9 and o.range == "RIGHT",
+        "Safari entrance Rocket must use STANDING_RIGHT (movement 9)")
+    end
+  end
   local expectedRockets = {
-    SAFARIZONE_ROCKET1 = { map = "SAFARI_ZONE_CENTER_KR", x = 12, y = 24, range = "RIGHT" },
+    SAFARIZONE_ROCKET1 = { map = "SAFARI_ZONE_CENTER_KR", x = 13, y = 23, range = "RIGHT" },
     SAFARIZONE_ROCKET2 = { map = "SAFARI_ZONE_CENTER_KR", x = 14, y = 1, range = "UP" },
-    SAFARIZONE_ROCKET3 = { map = "SAFARI_ZONE_EAST_KR", x = 0, y = 21, range = "DOWN" },
+    SAFARIZONE_ROCKET3 = { map = "SAFARI_ZONE_EAST_KR", x = 3, y = 21, range = "LEFT" },
     SAFARIZONE_ROCKET4 = { map = "SAFARI_ZONE_WEST_KR", x = 28, y = 22, range = "RIGHT" },
     SAFARIZONE_ROCKET5 = { map = "SAFARI_ZONE_NORTH_KR", x = 18, y = 35, range = "RIGHT" },
   }

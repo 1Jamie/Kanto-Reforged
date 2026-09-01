@@ -97,6 +97,13 @@ function BattleSpriteScale.defaultsForGen1ArtOnGold()
   return BattleSpriteScale.goldFromFraction(1, 1, BattleSpriteScale.GEN1.backPx)
 end
 
+--- Gen2 battleScaleBack for art whose back is `backPx` wide (32 → 1.5, 48 → 1).
+-- Ignores any stale ROM record scales — use when KR gs/flat art replaces ROM.
+function BattleSpriteScale.goldBackScaleForPx(backPx)
+  local _, gb = BattleSpriteScale.goldFromFraction(1, 1, backPx)
+  return gb
+end
+
 --- Write Gold battleScale* onto a Gen2 register payload from a Gen1 KR record.
 -- Always sets battleScaleBack when the art is Gen1-sized so Hoenn doesn't go tiny.
 function BattleSpriteScale.applyGen1RecordToGold(out, gen1Record, backPx)
@@ -155,28 +162,40 @@ function BattleSpriteScale.gen1RegisterCopy(record)
   return BattleSpriteScale.applyHoennBackOnGen1(copy)
 end
 
---- Gen2 intro draws the trainer in the player/enemy pic box while still
--- passing the lead mon into drawPic.  KR Hoenn backs use battleScaleBack
--- 1.5 (32→48); that must not resize Chris/Kris or the foe trainer.
+--- Gen2 player/enemy backs: image-level path scale, then species index.
+local KR_PIC_SCALE_VERSION = 4
+
 function BattleSpriteScale.install(mod)
-  local Host = require("mods.Kanto-Reforged.core.host")
-  if not Host.isGen2From(mod) and not Host.isGen2() then return end
-  local Gen1Patch = require("mods.Kanto-Reforged.core.gen1_patch")
+  BattleSpriteScale._mod = mod
   local ok, BS = pcall(require, "src.ui.gen2.BattleState")
   if not ok or not BS then return end
+  local Gen1Patch = require("mods.Kanto-Reforged.core.gen1_patch")
   Gen1Patch.apply(BS, function(BattleState)
-    if BattleState._krTrainerPicScale then return end
+    if BattleState._krTrainerPicScaleVersion == KR_PIC_SCALE_VERSION then return end
     local origPicScale = BattleState.picScale
     BattleState.picScale = function(self, path, mon, back)
+      -- Trainer intro pics: never apply mon battleScaleBack.
       if back and self.showPlayerTrainer then
-        return self:imageScale(path) or 1
+        return self:imageScale(path) or origPicScale(self, path, mon, back)
       end
       if (not back) and self.showEnemyTrainer then
-        return self:imageScale(path) or 1
+        return self:imageScale(path) or origPicScale(self, path, mon, back)
       end
+
+      -- Engine-native path scales (battle_sprite_scales registry).
+      local imgScale = self:imageScale(path)
+      if imgScale then return imgScale end
+
+      if back and mon and mon.species then
+        local SpriteResolve = require("mods.Kanto-Reforged.core.sprite_resolve")
+        local krBack = SpriteResolve.goldBackScaleForSpecies(
+          BattleSpriteScale._mod, mon.species)
+        if krBack then return krBack end
+      end
+
       return origPicScale(self, path, mon, back)
     end
-    BattleState._krTrainerPicScale = true
+    BattleState._krTrainerPicScaleVersion = KR_PIC_SCALE_VERSION
   end)
 end
 

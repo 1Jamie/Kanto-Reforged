@@ -270,10 +270,23 @@ return function(T, Data, run)
     BattleCompat.setWeather(cb, "SANDSTORM")
     Abilities.updateForecast(cb, castformBattler)
     T.eq(castformBattler.curTypes[1], "NORMAL", "Forecast leaves Castform NORMAL in SANDSTORM")
+    T.eq(castformMon._krCastformForm, nil, "sandstorm clears Forecast form sheet")
     t, p = MoveEffects.weatherBall(cb)
     T.eq(t, "ROCK", "Weather Ball is ROCK in SANDSTORM")
     T.eq(p, 100, "Weather Ball is 100 power in SANDSTORM")
     T.eq(BattleCompat.castformSuffix("SANDSTORM"), nil, "castformSuffix is nil in SANDSTORM")
+
+    -- Clear weather after rain must revert type + form (not keep rainy art).
+    BattleCompat.setWeather(cb, "RAINY")
+    Abilities.updateForecast(cb, castformBattler)
+    T.eq(castformMon._krCastformForm, "rainy", "rain commits rainy form")
+    BattleCompat.setWeather(cb, nil)
+    Abilities.updateForecast(cb, castformBattler)
+    T.eq(castformBattler.curTypes[1], "NORMAL", "Castform reverts to NORMAL when weather ends")
+    T.eq(castformMon._krCastformForm, nil, "weather end clears Forecast form sheet")
+    BattleCompat.scrubPartyMons({ castformMon })
+    T.eq(castformMon._krCastformForm, nil, "scrub strips Forecast form")
+    T.eq(castformMon.curTypes, nil, "scrub strips Forecast curTypes")
 
     -- Gold party mons are the battler (no .mon wrapper). Forecast type must
     -- survive a second sync the way a follow-up Weather Ball would.
@@ -392,7 +405,7 @@ return function(T, Data, run)
     CastformFx.install({ path = "mods/Kanto-Reforged" })
     T.eq(CastformFx.TOTAL, 36, "Castform morph is a short fade")
     T.check(CastformFx.assetPath({ path = "mods/Kanto-Reforged" }, "front", "sunny")
-      :find("castform_sunny_front", 1, true), "Castform sunny asset path")
+      :find("CASTFORM_SUNNY_front", 1, true), "Castform sunny asset path")
     local BS = require("src.battle.BattleState")
     T.check(type(BS.startPicMorph) == "function",
       "Gen1 BattleState exposes startPicMorph")
@@ -486,21 +499,23 @@ return function(T, Data, run)
     }
     local sunnyBattle = { _krWeather = "SUNNY" }
     local resolved = CastformFx.resolveSprite(
-      "mods/Kanto-Reforged/assets/castform_front.png", ctx, sunnyBattle,
+      "mods/Kanto-Reforged/assets/gs/CASTFORM_front.png", ctx, sunnyBattle,
       { path = "mods/Kanto-Reforged" })
-    T.check(resolved:find("castform_sunny_front", 1, true),
+    T.check(resolved:find("CASTFORM_SUNNY_front", 1, true),
       "pokemon.sprite resolves Castform's sunny form")
-    T.eq(ctx.trueColor, true,
-      "Gen2 pic() skips GBC remap for Castform weather art")
+    T.eq(ctx.trueColor, false,
+      "Castform weather art uses palette remap (not trueColor)")
+    T.eq(CastformFx.paletteName("sunny"), "CASTFORM_SUNNY", "sunny palette name")
 
     local clearCtx = {
       species = "CASTFORM", side = "front", kind = "battle", trueColor = false,
     }
-    local clearPath = "mods/Kanto-Reforged/assets/castform_front.png"
+    local clearPath = "mods/Kanto-Reforged/assets/gs/CASTFORM_front.png"
     T.eq(CastformFx.resolveSprite(clearPath, clearCtx, { field = {} },
       { path = "mods/Kanto-Reforged" }),
       clearPath, "clear weather keeps the default Castform pic")
     T.eq(clearCtx.trueColor, false, "default Castform pic does not force trueColor")
+    T.eq(CastformFx.paletteName(nil), "CASTFORM", "clear palette name")
 
     -- Hoenn battleScaleBack 1.5 must not resize the trainer intro pic when
     -- Castform (or any KR mon) is the lead.
@@ -510,21 +525,22 @@ return function(T, Data, run)
         local Scale = require("mods.Kanto-Reforged.battle.battle_sprite_scale")
         Scale.install({ loader = { generation = 2 } })
         local BS = require("src.ui.gen2.BattleState")
-        T.check(BS._krTrainerPicScale,
+        T.check(BS._krTrainerPicScaleVersion == 4,
           "Gen2 trainer intro ignores lead mon battleScale*")
         local view = {
           showPlayerTrainer = true,
           showEnemyTrainer = false,
-          pokemon = { CASTFORM = { battleScaleBack = 1.5, battleScaleFront = 1 } },
+          -- Forecast backs are 48×48 → Gold scale 1 (not 32→1.5).
+          pokemon = { CASTFORM = { battleScaleBack = 1, battleScaleFront = 1 } },
           imageScale = function() return nil end,
         }
         setmetatable(view, { __index = BS })
         T.eq(view:picScale("assets/chris_back.png", { species = "CASTFORM" }, true),
-          1, "Castform lead does not 1.5x the player trainer back")
+          1, "Castform lead does not scale the player trainer back")
         view.showPlayerTrainer = false
-        T.eq(view:picScale("mods/Kanto-Reforged/assets/castform_back.png",
+        T.eq(view:picScale("mods/Kanto-Reforged/assets/gs/CASTFORM_back.png",
             { species = "CASTFORM" }, true),
-          1.5, "Castform back still uses Hoenn battleScaleBack after send-out")
+          1, "Castform 48px back uses native Gold battleScaleBack after send-out")
         view.showEnemyTrainer = true
         T.eq(view:picScale("assets/youngster.png", { species = "RATTATA" }, false),
           1, "enemy trainer front ignores foe mon battleScale*")

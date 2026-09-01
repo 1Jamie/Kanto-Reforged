@@ -17925,8 +17925,8 @@ P.species = {
     },
     evolutions = {
     },
-    spriteFront = "mods/Kanto-Reforged/assets/castform_front.png",
-    spriteBack = "mods/Kanto-Reforged/assets/castform_back.png",
+    spriteFront = "mods/Kanto-Reforged/assets/gs/CASTFORM_front.png",
+    spriteBack = "mods/Kanto-Reforged/assets/gs/CASTFORM_back.png",
     frontSize = 6,
     palette = "CASTFORM",
     dexEntry = {

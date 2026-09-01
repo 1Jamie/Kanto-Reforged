@@ -114,11 +114,13 @@ function PokemonGen2.toGen2Record(record, opts)
     eggMoves = nil,
     palette = record.palette,
   }
-  -- KR art is Gen1-sized (32×32 backs). Expand Gen1 battleScale* into Gen2
-  -- absolutes (default back → 1.5 so Hoenn doesn't read tiny on Gen2).
-  BattleSpriteScale.applyGen1RecordToGold(out, record)
-  -- Never attach Crystal MonAnim rows — Hoenn/KR art is static-only, and
-  -- Gold/Silver/Gen1 have no animated-front system to consume them.
+  -- Flat KR art is Gen1-sized (32×32 backs → Gold back 1.5). Converted
+  -- RawSprites gs backs are 48×48 — pass backPx so they stay native on Gen2.
+  local backPx = (opts and opts.backPx) or BattleSpriteScale.GEN1.backPx
+  BattleSpriteScale.applyGen1RecordToGold(out, record, backPx)
+  out._krGoldScaled = true
+  -- gs idle strips play via battle/front_anim.lua on every edition; Crystal
+  -- MonAnim rows are only for vanilla ROM mons still on Crystal art.
   out.anim = nil
   -- ability is KR-only metadata; include when the registry accepts it (pcall register).
   if record.ability then out.ability = record.ability end
@@ -166,16 +168,30 @@ function PokemonGen2.registerForGen2(mod, pokemon_data, opts)
     local dex = record.dex or 0
     if dex > highestDex then highestDex = dex end
     if dex >= 252 then
-      local g2 = PokemonGen2.toGen2Record(record, { knownMove = knownMove })
-      -- Prefer Gen2-baked Johto art only applies to 152–251; Hoenn keeps KR assets.
+      local SpriteResolve = require("mods.Kanto-Reforged.core.sprite_resolve")
+      local backPx = SpriteResolve.backPxFor(mod, id)
+      local g2 = PokemonGen2.toGen2Record(record, {
+        knownMove = knownMove,
+        backPx = backPx,
+      })
+      -- Prefer gs paths when converted sprites exist.
+      -- pathsOnly=true: g2 already has correct Gold scales from toGen2Record;
+      -- re-running the scale conversion would treat Gold values as Gen1 values
+      -- and halve them (double-conversion bug).
+      SpriteResolve.applyToRecord(mod, id, g2, { pathsOnly = true })
       local ok = pcall(function()
         mod.content.pokemon:register(id, g2)
       end)
       if ok then nReg = nReg + 1 end
     elseif dex >= 1 and dex <= 251 then
-      -- Gen2 ROM already has the species; patch KR ability (+ optional learn bits later).
+      -- Gen2 ROM already has the species; patch KR ability + sprite art.
       local patch = {}
       if record.ability then patch.ability = record.ability end
+      local SpriteResolve = require("mods.Kanto-Reforged.core.sprite_resolve")
+      local art = SpriteResolve.registryPatch(mod, id)
+      if art then
+        for k, v in pairs(art) do patch[k] = v end
+      end
       if next(patch) then
         local ok = pcall(function()
           mod.content.pokemon:patch(id, patch)
@@ -195,43 +211,11 @@ end
 -- Compat alias for older call sites / tests.
 PokemonGen2.registerForGold = PokemonGen2.registerForGen2
 
---- Gen1 sprites 1–251: CUSTOM KR or a captured Gen2 edition cache.
--- Prefer SpriteCache (per-edition gold/silver/crystal); legacy johto/ bake
--- remains as a fallback when no edition cache exists yet.
+--- Gen1 sprites: prefer converted RawSprites (assets/gs), else flat assets.
+-- Gold/Silver/Crystal edition caches are retired — KR owns battle art.
 function PokemonGen2.applyGen1DerivedSprites(mod, pokemon_data)
-  local SpriteCache = require("mods.Kanto-Reforged.core.sprite_cache")
-  if #SpriteCache.availableEditions(mod) > 0
-      or (mod.options and mod.options:get(SpriteCache.OPTION_KEY)) then
-    return SpriteCache.applyToData(mod, pokemon_data)
-  end
-  -- Legacy single johto/ bake from older installs.
-  local modId = mod.id or "Kanto-Reforged"
-  local n = 0
-  local nScaled = 0
-  for id, record in pairs(pokemon_data.species or {}) do
-    local dex = record.dex or 0
-    if dex >= 152 and dex <= 251 then
-      local base = id:lower()
-      local frontRel = "johto/" .. base .. "_front.png"
-      local backRel = "johto/" .. base .. "_back.png"
-      local front = PokemonGen2.derivedOrFallback(modId, frontRel, record.spriteFront)
-      local back = PokemonGen2.derivedOrFallback(modId, backRel, record.spriteBack)
-      local usedDerivedBack = (back ~= record.spriteBack)
-      if front ~= record.spriteFront or usedDerivedBack then
-        record.spriteFront = front
-        record.spriteBack = back
-        n = n + 1
-      end
-      if usedDerivedBack then
-        BattleSpriteScale.applyGoldBackOnGen1(record)
-        nScaled = nScaled + 1
-      end
-    end
-  end
-  if n > 0 and mod.log then
-    mod.log:info("Using legacy Johto-derived art for %d species", n)
-  end
-  return n
+  local SpriteResolve = require("mods.Kanto-Reforged.core.sprite_resolve")
+  return SpriteResolve.applyToData(mod, pokemon_data)
 end
 
 return PokemonGen2

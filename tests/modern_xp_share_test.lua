@@ -14,6 +14,7 @@ return function(T, Data, run)
   T.eq(modernOpt.type, "toggle", "slot-2 XP share is a toggle")
   T.eq(modernOpt.default, true, "slot-2 XP share defaults on")
   T.eq(modernOpt.label, "XP SHARE (SLOT 2)", "slot-2 XP share label")
+  T.check(ModernXpShare._installed, "slot-2 XP share installed via battle.exp_award")
 
   -- Fraction math (scenarios A–C).
   do
@@ -69,6 +70,7 @@ return function(T, Data, run)
     b.uiNext = function() end
     b.drainNext = function() end
     b.learnMove = function() end
+    b.sayNextAutoWaitSfx = function() end
     b.queue = {}
     b.nextInsert = 0
     return game, b
@@ -92,7 +94,7 @@ return function(T, Data, run)
     game.save.inventory.EXP_ALL = 1
     b.participants = { [lead] = true }
     local before = { lead.exp, slot2.exp, slot3.exp, fainted.exp }
-    b:awardExperience()
+    b:awardExp()
     local wantLead, wantSlot2 = expectGain(0.70), expectGain(0.30)
     T.eq(lead.exp - before[1], wantLead, "A: solo lead gets 70% pool")
     T.eq(slot2.exp - before[2], wantSlot2, "A: slot 2 gets 30% pool")
@@ -112,7 +114,7 @@ return function(T, Data, run)
     local game, b = makeBattle({ lead, bench })
     b.participants = { [lead] = true }
     local before = { lead.exp, bench.exp }
-    b:awardExperience()
+    b:awardExp()
     T.eq(lead.exp - before[1], solo, "vanilla: sole participant gets full pool")
     T.eq(bench.exp - before[2], 0, "vanilla: bench gets nothing without EXP.ALL")
     restoreOpts()
@@ -129,7 +131,7 @@ return function(T, Data, run)
     battle.participants = { [a] = true, [bMon] = true }
     local fFrac, bFrac = ModernXpShare.fractions(2, true)
     local before = { a.exp, slot2.exp, bMon.exp }
-    battle:awardExperience()
+    battle:awardExp()
     local wantF, wantB = expectGain(fFrac), expectGain(bFrac)
     T.eq(a.exp - before[1], wantF, "B: fighter A gets half of 70%")
     T.eq(bMon.exp - before[3], wantF, "B: fighter B gets half of 70%")
@@ -149,7 +151,7 @@ return function(T, Data, run)
     battle.participants = { [a] = true, [bMon] = true, [cMon] = true }
     local fFrac, bFrac = ModernXpShare.fractions(3, true)
     local before = { a.exp, slot2.exp, bMon.exp, cMon.exp }
-    battle:awardExperience()
+    battle:awardExp()
     local wantF, wantB = expectGain(fFrac), expectGain(bFrac)
     T.eq(a.exp - before[1], wantF, "C: fighter A share")
     T.eq(bMon.exp - before[3], wantF, "C: fighter B share")
@@ -168,9 +170,112 @@ return function(T, Data, run)
     battle.participants = { [a] = true, [bMon] = true }
     local before = { a.exp, bMon.exp }
     local half = Experience.gainFor(enemyDef, 10, false, 2, false, Data.constants)
-    battle:awardExperience()
+    battle:awardExp()
     T.eq(a.exp - before[1], half, "slot 2 fought: equal half of full pool")
     T.eq(bMon.exp - before[2], half, "slot 2 fought: no extra bench share")
     restoreOpts()
+  end
+
+  -- Faint tail must not crash: awardExp's deferred steps stay a table when
+  -- the hook (or a stub) suppresses a second XP pass.  Regression for the
+  -- old enemyMonFainted Experience.apply stub that returned only two values.
+  do
+    setOpt(ModernXpShare.OPTION_KEY, true)
+    local lead = Pokemon.new(Data, "BULBASAUR", 20)
+    local slot2 = Pokemon.new(Data, "SQUIRTLE", 20)
+    local game, b = makeBattle({ lead, slot2 })
+    b.participants = { [lead] = true }
+    local ok, err = pcall(function() b:awardExp() end)
+    T.check(ok, "awardExp with hook does not crash: " .. tostring(err))
+    -- Stock faint path re-enters awardExp safely after our payout cleared
+    -- participants; second call is a no-op (empty alive).
+    b.participants = {}
+    ok, err = pcall(function() b:awardExp() end)
+    T.check(ok, "second awardExp after share is safe: " .. tostring(err))
+    restoreOpts()
+  end
+
+  -- Gen 2: same toggle drives battle.exp_award on Gold's Battle.
+  do
+    local okBattle, Battle = pcall(require, "src.battle.gen2.Battle")
+    local okMon, Mon = pcall(require, "src.battle.gen2.Mon")
+    if okBattle and okMon and Battle and Mon then
+      local perfect = { attack = 15, defense = 15, speed = 15, special = 15 }
+      perfect.hp = Mon.hpDV(perfect)
+      local function g2Award(partySpec, optOn)
+        setOpt(ModernXpShare.OPTION_KEY, optOn)
+        local party, participants = {}, {}
+        for index, spec in ipairs(partySpec) do
+          local mon = Mon.new(Data, "MACHOP", 20, { dvs = perfect })
+          if not mon then
+            mon = Mon.new(Data, "BULBASAUR", 20, { dvs = perfect })
+          end
+          if spec.hp then mon.hp = spec.hp end
+          party[index] = mon
+          if spec.participant then participants[index] = true end
+        end
+        local wildSpecies = Data.pokemon.PIDGEY and "PIDGEY" or "RATTATA"
+        local wild = Mon.new(Data, wildSpecies, 14, { dvs = perfect })
+        local battle = Battle.new({
+          data = Data, party = party, wild = wild,
+          save = { player = { id = 1, badges = {} } },
+          random = function(n) return (n or 1) > 1 and 1 or 0 end,
+        })
+        battle.participants = participants
+        local before = {}
+        for i, mon in ipairs(party) do before[i] = mon.experience or 0 end
+        local ok, err = pcall(function() battle:awardExperience(wild) end)
+        T.check(ok, "Gen2 awardExperience ok: " .. tostring(err))
+        local gained = {}
+        for i, mon in ipairs(party) do
+          gained[i] = (mon.experience or 0) - before[i]
+        end
+        restoreOpts()
+        return gained, party
+      end
+
+      local gSolo = g2Award({ { participant = true }, {} }, true)
+      T.check(gSolo[1] > 0, "Gen2 toggle on: fighter gains XP")
+      T.check(gSolo[2] > 0, "Gen2 toggle on: slot 2 bench gains XP")
+      T.check(gSolo[1] > gSolo[2], "Gen2 toggle on: fighter gets more than bench")
+
+      local gOff = g2Award({ { participant = true }, {} }, false)
+      T.check(gOff[1] > 0, "Gen2 toggle off: fighter still gains")
+      T.eq(gOff[2], 0, "Gen2 toggle off: bench gets nothing without EXP.SHARE item")
+
+      local gBoth = g2Award({ { participant = true }, { participant = true } }, true)
+      T.eq(gBoth[1], gBoth[2], "Gen2: both fighters equal when slot 2 fought")
+
+      -- EXP.SHARE *item* must not tax our toggle payout (engine applyShare
+      -- closes over halved; we bypass that while replacing vanilla).
+      local function g2WithItem(optOn)
+        setOpt(ModernXpShare.OPTION_KEY, optOn)
+        local p1 = Mon.new(Data, "BULBASAUR", 20, { dvs = perfect })
+        local p2 = Mon.new(Data, "SQUIRTLE", 20, { dvs = perfect })
+        p2.item = "EXP_SHARE"
+        local wild = Mon.new(Data, Data.pokemon.PIDGEY and "PIDGEY" or "RATTATA",
+          14, { dvs = perfect })
+        local battle = Battle.new({
+          data = Data, party = { p1, p2 }, wild = wild,
+          save = { player = { id = 1, badges = {} } },
+          random = function(n) return (n or 1) > 1 and 1 or 0 end,
+        })
+        battle.participants = { [1] = true }
+        local b1, b2 = p1.experience, p2.experience
+        battle:awardExperience(wild)
+        restoreOpts()
+        return p1.experience - b1, p2.experience - b2
+      end
+      local noItem = gSolo
+      local withItemF, withItemB = g2WithItem(true)
+      T.eq(withItemF, noItem[1],
+        "Gen2 toggle on: EXP.SHARE item does not tax fighter share")
+      T.eq(withItemB, noItem[2],
+        "Gen2 toggle on: EXP.SHARE item does not tax bench share")
+      local offF, offB = g2WithItem(false)
+      T.check(offB > 0, "Gen2 toggle off: EXP.SHARE item still pays the holder")
+      T.check(offF > 0 and offF <= noItem[1],
+        "Gen2 toggle off: vanilla halved pool for fighter")
+    end
   end
 end
