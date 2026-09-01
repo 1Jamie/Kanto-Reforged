@@ -3,10 +3,11 @@
 Per-species artist credit for battle front/back art shipped with this mod.
 
 If you would like to go check out the awesome creators that did the heavy lifting with the art you find find them here! please give them some love for their amazing work <3
-(https://x.com/nuukiie)[https://x.com/nuukiie]
-(https://x.com/SageDeoxys)[https://x.com/SageDeoxys]
-(https://sagedeoxys.blogspot.com/?m=1)[https://sagedeoxys.blogspot.com/?m=1]
-(https://bsky.app/profile/sagedeoxys.bsky.social)[https://bsky.app/profile/sagedeoxys.bsky.social]
+
+- [Nuukiie on X](https://x.com/nuukiie)
+- [SageDeoxys on X](https://x.com/SageDeoxys)
+- [SageDeoxys blog](https://sagedeoxys.blogspot.com/?m=1)
+- [SageDeoxys on Bluesky](https://bsky.app/profile/sagedeoxys.bsky.social)
 
 AND DO NOT FORGET THE ABSOLUTE LEGEND THAT DID THE HARD WORKING OF GETTING ALL THIS PUT TOGETHER AND GETTING PERMISSONS AND PUTING IT INTO AND ORANIZED PLACE FOR ME!!!! TTiN 
 
