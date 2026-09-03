@@ -589,14 +589,19 @@ return function(mod)
     end
 
     if Host.isGen2From(mod) or Host.isGen2() then
+      -- Register Hoenn species FIRST so content.pokemon:register succeeds.
+      -- patchRegistry adds a patch op for every indexed species (including
+      -- unregistered Hoenn ones); when it runs before register, the registry
+      -- sees a pre-existing op and throws "already registered", silently
+      -- dropping all 135 Hoenn Pokémon (leaving them with no levelMoves).
+      PokemonGen2.registerForGen2(mod, pokemon_data, {
+        gen2DataReady = gen2DataReady,
+      })
+
       -- Sprite paths + battleScaleBack must land on content.pokemon before
       -- Loader merge freezes the registry (game.ready is too late).
       local SpriteResolve = require("mods.Kanto-Reforged.core.sprite_resolve")
       SpriteResolve.patchRegistry(mod)
-
-      PokemonGen2.registerForGen2(mod, pokemon_data, {
-        gen2DataReady = gen2DataReady,
-      })
       -- Prefer converted RawSprites on live Data (ROM 1–251 + registered Hoenn).
       local SpriteResolve = require("mods.Kanto-Reforged.core.sprite_resolve")
       SpriteResolve.applyLive(mod)
