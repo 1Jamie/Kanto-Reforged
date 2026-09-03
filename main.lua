@@ -210,6 +210,11 @@ return function(mod)
     RulesetOpt.install(mod)
   end
 
+  -- National Dex (#1–386) needs more than vanilla 12/14 PC boxes.
+  -- Mutates Boxes.COUNT / Save.NUM_BOXES (constants.boxCount is unread).
+  local PcBoxes = require("mods.Kanto-Reforged.pokemon.pc_boxes")
+  PcBoxes.apply(mod)
+
   SpeciesScope._refreshContent = refreshScopeContent
   SpeciesScope.install(mod)
 
@@ -243,6 +248,11 @@ return function(mod)
   -- Party GIVE/TAKE + bag berry USE on both hosts; Gen1 also patches
   -- BattleState / MoveEffects, Gen2 wires item heldEffect + wild holds.
   HeldItems.install(mod)
+
+  -- Caught Gen3 mons from the empty-learnset bug: fill 0-move slots only.
+  local EmptyMovesRepair = require("mods.Kanto-Reforged.pokemon.empty_moves_repair")
+  EmptyMovesRepair.install(mod)
+
   if Host.isGen1() then
     Gender.register(mod)
     Gender.install(mod)
@@ -1428,10 +1438,15 @@ return function(mod)
   end)
 
   -- Ensure Data.moves also lose Gen4 categories after merge (vanilla + KR).
-  mod.events:on("game.ready", function()
+  mod.events:on("game.ready", function(ev)
     local n = MoveCategoryGen3.apply()
     if n > 0 and mod.log then
       mod.log:info("Stripped Gen4 move.category on %d moves (Gen3 type split)", n)
+    end
+    -- Grow pre-expansion saves so new boxes exist beyond vanilla 12/14.
+    local save = ev and ev.game and ev.game.save
+    if save then
+      require("mods.Kanto-Reforged.pokemon.pc_boxes").growSave(save)
     end
   end)
 
@@ -1577,8 +1592,14 @@ return function(mod)
     if resolved and resolved ~= path then return resolved end
     -- KR art: assets/gs → flat assets → caller/ROM.
     local SpriteResolve = require("mods.Kanto-Reforged.core.sprite_resolve")
-    local alt = SpriteResolve.resolvePath(mod, ctx and ctx.species, ctx and ctx.side)
-    if alt then return alt end
+    local alt = SpriteResolve.resolvePath(mod, ctx and ctx.species, ctx and ctx.side, path)
+    if alt then
+      -- KR gs/flat sheets are 2bpp grayscale. Crystal ROM rows often carry
+      -- trueColor from the extractor; leaving that set skips GbcPalette and
+      -- the gray PNG looks muddy/blurry next to paletted Gold/Silver art.
+      if ctx then ctx.trueColor = false end
+      return alt
+    end
     return next(path, ctx)
   end)
 

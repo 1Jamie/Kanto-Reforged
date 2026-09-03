@@ -1,4 +1,8 @@
--- Resolve KR battle pics: assets/gs → flat assets → caller/ROM.
+-- Resolve KR battle pics.
+--   Gen 2: assets/gs → ROM (dex 1–251) → flat /assets (Hoenn-only, no cart pic)
+--   Gen 1: assets/gs → flat /assets → caller/ROM
+-- 32×32 flats are inferior to Gold/Crystal 48×48 backs; only use them when
+-- the cart has no sprite. Gen 1 still needs them for Johto/Hoenn.
 -- Front idle loops: battle/front_anim.lua (all hosts when gs strips exist).
 -- Crystal MonAnim is fallback on Crystal only for ROM-native species.
 --
@@ -90,12 +94,76 @@ function SpriteResolve.hasFlat(_mod, speciesId, side)
   return meta.front == true
 end
 
+-- Gold/Silver/Crystal National Dex through Celebi. Hoenn starts at 252.
+local GEN2_ROM_DEX_MAX = 251
+
+local function isGen2Mod(mod)
+  local loader = Host.modLoader(mod)
+  if loader and loader.generation == 2 then return true end
+  return Host.isGen2From(mod) or Host.isGen2()
+end
+
+function SpriteResolve.speciesDex(speciesId)
+  if not speciesId then return nil end
+  if not SpriteResolve._dexById then
+    SpriteResolve._dexById = {}
+    local ok, pdata = pcall(require, "mods.Kanto-Reforged.pokemon.pokemon_data")
+    if ok and pdata and type(pdata.species) == "table" then
+      for id, rec in pairs(pdata.species) do
+        if type(rec) == "table" and rec.dex then
+          SpriteResolve._dexById[id] = rec.dex
+        end
+      end
+    end
+  end
+  return SpriteResolve._dexById[speciesId]
+end
+
+--- True when Gold/Silver/Crystal already ships this species' battle pic.
+function SpriteResolve.gen2RomHas(mod, speciesId)
+  if not isGen2Mod(mod) then return false end
+  local dex = SpriteResolve.speciesDex(speciesId)
+  return type(dex) == "number" and dex >= 1 and dex <= GEN2_ROM_DEX_MAX
+end
+
+--- Extractor path for a Gen2 cart pic (see RomExtractorGen2 pokemonAssets).
+function SpriteResolve.gen2RomPath(speciesId, side)
+  if not speciesId then return nil end
+  local folder = (side == "back") and "back" or "front"
+  return "assets/generated/battle/" .. folder .. "/"
+    .. tostring(speciesId):lower() .. ".png"
+end
+
+--- Which sheet a battle-pic path is: "gs", "flat", "rom", or nil.
+function SpriteResolve.assetKind(path)
+  if type(path) ~= "string" then return nil end
+  if path:find("assets/generated/battle/", 1, true) then
+    return "rom"
+  end
+  if path:find("assets/gs/", 1, true) then
+    return "gs"
+  end
+  if path:find("/assets/", 1, true)
+      and (path:find("_back.png", 1, true) or path:find("_front.png", 1, true))
+      and not path:find("assets/gs/", 1, true) then
+    return "flat"
+  end
+  return nil
+end
+
 --- Live pokemon.sprite override. Nil → keep caller path (ROM).
--- Priority: gs → flat → nil.
-function SpriteResolve.resolvePath(mod, speciesId, side)
+-- Gen 2: gs → ROM → flat. Gen 1: gs → flat → ROM.
+-- `callerPath` remaps leftover KR flats onto the cart pic when ROM should win.
+function SpriteResolve.resolvePath(mod, speciesId, side, callerPath)
   if not speciesId then return nil end
   if SpriteResolve.hasGs(mod, speciesId, side) then
     return SpriteResolve.gsPath(mod, speciesId, side)
+  end
+  if SpriteResolve.gen2RomHas(mod, speciesId) then
+    if SpriteResolve.assetKind(callerPath) == "flat" then
+      return SpriteResolve.gen2RomPath(speciesId, side)
+    end
+    return nil
   end
   if SpriteResolve.hasFlat(mod, speciesId, side) then
     return SpriteResolve.flatPath(mod, speciesId, side)
@@ -109,12 +177,6 @@ local function sizeTiles(px)
   if t < 1 then t = 1 end
   if t > 7 then t = 7 end
   return t
-end
-
-local function isGen2Mod(mod)
-  local loader = Host.modLoader(mod)
-  if loader and loader.generation == 2 then return true end
-  return Host.isGen2From(mod) or Host.isGen2()
 end
 
 local function applyFront(mod, id, rec, source, pathsOnly)
@@ -182,11 +244,20 @@ end
 
 local function bestSource(mod, id, side)
   if SpriteResolve.hasGs(mod, id, side) then return "gs" end
+  -- Gen 2 cart pics beat KR 32×32 flats.
+  if SpriteResolve.gen2RomHas(mod, id) then return nil end
   if SpriteResolve.hasFlat(mod, id, side) then return "flat" end
   return nil
 end
 
---- Apply best available art onto a species record (gs → flat → leave ROM).
+local function restoreGen2RomPic(rec, id, key, side)
+  if SpriteResolve.assetKind(rec[key]) ~= "flat" then return false end
+  rec[key] = SpriteResolve.gen2RomPath(id, side)
+  return true
+end
+
+--- Apply best available art onto a species record.
+-- Gen 2: gs → leave/restore ROM → flat (Hoenn). Gen 1: gs → flat → ROM.
 -- Mutates `rec`. Returns true when any path was written.
 -- opts.pathsOnly=true: only update sprite paths, skip scale/size mutations.
 --   Use this when `rec` is already a converted Gen2 record with correct scales.
@@ -197,9 +268,18 @@ function SpriteResolve.applyToRecord(mod, id, rec, opts)
   local frontSrc = bestSource(mod, id, "front")
   if frontSrc and applyFront(mod, id, rec, frontSrc, pathsOnly) then
     changed = true
+  elseif SpriteResolve.gen2RomHas(mod, id)
+      and restoreGen2RomPic(rec, id, "spriteFront", "front") then
+    changed = true
   end
   local backSrc = bestSource(mod, id, "back")
   if backSrc and applyBack(mod, id, rec, backSrc, pathsOnly) then
+    changed = true
+  elseif SpriteResolve.gen2RomHas(mod, id)
+      and restoreGen2RomPic(rec, id, "spriteBack", "back") then
+    if not pathsOnly and rec.battleScaleBack and rec.battleScaleBack > 1.01 then
+      rec.battleScaleBack = 1
+    end
     changed = true
   end
   return changed
@@ -286,30 +366,44 @@ function SpriteResolve.registryPatch(mod, id)
   return buildPatch(mod, id)
 end
 
---- Gen2: register flat KR back paths in battle_sprite_scales (32px → 1.5).
--- Engine picScale checks image-level scale before species battleScaleBack;
--- this survives even when the picScale monkey-patch is lost after hot reload.
+local function registerOneBackScale(reg, key, path, scale)
+  if not (reg and path and scale) then return false end
+  local ok = pcall(function()
+    if reg.get and reg:get(key) then
+      reg:patch(key, { path = path, scale = scale })
+    else
+      reg:register(key, { path = path, scale = scale })
+    end
+  end)
+  return ok
+end
+
+--- Gen2: register KR back paths in battle_sprite_scales (32px → 1.5, 48px → 1).
+-- Engine picScale checks image-level scale before species battleScaleBack.
 function SpriteResolve.registerBackPathScales(mod)
   local reg = mod and mod.content and mod.content.battle_sprite_scales
   if not reg or reg.frozen then return 0 end
   local n = 0
+  for id, meta in pairs(SpriteResolve.gsIndex()) do
+    if meta.backW then
+      local path = SpriteResolve.gsPath(mod, id, "back")
+      local scale = BattleSpriteScale.goldBackScaleForPx(meta.backW)
+      if registerOneBackScale(reg, "kr_gs_back_" .. id, path, scale) then
+        n = n + 1
+      end
+    end
+  end
   for id, meta in pairs(SpriteResolve.flatIndex()) do
-    if meta.back then
+    if meta.back and not SpriteResolve.gen2RomHas(mod, id) then
       local path = SpriteResolve.flatPath(mod, id, "back")
       local scale = BattleSpriteScale.goldBackScaleForPx(meta.backW or 32)
-      local key = "kr_flat_back_" .. id
-      local ok = pcall(function()
-        reg:register(key, { path = path, scale = scale })
-      end)
-      if ok then
+      if registerOneBackScale(reg, "kr_flat_back_" .. id, path, scale) then
         n = n + 1
-      elseif mod and mod.log then
-        mod.log:warn("registerBackPathScales %s failed", id)
       end
     end
   end
   if mod and mod.log and n > 0 then
-    mod.log:info("SpriteResolve: registered %d flat back path scales", n)
+    mod.log:info("SpriteResolve: registered %d back path scales", n)
   end
   return n
 end
@@ -323,8 +417,17 @@ function SpriteResolve.applyBackPathScales(mod, data)
     data.battle_sprite_scales = scales
   end
   local n = 0
+  for id, meta in pairs(SpriteResolve.gsIndex()) do
+    if meta.backW then
+      scales["kr_gs_back_" .. id] = {
+        path = SpriteResolve.gsPath(mod, id, "back"),
+        scale = BattleSpriteScale.goldBackScaleForPx(meta.backW),
+      }
+      n = n + 1
+    end
+  end
   for id, meta in pairs(SpriteResolve.flatIndex()) do
-    if meta.back then
+    if meta.back and not SpriteResolve.gen2RomHas(mod, id) then
       local path = SpriteResolve.flatPath(mod, id, "back")
       local scale = BattleSpriteScale.goldBackScaleForPx(meta.backW or 32)
       scales["kr_flat_back_" .. id] = { path = path, scale = scale }
@@ -362,13 +465,19 @@ function SpriteResolve.patchRegistry(mod)
   return n
 end
 
---- Stamp battleScaleBack on every indexed KR back species in a live table.
+--- Stamp battleScaleBack from the pic that will actually be drawn.
+-- Do not stamp 1.5 onto Gen2 ROM natives just because a 32px flat exists.
 function SpriteResolve.applyGoldBackScales(mod, pokemonTable)
   if type(pokemonTable) ~= "table" then return 0 end
   local n = 0
   for id, rec in pairs(pokemonTable) do
     if type(rec) == "table" then
-      local scale = SpriteResolve.goldBackScaleForSpecies(mod, id)
+      local drawn = SpriteResolve.resolvePath(mod, id, "back", rec.spriteBack)
+        or rec.spriteBack
+      local scale = SpriteResolve.goldBackScaleForDrawnPath(mod, drawn, id)
+      if not scale and SpriteResolve.resolvePath(mod, id, "back") then
+        scale = SpriteResolve.goldBackScaleForSpecies(mod, id)
+      end
       if scale then
         rec.battleScaleBack = scale
         n = n + 1
@@ -433,6 +542,7 @@ end
 function SpriteResolve.invalidateIndex()
   SpriteResolve._gsIndex = nil
   SpriteResolve._flatIndex = nil
+  SpriteResolve._dexById = nil
   package.loaded["mods.Kanto-Reforged.pokemon.gs_index"] = nil
   package.loaded["mods.Kanto-Reforged.pokemon.gs_anim_index"] = nil
   package.loaded["mods.Kanto-Reforged.pokemon.flat_index"] = nil
@@ -462,6 +572,41 @@ end
 function SpriteResolve.hasKrBack(mod, speciesId)
   return SpriteResolve.hasGs(mod, speciesId, "back")
     or SpriteResolve.hasFlat(mod, speciesId, "back")
+end
+
+--- Which KR (or ROM) back the live `path` is, independent of species index.
+-- Index-only scale is wrong when gs is indexed but the frame draws a 32px
+-- flat fallback — or Crystal ROM 48px with a leftover 1.5 species stamp.
+function SpriteResolve.backPathKind(path)
+  if type(path) ~= "string" then return nil end
+  if path:find("assets/generated/battle/back/", 1, true) then
+    return "rom"
+  end
+  if path:find("assets/gs/", 1, true) and path:find("_back", 1, true) then
+    return "gs"
+  end
+  if path:find("_back.png", 1, true) and path:find("/assets/", 1, true)
+      and not path:find("assets/gs/", 1, true) then
+    return "flat"
+  end
+  return nil
+end
+
+--- Gen2 battleScaleBack for the pic actually on screen.
+function SpriteResolve.goldBackScaleForDrawnPath(mod, path, speciesId)
+  local kind = SpriteResolve.backPathKind(path)
+  if kind == "gs" then
+    local meta = speciesId and SpriteResolve.gsIndex()[speciesId]
+    return BattleSpriteScale.goldBackScaleForPx(
+      (meta and meta.backW) or BattleSpriteScale.GOLD.backPx)
+  end
+  if kind == "flat" then
+    local meta = speciesId and SpriteResolve.flatIndex()[speciesId]
+    return BattleSpriteScale.goldBackScaleForPx(
+      (meta and meta.backW) or BattleSpriteScale.GEN1.backPx)
+  end
+  -- ROM / unknown: Gold/Crystal backs are already 48px at 1×.
+  return nil
 end
 
 --- Gen2 battleScaleBack from species index only (gs 48px→1, flat 32px→1.5).

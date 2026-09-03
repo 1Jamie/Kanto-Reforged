@@ -525,7 +525,7 @@ return function(T, Data, run)
         local Scale = require("mods.Kanto-Reforged.battle.battle_sprite_scale")
         Scale.install({ loader = { generation = 2 } })
         local BS = require("src.ui.gen2.BattleState")
-        T.check(BS._krTrainerPicScaleVersion == 5,
+        T.check(BS._krTrainerPicScaleVersion == 7,
           "Gen2 trainer intro ignores lead mon battleScale*")
         local view = {
           showPlayerTrainer = true,
@@ -546,6 +546,15 @@ return function(T, Data, run)
         T.eq(view:picScale("mods/Kanto-Reforged/assets/gs/CASTFORM_back.png",
             { species = "CASTFORM" }, true),
           1, "Castform 48px back uses native Gold battleScaleBack after send-out")
+        T.eq(view:picScale("assets/generated/battle/back/pikachu.png",
+            { species = "PIKACHU" }, true),
+          1, "Crystal/Gold ROM 48px back stays 1× (not KR 32px 1.5)")
+        T.eq(view:picScale("mods/Kanto-Reforged/assets/typhlosion_back.png",
+            { species = "TYPHLOSION" }, true),
+          1, "Gen2 ROM Typhlosion does not use the 32px KR flat")
+        T.eq(view:picScale("mods/Kanto-Reforged/assets/groudon_back.png",
+            { species = "GROUDON" }, true),
+          1.5, "Hoenn 32px flat back is scaled to Gold 48px box")
         view.showEnemyTrainer = true
         T.eq(view:picScale("assets/youngster.png", { species = "RATTATA" }, false),
           1, "enemy trainer front ignores foe mon battleScale* (scale 1.4)")

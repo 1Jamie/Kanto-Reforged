@@ -163,7 +163,7 @@ function BattleSpriteScale.gen1RegisterCopy(record)
 end
 
 --- Gen2 player/enemy backs: image-level path scale, then species index.
-local KR_PIC_SCALE_VERSION = 5
+local KR_PIC_SCALE_VERSION = 7
 
 function BattleSpriteScale.install(mod)
   BattleSpriteScale._mod = mod
@@ -173,6 +173,16 @@ function BattleSpriteScale.install(mod)
   Gen1Patch.apply(BS, function(BattleState)
     if BattleState._krTrainerPicScaleVersion == KR_PIC_SCALE_VERSION then return end
     local origPicScale = BattleState.picScale
+    local origPic = BattleState.pic
+    if type(origPic) == "function" then
+      BattleState.pic = function(self, mon, back)
+        local image, trueColor, path = origPic(self, mon, back)
+        if image and image.setFilter then
+          pcall(image.setFilter, image, "nearest", "nearest")
+        end
+        return image, trueColor, path
+      end
+    end
     BattleState.picScale = function(self, path, mon, back)
       -- Trainer intro pics: never apply mon battleScaleBack / battleScaleFront.
       if back and self.showPlayerTrainer then
@@ -182,15 +192,33 @@ function BattleSpriteScale.install(mod)
         return self:imageScale(path) or 1
       end
 
-      -- Engine-native path scales (battle_sprite_scales registry).
+      if back then
+        local SpriteResolve = require("mods.Kanto-Reforged.core.sprite_resolve")
+        local species = mon and mon.species
+        local drawn = SpriteResolve.resolvePath(
+          BattleSpriteScale._mod, species, "back", path) or path
+        local byPath = SpriteResolve.goldBackScaleForDrawnPath(
+          BattleSpriteScale._mod, drawn, species)
+        if byPath then return byPath end
+        -- Cart 48px backs: ignore leftover 1.5 stamps and KR 32px index rows.
+        if SpriteResolve.backPathKind(drawn) == "rom"
+            or SpriteResolve.backPathKind(path) == "rom"
+            or (species and SpriteResolve.gen2RomHas(BattleSpriteScale._mod, species)
+                and not SpriteResolve.hasGs(BattleSpriteScale._mod, species, "back")) then
+          return self:imageScale(path) or 1
+        end
+      end
+
       local imgScale = self:imageScale(path)
       if imgScale then return imgScale end
 
       if back and mon and mon.species then
         local SpriteResolve = require("mods.Kanto-Reforged.core.sprite_resolve")
-        local krBack = SpriteResolve.goldBackScaleForSpecies(
-          BattleSpriteScale._mod, mon.species)
-        if krBack then return krBack end
+        if SpriteResolve.resolvePath(BattleSpriteScale._mod, mon.species, "back") then
+          local krBack = SpriteResolve.goldBackScaleForSpecies(
+            BattleSpriteScale._mod, mon.species)
+          if krBack then return krBack end
+        end
       end
 
       return origPicScale(self, path, mon, back)

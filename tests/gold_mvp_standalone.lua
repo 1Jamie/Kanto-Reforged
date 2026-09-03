@@ -71,6 +71,12 @@ if treecko then
     "TREECKO has level moves")
 end
 
+do
+  local PcBoxes = require("mods.Kanto-Reforged.pokemon.pc_boxes")
+  local Save = require("src.core.gen2.Save")
+  T.eq(Save.NUM_BOXES, PcBoxes.COUNT, "Gold PC expanded past vanilla 14 boxes")
+end
+
 -- Johto natives only exist when a Gold cache was imported.
 if Data.pokemon and Data.pokemon.CHIKORITA then
   T.check(true, "CHIKORITA still present (Gold native)")

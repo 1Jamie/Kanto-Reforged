@@ -100,23 +100,45 @@ do
   T.eq(rec.battleScaleBack, 1, "Gen2 48px back scale is 1")
 end
 
--- Gen2: flat 32px backs must scale to 1.5 even when ROM record had battleScaleBack=1.
+-- Gen2: Johto/Kanto flats fall through to ROM; Hoenn 32px still scales 1.5.
 do
   GameVersion.set("gold")
   Host.clearForce()
-  if SpriteResolve.hasFlat(mod, "AIPOM", "back")
-      and not SpriteResolve.hasGs(mod, "AIPOM", "back") then
-    local rec = { dex = 190, battleScaleBack = 1, anim = { sheet = "x" } }
-    SpriteResolve.applyToRecord(
-      { id = "Kanto-Reforged", _loader = { generation = 2 } },
-      "AIPOM",
-      rec
-    )
-    T.check(rec.spriteBack:find("assets/aipom_back.png", 1, true) ~= nil,
-      "Gen2 flat AIPOM back path")
-    T.eq(rec.battleScaleBack, 1.5, "Gen2 flat 32px back overrides ROM scale 1")
+  local g2mod = { id = "Kanto-Reforged", _loader = { generation = 2 } }
+  T.eq(SpriteResolve.resolvePath(g2mod, "TYPHLOSION", "back"), nil,
+    "Gen2 Typhlosion back falls through to ROM")
+  T.eq(
+    SpriteResolve.resolvePath(
+      g2mod, "TYPHLOSION", "back",
+      "mods/Kanto-Reforged/assets/typhlosion_back.png"),
+    "assets/generated/battle/back/typhlosion.png",
+    "leftover KR Typhlosion flat remaps to the cart pic")
+  if SpriteResolve.hasFlat(g2mod, "AIPOM", "back")
+      and not SpriteResolve.hasGs(g2mod, "AIPOM", "back") then
+    local rec = {
+      dex = 190,
+      battleScaleBack = 1.5,
+      spriteBack = "mods/Kanto-Reforged/assets/aipom_back.png",
+      anim = { sheet = "x" },
+    }
+    SpriteResolve.applyToRecord(g2mod, "AIPOM", rec)
+    T.check(rec.spriteBack:find("assets/generated/battle/back/aipom.png", 1, true) ~= nil,
+      "Gen2 AIPOM back restores ROM instead of 32px flat")
+    T.eq(rec.battleScaleBack, 1, "Gen2 ROM back is not stamped 1.5")
   else
     T.check(true, "AIPOM flat-only fixture not present — skip")
+    T.check(true, "AIPOM ROM restore skipped")
+  end
+  if SpriteResolve.hasFlat(g2mod, "GROUDON", "back")
+      and not SpriteResolve.hasGs(g2mod, "GROUDON", "back") then
+    local rec = { dex = 383, battleScaleBack = 1, anim = { sheet = "x" } }
+    SpriteResolve.applyToRecord(g2mod, "GROUDON", rec)
+    T.check(rec.spriteBack:find("assets/groudon_back.png", 1, true) ~= nil,
+      "Gen2 Hoenn Groudon keeps the KR flat back")
+    T.eq(rec.battleScaleBack, 1.5, "Gen2 Hoenn 32px back scales to 1.5")
+  else
+    T.check(true, "GROUDON flat-only fixture not present — skip")
+    T.check(true, "GROUDON flat scale skipped")
   end
 end
 
@@ -144,6 +166,27 @@ do
   T.eq(SpriteResolve.backPxFor(mod, "NOT_A_MON"), nil, "unknown species has no backPx")
 end
 
+-- Scale the pic that is actually drawn (Crystal ROM vs 32px flat fallback).
+do
+  GameVersion.set("gold")
+  Host.clearForce()
+  local g2mod = { id = "Kanto-Reforged", path = "mods/Kanto-Reforged" }
+  T.eq(SpriteResolve.backPathKind("assets/generated/battle/back/pikachu.png"),
+    "rom", "generated back is ROM")
+  T.eq(
+    SpriteResolve.goldBackScaleForDrawnPath(
+      g2mod, "mods/Kanto-Reforged/assets/typhlosion_back.png", "TYPHLOSION"),
+    1.5, "drawn 32px flat back is 1.5")
+  T.eq(
+    SpriteResolve.goldBackScaleForDrawnPath(
+      g2mod, "mods/Kanto-Reforged/assets/gs/PIKACHU_back.png", "PIKACHU"),
+    1, "drawn 48px gs back is 1")
+  T.eq(
+    SpriteResolve.goldBackScaleForDrawnPath(
+      g2mod, "assets/generated/battle/back/pikachu.png", "PIKACHU"),
+    nil, "ROM Crystal/Gold back is not given a 1.5 KR stamp")
+end
+
 -- applyGoldBackScales stamps live game.data.pokemon tables.
 do
   GameVersion.set("gold")
@@ -152,39 +195,42 @@ do
   local live = {
     TYPHLOSION = { dex = 157, battleScaleBack = 1 },
     PIKACHU = { dex = 25, battleScaleBack = 1 },
+    GROUDON = { dex = 383, battleScaleBack = 1 },
   }
-  local n = SpriteResolve.applyGoldBackScales(g2mod, live)
-  T.check(n >= 2, "applyGoldBackScales touches indexed species")
-  T.eq(live.TYPHLOSION.battleScaleBack, 1.5, "live TYPHLOSION stamped 1.5")
+  SpriteResolve.applyGoldBackScales(g2mod, live)
+  T.eq(live.TYPHLOSION.battleScaleBack, 1, "live TYPHLOSION ROM back stays 1")
   T.eq(live.PIKACHU.battleScaleBack, 1, "live PIKACHU gs back stays 1")
+  T.eq(live.GROUDON.battleScaleBack, 1.5, "live GROUDON Hoenn flat stamped 1.5")
 end
 
--- applyBackPathScales stamps game.data.battle_sprite_scales for flat backs.
+-- applyBackPathScales stamps Hoenn flats, not ROM-native 32px leftovers.
 do
   GameVersion.set("gold")
   Host.clearForce()
   local g2mod = { id = "Kanto-Reforged", path = "mods/Kanto-Reforged" }
   local data = {}
   local n = SpriteResolve.applyBackPathScales(g2mod, data)
-  T.check(n >= 1, "applyBackPathScales touches flat_index backs")
-  local path = SpriteResolve.flatPath(g2mod, "TYPHLOSION", "back")
-  T.eq(data.battle_sprite_scales.kr_flat_back_TYPHLOSION.path, path,
-    "TYPHLOSION path scale entry")
-  T.eq(data.battle_sprite_scales.kr_flat_back_TYPHLOSION.scale, 1.5,
-    "TYPHLOSION flat back path scale 1.5")
+  T.check(n >= 1, "applyBackPathScales touches gs/Hoenn backs")
+  T.eq(data.battle_sprite_scales.kr_flat_back_TYPHLOSION, nil,
+    "TYPHLOSION ROM native is not given a KR 32px path scale")
+  local path = SpriteResolve.flatPath(g2mod, "GROUDON", "back")
+  T.eq(data.battle_sprite_scales.kr_flat_back_GROUDON.path, path,
+    "GROUDON path scale entry")
+  T.eq(data.battle_sprite_scales.kr_flat_back_GROUDON.scale, 1.5,
+    "GROUDON flat back path scale 1.5")
   local BS = require("src.ui.gen2.BattleState")
   local view = {
     game = { data = data },
-    pokemon = { TYPHLOSION = { battleScaleBack = 1 } },
+    pokemon = { GROUDON = { battleScaleBack = 1 } },
     showPlayerTrainer = false,
     imageScale = BS.imageScale,
   }
   setmetatable(view, { __index = BS })
-  T.eq(view:picScale(path, { species = "TYPHLOSION" }, true), 1.5,
-    "vanilla picScale reads path scale from game.data")
+  T.eq(view:picScale(path, { species = "GROUDON" }, true), 1.5,
+    "vanilla picScale reads Hoenn path scale from game.data")
 end
 
--- Gen2 registry patch: flat 32px → battleScaleBack 1.5 before freeze.
+-- Gen2 registry patch: ROM natives are not overwritten with 32px flats.
 do
   local Registry = require("src.mods.Registry")
   local reg = Registry.new("pokemon")
@@ -198,16 +244,19 @@ do
   GameVersion.set("gold")
   Host.clearForce()
   local patch = SpriteResolve.registryPatch(g2mod, "TYPHLOSION")
-  T.check(patch ~= nil, "TYPHLOSION registry patch exists")
-  T.eq(patch.battleScaleBack, 1.5, "TYPHLOSION flat back scale in registry patch")
+  T.eq(patch, nil, "TYPHLOSION has no KR patch on Gen2 (ROM wins)")
+  local groudon = SpriteResolve.registryPatch(g2mod, "GROUDON")
+  T.check(groudon ~= nil, "GROUDON registry patch exists")
+  T.eq(groudon.battleScaleBack, 1.5, "GROUDON flat back scale in registry patch")
   T.check(
-    patch.spriteBack:find("typhlosion_back.png", 1, true) ~= nil,
-    "TYPHLOSION flat back path in patch"
+    groudon.spriteBack:find("groudon_back.png", 1, true) ~= nil,
+    "GROUDON flat back path in patch"
   )
   SpriteResolve.patchRegistry(g2mod)
-  local merged = reg:get("TYPHLOSION")
-  T.check(merged ~= nil, "registry fold has TYPHLOSION")
-  T.eq(merged.battleScaleBack, 1.5, "merged TYPHLOSION battleScaleBack")
+  T.eq(reg:get("TYPHLOSION"), nil, "registry does not fold ROM Typhlosion onto KR flat")
+  local merged = reg:get("GROUDON")
+  T.check(merged ~= nil, "registry fold has GROUDON")
+  T.eq(merged.battleScaleBack, 1.5, "merged GROUDON battleScaleBack")
 end
 
 GameVersion.set("red")
