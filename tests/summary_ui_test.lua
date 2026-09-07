@@ -134,5 +134,34 @@ return function(T, Data, run)
     fakeGame.stack.pop = function() popped = true end
     menu:advance()
     T.check(popped, "advance on last page closes summary")
+
+    -- Gen1 update & whiteHold lifecycle test
+    local fresh = factory(fakeGame, mon)
+    T.check(fresh.whiteHold ~= nil and fresh.whiteHold > 0, "fresh summary has whiteHold > 0")
+    local initialHold = fresh.whiteHold
+    local keyToPress = "a"
+    fakeGame.input = {
+      wasPressed = function(_, k) return k == keyToPress end,
+    }
+    fresh:update(1 / 60)
+    T.eq(fresh.whiteHold, initialHold - 1, "update decrements whiteHold by 1")
+    T.eq(fresh.page, 1, "input ignored while whiteHold > 0")
+
+    while fresh.whiteHold > 0 do
+      fresh:update(1 / 60)
+    end
+    T.eq(fresh.whiteHold, 0, "whiteHold reached 0")
+    T.eq(fresh.page, 1, "still on page 1 after hold finishes")
+
+    fresh:update(1 / 60)
+    T.eq(fresh.page, 2, "A on page 1 flips to page 2")
+    fresh:update(1 / 60)
+    T.eq(fresh.page, 3, "A on page 2 flips to page 3")
+
+    local pushedState
+    fakeGame.stack.push = function(_, s) pushedState = s end
+    fresh:update(1 / 60)
+    T.check(fresh.closing == true, "A on page 3 sets closing = true")
+    T.check(pushedState ~= nil, "A on page 3 pushes closing whiteFlash transition")
   end
 end

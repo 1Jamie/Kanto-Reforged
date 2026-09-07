@@ -71,6 +71,20 @@ if treecko then
     "TREECKO has level moves")
 end
 
+-- Same Hoenn-register-before-patchRegistry fix: empty tmhm made HM03 Surf
+-- refuse on caught Marshtomp (PartyMenu:tmhmAble reads species.tmhm).
+local marsh = Data.pokemon and Data.pokemon.MARSHTOMP
+T.check(marsh ~= nil, "MARSHTOMP registered on Gold")
+do
+  local hasSurf = false
+  for _, mv in ipairs((marsh and marsh.tmhm) or {}) do
+    if mv == "SURF" then hasSurf = true end
+  end
+  T.check(hasSurf, "MARSHTOMP tmhm includes SURF (HM03 teachable)")
+  T.check(marsh and marsh.levelMoves and #marsh.levelMoves > 1,
+    "MARSHTOMP has a real level-up set (not the Pound stub)")
+end
+
 do
   local PcBoxes = require("mods.Kanto-Reforged.pokemon.pc_boxes")
   local Save = require("src.core.gen2.Save")

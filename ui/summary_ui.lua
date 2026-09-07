@@ -84,11 +84,11 @@ local function redrawSplitSpecialStats(self)
   love.graphics.rectangle("fill", 8, 72, 64, 64)
   love.graphics.setColor(0, 0, 0, 1)
   local rows = {
-    { "ATK.", stats.attack },
-    { "DEF.", stats.defense },
+    { "ATK", stats.attack },
+    { "DEF", stats.defense },
     { "SPEED", stats.speed },
-    { "SP.ATK", sp and sp.sp_attack or stats.special },
-    { "SP.DEF", sp and sp.sp_defense or stats.special },
+    { "SPATK", sp and sp.sp_attack or stats.special },
+    { "SPDEF", sp and sp.sp_defense or stats.special },
   }
   for i, s in ipairs(rows) do
     local y = 72 + (i - 1) * 12
@@ -122,9 +122,9 @@ local function drawHeader(self)
 end
 
 local function drawAbilityPage(self)
+  -- Clear info column and lower area; upper header (sprite, dex, name) is drawn by baseDraw
   love.graphics.setColor(1, 1, 1, 1)
-  love.graphics.rectangle("fill", 0, 0, 160, 144)
-  drawHeader(self)
+  love.graphics.rectangle("fill", 72, 16, 88, 48)
 
   local mon = self.mon
   local data = self.game.data
@@ -313,6 +313,7 @@ function SummaryUi.register(mod)
 
         -- Same A/B page flow, callable from Gen1 Modern UI semantic actions.
         function self:advance()
+          self.whiteHold = 0
           if self.page < self._expMaxPage then
             self.page = self.page + 1
           else
@@ -321,21 +322,36 @@ function SummaryUi.register(mod)
         end
 
         function self:update(_dt)
-          local input = self.game.input
-          if input:wasPressed("a") or input:wasPressed("b") then
-            self:advance()
+          if self.closing then return end
+          if self.whiteHold and self.whiteHold > 0 then
+            self.whiteHold = self.whiteHold - 1
+            if self.whiteHold == 0 then
+              require("src.core.Sound").playCry(self.game.data, self.mon.species)
+            end
+            return
+          end
+          local input = self.game and self.game.input
+          if input and (input:wasPressed("a") or input:wasPressed("b")) then
+            if self.page < self._expMaxPage then
+              self.page = self.page + 1
+            else
+              local Transition = require("src.render.Transition")
+              self.closing = true
+              self.game.stack:push(Transition.whiteFlash(self.game, nil, function()
+                self.game.stack:pop()
+              end))
+            end
           end
         end
 
         local baseDraw = Builtin.draw
         function self:draw()
-          if self.page <= 2 then
-            baseDraw(self)
-            redrawNameWithGender(self)
-            if self.page == 1 and SplitSpecial.enabled(mod) then
-              redrawSplitSpecialStats(self)
-            end
-          else
+          baseDraw(self)
+          if self.whiteHold and self.whiteHold > 0 then return end
+          redrawNameWithGender(self)
+          if self.page == 1 and SplitSpecial.enabled(mod) then
+            redrawSplitSpecialStats(self)
+          elseif self.page >= 3 then
             drawAbilityPage(self)
           end
         end
