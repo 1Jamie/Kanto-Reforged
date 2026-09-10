@@ -1320,6 +1320,37 @@ T.check(hasMilotic, "Milotic evolves from Feebas via Water Stone")
     T.eq(result, "consumed", "Moon Stone is consumed on Scyther")
     T.eq(extra and extra.evolveTo, "SCIZOR", "Moon Stone evolves Scyther into Scizor")
   end
+
+  local tradeStones = {
+    HAUNTER = "GENGAR",
+    KADABRA = "ALAKAZAM",
+    MACHOKE = "MACHAMP",
+    GRAVELER = "GOLEM",
+    SEADRA = "KINGDRA",
+  }
+  for pre, post in pairs(tradeStones) do
+    local def = Data.pokemon[pre]
+    T.check(def and def.evolutions, pre .. " evolutions table exists")
+    local hasEvo = false
+    for _, evo in ipairs(def and def.evolutions or {}) do
+      local target = evo.species or evo.into
+      local method = evo.method
+      if target == post and evo.item == "MOON_STONE"
+          and (method == "ITEM" or method == "EVOLVE_ITEM") then
+        hasEvo = true
+      end
+    end
+    T.check(hasEvo, post .. " evolves from " .. pre .. " via Moon Stone")
+    if Data.items.MOON_STONE and def then
+      local ItemEffects = require("src.inventory.ItemEffects")
+      local mon = { species = pre, level = 30, hp = 50,
+        stats = { hp = 50 }, moves = {} }
+      local result, _, extra = ItemEffects.use(Data, { player = { name = "RED" } },
+        "MOON_STONE", mon, nil, nil, nil)
+      T.eq(result, "consumed", "Moon Stone is consumed on " .. pre)
+      T.eq(extra and extra.evolveTo, post, "Moon Stone evolves " .. pre .. " into " .. post)
+    end
+  end
 end)()
 
 -- 16b. Gen3 learnsets applied from learnset_gen3.lua (Emerald-first PokeAPI).

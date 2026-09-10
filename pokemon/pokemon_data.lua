@@ -20715,6 +20715,18 @@ P.evolutions = {
   GOLBAT = {
     { method = "LEVEL", species = "CROBAT", level = 36 },
   },
+  GRAVELER = {
+    { method = "ITEM", species = "GOLEM", item = "MOON_STONE" },
+  },
+  HAUNTER = {
+    { method = "ITEM", species = "GENGAR", item = "MOON_STONE" },
+  },
+  KADABRA = {
+    { method = "ITEM", species = "ALAKAZAM", item = "MOON_STONE" },
+  },
+  MACHOKE = {
+    { method = "ITEM", species = "MACHAMP", item = "MOON_STONE" },
+  },
   MANTYKE = {
     { method = "LEVEL", species = "MANTINE", level = 20 },
   },
@@ -20731,6 +20743,7 @@ P.evolutions = {
     { method = "ITEM", species = "SCIZOR", item = "MOON_STONE" },
   },
   SEADRA = {
+    { method = "ITEM", species = "KINGDRA", item = "MOON_STONE" },
     { method = "ITEM", species = "KINGDRA", item = "WATER_STONE" },
   },
   SLOWPOKE = {

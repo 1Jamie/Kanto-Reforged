@@ -6729,7 +6729,8 @@ def parse_evolution_chain(chain_node, evolutions_map):
                 else:
                     method = "TRADE"
             else:
-                method = "TRADE"
+                method = "ITEM"
+                item = "MOON_STONE"
         elif trigger == "level-up":
             if level is not None:
                 method = "LEVEL"
@@ -7212,7 +7213,7 @@ def main():
             continue
         filtered = [
             e for e in filter_evolutions(evos, allowed_species)
-            if e["species"] in generated_ids
+            if e["species"] in generated_ids or e.get("method") == "ITEM"
         ]
         if filtered:
             evolutions_map[species_id] = filtered

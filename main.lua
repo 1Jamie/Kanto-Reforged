@@ -783,7 +783,7 @@ return function(mod)
     -- Patch vanilla Kanto species evolutions
     if pokemon_data.evolutions then
       local evos_patched = 0
-      local useInto = Host.isGen2()
+      local useInto = Host.isGen2From(mod) or Host.isGen2()
       for speciesId, new_evos in pairs(pokemon_data.evolutions) do
         local existing = mod.content.pokemon:get(speciesId)
         if existing then
