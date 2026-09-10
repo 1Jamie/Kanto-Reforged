@@ -74,12 +74,26 @@ function TrainersGen2.install(mod)
     for _, mon in ipairs(out) do
       if mon.species == guestId then return result end
     end
+    local Host = require("mods.Kanto-Reforged.core.host")
+    local game = Host.liveGame(mod) or _G.game
+    local data = (game and game.data) or (mod and mod.data) or require("src.core.Data")
     local Mon = require("src.battle.gen2.Mon")
-    local Data = require("src.core.Data")
-    local guestMon = Mon.new(Data, guestId, level, {
+    local guestMon = Mon.new(data, guestId, level, {
       dvs = { attack = 9, defense = 8, speed = 8, special = 8 },
     })
-    out[#out + 1] = guestMon or { level = level, species = guestId }
+    if guestMon then
+      out[#out + 1] = guestMon
+    else
+      -- Fallback: if Mon.new failed, ensure moves are at least allocated from levelMoves
+      local def = data and data.pokemon and data.pokemon[guestId]
+      local moves = def and Mon.movesAtLevel and Mon.movesAtLevel(def, level, data.moves)
+      out[#out + 1] = {
+        level = level,
+        species = guestId,
+        moves = moves,
+        dvs = { attack = 9, defense = 8, speed = 8, special = 8 },
+      }
+    end
     return out
   end)
   mod.log:info("Gen2 trainer.party Gen3 guests installed")

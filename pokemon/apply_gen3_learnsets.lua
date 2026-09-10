@@ -136,6 +136,7 @@ end
 function ApplyGen3Learnsets.apply(mod, Host, gen3Table)
   if not (mod and gen3Table and gen3Table.species) then return 0 end
   local DisabledMoves = require("mods.Kanto-Reforged.pokemon.disabled_moves")
+  local isGen2 = (Host and Host.isGen2From and Host.isGen2From(mod)) or (Host and Host.isGen2 and Host.isGen2())
 
   local knownMove = function(id)
     return id and mod.content.moves:get(id) ~= nil
@@ -153,11 +154,11 @@ function ApplyGen3Learnsets.apply(mod, Host, gen3Table)
         -- Gold, Silver, and Crystal share this TM/HM table and this branch.
         -- Gen3 dropped HM06 Whirlpool; union restores ROM learners, and the
         -- extra grant covers Hoenn Water-types that never had a Gen2 sheet.
-        if Host.isGen2() then
+        if isGen2 then
           filtered.tmhm = ApplyGen3Learnsets.ensureGen2Whirlpool(filtered.tmhm, existing)
         end
         local ok = pcall(function()
-          if Host.isGen2() then
+          if isGen2 then
             mod.content.pokemon:patch(speciesId, {
               levelMoves = ApplyGen3Learnsets.toLevelMoves(filtered),
               tmhm = filtered.tmhm,

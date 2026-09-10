@@ -110,7 +110,7 @@ local function rebuildRows(game)
     items[#items + 1] = {
       value = id,
       label = def and def.name or id,
-      right = (not unsellable) and ("x" .. tostring(game.save.inventory[id])) or nil,
+      count = (not unsellable) and game.save.inventory[id] or nil,
     }
   end
   items[#items + 1] = { cancel = true, label = Strings("CANCEL") }

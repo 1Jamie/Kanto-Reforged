@@ -85,19 +85,22 @@ function DisabledMoves.stripAllSpecies(mod)
   local reg = mod.content.pokemon
   if type(reg.each) ~= "function" then return 0 end
   for speciesId, sp in reg:each() do
-    if sp then
-      local patch = DisabledMoves.stripLearnFields({
-        level1Moves = sp.level1Moves,
-        learnset = sp.learnset,
-        levelMoves = sp.levelMoves,
-        evolutionMoves = sp.evolutionMoves,
-        tmhm = sp.tmhm,
-        eggMoves = sp.eggMoves,
-      })
-      local ok = pcall(function()
-        mod.content.pokemon:patch(speciesId, patch)
-      end)
-      if ok then n = n + 1 end
+    if type(sp) == "table" then
+      local patch = {}
+      if sp.level1Moves then patch.level1Moves = sp.level1Moves end
+      if sp.learnset then patch.learnset = sp.learnset end
+      if sp.levelMoves then patch.levelMoves = sp.levelMoves end
+      if sp.evolutionMoves then patch.evolutionMoves = sp.evolutionMoves end
+      if sp.tmhm then patch.tmhm = sp.tmhm end
+      if sp.eggMoves then patch.eggMoves = sp.eggMoves end
+
+      patch = DisabledMoves.stripLearnFields(patch)
+      if next(patch) then
+        local ok = pcall(function()
+          mod.content.pokemon:patch(speciesId, patch)
+        end)
+        if ok then n = n + 1 end
+      end
     end
   end
   return n
