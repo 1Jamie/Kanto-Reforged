@@ -44,6 +44,11 @@ def _quad_path(name: str) -> str:
 
 def _load_png(name: str, expected: tuple[int, int]) -> Image.Image:
     path = _quad_path(name)
+    if not os.path.isfile(path) and name in ("cave_wooden_sign.png", "forest_wooden_sign.png"):
+        try:
+            extract_quad_sources_from_gen1()
+        except Exception as exc:  # noqa: BLE001
+            print(f"[tileset_quad_patches] Auto-extract notice for {name}: {exc}")
     if not os.path.isfile(path):
         raise FileNotFoundError(f"Missing tileset quad source: {path}")
     im = Image.open(path).convert("L")

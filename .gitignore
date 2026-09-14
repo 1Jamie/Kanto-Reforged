@@ -53,10 +53,11 @@ __pycache__/
 *.xdelta
 
 # Composed at restore time from overrides/tileset_quads/ + stock Gold sheets
-overrides/tilesets/cave.png
-overrides/tilesets/kanto.png
+overrides/tilesets/*.png
 
-# Quad patch scratch dumps (only ship final PNG sources under tileset_quads/)
+# Quad patch extracts from local ROMs (wood_stair.png is custom mod art and remains tracked)
+overrides/tileset_quads/cave_wooden_sign.png
+overrides/tileset_quads/forest_wooden_sign.png
 overrides/tileset_quads/_debug/
 overrides/tileset_quads/_debug2/
 

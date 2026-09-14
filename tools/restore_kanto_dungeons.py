@@ -366,13 +366,24 @@ def _strat_stamp_house():
     }
 
 
-# Cave maps still on Gen1 CAVERN art (everything else uses TILESET_CAVE + CAVE_G1_TO_G2).
-CAVE_KEEP_GEN1_MAPS = frozenset({"ROCK_TUNNEL_POKECENTER"})
+def _strat_stamp_pokecenter():
+    return {
+        "strategy": "stamp_pokecenter",
+        "tileset": "TILESET_POKECENTER",
+        "environment": "POKECENTER",
+        "palette": "PALETTE_DAY",
+        "borderBlock": 0,
+        "width": 5,
+        "height": 4,
+    }
+
+
+# Cave maps still on Gen1 CAVERN art (everything uses TILESET_CAVE + CAVE_G1_TO_G2).
+CAVE_KEEP_GEN1_MAPS = frozenset()
 
 # Gen1 tilesets kept in Data.tilesets for maps/features that still need them.
-# Everything else from the Red extract is pruned before export.
-# CAVERN omitted: restored caves use TILESET_CAVE; Regirock Gen2 uses legend_maps_data.
-KEEP_GEN1_TILESETS = frozenset({"POKECENTER", "GYM"})
+# Empty: all maps now use native Gen2 tilesets (TILESET_CAVE, TILESET_KANTO, TILESET_POKECENTER, etc.).
+KEEP_GEN1_TILESETS = frozenset()
 
 
 def _build_map_strategies():
@@ -454,7 +465,7 @@ def _build_map_strategies():
                 palette="PALETTE_NITE", border=1, default_block=25,
             )
 
-    strategies["ROCK_TUNNEL_POKECENTER"] = _strat_keep_gen1()
+    strategies["ROCK_TUNNEL_POKECENTER"] = _strat_stamp_pokecenter()
     return strategies
 
 
@@ -467,6 +478,12 @@ BLOCK_DICTS = {
     "CAVE_G1_TO_G2": CAVE_G1_TO_G2,
     "KANTO_G1_TO_G2": KANTO_G1_TO_G2,
 }
+
+
+# Fixed Gen2 stamp layouts (defined before apply_map_strategy is called)
+GEN2_GATE_BLOCKS = [2, 2, 4, 2, 2, 9, 1, 1, 1, 8, 13, 1, 1, 1, 12, 20, 1, 10, 1, 20]
+GEN2_HOUSE_BLOCKS = [4, 30, 5, 29, 15, 1, 2, 15, 15, 12, 13, 15, 6, 11, 15, 7]
+GEN2_POKECENTER_BLOCKS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20]
 
 
 def apply_map_strategy(map_id, mdef, restored_tilesets):
@@ -519,6 +536,15 @@ def apply_map_strategy(map_id, mdef, restored_tilesets):
         mdef["height"] = strat.get("height", 4)
         mdef["blocks"] = list(GEN2_HOUSE_BLOCKS)
 
+    elif kind == "stamp_pokecenter":
+        mdef["tileset"] = strat["tileset"]
+        mdef["environment"] = strat["environment"]
+        mdef["palette"] = strat.get("palette", "PALETTE_DAY")
+        mdef["borderBlock"] = strat.get("borderBlock", 0)
+        mdef["width"] = strat.get("width", 5)
+        mdef["height"] = strat.get("height", 4)
+        mdef["blocks"] = list(GEN2_POKECENTER_BLOCKS)
+
     else:  # keep_gen1
         # Gen1 tileset id as environment so bakeMapImage uses groupColors[CAVERN]
         # instead of Gold's generic CAVE pool (which left maps grayscale).
@@ -559,10 +585,6 @@ def _attach_gold_tileset(restored_tilesets, gold_tilesets, name):
     if blocks:
         restored_tilesets[name] = rec
 
-
-# Fixed Gen2 stamp layouts (must be defined before apply_map_strategy is called at runtime)
-GEN2_GATE_BLOCKS = [2, 2, 4, 2, 2, 9, 1, 1, 1, 8, 13, 1, 1, 1, 12, 20, 1, 10, 1, 20]
-GEN2_HOUSE_BLOCKS = [4, 30, 5, 29, 15, 1, 2, 15, 15, 12, 13, 15, 6, 11, 15, 7]
 
 # Tileset-specific tile semantic rules for Gen 2 COLL_* mapping
 
@@ -771,10 +793,20 @@ MAP_WARP_EXPLICIT_REDIRECTS = {
 }
 
 def load_lua_json(lua_path):
-    tool_path = os.path.join("tools", "lua_to_json.lua")
-    if not os.path.exists(tool_path):
-        raise FileNotFoundError(f"Missing {tool_path}")
-    proc = subprocess.run(["luajit", tool_path, lua_path], capture_output=True, text=True, check=True)
+    candidates = [
+        os.path.join("tools", "lua_to_json.lua"),
+        os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "..", "tools", "lua_to_json.lua")),
+    ]
+    tool_path = next((c for c in candidates if os.path.exists(c)), None)
+    if not tool_path:
+        raise FileNotFoundError("Missing tools/lua_to_json.lua")
+    lua_candidates = [
+        lua_path,
+        os.path.expanduser(f"~/.local/share/love/pokemon-love2d/red/{lua_path}"),
+        os.path.expanduser(f"~/.local/share/love/pokemon-love2d/{lua_path}"),
+    ]
+    resolved_lua = next((c for c in lua_candidates if os.path.exists(c)), lua_path)
+    proc = subprocess.run(["luajit", tool_path, resolved_lua], capture_output=True, text=True, check=True)
     return json.loads(proc.stdout)
 
 CLASS_NAME_TO_INDEX = {
@@ -945,8 +977,8 @@ def generate_blaine_gym():
         "index": 1300,
         "width": 6,
         "height": 8,
-        "tileset": "GYM",
-        "gen1Tileset": "GYM",
+        "tileset": "TILESET_FACILITY",
+        "gen1Tileset": "TILESET_FACILITY",
         "environment": "GYM",
         "palette": "PALETTE_DAY",
         "borderBlock": 14,

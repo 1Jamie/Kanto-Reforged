@@ -582,22 +582,22 @@ local function runTests()
     "Restored caves must use native Gold TILESET_CAVE")
   print("  TILESET_CAVE (dungeons) verified; CAVERN not distributed.")
 
-  -- 11b. Gen1 sheets kept for POKECENTER/GYM must resolve via mod overrides.
+  -- 11b. Gen1 sheets must not ship; all maps use native Gen2 tilesets.
   RestoredDungeons.bindGen1TilesetOverrideImages(Data)
-  assert(Data.tilesets.POKECENTER.image == "assets/generated/tilesets/kr_pokecenter.png",
-    "POKECENTER must point at kr_pokecenter override sheet")
-  assert(Data.tilesets.GYM.image == "assets/generated/tilesets/kr_gym.png",
-    "GYM must point at kr_gym override sheet")
+  assert(Data.tilesets.POKECENTER == nil,
+    "POKECENTER Gen1 tileset must not ship in Data.tilesets")
+  assert(Data.tilesets.GYM == nil,
+    "GYM Gen1 tileset must not ship in Data.tilesets")
   assert(Data.tilesets.TILESET_KANTO.image == "assets/generated/tilesets/kanto.png",
     "TILESET_KANTO keeps stock/override kanto.png path")
   assert(not io.open("mods/Kanto-Reforged/overrides/tilesets/kr_cavern.png", "rb"),
     "kr_cavern.png must not be shipped (caves use TILESET_CAVE)")
-  assert(io.open("mods/Kanto-Reforged/overrides/tileset_quads/cave_wooden_sign.png", "rb"),
-    "cave sign quad must ship under overrides/tileset_quads/")
+  assert(not io.open("mods/Kanto-Reforged/overrides/tilesets/kr_gym.png", "rb"),
+    "kr_gym.png must not be shipped (gyms use TILESET_FACILITY)")
+  assert(not io.open("mods/Kanto-Reforged/overrides/tilesets/kr_pokecenter.png", "rb"),
+    "kr_pokecenter.png must not be shipped (pokecenters use TILESET_POKECENTER)")
   assert(io.open("mods/Kanto-Reforged/overrides/tileset_quads/wood_stair.png", "rb"),
     "wood_stair quad must ship under overrides/tileset_quads/")
-  assert(io.open("mods/Kanto-Reforged/overrides/tileset_quads/forest_wooden_sign.png", "rb"),
-    "forest sign quad must ship under overrides/tileset_quads/")
   assert(io.open("mods/Kanto-Reforged/overrides/tilesets/cave.png", "rb"),
     "restore must compose overrides/tilesets/cave.png from quad sources")
   assert(io.open("mods/Kanto-Reforged/overrides/tilesets/kanto.png", "rb"),
@@ -605,7 +605,7 @@ local function runTests()
   local caveBlocks = Data.tilesets.TILESET_CAVE and Data.tilesets.TILESET_CAVE.blocks
   assert(caveBlocks and caveBlocks[121] and caveBlocks[121][11] == 90 and caveBlocks[121][16] == 93,
     "TILESET_CAVE block #120 must use Gen1 sign tiles 90–93 in BR quadrant")
-  print("  Gen1 tileset override sheets (kr_*) verified.")
+  print("  Gen1 tileset isolation verified (no kr_* sheets shipped).")
 
   -- 12. Verify Gen 1 safety isolation
   if Host.isGen1() then

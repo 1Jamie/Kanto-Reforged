@@ -1206,20 +1206,8 @@ local function rebuildWarpAt(map)
   end
 end
 
--- Gen1 tileset sheets ship under overrides/tilesets/kr_*.png so Gold mobile
--- (versioned gold/assets/generated only) can bake MT_MOON_*_KR without a Red
--- import, and so we never shadow Gold's gate/house/pokecenter/forest sheets.
 local function bindGen1TilesetOverrideImages(Data)
-  if not (Data and Data.tilesets) then return end
-  for tsId, tsDef in pairs(Data.tilesets) do
-    if type(tsDef) == "table" and type(tsDef.image) == "string"
-        and not tostring(tsId):match("^TILESET_") then
-      local base = tsDef.image:match("tilesets/([^/]+)$")
-      if base and not base:match("^kr_") then
-        tsDef.image = "assets/generated/tilesets/kr_" .. base
-      end
-    end
-  end
+  -- No-op: all maps use native Gen2 tilesets (TILESET_CAVE, TILESET_KANTO, TILESET_POKECENTER, etc.).
 end
 
 RestoredDungeons.bindGen1TilesetOverrideImages = bindGen1TilesetOverrideImages
@@ -1248,33 +1236,36 @@ local RESTORED_DUNGEON_LANDMARK_RULES = {
   { prefix = "MT_MOON", landmark = 52 }, -- LANDMARK_MT_MOON
   { prefix = "MOUNT_MOON", landmark = 52 },
   { prefix = "CERULEAN_CAVE", landmark = 54 }, -- LANDMARK_CERULEAN_CITY
-  { prefix = "ROCK_TUNNEL", landmark = 65 }, -- LANDMARK_ROCK_TUNNEL
-  { prefix = "DIGLETTS_CAVE", landmark = 61 }, -- LANDMARK_DIGLETTS_CAVE
-  { prefix = "SAFARI_ZONE", landmark = 80 }, -- LANDMARK_FUCHSIA_CITY
   { prefix = "SEAFOAM", landmark = 83 }, -- LANDMARK_SEAFOAM_ISLANDS
+  { prefix = "SAFARI_ZONE", landmark = 68 }, -- LANDMARK_FUCHSIA_CITY
+  { prefix = "ROCK_TUNNEL", landmark = 60 }, -- LANDMARK_ROCK_TUNNEL
+  { prefix = "DIGLETTS_CAVE", landmark = 57 }, -- LANDMARK_DIGLETTS_CAVE
 }
-
-local function restoredDungeonLandmark(mapId)
-  if type(mapId) ~= "string" then return nil end
-  local base = mapId:gsub("_KR$", "")
-  for _, rule in ipairs(RESTORED_DUNGEON_LANDMARK_RULES) do
-    if base:sub(1, #rule.prefix) == rule.prefix then
-      return rule.landmark
-    end
-  end
-  return nil
-end
 
 local function applyRestoredDungeonLandmarks(Data)
   if not (Data and Data.maps) then return end
   for mapId, mdef in pairs(Data.maps) do
-    if type(mdef) == "table" and mapId:find("_KR$") then
-      local landmark = restoredDungeonLandmark(mapId)
-      if landmark then
-        mdef.landmark = landmark
+    if type(mdef) == "table" and mdef.landmark == nil then
+      for _, rule in ipairs(RESTORED_DUNGEON_LANDMARK_RULES) do
+        if mapId:find(rule.prefix, 1, true) then
+          mdef.landmark = rule.landmark
+          break
+        end
       end
     end
   end
+end
+
+RestoredDungeons.applyRestoredDungeonLandmarks = applyRestoredDungeonLandmarks
+
+local function restoredDungeonLandmark(mapId)
+  if type(mapId) ~= "string" then return nil end
+  for _, rule in ipairs(RESTORED_DUNGEON_LANDMARK_RULES) do
+    if mapId:find(rule.prefix, 1, true) then
+      return rule.landmark
+    end
+  end
+  return nil
 end
 
 RestoredDungeons.restoredDungeonLandmark = restoredDungeonLandmark
@@ -1296,18 +1287,7 @@ local function normalizeDungeonData(Data)
     Campaign.mergeTexts(DUNGEON_TEXT)
   end
 
-  bindGen1TilesetOverrideImages(Data)
   applyRestoredDungeonLandmarks(Data)
-
-  if Data.maps.SEAFOAM_GYM then
-    local gym = Data.maps.SEAFOAM_GYM
-    gym.height = 8
-    gym.heightCells = 16
-    if gym.blocks and #gym.blocks >= 48 then
-      gym.blocks[45] = 5
-      gym.blocks[46] = 5
-    end
-  end
 
   local SPRITE_MAP = {
     SPRITE_BLAINE = "SPRITE_GRAMPS",
