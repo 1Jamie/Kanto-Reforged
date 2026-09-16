@@ -9,16 +9,42 @@ local VersionExclusives = {}
 
 -- Per-host missing bases (evolutions via level / stones).
 local MISSING = {
-  red = { "SANDSHREW", "VULPIX", "MEOWTH", "BELLSPROUT", "MAGMAR", "PINSIR" },
-  blue = { "EKANS", "ODDISH", "MANKEY", "GROWLITHE", "SCYTHER", "ELECTABUZZ" },
+  red = {
+    "SANDSHREW", "VULPIX", "MEOWTH", "BELLSPROUT", "MAGMAR", "PINSIR",
+    "BULBASAUR", "CHARMANDER", "SQUIRTLE",
+    "CHIKORITA", "CYNDAQUIL", "TOTODILE",
+    "TREECKO", "TORCHIC", "MUDKIP",
+  },
+  blue = {
+    "EKANS", "ODDISH", "MANKEY", "GROWLITHE", "SCYTHER", "ELECTABUZZ",
+    "BULBASAUR", "CHARMANDER", "SQUIRTLE",
+    "CHIKORITA", "CYNDAQUIL", "TOTODILE",
+    "TREECKO", "TORCHIC", "MUDKIP",
+  },
   yellow = {
     "WEEDLE", "EKANS", "MEOWTH", "KOFFING", "JYNX", "ELECTABUZZ", "MAGMAR",
+    "BULBASAUR", "CHARMANDER", "SQUIRTLE",
+    "CHIKORITA", "CYNDAQUIL", "TOTODILE",
+    "TREECKO", "TORCHIC", "MUDKIP",
   },
-  gold = { "VULPIX", "MEOWTH", "LEDYBA", "DELIBIRD", "SKARMORY", "PHANPY" },
+  gold = {
+    "VULPIX", "MEOWTH", "LEDYBA", "DELIBIRD", "SKARMORY", "PHANPY",
+    "BULBASAUR", "CHARMANDER", "SQUIRTLE",
+    "CHIKORITA", "CYNDAQUIL", "TOTODILE",
+    "TREECKO", "TORCHIC", "MUDKIP",
+  },
   silver = {
     "MANKEY", "GROWLITHE", "SPINARAK", "GLIGAR", "TEDDIURSA", "MANTINE",
+    "BULBASAUR", "CHARMANDER", "SQUIRTLE",
+    "CHIKORITA", "CYNDAQUIL", "TOTODILE",
+    "TREECKO", "TORCHIC", "MUDKIP",
   },
-  crystal = { "VULPIX", "MANKEY", "MAREEP", "GIRAFARIG", "REMORAID" },
+  crystal = {
+    "VULPIX", "MANKEY", "MAREEP", "GIRAFARIG", "REMORAID",
+    "BULBASAUR", "CHARMANDER", "SQUIRTLE",
+    "CHIKORITA", "CYNDAQUIL", "TOTODILE",
+    "TREECKO", "TORCHIC", "MUDKIP",
+  },
 }
 
 -- Classic homes: one grass/water slot each.
@@ -40,6 +66,22 @@ local PLACE = {
   WEEDLE = { map = "VIRIDIAN_FOREST", kind = "grass", slot = 2 },
   KOFFING = { map = "POKEMON_MANSION_B1F", kind = "grass", slot = 2 },
   JYNX = { map = "SEAFOAM_ISLANDS_B4F", kind = "grass", slot = 8 },
+
+  -- Gen 1 Starters (Kanto)
+  BULBASAUR = { map = "VIRIDIAN_FOREST", kind = "grass", slot = 8 },
+  CHARMANDER = { map = "ROUTE_3", kind = "grass", slot = 7 },
+  SQUIRTLE = { map = "ROUTE_25", kind = "grass", slot = 8 },
+
+  -- Gen 2 Starters (Kanto)
+  CHIKORITA = { map = "ROUTE_2", kind = "grass", slot = 8 },
+  CYNDAQUIL = { map = "ROUTE_4", kind = "grass", slot = 8 },
+  TOTODILE = { map = "ROUTE_6", kind = "grass", slot = 8 },
+
+  -- Gen 3 Starters (Kanto)
+  TREECKO = { map = "ROUTE_24", kind = "grass", slot = 8 },
+  TORCHIC = { map = "ROUTE_8", kind = "grass", slot = 8 },
+  MUDKIP = { map = "ROUTE_13", kind = "grass", slot = 8 },
+
   -- Gen2 (Johto / early Kanto; water where classic)
   LEDYBA = { map = "ROUTE_30", kind = "grass", slot = 6 },
   SPINARAK = { map = "ROUTE_30", kind = "grass", slot = 6 },
@@ -62,6 +104,21 @@ local PLACE_GEN2 = {
   GROWLITHE = { map = "ROUTE_37", kind = "grass", slot = 6 },
   MEOWTH = { map = "ROUTE_38", kind = "grass", slot = 6 },
   MANKEY = { map = "ROUTE_42", kind = "grass", slot = 6 },
+
+  -- Gen 1 Starters (Johto)
+  BULBASAUR = { map = "ILEX_FOREST", kind = "grass", slot = 6 },
+  CHARMANDER = { map = "ROUTE_33", kind = "grass", slot = 6 },
+  SQUIRTLE = { map = "ROUTE_34", kind = "grass", slot = 6 },
+
+  -- Gen 2 Starters (Johto)
+  CHIKORITA = { map = "ROUTE_31", kind = "grass", slot = 6 },
+  CYNDAQUIL = { map = "ROUTE_36", kind = "grass", slot = 6 },
+  TOTODILE = { map = "ROUTE_32", kind = "grass", slot = 5 },
+
+  -- Gen 3 Starters (Johto)
+  TREECKO = { map = "NATIONAL_PARK", kind = "grass", slot = 6 },
+  TORCHIC = { map = "ROUTE_39", kind = "grass", slot = 6 },
+  MUDKIP = { map = "ROUTE_35", kind = "grass", slot = 6 },
 }
 
 local function placementFor(species)
@@ -86,11 +143,14 @@ local function slotHas(slots, species)
   return false
 end
 
--- Vanilla Safari / late rares must not be clobbered when cross-injecting
--- the counterpart exclusive (Red Pinsir must not erase Scyther, etc.).
+-- Vanilla Safari / late rares / starters must not be clobbered when
+-- cross-injecting counterpart exclusives or mixing spawns.
 local PROTECTED = {
   CHANSEY = true, DRAGONAIR = true, DRAGONITE = true,
   SCYTHER = true, PINSIR = true, KANGASKHAN = true, TAUROS = true,
+  BULBASAUR = true, CHARMANDER = true, SQUIRTLE = true,
+  CHIKORITA = true, CYNDAQUIL = true, TOTODILE = true,
+  TREECKO = true, TORCHIC = true, MUDKIP = true,
 }
 
 local function writeSlot(slots, index, species)
@@ -239,22 +299,50 @@ local function injectGen2(mod, species, place)
   return injectGen2Grass(mod, species, place)
 end
 
-function VersionExclusives.apply(mod)
+function VersionExclusives.apply(mod, opts)
   local vid = Host.versionId()
   local list = MISSING[vid]
   if not list then return 0 end
 
+  opts = opts or {}
+  local okScope, SpeciesScope = pcall(require, "mods.Kanto-Reforged.pokemon.species_scope")
+  local scopeMode = opts.speciesScope
+  if not scopeMode and okScope and SpeciesScope then
+    scopeMode = SpeciesScope.mode(mod)
+  end
+
   local n = 0
   for _, species in ipairs(list) do
-    local place = placementFor(species)
-    if place then
-      local ok
-      if Host.isGen2() then
-        ok = injectGen2(mod, species, place)
-      else
-        ok = injectGen1(mod, species, place)
+    local allowed = true
+    if scopeMode == "kanto" then
+      local dex = nil
+      if okScope and SpeciesScope then
+        dex = SpeciesScope.dexOf(nil, species)
       end
-      if ok then n = n + 1 end
+      if dex and dex > 151 then
+        allowed = false
+      end
+    elseif scopeMode == "johto_native" then
+      local dex = nil
+      if okScope and SpeciesScope then
+        dex = SpeciesScope.dexOf(nil, species)
+      end
+      if dex and dex > 251 then
+        allowed = false
+      end
+    end
+
+    if allowed then
+      local place = placementFor(species)
+      if place then
+        local ok
+        if Host.isGen2() then
+          ok = injectGen2(mod, species, place)
+        else
+          ok = injectGen1(mod, species, place)
+        end
+        if ok then n = n + 1 end
+      end
     end
   end
   if mod and mod.log and n > 0 then

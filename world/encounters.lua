@@ -18,6 +18,9 @@ local Encounters = {}
 local VANILLA_RARES = {
   CHANSEY = true, DRAGONAIR = true, DRAGONITE = true,
   SCYTHER = true, PINSIR = true, KANGASKHAN = true, TAUROS = true,
+  BULBASAUR = true, CHARMANDER = true, SQUIRTLE = true,
+  CHIKORITA = true, CYNDAQUIL = true, TOTODILE = true,
+  TREECKO = true, TORCHIC = true, MUDKIP = true,
 }
 
 -- Map → habitats that may contribute + which encounter kinds to patch.
@@ -589,7 +592,7 @@ local function mixIconicGuests(index, mapDef, slots, _avg, _maxLv)
 end
 
 -- Curated: replace a few slots with Gen 2/3 (default), then cover gaps.
-local function mixCurated(mod, index)
+local function mixCurated(mod, index, opts)
   local mapIds = {}
   for id in pairs(MAPS) do mapIds[#mapIds + 1] = id end
   table.sort(mapIds)
@@ -628,7 +631,7 @@ local function mixCurated(mod, index)
   end
 
   ensureBaseCoverage(mod, index)
-  require("mods.Kanto-Reforged.world.version_exclusives").apply(mod)
+  require("mods.Kanto-Reforged.world.version_exclusives").apply(mod, opts)
   -- Version exclusives share fixed classic homes (e.g. Sandshrew → Route 11
   -- slot 8). Re-run coverage so pack bases those injects overwrote land again.
   ensureBaseCoverage(mod, index)
@@ -846,7 +849,7 @@ function Encounters.apply(mod, pokemon_data, mode, opts)
   elseif mode == "full_random" then
     mixFullRandom(mod, index, opts)
   else
-    mixCurated(mod, index)
+    mixCurated(mod, index, opts)
   end
   return index
 end
