@@ -1157,6 +1157,8 @@ do
   T.eq(nincada.species, "NINJASK", "Nincada became Ninjask")
   T.eq(#save.party, 2, "apply path adds Shedinja with spare slot + ball")
   T.eq(save.party[2].species, "SHEDINJA", "apply path Shedinja species")
+  T.eq(save.party[2].gender, nil, "Shedinja is Genderless (gender is nil)")
+  T.eq(save.party[2].dvs.attack, nincada.dvs.attack, "Shedinja inherited Nincada attack DV")
   T.eq(save.inventory.POKE_BALL, nil, "apply path consumes the Poké Ball")
   T.eq(#pushed, 0, "apply path does not push TextBox under EvolutionState")
   -- Flush deferred announce the way Congrats → learnEvolutionMoves does

@@ -1781,6 +1781,8 @@ return function(mod)
       shedinja.moves = Merge.deepCopy(ev.mon.moves)
     end
     shedinja.otName = ev.mon.otName
+    shedinja.gender = nil -- Shedinja is strictly Genderless (genderRatio = -1)
+    shedinja.shiny = ev.mon.shiny
     shedinja.stats = Stats.calc(game.data.pokemon.SHEDINJA, shedinja.level,
                                 shedinja.dvs, shedinja.statExp)
     shedinja.hp = 1

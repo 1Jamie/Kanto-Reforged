@@ -303,4 +303,24 @@ do
   T.check(ctx2.trueColor ~= true, "rainy does not force trueColor")
 end
 
+-- UNOWN on Gen 2 preserves ROM letters table and does not patch flat single sprite
+do
+  GameVersion.set("gold")
+  Host.force(2)
+  local unownRec = {
+    dex = 201,
+    letters = {
+      A = { spriteFront = "assets/generated/battle/front/unown_a.png" },
+      B = { spriteFront = "assets/generated/battle/front/unown_b.png" },
+    },
+  }
+  local changed = SpriteResolve.applyToRecord(mod, "UNOWN", unownRec)
+  T.eq(changed, false, "SpriteResolve leaves Gen 2 UNOWN untouched")
+  T.check(unownRec.letters ~= nil, "UNOWN letters table preserved on Gen 2")
+  T.check(unownRec.letters.B ~= nil, "UNOWN letter B sprite preserved")
+  local patch = SpriteResolve.registryPatch(mod, "UNOWN")
+  T.eq(patch, nil, "SpriteResolve registryPatch returns nil for UNOWN on Gen 2")
+  Host.clearForce()
+end
+
 T.finish("sprite_resolve")

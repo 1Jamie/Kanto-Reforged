@@ -263,6 +263,10 @@ end
 --   Use this when `rec` is already a converted Gen2 record with correct scales.
 function SpriteResolve.applyToRecord(mod, id, rec, opts)
   if type(rec) ~= "table" or not id then return false end
+  if id == "UNOWN" and isGen2Mod(mod) then
+    -- Preserve Gen 2 ROM Unown letter table
+    return false
+  end
   local pathsOnly = opts and opts.pathsOnly
   local changed = false
   local frontSrc = bestSource(mod, id, "front")
@@ -319,6 +323,11 @@ local function eachIndexedId()
 end
 
 local function buildPatch(mod, id)
+  if id == "UNOWN" and isGen2Mod(mod) then
+    -- Gen 2 ROM Unown has 26 form letters (A–Z) in def.letters.
+    -- Do not patch a single static front/back sprite over Gen 2 Unown.
+    return nil
+  end
   local patch = {}
   local frontSrc = bestSource(mod, id, "front")
   if frontSrc == "gs" then

@@ -246,4 +246,31 @@ return function(T, Data, run)
     local free = Status.beforeMove(bat, function() return 1 end, {})
     T.eq(free, true, "infatuation can still allow a move")
   end
+
+  -- Azurill -> Marill gender flip on evolution (thresholds 75% -> 50%)
+  do
+    Data.pokemon.AZURILL = Data.pokemon.AZURILL or { id = "AZURILL", genderRate = 6 }
+    Data.pokemon.MARILL = Data.pokemon.MARILL or { id = "MARILL", genderRate = 4 }
+    local azurill = {
+      species = "AZURILL",
+      level = 15,
+      dvs = { attack = 9, defense = 10, speed = 10, special = 10 },
+      gender = "F", -- 9 < 12 (rate 6 * 2) is Female
+    }
+    T.eq(Gender.fromDVs(Data, "AZURILL", azurill.dvs), "F", "Azurill with Atk DV 9 is Female (rate 6)")
+    -- Evolve to Marill: Atk DV 9 is >= 8 (rate 4 * 2) -> becomes Male
+    azurill.species = "MARILL"
+    run.loader.events:emit("pokemon.evolved", { mon = azurill, fromSpecies = "AZURILL", toSpecies = "MARILL" })
+    T.eq(azurill.gender, "M", "Azurill Atk DV 9 correctly flips to Male upon evolving to Marill (rate 4)")
+
+    -- Evolving to a genderless species clears gender to nil
+    local magnemite = {
+      species = "MAGNEMITE",
+      dvs = { attack = 9, defense = 10, speed = 10, special = 10 },
+      gender = "M", -- stale gender
+    }
+    magnemite.species = "MAGNETON"
+    run.loader.events:emit("pokemon.evolved", { mon = magnemite, fromSpecies = "MAGNEMITE", toSpecies = "MAGNETON" })
+    T.eq(magnemite.gender, nil, "evolving to a genderless species resyncs gender to nil")
+  end
 end

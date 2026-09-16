@@ -44,9 +44,9 @@ end
 -- to a stale mon._krCastformForm after weather ends — that kept rainy/sunny
 -- art up and carried into the next fight.
 function CastformFx.activeSuffix(battle, mon, back)
-  if battle and mon then
+  if battle then
     local morphAll = battle._krCastformMorph
-    if morphAll then
+    if morphAll and mon then
       local side = back and "player" or "enemy"
       if mon.isPlayer == true or mon == battle.player then
         side = "player"

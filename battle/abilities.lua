@@ -644,4 +644,6 @@ function Abilities.illuminateRateMult(game)
   return 1
 end
 
+Abilities.abilityOf = abilityOf
+
 return Abilities

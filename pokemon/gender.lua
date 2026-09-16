@@ -224,6 +224,17 @@ function Gender.install(mod)
     end
   end
 
+  -- Resync gender on evolution to account for shifting gender thresholds (e.g. Azurill -> Marill)
+  -- and genderless evolutions.
+  mod.events:on("pokemon.evolved", function(ev)
+    local mon = ev and ev.mon
+    local game = ev and (ev.game or mod._evoGame or mod.activeGame)
+    local data = (game and game.data) or (mod.activeGame and mod.activeGame.data)
+    if mon and data then
+      Gender.resync(data, mon)
+    end
+  end)
+
   -- game.ready only sees the new-game skeleton; CONTINUE replaces the save
   -- afterward, so also backfill on save.loaded.
   mod.events:on("game.ready", backfillActive)
