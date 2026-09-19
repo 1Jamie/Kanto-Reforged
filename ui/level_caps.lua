@@ -267,11 +267,15 @@ end
 
 local function pinExpAtLevel(data, mon, level)
   local Growth = require("src.pokemon.Growth")
-  local speciesDef = data.pokemon[mon.species]
-  if not speciesDef then return end
-  local nextExp = Growth.expForLevel(speciesDef.growthRate, level + 1)
-  if nextExp and mon.exp >= nextExp then
+  local speciesDef = data and data.pokemon and data.pokemon[mon and mon.species]
+  if not speciesDef or not mon then return end
+  local nextExp = Growth.expForLevel(speciesDef.growthRate, (level or mon.level or 1) + 1)
+  local curExp = mon.exp or mon.experience
+  if nextExp and curExp and curExp >= nextExp then
     mon.exp = nextExp - 1
+    if mon.experience ~= nil then
+      mon.experience = mon.exp
+    end
   end
 end
 
@@ -403,7 +407,7 @@ function LevelCaps.install(mod)
       local save = currentSave()
       if not save or not mon then return levels, gained, steps end
       local cap = LevelCaps.capFor(data, save)
-      local speciesDef = data.pokemon[mon.species]
+      local speciesDef = data and data.pokemon and data.pokemon[mon.species]
       if not speciesDef then return levels, gained, steps end
 
       local defer = opts and opts.defer
