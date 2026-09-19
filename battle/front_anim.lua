@@ -48,6 +48,7 @@ function FrontAnim.presentationHoldsEnemyGen1(battle, battler)
 end
 
 function FrontAnim.syncGen1Hold(battle, battler)
+  if BattleCompat.isGen2(battle) then return false end
   local holding = FrontAnim.presentationHoldsEnemyGen1(battle, battler)
   local was = battler._krFrontAnimHeld
   if was and not holding and battler._krFrontAnim then
@@ -276,6 +277,7 @@ function FrontAnim.shouldAnimateBattler(battle, battler, mod)
 end
 
 function FrontAnim.ensureCache(battle, battler, mod)
+  if BattleCompat.isGen2(battle) then return nil end
   local species = battlerSpecies(battler)
   if not species then return nil end
   local mon = BattleCompat.mon(battler)
@@ -319,7 +321,7 @@ function FrontAnim.tickBattler(battle, battler, mod)
 end
 
 function FrontAnim.tickBattle(battle, mod)
-  if not battle then return end
+  if not battle or BattleCompat.isGen2(battle) then return end
   for _, b in ipairs({ battle.enemy, battle.player }) do
     if b then FrontAnim.tickBattler(battle, b, mod) end
   end

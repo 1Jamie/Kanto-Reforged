@@ -415,26 +415,115 @@ local AI_EPHEMERAL = {
   "_krCastformForm",
 }
 
---- Strip AI facade fields from party mons so Gold saves stay acyclic.
-function BattleCompat.scrubPartyMons(party)
-  for _, mon in ipairs(party or {}) do
-    if type(mon) == "table" then
-      -- Self-cycle from prepareAiBattler before the Gen2 guard existed.
-      if mon.mon == mon then mon.mon = nil end
-      for _, key in ipairs(AI_EPHEMERAL) do
-        mon[key] = nil
+--- Scrub ephemeral runtime/battle/AI fields and non-serializable values (userdata/functions)
+-- from a single mon table so saves stay acyclic and serializable.
+function BattleCompat.scrubMon(mon, seen)
+  if type(mon) ~= "table" then return end
+  seen = seen or {}
+  if seen[mon] then return end
+  seen[mon] = true
+
+  -- Self-cycle from prepareAiBattler before the Gen2 guard existed.
+  if mon.mon == mon then mon.mon = nil end
+  mon.sprite = nil
+
+  local toRemove = {}
+  for k, v in pairs(mon) do
+    local vt = type(v)
+    if vt == "userdata" or vt == "function" or vt == "thread" then
+      toRemove[#toRemove + 1] = k
+    elseif type(k) == "string" then
+      if k:sub(1, 3) == "_kr" then
+        toRemove[#toRemove + 1] = k
+      elseif k:sub(1, 3) == "exp" and k ~= "experience" then
+        toRemove[#toRemove + 1] = k
+      end
+    elseif vt == "table" then
+      if v == mon or seen[v] then
+        toRemove[#toRemove + 1] = k
+      else
+        BattleCompat.scrubMon(v, seen)
       end
     end
   end
+
+  for _, key in ipairs(toRemove) do
+    mon[key] = nil
+  end
+  for _, key in ipairs(AI_EPHEMERAL) do
+    mon[key] = nil
+  end
+end
+
+--- Strip AI facade fields, userdata, and ephemeral battle tags from party mons.
+function BattleCompat.scrubPartyMons(party)
+  for _, mon in ipairs(party or {}) do
+    BattleCompat.scrubMon(mon)
+  end
+end
+
+--- Recursively strip all userdata, functions, threads, and ephemeral fields from an entire save table.
+function BattleCompat.scrubSave(save)
+  if type(save) ~= "table" then return end
+  if type(save.party) == "table" then
+    BattleCompat.scrubPartyMons(save.party)
+  end
+  if type(save.boxes) == "table" then
+    for _, box in ipairs(save.boxes) do
+      if type(box) == "table" then
+        BattleCompat.scrubPartyMons(box)
+      end
+    end
+  end
+  if type(save.daycare) == "table" then
+    if type(save.daycare.mon) == "table" then BattleCompat.scrubMon(save.daycare.mon) end
+    if type(save.daycare.mon1) == "table" then BattleCompat.scrubMon(save.daycare.mon1) end
+    if type(save.daycare.mon2) == "table" then BattleCompat.scrubMon(save.daycare.mon2) end
+    if type(save.daycare.mons) == "table" then BattleCompat.scrubPartyMons(save.daycare.mons) end
+  end
+
+  local seen = {}
+  local function cleanTree(t)
+    if type(t) ~= "table" or seen[t] then return end
+    seen[t] = true
+    local toRemove = {}
+    for k, v in pairs(t) do
+      local kt = type(k)
+      if kt ~= "string" and kt ~= "number" and kt ~= "boolean" then
+        toRemove[#toRemove + 1] = k
+      else
+        local vt = type(v)
+        if vt == "userdata" or vt == "function" or vt == "thread" then
+          toRemove[#toRemove + 1] = k
+        elseif vt == "table" then
+          if seen[v] then
+            toRemove[#toRemove + 1] = k
+          else
+            cleanTree(v)
+          end
+        end
+      end
+    end
+    for _, k in ipairs(toRemove) do
+      t[k] = nil
+    end
+  end
+  cleanTree(save)
 end
 
 function BattleCompat.scrubBattle(battle)
   if not battle then return end
   BattleCompat.scrubPartyMons(battle.party)
   BattleCompat.scrubPartyMons(battle.enemyParty)
+  if battle.player then
+    BattleCompat.scrubMon(BattleCompat.mon(battle.player) or battle.player)
+  end
+  if battle.enemy then
+    BattleCompat.scrubMon(BattleCompat.mon(battle.enemy) or battle.enemy)
+  end
   local game = battle.game
   if game and game.save then
-    BattleCompat.scrubPartyMons(game.save.party)
+    BattleCompat.scrubSave(game.save)
   end
 end
 

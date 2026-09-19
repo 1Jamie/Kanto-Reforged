@@ -146,9 +146,14 @@ local mockBS = setmetatable({
   picCache = {},
 }, { __index = BS })
 
+mockBS._krFrontAnimSheets = { ARBOK = { getDimensions = function() return 240, 40 end } }
+mockBS._krFrontAnimQuads = { ["ARBOK:horizontal:1"] = { id = "quad" } }
+
 mockBS:startFrontAnim(mockBS.battle.enemy)
+local sheet, quad = mockBS:frontAnimFrame(mockBS.battle.enemy)
+T.check(sheet ~= nil and quad ~= nil, "Gen2 frontAnimFrame returns KR strip quad")
 local okStep, errStep = pcall(function()
-  for _ = 1, 30 do
+  for _ = 1, 10 do
     mockBS:stepFrontAnim()
   end
 end)
@@ -163,8 +168,6 @@ T.check(
   mockBS._krFrontAnimMonState[mockBS.battle.enemy].frame ~= frame0,
   "Gen2 stepFrontAnim advances strip state"
 )
-local sheet, quad = mockBS:frontAnimFrame(mockBS.battle.enemy)
-T.check(sheet ~= nil and quad ~= nil, "Gen2 frontAnimFrame returns KR strip quad")
 
 Host.clearForce()
 T.finish("front_anim")

@@ -1675,11 +1675,12 @@ return function(mod)
   end)
 
   -- Belt-and-suspenders: scrub again at write time in case a battle left
-  -- party[i].mon == party[i] (serialize cycle / former stack overflow).
+  -- party[i].mon == party[i] (serialize cycle / former stack overflow)
+  -- or any runtime userdata / ephemeral fields.
   mod.events:on("save.writing", function(ev)
     local BattleCompat = require("mods.Kanto-Reforged.battle.battle_compat")
     if ev and ev.save then
-      BattleCompat.scrubPartyMons(ev.save.party)
+      BattleCompat.scrubSave(ev.save)
     end
   end)
   
@@ -1745,7 +1746,11 @@ return function(mod)
   -- Announcements are queued and flushed from learnEvolutionMoves so we
   -- never push a TextBox during EvolutionState's apply→congrats window.
   mod.events:on("pokemon.evolved", function(ev)
-    if ev.fromSpecies ~= "NINCADA" or ev.toSpecies ~= "NINJASK" then
+    if ev and ev.mon then
+      local BattleCompat = require("mods.Kanto-Reforged.battle.battle_compat")
+      BattleCompat.scrubMon(ev.mon)
+    end
+    if not ev or ev.fromSpecies ~= "NINCADA" or ev.toSpecies ~= "NINJASK" then
       return
     end
     -- Gen1 KANTO scope: Shedinja is out of dex range — skip the split.
