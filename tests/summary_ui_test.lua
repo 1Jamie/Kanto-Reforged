@@ -54,18 +54,39 @@ return function(T, Data, run)
     save = { player = { name = "RED", id = 1 }, pokedex = { seen = {}, owned = {} } },
     stack = { pop = function() end },
   }
-  -- Cry / sprite may warn without love; still construct if possible
+  -- Test nil exp safety and draw across all 3 pages
+  do
+    local bareMon = {
+      species = "CHARMANDER",
+      level = 15,
+    }
+    local bareMenu = factory(fakeGame, bareMon)
+    T.check(bareMon.exp ~= nil and bareMon.exp > 0, "bare mon exp initialized from growth rate")
+    bareMenu.whiteHold = 0
+    bareMenu.page = 1
+    T.check(pcall(function() bareMenu:draw() end), "bare mon draws page 1")
+    bareMenu.page = 2
+    T.check(pcall(function() bareMenu:draw() end), "bare mon draws page 2")
+    bareMenu.page = 3
+    T.check(pcall(function() bareMenu:draw() end), "bare mon draws page 3")
+
+    local g2ExpMon = {
+      species = "SQUIRTLE",
+      level = 10,
+      experience = 1250,
+    }
+    local g2Menu = factory(fakeGame, g2ExpMon)
+    T.eq(g2ExpMon.exp, 1250, "mon with experience adopts into mon.exp")
+    g2Menu.whiteHold = 0
+    g2Menu.page = 2
+    T.check(pcall(function() g2Menu:draw() end), "mon with experience draws page 2")
+    g2Menu.page = 3
+    T.check(pcall(function() g2Menu:draw() end), "mon with experience draws page 3")
+  end
+
   local ok, menu = pcall(factory, fakeGame, mon)
   if ok and menu then
     T.eq(menu._expMaxPage, 3, "summary has three pages")
-    menu.page = 3
-    -- Draw should not error on ability page
-    local drawOk = pcall(function() menu:draw() end)
-    T.check(drawOk, "ability/held-item summary page draws")
-  else
-    -- Headless without love graphics: still assert factory shape
-    T.check(true, "summary factory present (draw skipped headless)")
-    T.check(true, "summary draw skipped headless")
   end
 
   T.eq(HeldItems.def("MAGNET").name, "MAGNET", "Magnet held-item name for summary")

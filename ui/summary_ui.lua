@@ -308,6 +308,16 @@ function SummaryUi.register(mod)
   Gen1Patch.apply(require("src.ui.SummaryMenu"), function(Builtin)
     mod.content.screens:register("SummaryMenu", {
       new = function(game, mon)
+        if mon then
+          if not mon.exp then
+            local Growth = require("src.pokemon.Growth")
+            local def = game and game.data and game.data.pokemon and game.data.pokemon[mon.species]
+            mon.exp = mon.experience
+              or (def and def.growthRate and Growth.expForLevel(def.growthRate, mon.level or 1, game.data and game.data.growth_rates))
+              or 0
+          end
+          mon.moves = mon.moves or {}
+        end
         local self = Builtin.new(game, mon)
         self._expMaxPage = 3
 
@@ -346,13 +356,23 @@ function SummaryUi.register(mod)
 
         local baseDraw = Builtin.draw
         function self:draw()
+          if self.page >= 3 then
+            love.graphics.setColor(1, 1, 1, 1)
+            love.graphics.rectangle("fill", 0, 0, 160, 144)
+            drawHeader(self)
+            drawAbilityPage(self)
+            if self.whiteHold and self.whiteHold > 0 then
+              love.graphics.setColor(1, 1, 1, 1)
+              love.graphics.rectangle("fill", 0, 0, 160, 144)
+            end
+            return
+          end
+
           baseDraw(self)
           if self.whiteHold and self.whiteHold > 0 then return end
           redrawNameWithGender(self)
           if self.page == 1 and SplitSpecial.enabled(mod) then
             redrawSplitSpecialStats(self)
-          elseif self.page >= 3 then
-            drawAbilityPage(self)
           end
         end
 
