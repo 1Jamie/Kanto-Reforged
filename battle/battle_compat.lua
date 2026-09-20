@@ -435,7 +435,7 @@ function BattleCompat.scrubMon(mon, seen)
     elseif type(k) == "string" then
       if k:sub(1, 3) == "_kr" then
         toRemove[#toRemove + 1] = k
-      elseif k:sub(1, 3) == "exp" and k ~= "experience" then
+      elseif k:sub(1, 3) == "exp" and k ~= "experience" and k ~= "exp" then
         toRemove[#toRemove + 1] = k
       end
     elseif vt == "table" then

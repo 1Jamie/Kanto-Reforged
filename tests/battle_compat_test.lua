@@ -98,6 +98,13 @@ return function(T)
         hp = 55,
         sprite = dummyUserdata,
       },
+      mon2 = {
+        species = "CHARMANDER",
+        level = 4,
+        exp = 96,
+        hp = 18,
+        expProtected = true,
+      },
     },
     flags = { EVENT_TEST = true },
   }
@@ -116,6 +123,8 @@ return function(T)
   T.eq(shinyMon.nickname, "Leafy", "scrub keeps nickname")
   T.eq(shinyMon.level, 16, "scrub keeps level")
   T.eq(shinyMon.experience, 4096, "scrub keeps experience")
+  T.eq(save.daycare.mon2.exp, 96, "scrub keeps Gen 1 mon.exp")
+  T.eq(save.daycare.mon2.expProtected, nil, "scrub removes ephemeral expProtected on Gen 1 mon")
   T.eq(shinyMon.hp, 50, "scrub keeps hp")
   T.eq(shinyMon.shiny, true, "scrub keeps shiny flag")
   T.eq(shinyMon.gender, "female", "scrub keeps gender")

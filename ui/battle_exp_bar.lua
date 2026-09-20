@@ -199,7 +199,7 @@ local function fillOrigin(battle)
   return BattleExpBar.CLASSIC_TX * 8, BattleExpBar.CLASSIC_TY * 8 + 1
 end
 
--- Gen 2 FillInExpBar grows from the right end-cap toward the triangle.
+-- Gen 2 FillInExpBar grows from left to right.
 local function fillRect(battle, sx, sy)
   local isWide = battle and battle.wideLayout and battle:wideLayout()
   local maxLen = isWide and BattleExpBar.WIDE_LENGTH_PX or BattleExpBar.LENGTH_PX
@@ -207,7 +207,7 @@ local function fillRect(battle, sx, sy)
   if pixels <= 0 then return nil end
   sx, sy = sx or 0, sy or 0
   local ox, oy = fillOrigin(battle)
-  local px = ox + sx + maxLen - pixels
+  local px = ox + sx
   local py = oy + sy
   local w, h = pixels, BattleExpBar.CHANNEL_PX
   if not isWide and battle.phase == "moveSelect" then
@@ -256,12 +256,12 @@ function BattleExpBar.drawFill(battle, color)
     G.setColor(1, 1, 1, 0.85)
     G.rectangle("fill", ox + 1, oy + 1, trackW - 2, trackH - 2)
 
-    -- Sleek 2px blue EXP fill inside capsule (right-aligned, fills Right -> Left)
+    -- Sleek 2px blue EXP fill inside capsule (fills Left -> Right)
     local fraction = math.max(0, math.min(1, (battle.krShownExp or 0) / trackW))
     local maxFill = trackW - 2
     local fillW = math.floor(fraction * maxFill)
     if fillW > 0 then
-      local fillX = ox + trackW - 1 - fillW
+      local fillX = ox + 1
       G.setColor(BLUE)
       G.rectangle("fill", fillX, oy + 1, fillW, trackH - 2)
     end
