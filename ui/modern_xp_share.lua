@@ -59,10 +59,19 @@ local function partyOf(battle)
   return {}
 end
 
--- Pay one mon through the engine helper.  Gen2's applyShare closes over
--- `halved` from any live EXP.SHARE *item* holder; while our toggle replaces
--- vanilla we must not keep that tax (and we also skip the holders pass).
 local function payShare(ctx, mon, split, announce)
+  if mon and not mon.exp then
+    local Growth = require("src.pokemon.Growth")
+    local data = ctx and ctx.battle and ctx.battle.data
+    local speciesDef = data and data.pokemon and data.pokemon[mon.species]
+    local growthRate = speciesDef and speciesDef.growthRate
+    mon.exp = mon.experience
+      or (growthRate and Growth.expForLevel(growthRate, mon.level or 1, data and data.growth_rates))
+      or 0
+    if mon.experience ~= nil then
+      mon.experience = mon.exp
+    end
+  end
   local battle = ctx.battle
   if ctx.halved and ctx.loser and battle
       and type(battle.giveExperiencePass) == "function"

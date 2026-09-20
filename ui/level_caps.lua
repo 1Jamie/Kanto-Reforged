@@ -269,8 +269,10 @@ local function pinExpAtLevel(data, mon, level)
   local Growth = require("src.pokemon.Growth")
   local speciesDef = data and data.pokemon and data.pokemon[mon and mon.species]
   if not speciesDef or not mon then return end
-  local nextExp = Growth.expForLevel(speciesDef.growthRate, (level or mon.level or 1) + 1)
+  local nextExp = Growth.expForLevel(speciesDef.growthRate, (level or mon.level or 1) + 1, data and data.growth_rates)
   local curExp = mon.exp or mon.experience
+    or (speciesDef.growthRate and Growth.expForLevel(speciesDef.growthRate, mon.level or 1, data and data.growth_rates))
+    or 0
   if nextExp and curExp and curExp >= nextExp then
     mon.exp = nextExp - 1
     if mon.experience ~= nil then
@@ -396,6 +398,18 @@ function LevelCaps.install(mod)
     -- applyShare (`#steps`) does not crash under the soft cap wrap.
     Experience.apply = function(data, mon, defeatedDef, level, isTrainer,
                                   numParticipants, traded, opts)
+      if mon then
+        if not mon.exp then
+          local speciesDef = data and data.pokemon and data.pokemon[mon.species]
+          local growthRate = speciesDef and speciesDef.growthRate
+          mon.exp = mon.experience
+            or (growthRate and Growth.expForLevel(growthRate, mon.level or 1, data and data.growth_rates))
+            or 0
+        end
+        if mon.experience ~= nil and mon.exp ~= nil then
+          mon.experience = mon.exp
+        end
+      end
       local preLevel = mon and mon.level or 0
       local levels, gained, steps = original(data, mon, defeatedDef, level,
         isTrainer, numParticipants, traded, opts)
