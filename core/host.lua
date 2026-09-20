@@ -307,56 +307,8 @@ function Host.installEngineShims(mod)
     end
   end)
 
-  pcall(function()
-    local okScreens, Screens = pcall(require, "src.ui.Screens")
-    if okScreens and type(Screens) == "table" and not Screens._krStartMenuRouter then
-      local origPush = Screens.push
-      if type(origPush) == "function" then
-        Screens.push = function(game, id, ...)
-          if id == "StartMenu" and (Host.isGen2() or (game and game.generation and game.generation >= 2)) then
-            local gen = (game and game.generation) or Host.generation() or 2
-            id = "Gen" .. tostring(gen) .. "StartMenu"
-          end
-          return origPush(game, id, ...)
-        end
-      end
-      local origBuild = Screens.build
-      if type(origBuild) == "function" then
-        Screens.build = function(game, id, ...)
-          if id == "StartMenu" and (Host.isGen2() or (game and game.generation and game.generation >= 2)) then
-            local gen = (game and game.generation) or Host.generation() or 2
-            id = "Gen" .. tostring(gen) .. "StartMenu"
-          end
-          return origBuild(game, id, ...)
-        end
-      end
-      Screens._krStartMenuRouter = true
-    end
-  end)
-
-  pcall(function()
-    Gen1Patch.apply(require("src.ui.StartMenu"), function(StartMenu)
-      if StartMenu and not StartMenu._krGenerationalGuard then
-        local origNew = StartMenu.new
-        if type(origNew) == "function" then
-          StartMenu.new = function(game, opts)
-            if Host.isGen2() or (game and game.generation and game.generation >= 2) then
-              local okScreens, Screens = pcall(require, "src.ui.Screens")
-              if okScreens and Screens and Screens.build then
-                local gen = (game and game.generation) or Host.generation() or 2
-                return Screens.build(game, "Gen" .. tostring(gen) .. "StartMenu", opts)
-              end
-            end
-            return origNew(game, opts)
-          end
-          StartMenu._krGenerationalGuard = true
-        end
-      end
-    end)
-  end)
-
   if mod and mod.log then
-    mod.log:info("Host: installed option-persistence and UI engine shims")
+    mod.log:info("Host: installed option-persistence engine shims")
   end
 end
 
