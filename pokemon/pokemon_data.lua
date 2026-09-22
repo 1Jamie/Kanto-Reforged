@@ -3522,7 +3522,7 @@ P.species = {
     evolutions = {
       { method = "LEVEL", species = "NOCTOWL", level = 20 },
     },
-    spriteFront = "mods/Kanto-Reforged/assets/hoothoot_front.png",
+    spriteFront = "mods/Kanto-Reforged/assets/gs/HOOTHOOT_front.png",
     spriteBack = "mods/Kanto-Reforged/assets/hoothoot_back.png",
     frontSize = 6,
     palette = "HOOTHOOT",
@@ -6157,7 +6157,6 @@ P.species = {
     },
     evolutions = {
     },
-    spriteFront = "mods/Kanto-Reforged/assets/murkrow_front.png",
     spriteBack = "mods/Kanto-Reforged/assets/murkrow_back.png",
     frontSize = 6,
     palette = "MURKROW",
@@ -6958,7 +6957,6 @@ P.species = {
     evolutions = {
       { method = "LEVEL", species = "GRANBULL", level = 23 },
     },
-    spriteFront = "mods/Kanto-Reforged/assets/snubbull_front.png",
     spriteBack = "mods/Kanto-Reforged/assets/snubbull_back.png",
     frontSize = 6,
     palette = "SNUBBULL",
@@ -8256,7 +8254,7 @@ P.species = {
     },
     evolutions = {
     },
-    spriteFront = "mods/Kanto-Reforged/assets/mantine_front.png",
+    spriteFront = "mods/Kanto-Reforged/assets/gs/MANTINE_front.png",
     spriteBack = "mods/Kanto-Reforged/assets/mantine_back.png",
     frontSize = 7,
     palette = "MANTINE",

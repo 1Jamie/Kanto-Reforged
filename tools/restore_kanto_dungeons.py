@@ -969,70 +969,6 @@ def lua_encode(val, indent=0):
         return "\n".join(lines)
     return "nil"
 
-def generate_blaine_gym():
-    """Generates Blaine's Gym dedicated interior room definition (SEAFOAM_GYM)."""
-    return {
-        "id": "SEAFOAM_GYM",
-        "label": "SeafoamGym",
-        "index": 1300,
-        "width": 6,
-        "height": 8,
-        "tileset": "TILESET_FACILITY",
-        "gen1Tileset": "TILESET_FACILITY",
-        "environment": "GYM",
-        "palette": "PALETTE_DAY",
-        "borderBlock": 14,
-        "blocks": [
-            14, 14, 14, 14, 14, 14,
-            14,  1,  2,  3,  4, 14,
-            14,  5,  6,  7,  8, 14,
-            14,  9, 10, 11, 12, 14,
-            14, 13, 14, 15, 16, 14,
-            14, 17, 18, 19, 20, 14,
-            14, 21, 22, 23, 24, 14,
-            14, 14,  1,  1, 14, 14,
-        ],
-        "warps": [
-            {"x": 4, "y": 15, "destMap": "SEAFOAM_ISLANDS_1F", "destWarp": 5},
-            {"x": 5, "y": 15, "destMap": "SEAFOAM_ISLANDS_1F", "destWarp": 5},
-        ],
-        "signs": [
-            {"x": 3, "y": 13, "text": "TEXT_CINNABAR_GYM_STATUE"},
-            {"x": 6, "y": 13, "text": "TEXT_CINNABAR_GYM_STATUE"},
-        ],
-        "bgEvents": [
-            {"x": 3, "y": 13, "kind": 0, "scriptKey": [{"op": "opentext"}, {"op": "writetext", "text": "CINNABAR ISLAND POKEMON GYM\nLEADER: BLAINE"}, {"op": "waitbutton"}, {"op": "closetext"}], "text": "CINNABAR ISLAND POKEMON GYM\nLEADER: BLAINE"},
-            {"x": 6, "y": 13, "kind": 0, "scriptKey": [{"op": "opentext"}, {"op": "writetext", "text": "CINNABAR ISLAND POKEMON GYM\nLEADER: BLAINE"}, {"op": "waitbutton"}, {"op": "closetext"}], "text": "CINNABAR ISLAND POKEMON GYM\nLEADER: BLAINE"},
-        ],
-        "objects": [
-            {
-                "index": 1,
-                "name": "SEAFOAM_GYM_BLAINE",
-                "sprite": "SPRITE_BLAINE",
-                "x": 5,
-                "y": 3,
-                "movement": 6,
-                "range": "DOWN",
-                "text": "TEXT_CINNABARGYM_BLAINE",
-                "trainerClass": "OPP_BLAINE",
-                "trainerParty": 1,
-                "level": 60,
-                "sight": 3,
-                "trainer": {
-                    "class": "OPP_BLAINE",
-                    "member": 1,
-                    "party": 1,
-                    "event": 2998,
-                    "sight": 3,
-                    "seenText": "TEXT_CINNABARGYM_BLAINE",
-                    "winText": "Defeated!",
-                    "lossText": "Better luck next time!",
-                    "text": ["TEXT_CINNABARGYM_BLAINE", "Defeated!", "Better luck next time!"]
-                }
-            }
-        ],
-        "connections": {}
-    }
 
 MAP_MUSIC_MAP = {
     "VIRIDIAN_FOREST": 140, # Music_Route2 (0x80 | 12)
@@ -1654,11 +1590,7 @@ def main():
                     }
                     restored_gen2_encounters["water"][map_id + "_KR"] = w_entry
 
-    blaine_gym = generate_blaine_gym()
-    if blaine_gym["tileset"] in restored_tilesets:
-        blaine_gym["collision"] = restored_tilesets[blaine_gym["tileset"]]["collision"]
-    blaine_gym["id"] = "SEAFOAM_GYM_KR"
-    restored_maps["SEAFOAM_GYM_KR"] = blaine_gym
+
 
     _prune_unused_gen1_tilesets(restored_tilesets)
     kr_needed = bind_kr_tileset_images(restored_tilesets)

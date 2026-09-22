@@ -141,7 +141,6 @@ local function runTests()
     "MT_MOON_1F_KR", "MT_MOON_B1F_KR", "MT_MOON_B2F_KR",
     "CERULEAN_CAVE_1F_KR", "CERULEAN_CAVE_2F_KR", "CERULEAN_CAVE_B1F_KR",
     "SEAFOAM_ISLANDS_1F_KR", "SEAFOAM_ISLANDS_B1F_KR", "SEAFOAM_ISLANDS_B2F_KR", "SEAFOAM_ISLANDS_B3F_KR", "SEAFOAM_ISLANDS_B4F_KR",
-    "SEAFOAM_GYM_KR",
     "SAFARI_ZONE_CENTER_KR", "SAFARI_ZONE_EAST_KR", "SAFARI_ZONE_WEST_KR", "SAFARI_ZONE_NORTH_KR",
     "SAFARI_ZONE_CENTER_REST_HOUSE_KR", "SAFARI_ZONE_SECRET_HOUSE_KR", "SAFARI_ZONE_GATE_KR"
   }
@@ -172,19 +171,9 @@ local function runTests()
 
   print("  Canonical map dimensions verified.")
 
-  -- 4. Seafoam KR layouts ship in data, but overworld access is disabled at
-  -- runtime for now (Route 20 stays on stock Gen2 Seafoam). Keep the gym room
-  -- definition intact so re-enabling is a warp redirect away.
-  local gym = Data.maps.SEAFOAM_GYM_KR
-  assert(gym, "SEAFOAM_GYM_KR layout must remain in data")
-  assert(gym.tileset == "TILESET_FACILITY" or gym.tileset == "GYM",
-    "SEAFOAM_GYM must use dedicated GYM tileset")
-  local blaine = gym.objects and gym.objects[1]
-  local blaineClass = blaine and (blaine.trainerClass or (blaine.trainer and (blaine.trainer.classId or blaine.trainer.class)))
-  assert(blaineClass == "OPP_BLAINE" or blaineClass == "BLAINE",
-    "Blaine must be present in SEAFOAM_GYM_KR, got " .. tostring(blaineClass))
-  assert(blaine.level == 60, "Blaine's level must be scaled to 60")
-  print("  Seafoam gym data present (overworld access disabled).")
+  -- 4. Verify Blaine is not overridden (base Gen 2 Seafoam gym is used)
+  assert(Data.maps.SEAFOAM_GYM_KR == nil, "SEAFOAM_GYM_KR must not exist in data")
+  print("  Seafoam gym not overridden (base Gen 2 gym preserved).")
 
   -- 5. Verify Gen 2 Silver (Rival) on B2F & boss encounters
   local mtMoon1f = Data.maps.MT_MOON_1F_KR
@@ -543,7 +532,7 @@ local function runTests()
     "MT_MOON_1F_KR", "MT_MOON_B1F_KR", "MT_MOON_B2F_KR",
     "CERULEAN_CAVE_1F_KR", "CERULEAN_CAVE_2F_KR", "CERULEAN_CAVE_B1F_KR",
     "SEAFOAM_ISLANDS_1F_KR", "SEAFOAM_ISLANDS_B1F_KR", "SEAFOAM_ISLANDS_B2F_KR",
-    "SEAFOAM_ISLANDS_B3F_KR", "SEAFOAM_ISLANDS_B4F_KR", "SEAFOAM_GYM_KR",
+    "SEAFOAM_ISLANDS_B3F_KR", "SEAFOAM_ISLANDS_B4F_KR",
     "SAFARI_ZONE_CENTER_KR", "SAFARI_ZONE_EAST_KR", "SAFARI_ZONE_WEST_KR",
     "SAFARI_ZONE_NORTH_KR", "SAFARI_ZONE_CENTER_REST_HOUSE_KR",
     "SAFARI_ZONE_SECRET_HOUSE_KR", "SAFARI_ZONE_GATE_KR",

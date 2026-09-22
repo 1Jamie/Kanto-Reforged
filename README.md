@@ -359,7 +359,7 @@ AND DO NOT FORGET THE ABSOLUTE LEGEND THAT DID THE HARD WORKING OF GETTING ALL T
 | 195 | Quagsire | SageDeoxys | gs |
 | 196 | Espeon | 1jamie / lady_gaia | base assets |
 | 197 | Umbreon | 1jamie / lady_gaia | base assets |
-| 198 | Murkrow | 1jamie / lady_gaia | base assets |
+| 198 | Murkrow | Game Freak (vanilla) | ROM |
 | 199 | Slowking | 1jamie / lady_gaia | base assets |
 | 200 | Misdreavus | 1jamie / lady_gaia | base assets |
 | 201 | Unown | SageDeoxys | gs |
@@ -370,7 +370,7 @@ AND DO NOT FORGET THE ABSOLUTE LEGEND THAT DID THE HARD WORKING OF GETTING ALL T
 | 206 | Dunsparce | SageDeoxys | gs |
 | 207 | Gligar | 1jamie / lady_gaia | base assets |
 | 208 | Steelix | 1jamie / lady_gaia | base assets |
-| 209 | Snubbull | 1jamie / lady_gaia | base assets |
+| 209 | Snubbull | Game Freak (vanilla) | ROM |
 | 210 | Granbull | 1jamie / lady_gaia | base assets |
 | 211 | Qwilfish | SageDeoxys | gs |
 | 212 | Scizor | SageDeoxys | gs |
