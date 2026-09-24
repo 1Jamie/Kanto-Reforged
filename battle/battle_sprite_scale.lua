@@ -151,13 +151,19 @@ end
 -- mutates the shared pokemon_data table Gen2 also loads.
 function BattleSpriteScale.gen1RegisterCopy(record)
   if not record then return record end
-  local dex = record.dex or 0
-  if dex < 252 or record.battleScaleBack ~= nil then
-    return record
-  end
   local copy = {}
   for k, v in pairs(record) do
     copy[k] = v
+  end
+  if not copy.spriteFront then
+    copy.spriteFront = "mods/Kanto-Reforged/assets/fallback_front.png"
+  end
+  if not copy.spriteBack then
+    copy.spriteBack = "mods/Kanto-Reforged/assets/fallback_back.png"
+  end
+  local dex = record.dex or 0
+  if dex < 252 or record.battleScaleBack ~= nil then
+    return copy
   end
   return BattleSpriteScale.applyHoennBackOnGen1(copy)
 end

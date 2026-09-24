@@ -86,12 +86,15 @@ local g2After = PokemonGen2.toGen2Record({
 })
 eq(g2After.battleScaleBack, 1.5, "gen2 castform still 1.5 after gen1 copy helper")
 
-local authored = { dex = 252, battleScaleBack = 1.3 }
-eq(Scale.gen1RegisterCopy(authored), authored, "authored back reused")
-eq(authored.battleScaleBack, 1.3, "authored back kept")
+local authored = { dex = 252, battleScaleBack = 1.3, spriteFront = "f", spriteBack = "b" }
+local authoredReg = Scale.gen1RegisterCopy(authored)
+eq(authoredReg.battleScaleBack, 1.3, "authored back kept")
+eq(authoredReg.spriteFront, "f", "authored front kept")
 
 local johto = { dex = 177 }
-eq(Scale.gen1RegisterCopy(johto), johto, "johto not auto-scaled")
+local johtoReg = Scale.gen1RegisterCopy(johto)
+eq(johtoReg.battleScaleBack, nil, "johto not auto-scaled")
+eq(johtoReg.spriteFront, "mods/Kanto-Reforged/assets/fallback_front.png", "johto missing front gets fallback")
 
 if fails == 0 then
   print("OK battle_sprite_scale tests")

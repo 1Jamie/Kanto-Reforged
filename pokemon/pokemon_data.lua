@@ -6157,6 +6157,7 @@ P.species = {
     },
     evolutions = {
     },
+    spriteFront = "mods/Kanto-Reforged/assets/fallback_front.png",
     spriteBack = "mods/Kanto-Reforged/assets/murkrow_back.png",
     frontSize = 6,
     palette = "MURKROW",
@@ -6957,6 +6958,7 @@ P.species = {
     evolutions = {
       { method = "LEVEL", species = "GRANBULL", level = 23 },
     },
+    spriteFront = "mods/Kanto-Reforged/assets/fallback_front.png",
     spriteBack = "mods/Kanto-Reforged/assets/snubbull_back.png",
     frontSize = 6,
     palette = "SNUBBULL",
