@@ -79,17 +79,20 @@ function Weather.rewrittenChipText(text)
 end
 
 function Weather.current(battle)
-  if Weather.suppressed(battle) then return nil end
-  return BattleCompat.getWeather(battle)
+  if not battle then return nil end
+  local b = battle.battle or battle
+  if Weather.suppressed(b) or Weather.suppressed(battle) then return nil end
+  return BattleCompat.getWeather(b) or BattleCompat.getWeather(battle)
 end
 
 function Weather.suppressed(battle)
   if not battle then return false end
+  local b = battle.battle or battle
   local ok, Abilities = pcall(require, "mods.Kanto-Reforged.battle.abilities")
   if not ok or not Abilities or not Abilities.abilityOf then return false end
-  local a = Abilities.abilityOf(battle, battle.player)
-  local b = Abilities.abilityOf(battle, battle.enemy)
-  return a == "AIR_LOCK" or a == "CLOUD_NINE" or b == "AIR_LOCK" or b == "CLOUD_NINE"
+  local a = Abilities.abilityOf(b, b.player) or Abilities.abilityOf(battle, battle.player)
+  local c = Abilities.abilityOf(b, b.enemy) or Abilities.abilityOf(battle, battle.enemy)
+  return a == "AIR_LOCK" or a == "CLOUD_NINE" or c == "AIR_LOCK" or c == "CLOUD_NINE"
 end
 
 function Weather.typeModifier(battle, moveType)

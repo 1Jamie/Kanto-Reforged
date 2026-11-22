@@ -1,5 +1,5 @@
--- Optional Gen1 Modern UI contract for Kanto Reforged.
--- No-op when gen1_modern_ui is not installed; native Gen1 screens stay as-is.
+-- Optional OmniUI contract for Kanto Reforged.
+-- No-op when omni_ui is not installed; native Gen1 screens stay as-is.
 
 local SummaryUi = require("mods.Kanto-Reforged.ui.summary_ui")
 local SplitSpecial = require("mods.Kanto-Reforged.battle.split_special")
@@ -203,14 +203,28 @@ end
 return function(mod)
   local Host = require("mods.Kanto-Reforged.core.host")
   if Host.isGen2() then
-    return false, "Gen1 Modern UI adapter is Gen1-only"
+    return false, "OmniUI adapter is Gen1-only"
   end
-  local ui = mod.find and mod.find("gen1_modern_ui") or nil
-  if not (ui and ui.exports and ui.exports.registerAdapter) then
-    return false, "Gen1 Modern UI is not installed"
+  local function findModernUi()
+    if type(mod.find) == "function" then
+      local ui = mod.find("omni_ui")
+      if ui and ui.exports and ui.exports.registerAdapter then
+        return ui
+      end
+    end
+    local packed = package.loaded["mods.omni_ui.api.PublicApi"] or package.loaded["gen1_modern_ui"]
+    if type(packed) == "table" and packed.registerAdapter then
+      return { id = "omni_ui", exports = packed }
+    end
+    return nil
   end
 
   SplitSpecial.installModernUiPartyPatch(mod)
+
+  local ui = findModernUi()
+  if not (ui and ui.exports and ui.exports.registerAdapter) then
+    return false, "OmniUI is not installed"
+  end
 
   mod.exports.gen1ModernUi = {
     apiVersion = 1,

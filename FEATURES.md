@@ -1,8 +1,21 @@
 # Kanto Reforged — Full Feature Guide
 
+Version **1.8.0** (22 November 2026, FireRed / LeafGreen release).
+
 Numbers, locations, unlock gates, recipes. The short overview and install steps are in [README.md](README.md). The play-through style guide is [WALKTHROUGH.md](WALKTHROUGH.md).
 
 Mod id: `Kanto-Reforged`. Enable it in the launcher Mods tab or the F10 manager. This mod sets `affects_link`, so both sides need matching mods for link play.
+
+## Supported hosts
+
+| Host | Release |
+|---|---|
+| Red | Supported |
+| Blue | Supported |
+| Gold | Supported |
+| Silver | Supported |
+| FireRed | Supported (1.8.0) |
+| LeafGreen | Supported (1.8.0) |
 
 ---
 
@@ -33,6 +46,7 @@ Mod id: `Kanto-Reforged`. Enable it in the launcher Mods tab or the F10 manager.
 23. [Custom maps](#custom-maps)
 24. [Caveats and save notes](#caveats-and-save-notes)
 25. [Module map (for modders)](#module-map-for-modders)
+26. [FireRed / LeafGreen](#firered--leafgreen)
 
 ---
 
@@ -57,7 +71,7 @@ Configured in the mod manager / F10 options:
 | **SWITCH HIT AI** | Classic | Free-hit timing when you switch: **CLASSIC** picks after send-out; **GEN 3** locks against the outgoing mon. Same labels on Red and Gold. |
 | **BAG GIVE** | On | Allow Give held item from the bag as well as from the party menu. |
 | **RULESET** | MODERN (forced) | **Red only.** KR always forces engine `modern_clean` (no 1/256 miss, Focus Energy helps crits, enemies spend PP, Hyper Beam always recharges, end-of-turn residuals) plus Gen3 crit / partial-trap capabilities. The old GEN 1 / `gen1_faithful` toggle is removed; leftover faithful saves migrate to `modern_clean`. Hidden on Gold (native Gen2 rules + same KR Gen3 overlays where applicable). |
-| **SP.ATK / SP.DEF** | On | **Red only.** Special moves use separate Sp.Atk / Sp.Def bases (PokeAPI) instead of Gen 1 Special. Summary and Modern UI party/PC detail show both stats (`SAT` / `SDF`). Stages, DVs, and Calcium stay Gen 1 (one shared Special). Hidden on Gold (already split). |
+| **SP.ATK / SP.DEF** | On | **Red only.** Special moves use separate Sp.Atk / Sp.Def bases (PokeAPI) instead of Gen 1 Special. Summary and party/PC detail show both stats (`SAT` / `SDF`). Stages, DVs, and Calcium stay Gen 1 (one shared Special). Hidden on Gold (already split). |
 | **EXP BAR** | On | **Red only.** Blue EXP bar under the HP bar in battle (Gen 2 style, widescreen-aware). Hidden on Gold (native bar). |
 | **DEXNAV** | DEXNAV | **Red only.** Start-menu label / off. Gold DexNav is a Pokegear card (no rename toggle). |
 
@@ -350,8 +364,9 @@ There are no separate "seeds." You plant a berry, it grows, you harvest more ber
 ### Growth
 
 - **9** plots. Face a bed + A to plant (spends 1 berry).
-- Growth uses the global `farmSteps` counter (any overworld tile step). Base **320** steps per plant.
-- Soil ranks: 0→320, 1→280, 2→240, 3→192 steps.
+- Growth uses the global `farmSteps` counter (any overworld tile step). Base **500** steps per plant.
+- Soil ranks: 0→500, 1→438, 2→375, 3→300 steps.
+- While it grows, the plot says it was freshly planted, is still growing, or is almost full grown. A finished plot is ready to pick.
 - Rank gates:
   - Rank 1: ≥ **5** Pokédex owned
   - Rank 2: Grass-type in party at **Lv ≥ 20**
@@ -397,7 +412,7 @@ Step cool-down between crafts: **640** farm steps (480 at soil rank 3).
 - **Summary Menu:**
   - **Gen 1:** Page 3 displays ability, held item, and gender glyph.
   - **Gen 2:** Page 4 displays ability, held item, gender glyph, and ability description text.
-- **Optional [Gen1 Modern UI](https://github.com/ArmstrongThomas/gen1-modern-ui):** Supported on Red.
+- **Summary and overlay:** Gen 1 summary page 3 shows ability, held item, and gender. Gen 2 page 4 adds the ability text. [OmniUI](https://github.com/1Jamie/omni_ui) (`omni_ui`) is supported and recommended on Red, Blue, Gold, Silver, Crystal, FireRed, and LeafGreen.
 
 ![DexNav (Cerulean City)](screen-shots/dexnav.png)
 ![Berries pocket](screen-shots/bag-berries.png)
@@ -407,7 +422,7 @@ Step cool-down between crafts: **640** farm steps (480 at soil rank 3).
 
 ## Level caps
 
-**Opt-in only.** Talk to the Rare Candy youngster outside the Viridian Poké Mart (Gen 1) or in Cherrygrove City (Gen 2). Taking **any** amount permanently enables soft caps:
+**Opt-in only.** Talk to the Rare Candy youngster outside the Viridian Poké Mart on Red, Blue, FireRed, and LeafGreen, or in Cherrygrove City on Gold, Silver, and Crystal. Taking **any** amount permanently enables soft caps:
 
 - Tops your Rare Candies toward **99**.
 - At the current cap, battle XP becomes +1-style soft stop and Rare Candy cannot push past it.
@@ -491,21 +506,22 @@ Lead must **hold a berry**. First clear → **Focus Sash**. Rematches → 1× Ch
 
 - **Gen 1:** Underground Path (Route 5 side).
 - **Gen 2:** Underground Path (Route 5/6 tunnel).
-- Reads DV words, Hidden Power type, and highest statExp.
+- **FRLG:** Underground Path North Entrance.
+- Reads DV / IV words, Hidden Power type, and effort.
 
-### Extra trades (Gen 1)
+### Extra trades (Gen 1 + FRLG)
 
 | Location | Give → Get | Held on received |
 |---|---|---|
-| Route 2 Trade House | Rattata → Taillow (“SWIFT”) | Cleanse Tag |
-| Fuchsia Bill’s Grandpa’s House | Bellsprout → Seedot (“GLAND”) | Soothe Bell |
+| Route 2 Trade House (`Route2_House` on FRLG) | Rattata → Taillow (“SWIFT”) | Cleanse Tag |
+| Fuchsia Bill’s Grandpa’s House (`FuchsiaCity_House1` on FRLG) | Bellsprout → Seedot (“GLAND”) | Soothe Bell |
 
 ---
 
 ## Move Hub
 
 - **Gen 1:** Saffron Pidgey House.
-- **Gen 2:** Saffron City (Mr. Psychic's House).
+- **Gen 2 / FRLG:** Saffron City (Mr. Psychic's House).
 
 | Service | Cost | Notes |
 |---|---|---|
@@ -519,11 +535,12 @@ Lead must **hold a berry**. First clear → **Focus Sash**. Rematches → 1× Ch
 
 - **Gen 1:** Cinnabar Lab Metronome Room.
 - **Gen 2:** Cinnabar Pokémon Center 1F.
+- **FRLG:** Cinnabar Lab Research Room.
 
 | Exchange | Notes |
 |---|---|
-| Metal Coat → Life Orb | One-shot |
-| 3× Nugget → Focus Sash | One-shot; if you already have a sash → 2× Heart Scale instead |
+| Metal Coat → Life Orb | One-shot; on FRLG the bag receives **Leftovers** (no Life Orb item id) |
+| 3× Nugget → Focus Sash | One-shot; on FRLG the bag receives **Focus Band**; if you already have one → 2× Heart Scale instead |
 | Leaf Stone → berry pack | Repeatable: BERRY, Cheri, Pecha, Rawst, Aspear (1 each) |
 
 ---
@@ -617,7 +634,61 @@ The codebase is organized into domain-specific subdirectories:
 | `items/held_items.lua` / `items/competitive_items.lua` / `items/bag_pockets.lua` | Held item effects, battle items (Choice Band/Life Orb/Focus Sash), Gen1 bag pockets fallback (companion: `gen1_bag_pockets`) |
 | `ui/summary_ui.lua` / `ui/dexnav.lua` / `ui/level_caps.lua` / `ui/xp_bar.lua` | Extra summary page (Page 3/4), DexNav start menu / Pokegear, level caps, XP bar |
 | `tools/generate_pokemon_mod.py` | Data generator pipeline from PokeAPI |
-| `sevii/` (parked) | Sevii ferry/maps/tooling — disabled until `SEVII_ENABLED` |
+| `sevii/` (parked on Gen 1) | Sevii ferry/maps/tooling for the Gen 1 host — still disabled until `SEVII_ENABLED`. FireRed / LeafGreen use the cart Sevii region. |
 
 Tests live under `tests/` and are pulled in by `tests/Kanto-Reforged_test.lua`.
+
+---
+
+## FireRed / LeafGreen
+
+Version **1.8.0**. Cart systems stay native. KR adds the pieces below on FireRed and LeafGreen.
+
+### Pokédex
+
+Species **1–386** are in the dex and the PC, Johto and Hoenn included.
+
+### Pokédex area page
+
+On area page 2, **SELECT** toggles the markers between **Kanto** and the **Sevii Islands**. The hint on that page reads SELECT: REGION.
+
+### New game
+
+Before the shrink into the bedroom, Oak asks three questions:
+
+1. Randomize the starters.
+2. Full-mix the spawn tables.
+3. If full-mix is on, whether legendaries join that mix.
+
+Yes on the recap keeps those answers. No runs the three questions again. The intro line itself is not repeated. After that, the scene continues into the bedroom spawn.
+
+On Route 22, the old man who teaches catching can be declined. **No** skips the Weedle battle, still gives the Teachy TV, and moves him off the road so the early game continues.
+
+### Trade evolutions
+
+The Moon Stone bypasses from the shared table apply on FireRed and LeafGreen: Onix, Scyther, Poliwhirl, Slowpoke, Porygon, and the other listed lines evolve from the bag without a link partner.
+
+### Sevii and post-game encounters
+
+- **Roamers:** catching or defeating the current beast cycles Raikou → Entei → Suicune, and the new beast keeps full 0–31 IVs.
+- **Hoenn fossils:** Root Fossil in Five Island Lost Cave (room 10). Claw Fossil in Four Island Icefall Cave (back). The Cinnabar Lab experiment room revives them into Lileep and Anorith at level 20.
+- **Regi trio:** after the Tanoby Key, Regirock, Regice, and Registeel are in the Scufib, Dilford, and Viapois chambers on Seven Island, level 50.
+- **Mystic Ticket:** a Celadon Circuit streak. It opens the Seagallop trip to Navel Rock.
+- **Aurora Ticket:** the researcher in the One Island Pokémon Center, after the Champion flag. It opens Birth Island.
+
+### Soft level caps
+
+Optional. The Rare Candy kid stands in **Viridian City**, east of the Mart, the same spot as on Red. Accepting the candies turns soft caps on for that save. Declining leaves experience vanilla.
+
+### Berry Farm
+
+Centers open the farm the same way as the other hosts. Base growth is **500** steps. Soil rank shortens that to 438, 375, or 300. A growing plot says one of:
+
+| Stage | Line |
+|---|---|
+| Early | The plot was freshly planted. |
+| Middle | The plant is still growing. |
+| Late | The plant is almost full grown. |
+
+A plot that has finished those steps is ready to pick.
 

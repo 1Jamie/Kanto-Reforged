@@ -1765,5 +1765,80 @@ return function(T, Data, run)
       T.check(qaScore < tackleScore, "scoreTactical gives Quick Attack extra finish bonus when target is in KO range")
     end
   end
+
+  -- 5. Dream Eater and Snore sleep condition scoring
+  do
+    local dreamEater = Data.moves.DREAM_EATER or { id = "DREAM_EATER", power = 100, type = "PSYCHIC_TYPE", effect = "DREAM_EATER_EFFECT" }
+    local snore = Data.moves.SNORE or { id = "SNORE", power = 50, type = "NORMAL", effect = "SNORE_EFFECT" }
+    local hypnosis = Data.moves.HYPNOSIS or { id = "HYPNOSIS", power = 0, type = "PSYCHIC_TYPE", effect = "SLEEP_EFFECT" }
+    local psychicM = Data.moves.PSYCHIC_M or { id = "PSYCHIC_M", power = 90, type = "PSYCHIC_TYPE" }
+
+    local userGardevoir = atkBattler({
+      curTypes = { "PSYCHIC_TYPE" },
+      moves = { { id = "HYPNOSIS", pp = 20 }, { id = "DREAM_EATER", pp = 15 }, { id = "PSYCHIC_M", pp = 10 } },
+      mon = { hp = 100, maxHp = 100, stats = { hp = 100 } },
+    })
+    local targetAwake = defBattler({
+      curTypes = { "NORMAL" },
+      hp = 100, maxHp = 100,
+    })
+    local targetAsleep = defBattler({
+      curTypes = { "NORMAL" },
+      status = "SLP",
+      hp = 100, maxHp = 100,
+    })
+
+    local b = fakeBattle({ class = "OPP_SABRINA", party = 1 })
+    b.player = targetAwake
+    local bAsleep = fakeBattle({ class = "OPP_SABRINA", party = 1 })
+    bAsleep.player = targetAsleep
+    local vAwake = { user = userGardevoir, target = targetAwake, battle = b, data = Data }
+    local vAsleep = { user = userGardevoir, target = targetAsleep, battle = bAsleep, data = Data }
+
+    -- Dream Eater vs Awake target should be dumped (+6 penalty)
+    local deScoreAwake = TrainerAi.score(vAwake, dreamEater, 10)
+    local psyScoreAwake = TrainerAi.score(vAwake, psychicM, 10)
+    T.check(deScoreAwake >= 16, "Dream Eater gets dumped (+6) when target is awake")
+    T.check(psyScoreAwake < deScoreAwake, "Psychic is preferred over Dream Eater against awake target")
+
+    -- Dream Eater vs Asleep target is favored
+    local deScoreAsleep = TrainerAi.score(vAsleep, dreamEater, 10)
+    T.check(deScoreAsleep < deScoreAwake, "Dream Eater is favored when target is asleep")
+
+    -- Hypnosis gets synergy bonus when user carries Dream Eater and target is awake
+    local hypScore = TrainerAi.score(vAwake, hypnosis, 10)
+    T.check(hypScore < 10, "Hypnosis receives synergy preference when user has Dream Eater")
+
+    -- Snore while awake is dumped (+6 penalty)
+    local snoreScoreAwake = TrainerAi.score(vAwake, snore, 10)
+    T.check(snoreScoreAwake >= 16, "Snore gets dumped (+6) when user is awake")
+  end
+
+  -- 6. Contact flag detection (Earthquake vs contact abilities)
+  do
+    local Abilities = require("mods.Kanto-Reforged.battle.abilities")
+    T.eq(Abilities.makesContact({ id = "EARTHQUAKE" }), false, "Earthquake does not make contact")
+    T.eq(Abilities.makesContact({ id = "ROCK_SLIDE" }), false, "Rock Slide does not make contact")
+    T.eq(Abilities.makesContact({ id = "MAGNITUDE" }), false, "Magnitude does not make contact")
+    T.eq(Abilities.makesContact({ id = "TACKLE" }), true, "Tackle makes contact")
+    T.eq(Abilities.makesContact({ id = "MEGA_PUNCH" }), true, "Mega Punch makes contact")
+    T.eq(Abilities.makesContact({ id = "PETAL_DANCE" }), true, "Petal Dance makes contact (special contact move)")
+    T.eq(Abilities.makesContact({ id = "THUNDERBOLT" }), false, "Thunderbolt does not make contact")
+  end
+
+  -- 7. Victory Road Rival Gen 2 scaling
+  do
+    local ExpTrainers = require("mods.Kanto-Reforged.battle.trainers")
+    local mockMod = { content = { trainers = { patch = function() end } }, data = {} }
+    ExpTrainers.apply(mockMod)
+    local vRoadSilver13 = ExpTrainers._gen2RosterByKey and ExpTrainers._gen2RosterByKey["RIVAL1_13"]
+    T.check(vRoadSilver13 ~= nil, "Victory Road Rival party 13 registered in Gen 2 rosters")
+    if vRoadSilver13 and vRoadSilver13.roster then
+      T.check(#vRoadSilver13.roster == 6, "Victory Road Rival has full 6 mon party")
+      local ace = vRoadSilver13.roster[#vRoadSilver13.roster]
+      T.check(ace.level >= 46, "Victory Road Rival ace is scaled (level 46+)")
+      T.eq(ace.species, "MEGANIUM", "Victory Road Rival party 13 ace is Meganium")
+    end
+  end
 end
 

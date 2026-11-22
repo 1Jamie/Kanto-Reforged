@@ -44,8 +44,14 @@ return function(T, Data, HeldItems, run)
     "Celadon vitamins clerk does not sell Leftovers")
 
   local BerryFarm = require("mods.Kanto-Reforged.world.berry_farm")
-  T.eq(BerryFarm.GROW_STEPS, 320, "Base grow steps are 320")
-  T.eq(BerryFarm.GROW_BY_RANK[3], 192, "Soil rank 3 speeds growth")
+  T.eq(BerryFarm.GROW_STEPS, 500, "Base grow steps are 500")
+  T.eq(BerryFarm.GROW_BY_RANK[3], 300, "Soil rank 3 speeds growth")
+  T.eq(BerryFarm.growthPhrase(0, 500), "The plot was\nfreshly planted.",
+    "early growth hides the step count")
+  T.eq(BerryFarm.growthPhrase(200, 500), "The plant is\nstill growing.",
+    "mid growth hides the step count")
+  T.eq(BerryFarm.growthPhrase(400, 500), "The plant is\nalmost full grown.",
+    "late growth hides the step count")
 
   local parTarget = {
     mon = { heldItem = "CHERI_BERRY", hp = 40, stats = { hp = 40 }, status = "PAR" },

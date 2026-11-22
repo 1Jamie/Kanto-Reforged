@@ -195,6 +195,8 @@ local DUNGEON_TEXT = {
   TEXT_ROCKTUNNELPOKECENTER_FISHER = "I sold a useless NUGGET for ¥5000!",
   TEXT_ROCKTUNNELPOKECENTER_GENTLEMAN = "The element types of POKéMON make them stronger or weaker!",
   TEXT_ROCKTUNNELPOKECENTER_GUY = "I heard that GHOSTs haunt LAVENDER TOWN!",
+  TEXT_ROCKTUNNELPOKECENTER_LINK_RECEPTIONIST = "Welcome to the CABLE CLUB!",
+  TEXT_ROCKTUNNELPOKECENTER_NURSE = "Welcome to our POKéMON CENTER!\nWe heal your POKéMON back to perfect health!",
 }
 
 for _, v in pairs(DUNGEON_TEXT) do
@@ -1237,9 +1239,9 @@ local RESTORED_DUNGEON_LANDMARK_RULES = {
   { prefix = "MOUNT_MOON", landmark = 52 },
   { prefix = "CERULEAN_CAVE", landmark = 54 }, -- LANDMARK_CERULEAN_CITY
   { prefix = "SEAFOAM", landmark = 83 }, -- LANDMARK_SEAFOAM_ISLANDS
-  { prefix = "SAFARI_ZONE", landmark = 68 }, -- LANDMARK_FUCHSIA_CITY
-  { prefix = "ROCK_TUNNEL", landmark = 60 }, -- LANDMARK_ROCK_TUNNEL
-  { prefix = "DIGLETTS_CAVE", landmark = 57 }, -- LANDMARK_DIGLETTS_CAVE
+  { prefix = "SAFARI_ZONE", landmark = 80 }, -- LANDMARK_FUCHSIA_CITY
+  { prefix = "ROCK_TUNNEL", landmark = 65 }, -- LANDMARK_ROCK_TUNNEL
+  { prefix = "DIGLETTS_CAVE", landmark = 61 }, -- LANDMARK_DIGLETTS_CAVE
 }
 
 local function applyRestoredDungeonLandmarks(Data)

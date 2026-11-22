@@ -103,6 +103,13 @@ local function isGen2Mod(mod)
   return Host.isGen2From(mod) or Host.isGen2()
 end
 
+--- Gen 2 Unown is 26 letter pics on the species record (`letters.A`–`Z`).
+-- KR only has one sheet under the species id, so any art override collapses
+-- every form onto that sheet. Leave the cart pics alone.
+function SpriteResolve.skipGen2Unown(mod, speciesId)
+  return speciesId == "UNOWN" and isGen2Mod(mod)
+end
+
 function SpriteResolve.speciesDex(speciesId)
   if not speciesId then return nil end
   if not SpriteResolve._dexById then
@@ -156,6 +163,7 @@ end
 -- `callerPath` remaps leftover KR flats onto the cart pic when ROM should win.
 function SpriteResolve.resolvePath(mod, speciesId, side, callerPath)
   if not speciesId then return nil end
+  if SpriteResolve.skipGen2Unown(mod, speciesId) then return nil end
   if SpriteResolve.hasGs(mod, speciesId, side) then
     return SpriteResolve.gsPath(mod, speciesId, side)
   end
@@ -263,10 +271,7 @@ end
 --   Use this when `rec` is already a converted Gen2 record with correct scales.
 function SpriteResolve.applyToRecord(mod, id, rec, opts)
   if type(rec) ~= "table" or not id then return false end
-  if id == "UNOWN" and isGen2Mod(mod) then
-    -- Preserve Gen 2 ROM Unown letter table
-    return false
-  end
+  if SpriteResolve.skipGen2Unown(mod, id) then return false end
   local pathsOnly = opts and opts.pathsOnly
   local changed = false
   local frontSrc = bestSource(mod, id, "front")
@@ -323,11 +328,7 @@ local function eachIndexedId()
 end
 
 local function buildPatch(mod, id)
-  if id == "UNOWN" and isGen2Mod(mod) then
-    -- Gen 2 ROM Unown has 26 form letters (A–Z) in def.letters.
-    -- Do not patch a single static front/back sprite over Gen 2 Unown.
-    return nil
-  end
+  if SpriteResolve.skipGen2Unown(mod, id) then return nil end
   local patch = {}
   local frontSrc = bestSource(mod, id, "front")
   if frontSrc == "gs" then

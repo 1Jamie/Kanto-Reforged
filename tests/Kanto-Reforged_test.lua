@@ -2,6 +2,8 @@
 package.path = "./?.lua;./?/init.lua;" .. package.path
 
 local T = require("tests.modkit")
+local Setting = require("src.online.union.Setting")
+Setting.patchesOn = function() return false end
 local Data = require("src.core.Data")
 local Runtime = require("src.mods.Runtime")
 Data:load()

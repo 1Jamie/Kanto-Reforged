@@ -958,6 +958,26 @@ function TrainerAi.scoreNatural(view, def, score)
     return score + 6
   end
 
+  local function isAsleep(battler)
+    local st = BattleCompat.status(battler)
+    return st == "SLP" or st == "sleep"
+  end
+
+  if effect == "DREAM_EATER_EFFECT" or effect == "DREAM_EATER" or (def and def.id == "DREAM_EATER") then
+    if not isAsleep(target) then
+      return score + 6
+    else
+      score = score - 2
+    end
+  end
+
+  if effect == "SNORE_EFFECT" or effect == "EFFECT_SNORE" or (def and def.id == "SNORE")
+      or effect == "SLEEP_TALK_EFFECT" or effect == "EFFECT_SLEEP_TALK" or (def and def.id == "SLEEP_TALK") then
+    if not isAsleep(user) then
+      return score + 6
+    end
+  end
+
   if power > 0 then
     local row = TypeChart.rows(def.type, target.curTypes)[1]
     if row == 0 then return score + 6 end
@@ -1105,6 +1125,37 @@ function TrainerAi.score(view, def, score)
   end
   if DISABLE_EFFECTS[effect] and BattleCompat.disabledMoveId(view.battle, target) then
     return score + 6
+  end
+
+  local function isAsleep(battler)
+    local st = BattleCompat.status(battler)
+    return st == "SLP" or st == "sleep"
+  end
+
+  if effect == "DREAM_EATER_EFFECT" or effect == "DREAM_EATER" or (def and def.id == "DREAM_EATER") then
+    if not isAsleep(target) then
+      return score + 6
+    else
+      score = score - 3
+    end
+  end
+
+  if effect == "SNORE_EFFECT" or effect == "EFFECT_SNORE" or (def and def.id == "SNORE")
+      or effect == "SLEEP_TALK_EFFECT" or effect == "EFFECT_SLEEP_TALK" or (def and def.id == "SLEEP_TALK") then
+    if not isAsleep(user) then
+      return score + 6
+    end
+  end
+
+  if (effect == "SLEEP_EFFECT" or effect == "EFFECT_SLEEP" or (def and def.id == "HYPNOSIS"))
+      and not BattleCompat.status(target) then
+    local moves = user.curMoves or user.moves or {}
+    for _, mv in ipairs(moves) do
+      if (mv.id or mv) == "DREAM_EATER" then
+        score = score - 2
+        break
+      end
+    end
   end
 
   if power > 0 then
@@ -1650,6 +1701,9 @@ function TrainerAi.eliteAction(battle)
   if battle.expAiSwitchMon ~= battle.enemyIndex then
     battle.expAiSwitchMon = battle.enemyIndex
     battle.expAiSwitches = 0
+    battle.expAiTurnsOnField = 0
+  else
+    battle.expAiTurnsOnField = (battle.expAiTurnsOnField or 0) + 1
   end
 
   local theme = themeFor(battle)
@@ -1702,13 +1756,20 @@ function TrainerAi.eliteAction(battle)
     local trapped = PartialTrap.active(battle) and PartialTrap.isTrapped(user)
     local margin = 20 / switchBias
     local dying = userHp <= 0.25
-    if not trapped and (bestScore >= currentScore + margin
+    local turnsOnField = battle.expAiTurnsOnField or 0
+    local totalSwitches = battle.expAiTotalSwitches or 0
+    local maxTotalSwitches = switchBias >= 1.5 and 3 or 2
+
+    if not trapped and totalSwitches < maxTotalSwitches and (turnsOnField >= 1 or dying)
+       and (bestScore >= currentScore + margin
        or (dying and bestScore > currentScore * 1.25)) then
       -- Rate-limit: at most one AI switch per mon send-out unless Agatha-ish.
       local switches = battle.expAiSwitches or 0
       local maxSwitches = switchBias >= 1.5 and 2 or 1
       if switches < maxSwitches then
         battle.expAiSwitches = switches + 1
+        battle.expAiTotalSwitches = totalSwitches + 1
+        battle.expAiTurnsOnField = 0
         return { special = "aiSwitch", index = bestIdx }
       end
     end
@@ -2198,6 +2259,8 @@ function TrainerAi.install(mod)
       b.expMapId = b.expMapId or currentMapId(mod.activeGame)
         or currentMapId(ev.game)
       b.expAiSwitches = 0
+      b.expAiTotalSwitches = 0
+      b.expAiTurnsOnField = 0
       b.expBattleItemsUsed = 0
       b.expMonItemsUsed = {}
       if b.aiUses == nil then b.aiUses = 99 end

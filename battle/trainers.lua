@@ -16,7 +16,7 @@ local MIX = {
   { "OPP_MISTY", 1, 1, "MARILL" },
   { "OPP_MISTY", 1, "add", "CORPHISH", 19 },
   { "OPP_LT_SURGE", 1, 1, "FLAAFFY" },
-  { "OPP_LT_SURGE", 1, "add", "ELECTRIKE", 20 },
+  { "OPP_LT_SURGE", 1, "add", "ELECTABUZZ", 20 },
   { "OPP_ERIKA", 1, 2, "BELLOSSOM" },
   { "OPP_ERIKA", 1, "add", "BRELOOM", 26 },
   { "OPP_KOGA", 1, 3, "CROBAT" },
@@ -447,7 +447,7 @@ local MIX_GEN2 = {
   { "OPP_RIVAL2", 12, "add", "FERALIGATR", 78 },
 
   -- Lt. Surge (Vermilion Gym - target 55)
-  { "OPP_LT_SURGE", 1, 1, "ELECTRIKE", 52 },
+  { "OPP_LT_SURGE", 1, 1, "ELECTABUZZ", 52 },
   { "OPP_LT_SURGE", 1, 2, "AMPHAROS", 53 },
   { "OPP_LT_SURGE", 1, 3, "MAGNETON", 53 },
   { "OPP_LT_SURGE", 1, "add", "ELECTRODE", 54 },
@@ -623,7 +623,7 @@ local ACE_BERRIES_GEN2 = {
 local GEN2_FULL_PARTIES = {
   LT_SURGE = {
     [1] = {
-      { species = "ELECTRIKE", level = 52 },
+      { species = "ELECTABUZZ", level = 52 },
       { species = "AMPHAROS", level = 53 },
       { species = "MAGNETON", level = 53 },
       { species = "ELECTRODE", level = 54 },
@@ -664,12 +664,12 @@ local GEN2_FULL_PARTIES = {
   },
   SABRINA = {
     [1] = {
-      { species = "GIRAFARIG", level = 58 },
-      { species = "MR_MIME", level = 59 },
-      { species = "XATU", level = 59 },
-      { species = "ESPEON", level = 60 },
-      { species = "GARDEVOIR", level = 61 },
-      { species = "ALAKAZAM", level = 62, item = "CHERI_BERRY" },
+      { species = "GIRAFARIG", level = 58, moves = { "PSYCHIC_M", "CRUNCH", "BATON_PASS", "AGILITY" } },
+      { species = "MR_MIME", level = 59, moves = { "PSYCHIC_M", "THUNDERBOLT", "REFLECT", "BATON_PASS" } },
+      { species = "XATU", level = 59, moves = { "PSYCHIC_M", "AIR_SLASH", "CONFUSE_RAY", "GIGA_DRAIN" } },
+      { species = "ESPEON", level = 60, moves = { "PSYCHIC_M", "SHADOW_BALL", "CALM_MIND", "MORNING_SUN" } },
+      { species = "GARDEVOIR", level = 61, moves = { "PSYCHIC_M", "CALM_MIND", "SHADOW_BALL", "THUNDERBOLT" } },
+      { species = "ALAKAZAM", level = 62, item = "CHERI_BERRY", moves = { "PSYCHIC_M", "CALM_MIND", "RECOVER", "SHADOW_BALL" } },
     }
   },
   BROCK = {
@@ -702,6 +702,33 @@ local GEN2_FULL_PARTIES = {
       { species = "EXEGGUTOR", level = 71 },
       { species = "ARCANINE", level = 72, item = "CHERI_BERRY" },
     }
+  },
+  -- Silver (Victory Road - target 43-46, scaled for Rising Badge / pre-E4 cap)
+  RIVAL1 = {
+    [13] = {
+      { species = "SNEASEL", level = 43 },
+      { species = "GOLBAT", level = 44 },
+      { species = "MAGNETON", level = 44 },
+      { species = "HAUNTER", level = 44 },
+      { species = "KADABRA", level = 45 },
+      { species = "MEGANIUM", level = 46, item = "SITRUS_BERRY" },
+    },
+    [14] = {
+      { species = "SNEASEL", level = 43 },
+      { species = "GOLBAT", level = 44 },
+      { species = "MAGNETON", level = 44 },
+      { species = "HAUNTER", level = 44 },
+      { species = "KADABRA", level = 45 },
+      { species = "TYPHLOSION", level = 46, item = "SITRUS_BERRY" },
+    },
+    [15] = {
+      { species = "SNEASEL", level = 43 },
+      { species = "GOLBAT", level = 44 },
+      { species = "MAGNETON", level = 44 },
+      { species = "HAUNTER", level = 44 },
+      { species = "KADABRA", level = 45 },
+      { species = "FERALIGATR", level = 46, item = "SITRUS_BERRY" },
+    },
   },
 }
 

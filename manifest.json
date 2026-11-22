@@ -1,7 +1,7 @@
 {
   "id": "Kanto-Reforged",
   "name": "Kanto Reforged",
-  "version": "1.7.17",
+  "version": "1.8.0",
   "api": 2,
   "entry": "main.lua",
   "profile": "content",
@@ -10,7 +10,9 @@
   "priority": 50,
   "games": [
     "gen1",
-    "gen2"
+    "gen2",
+    "firered",
+    "leafgreen"
   ],
   "assets_transforms": "core/transforms.lua",
   "permissions": [
@@ -29,12 +31,12 @@
   ],
   "optional_dependencies": [
     "gen1_bag_pockets",
-    "gen1_modern_ui"
+    "omni_ui"
   ],
   "conflicts": [
     "modern_bag"
   ],
-  "description": "Gen 2-3 Pokemon, moves, abilities & more. Gold/Silver/Crystal: Hoenn in Kanto + farm/abilities/AI.",
+  "description": "Gen 2-3 Pokemon, moves, abilities & more. FireRed/LeafGreen 1.8.0: national dex, Sevii, farm, and new-game flow.",
   "github": "1Jamie/Kanto-Reforged",
   "affects_link": true
 }

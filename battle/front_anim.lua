@@ -146,6 +146,8 @@ end
 function FrontAnim.prefersKrAnim(speciesId, battle, mon, mod)
   if not speciesId then return false end
   mod = mod or FrontAnim._mod
+  -- One KR strip cannot stand in for the 26 letter pics.
+  if SpriteResolve.skipGen2Unown(mod, speciesId) then return false end
   local animId = FrontAnim.animSpeciesId(speciesId, battle, mon)
   if not FrontAnim.meta(animId) then return false end
   if mod then

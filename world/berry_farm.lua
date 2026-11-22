@@ -7,12 +7,13 @@ local HeldItems = require("mods.Kanto-Reforged.items.held_items")
 local BerryFarm = {}
 
 BerryFarm.MAP_ID = "BERRY_FARM"
-BerryFarm.GROW_STEPS = 320
+BerryFarm.GROW_STEPS = 500
 BerryFarm.PLOT_COUNT = 9
 BerryFarm.HARVEST_YIELD = 2
 
 -- Soil rank → effective grow steps (berry_quests sets soil_rank).
-BerryFarm.GROW_BY_RANK = { [0] = 320, [1] = 280, [2] = 240, [3] = 192 }
+-- Same fractions as the old 320/280/240/192 ladder, on a 500-step base.
+BerryFarm.GROW_BY_RANK = { [0] = 500, [1] = 438, [2] = 375, [3] = 300 }
 
 function BerryFarm.growSteps(mod)
   local Host = require("mods.Kanto-Reforged.core.host")
@@ -547,6 +548,22 @@ function BerryFarm.plotReady(mod, plotIndex)
   return (steps - (p.plantedAtSteps or 0)) >= BerryFarm.growSteps(mod)
 end
 
+-- Stage line for a plant that is not ready to pick. Thirds of the
+-- grow window: just planted, mid growth, then nearly ripe.
+function BerryFarm.growthPhrase(elapsed, need)
+  need = need or 1
+  if need < 1 then need = 1 end
+  elapsed = elapsed or 0
+  if elapsed < 0 then elapsed = 0 end
+  if elapsed * 3 < need then
+    return "The plot was\nfreshly planted."
+  end
+  if elapsed * 3 < need * 2 then
+    return "The plant is\nstill growing."
+  end
+  return "The plant is\nalmost full grown."
+end
+
 function BerryFarm.stepsRemaining(mod, plotIndex)
   local steps, plots = ensureState(mod)
   local p = getPlot(plots, plotIndex)
@@ -690,13 +707,14 @@ local function makePlotTalk(mod, plotIndex)
     end
 
     if not BerryFarm.plotReady(mod, plotIndex) then
+      local need = BerryFarm.growSteps(mod)
       local left = BerryFarm.stepsRemaining(mod, plotIndex)
       local def = HeldItems.def(p.berryId)
       -- Keep each page to 2 lines even with long berry names (soft-wrap).
       pushText(game, Strings(
-        "%s\nis growing...\f"
-        .. "%d steps left.",
-        def and def.name or p.berryId, left), done)
+        "%s\nis growing...\f%s",
+        def and def.name or p.berryId,
+        BerryFarm.growthPhrase(need - left, need)), done)
       return
     end
 
@@ -763,8 +781,8 @@ function BerryFarm.register(mod)
         .. "Buy berries at the\nstall anytime!\f"
         .. "Walk around, then\ncome back later.\f"
         .. "Harvest when it's\nready!\f"
-        .. "The shed door\ntakes you back.\f"
-        .. "Back to the last\nPOKéMON CENTER."), done)
+        .. "The shed door\ntakes you back to\f"
+        .. "the POKéMON CENTER\nyou were at."), done)
     end,
     TEXT_BERRY_FARM_FISHER = function(game, ow, npc, done)
       pushText(game, Strings(

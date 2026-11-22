@@ -1,10 +1,23 @@
 # Kanto Reforged
 
-Gen 2 and 3 content for Red/Blue and Gold/Silver/Crystal on this engine. Same classic story, more Pokemon, moves, abilities, held items, and some bag/party QoL so the extra stuff is easier to use. My goal here was not to bolt on or make things feel weird, but if Game Freak were to do these pieces back in gen1 and gen2, how would they have done it? The features added are attempted to be done in a way to make them feel like they are part of the base games, inspired by some of my favorite things from different generations and rom hacks ive played. I tried my best to make the gen2-3 mons look good and look like they belong by hand-adjusting pixel counts, scaling, and following classic color count rules and style constraints where possible. Hopefully at the end of the day it looks like an almost "alternate history" version of the classic games.
+Gen 2 and 3 content for Red/Blue, Gold/Silver/Crystal, and FireRed/LeafGreen on this engine. Same classic story, more Pokemon, moves, abilities, held items, and some bag/party QoL so the extra stuff is easier to use. My goal here was not to bolt on or make things feel weird, but if Game Freak were to do these pieces back in gen1 and gen2, how would they have done it? The features added are attempted to be done in a way to make them feel like they are part of the base games, inspired by some of my favorite things from different generations and rom hacks ive played. I tried my best to make the gen2-3 mons look good and look like they belong by hand-adjusting pixel counts, scaling, and following classic color count rules and style constraints where possible. Hopefully at the end of the day it looks like an almost "alternate history" version of the classic games.
 
-Mod id is `Kanto-Reforged`. Turn it on in the launcher Mods tab or the F10 manager.
+Mod id is `Kanto-Reforged`. Version **1.8.0** (22 November 2026, FireRed / LeafGreen release). Turn it on in the launcher Mods tab or the F10 manager.
 
-Has support for Gen1 Modern UI mod (on Gen1) and Pokegear Cards (on Gen2 — Gold, Silver, and Crystal).
+## Supported hosts
+
+| Host | Release |
+|---|---|
+| Red | Supported |
+| Blue | Supported |
+| Yellow | Supported |
+| Gold | Supported |
+| Silver | Supported |
+| Crystal | Supported |
+| FireRed | Supported (1.8.0) |
+| LeafGreen | Supported (1.8.0) |
+
+[OmniUI](https://github.com/1Jamie/omni_ui) (`omni_ui`) is supported and recommended. It covers Red/Blue, Gold/Silver/Crystal, and FireRed/LeafGreen. Pokegear Cards still add the DexNav card on Gen 2.
 
 ## Current status
 
@@ -28,7 +41,16 @@ Gen 2 support is live on Gold, Silver, and Crystal. Core pieces:
 - Crystal keeps its native gender select / Kris / cart bugfixes; KR does not pull Crystal animated front sheets into Gen1-shared art.
 - Battle pics prefer converted **RawSprites** grayscale under `assets/gs/` (fallback: flat `assets/*_{front,back}.png`, then ROM). The old **SPRITES 1-251** Gold/Silver/Crystal cache option is retired.
 
-**Sevii Islands:** On hold. Maps, ferry, and tooling live under `sevii/` but are not loaded (`SEVII_ENABLED = false`). Reserved map ids stay reserved; no Sevii play path until that work resumes.
+**FireRed / LeafGreen (generation 3 of gen1recomp++, version 1.8.0):**
+KR runs as a native FRLG host mod. Cart/engine Gen 3 systems stay native (abilities, learnsets, bag give, XP Share item, switch-hit rules, battle art). This release adds the FRLG-specific layer on top:
+
+- The Pokédex and PC cover species **1–386**, Johto and Hoenn included.
+- On the Pokédex area page, **SELECT** toggles the markers between Kanto and the Sevii Islands.
+- New game: Oak's experience questions (starter randomizer, full-mix spawns, legendaries in the mix) play before the shrink into your bedroom. The Viridian catch tutorial can be declined; No skips the Weedle battle, still gives the Teachy TV, and clears the road.
+- The same Moon Stone trade-evolution bypasses used on Red and Gold apply here.
+- Post-game: the roaming beasts cycle Raikou → Entei → Suicune. Root Fossil is in Five Island Lost Cave, Claw Fossil in Four Island Icefall Cave, and both revive at the Cinnabar Lab (Lileep and Anorith at level 20). The Regi trio waits in the Tanoby Ruins chambers after the Tanoby Key. The Mystic Ticket comes from a Celadon Circuit streak (Navel Rock). The Aurora Ticket comes from the One Island Center researcher after you become Champion (Birth Island).
+- Optional soft level caps from the Rare Candy kid in Viridian City, east of the Mart, the same offer as on Red.
+- Berry Farm uses the shared 500-step ladder. A growing plot says it was freshly planted, is still growing, or is almost full grown. A ripe plot is ready to pick.
 
 To install and play, grab the latest `.zip` release and install it into your game's `mods/` directory.
 
@@ -71,8 +93,7 @@ At runtime, `core/sprite_resolve.lua` dynamically resolves battle sprites throug
 - DexNav: start menu on Red after the Pokédex; Pokegear card on Gold via `pokegear_cards`.
 - Battle sprites: converted RawSprites under `assets/gs/` (fallback flat assets / ROM). Anim strips are stored for a later playback phase.
 - Party summary page for ability, held item, and gender glyph (Page 3 on Gen 1, Page 4 on Gen 2 with ability text).
-- Optional Gen1 Modern UI support for bag pockets and the summary ability page on Red.
-[https://github.com/ArmstrongThomas/gen1-modern-ui/](https://github.com/ArmstrongThomas/gen1-modern-ui/)
+- [OmniUI](https://github.com/1Jamie/omni_ui) (`omni_ui`) is supported and recommended. Enable it beside Kanto Reforged and party, bag, summary, Pokédex, PC, options, shops, battle HUD, and dialogue draw as one overlay. The lab starter preview (name and sprite) is drawn in that dialogue. Keyboard and gamepad are the supported inputs.
 
 ![Summary page with ability text](screen-shots/summary-ability.png)
 
@@ -96,7 +117,7 @@ Short classic style house NPCs. No natures/IVs; the judge reads DVs / Hidden Pow
 - **Snack Scout** (Celadon Hotel): lead must hold a berry; first clear Focus Sash.
 - **Judge** (UG Path): DV / Hidden Power / effort read for a party mon (Route 5 side on Gen 1; main tunnel on Gen 2).
 - **Trades**: Route 2 house Rattata→Taillow (Cleanse Tag); Fuchsia Bills Grandpa Bellsprout→Seedot (Soothe Bell).
-- **Berry economy**: status berries are not sold in city marts. Unlock plant types via badges (Soil Expert). Each unlock gifts 3 of that berry once. Buy more anytime from the farm merchant (¥300 / ¥600 / ¥2000 Lum). Base grow is 320 steps (Soil ranks speed it up). Celadon Mansion 3F blender: 10 berries → 1 vitamin, plus a step cool-down.
+- **Berry economy**: status berries are not sold in city marts. Unlock plant types via badges (Soil Expert). Each unlock gifts 3 of that berry once. Buy more anytime from the farm merchant (¥300 / ¥600 / ¥2000 Lum). Base grow is **500** steps (soil ranks 438 / 375 / 300). A growing plot reports freshly planted, still growing, or almost full grown. Celadon Mansion 3F blender: 10 berries → 1 vitamin, plus a step cool-down.
 - **Move Hub** (Saffron Pidgey House on Gen 1 / Mr. Psychic's House on Gen 2): relearn / tutor / delete; Heart Scale costs where noted.
 - **Blacksmith** (Cinnabar Metronome Room on Gen 1 / Cinnabar Pokecenter 1F on Gen 2): Metal Coat→Life Orb, Nuggets→Focus Sash, Leaf Stone→berry pack.
 - **Gen 3 fossils** (Gen 1): Root/Claw fossils + Cinnabar lab revive.
@@ -124,11 +145,11 @@ Configured in the mod manager / F10 options. Host-scoped keys (spawn/scope) keep
 
 1. Grab the latest `.zip` from releases.
 2. Put `Kanto-Reforged/` under the game's `mods/` folder, or install the zip from the launcher.
-3. Enable Kanto Reforged (and `pokegear_cards` if playing Gold) and start or continue a save.
+3. Enable Kanto Reforged. Add `omni_ui` for the overlay, and `pokegear_cards` on Gold/Silver/Crystal for the DexNav card. Start or continue a save.
 
 ## Full guides
 
-- **[WALKTHROUGH.md](WALKTHROUGH.md)**: step-by-step walkthrough for both Gen 1 (Red/Blue) and Gen 2 (Gold), written like youre playing through
+- **[WALKTHROUGH.md](WALKTHROUGH.md)**: step-by-step walkthrough for Gen 1 (Red/Blue), Gen 2 (Gold/Silver), and FireRed/LeafGreen, written like youre playing through
 - **[FEATURES.md](FEATURES.md)**: full reference (numbers, locations, unlock gates, prices, recipes, module map)
 
 ## Credits
@@ -548,4 +569,11 @@ AND DO NOT FORGET THE ABSOLUTE LEGEND THAT DID THE HARD WORKING OF GETTING ALL T
 | 384 | Rayquaza | 1jamie / lady_gaia | base assets |
 | 385 | Jirachi | SageDeoxys | gs |
 | 386 | Deoxys | SageDeoxys | gs |
+
+## Support
+
+Good Girl Software keeps Kanto Reforged going. If the mod has been part of a run you enjoyed, you can support the work here:
+
+- GitHub Sponsors: https://github.com/sponsors/1Jamie
+- Ko-fi: https://ko-fi.com/1jamie
 

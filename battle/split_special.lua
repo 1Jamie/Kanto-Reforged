@@ -125,7 +125,8 @@ local function findDrawMonDetail()
   end
 
   for _, entry in ipairs(chain) do
-    if entry.owner == "gen1_modern_ui" and type(entry.callback) == "function" then
+    if (entry.owner == "omni_ui" or entry.owner == "gen1_modern_ui")
+        and type(entry.callback) == "function" then
       local target, kind = search(entry.callback, 0)
       if target then return target, kind end
     end

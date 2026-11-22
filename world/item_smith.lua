@@ -27,7 +27,15 @@ ItemSmith.EXCHANGES = {
     altGive = "HEART_SCALE",
     altQty = 2,
     altIf = function(game)
-      return (game.save.inventory and (game.save.inventory.FOCUS_SASH or 0) > 0)
+      local Host = require("mods.Kanto-Reforged.core.host")
+      local save = game and (game.save or game.session)
+      if Host.isGen3() then
+        local BerryFarmGame3 = require("mods.Kanto-Reforged.world.berry_farm_game3")
+        -- FOCUS_SASH aliases to FOCUS_BAND on FRLG.
+        return BerryFarmGame3.bagGetItemCount(save, "FOCUS_SASH") > 0
+          or BerryFarmGame3.bagGetItemCount(save, "FOCUS_BAND") > 0
+      end
+      return (save and save.inventory and (save.inventory.FOCUS_SASH or 0) > 0)
         or false
     end,
   },
@@ -41,6 +49,14 @@ ItemSmith.EXCHANGES = {
 }
 
 local function canTake(save, need)
+  local Host = require("mods.Kanto-Reforged.core.host")
+  if Host.isGen3() then
+    local BerryFarmGame3 = require("mods.Kanto-Reforged.world.berry_farm_game3")
+    for id, n in pairs(need) do
+      if BerryFarmGame3.bagGetItemCount(save, id) < n then return false end
+    end
+    return true
+  end
   local inv = save.inventory or {}
   for id, n in pairs(need) do
     if (inv[id] or 0) < n then return false end
@@ -49,6 +65,14 @@ local function canTake(save, need)
 end
 
 local function doTake(save, need)
+  local Host = require("mods.Kanto-Reforged.core.host")
+  if Host.isGen3() then
+    local BerryFarmGame3 = require("mods.Kanto-Reforged.world.berry_farm_game3")
+    for id, n in pairs(need) do
+      BerryFarmGame3.bagRemoveItem(save, id, n)
+    end
+    return
+  end
   local Bag = require("src.inventory.Bag")
   for id, n in pairs(need) do
     Bag.remove(save, id, n)
@@ -67,6 +91,62 @@ local function talk(mod)
       HouseNpcs.pushText(game, Strings("Nothing left to\ntrade today."), done)
       return
     end
+
+    local Host = require("mods.Kanto-Reforged.core.host")
+    if Host.isGen3() then
+      local Choice = require("src.ui.game3.choice")
+      local labels = {}
+      for _, r in ipairs(rows) do
+        labels[#labels + 1] = r.label
+      end
+      labels[#labels + 1] = "CANCEL"
+      Choice.multi(labels, 0, function(idx)
+        local chosen = (type(idx) == "number") and rows[idx + 1]
+        if chosen then
+          local ex = chosen.value
+          if not canTake(game.save, ex.take) then
+            HouseNpcs.pushText(game, Strings("You don't have\nthe materials."), done)
+            return
+          end
+          doTake(game.save, ex.take)
+          if ex.giveSeeds then
+            local berries = { "BERRY", "CHERI_BERRY", "PECHA_BERRY", "RAWST_BERRY", "ASPEAR_BERRY" }
+            for i = 1, 5 do
+              HouseNpcs.giveItem(game, berries[((i - 1) % #berries) + 1], 1)
+            end
+            HouseNpcs.pushText(game, Strings("Here's a berry\npack!"), done)
+            return
+          end
+          local giveId, qty = ex.give, 1
+          if ex.altIf and ex.altIf(game) then
+            giveId, qty = ex.altGive, ex.altQty or 1
+          end
+          if not HouseNpcs.giveItem(game, giveId, qty) then
+            local save = game.save or game.session
+            if Host.isGen3() then
+              local BerryFarmGame3 = require("mods.Kanto-Reforged.world.berry_farm_game3")
+              for id, n in pairs(ex.take) do
+                BerryFarmGame3.bagAddItem(save, id, n)
+              end
+            else
+              local Bag = require("src.inventory.Bag")
+              for id, n in pairs(ex.take) do Bag.add(save, id, n) end
+            end
+            HouseNpcs.pushText(game, Strings("The bag is full!"), done)
+            return
+          end
+          if ex.once and ex.flag then
+            mod.save:set(ex.flag, true)
+          end
+          local def = game.data and game.data.items and game.data.items[giveId]
+          HouseNpcs.pushText(game, Strings("Traded for\n%s!", def and def.name or giveId), done)
+        else
+          if done then done() end
+        end
+      end)
+      return
+    end
+
     local ListMenu = require("src.ui.ListMenu")
     game.stack:push(ListMenu.new(game, Strings("Trade which?"), rows, {
       onChoose = function(row, menu)
@@ -98,7 +178,7 @@ local function talk(mod)
         if ex.once and ex.flag then
           mod.save:set(ex.flag, true)
         end
-        local def = game.data.items[giveId]
+        local def = game.data and game.data.items and game.data.items[giveId]
         HouseNpcs.pushText(game, Strings("Traded for\n%s!", def and def.name or giveId), done)
       end,
     }))
@@ -106,16 +186,18 @@ local function talk(mod)
 end
 
 function ItemSmith.register(mod)
-  if not mod.content.items:get("DRAGON_SCALE") then
+  if mod and mod.content and mod.content.items and mod.content.items.get and not mod.content.items:get("DRAGON_SCALE") then
     mod.content.items:register("DRAGON_SCALE", {
       id = "DRAGON_SCALE", name = "DRAGON SCALE", price = 2100, tossable = true,
     })
   end
 
-  local mapId = Host.isGen2() and "CINNABAR_POKECENTER_1F" or "CINNABAR_LAB_METRONOME_ROOM"
+  local isG3 = Host.isGen3()
+  local mapId = isG3 and "FR_CINNABAR_ISLAND_POKEMON_LAB_RESEARCH_ROOM"
+    or (Host.isGen2() and "CINNABAR_POKECENTER_1F" or "CINNABAR_LAB_METRONOME_ROOM")
   local index = Host.isGen2()
     and HouseNpcs.nextFreeIndex(mod, mapId, 4)
-    or 3
+    or (isG3 and 83 or 3)
   local x = Host.isGen2() and 1 or 5
   local y = Host.isGen2() and 3 or 5
 
@@ -123,8 +205,10 @@ function ItemSmith.register(mod)
     index = index,
     name = "CINNABARLABMETRONOMEROOM_SMITH",
     sprite = "SPRITE_SCIENTIST",
+    graphicsId = 55,
     text = "TEXT_CINNABARLABMETRONOMEROOM_SMITH",
     x = x, y = y,
+    gen3X = 5, gen3Y = 5,
   }, ItemSmith.OWNER)
 
   HouseNpcs.bindTalk(mod, mapId, {

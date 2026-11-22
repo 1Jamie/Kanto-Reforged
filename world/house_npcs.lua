@@ -39,6 +39,49 @@ HouseNpcs.BASELINE_CLAIMS = {
 }
 
 HouseNpcs._claims = {}
+HouseNpcs._gen3Injections = {}
+
+HouseNpcs.GEN3_MAP_ALIASES = {
+  CELADON_MANSION_1F = { "FR_CELADON_CITY_CONDOMINIUMS_1F", "CeladonCity_Condominiums_1F" },
+  CELADON_MANSION_2F = { "FR_CELADON_CITY_CONDOMINIUMS_2F", "CeladonCity_Condominiums_2F" },
+  CELADON_MANSION_3F = { "FR_CELADON_CITY_CONDOMINIUMS_3F", "CeladonCity_Condominiums_3F" },
+  CELADON_MANSION_ROOF = { "FR_CELADON_CITY_CONDOMINIUMS_ROOF", "CeladonCity_Condominiums_Roof" },
+  CELADON_MANSION_ROOF_HOUSE = { "FR_CELADON_CITY_CONDOMINIUMS_ROOF_ROOM", "CeladonCity_Condominiums_RoofRoom" },
+  UNDERGROUND_PATH_ROUTE_5 = { "FR_UNDERGROUND_PATH_NORTH_ENTRANCE", "UndergroundPath_NorthEntrance" },
+  UNDERGROUND_PATH_ROUTE_6 = { "FR_UNDERGROUND_PATH_SOUTH_ENTRANCE", "UndergroundPath_SouthEntrance" },
+  UNDERGROUND_PATH_ROUTE_7 = { "FR_UNDERGROUND_PATH_WEST_ENTRANCE", "UndergroundPath_WestEntrance" },
+  UNDERGROUND_PATH_ROUTE_8 = { "FR_UNDERGROUND_PATH_EAST_ENTRANCE", "UndergroundPath_EastEntrance" },
+  UNDERGROUND_PATH = { "FR_UNDERGROUND_PATH_NORTH_ENTRANCE", "UndergroundPath_NorthEntrance" },
+  CELADON_HOTEL = { "FR_CELADON_CITY_HOTEL", "CeladonCity_Hotel" },
+  VERMILION_PIDGEY_HOUSE = { "FR_VERMILION_CITY_HOUSE1", "VermilionCity_House1" },
+  CINNABAR_LAB_METRONOME_ROOM = { "FR_CINNABAR_ISLAND_POKEMON_LAB_RESEARCH_ROOM", "CinnabarIsland_PokemonLab_ResearchRoom" },
+  VIRIDIAN_CITY = { "FR_VIRIDIAN_CITY", "ViridianCity" },
+  SAFFRON_PIDGEY_HOUSE = { "FR_SAFFRON_CITY_MR_PSYCHICS_HOUSE", "SaffronCity_MrPsychicsHouse" },
+  MR_PSYCHICS_HOUSE = { "FR_SAFFRON_CITY_MR_PSYCHICS_HOUSE", "SaffronCity_MrPsychicsHouse" },
+  ROUTE_2_TRADE_HOUSE = { "FR_ROUTE2_HOUSE", "Route2_House" },
+  FUCHSIA_BILLS_GRANDPAS_HOUSE = { "FR_FUCHSIA_CITY_HOUSE1", "FuchsiaCity_House1" },
+}
+
+HouseNpcs.SPRITE_GEN3_GFX = {
+  SPRITE_SCIENTIST = 55,
+  SPRITE_HIKER = 56,
+  SPRITE_SUPER_NERD = 89,
+  SPRITE_BEAUTY = 29,
+  SPRITE_YOUNGSTER = 18,
+  SPRITE_LASS = 17,
+  SPRITE_GIRL = 23,
+  SPRITE_BRUNETTE_GIRL = 23,
+  SPRITE_GRAMPS = 61,
+  SPRITE_POKEFAN_M = 30,
+  SPRITE_FISHER = 57,
+  SPRITE_BLACK_BELT = 54,
+  SPRITE_GENTLEMAN = 61,
+  SPRITE_SAILOR = 62,
+  SPRITE_NURSE = 64,
+  SPRITE_CLERK = 68,
+  SPRITE_POKE_BALL = 92,
+  SPRITE_BIRD = 92,
+}
 
 local function key(map, index)
   return map .. "#" .. tostring(index)
@@ -49,6 +92,10 @@ function HouseNpcs.resetClaims()
   for _, row in ipairs(HouseNpcs.BASELINE_CLAIMS) do
     HouseNpcs._claims[key(row.map, row.index)] = row.owner
   end
+end
+
+function HouseNpcs.resetInjections()
+  HouseNpcs._gen3Injections = {}
 end
 
 function HouseNpcs.claim(map, index, owner)
@@ -106,11 +153,162 @@ function HouseNpcs.npcObject(row)
   return obj
 end
 
+function HouseNpcs.installGen3Hook(mod)
+  if HouseNpcs._gen3HookInstalled then return end
+  HouseNpcs._gen3HookInstalled = true
+
+  pcall(function()
+    local okObj, Objects = pcall(require, "src.core.game3.objects")
+    if okObj and Objects and Objects.loadMap then
+      local origLoad = Objects.loadMap
+      Objects.loadMap = function(game, mapId, def)
+        HouseNpcs.injectGen3(mapId, def)
+        return origLoad(game, mapId, def)
+      end
+    end
+  end)
+
+  if mod and mod.events and mod.events.on then
+    mod.events:on("map.entered", function(ev)
+      if ev and ev.mapId then
+        HouseNpcs.injectGen3(ev.mapId)
+      end
+    end)
+  end
+end
+
+function HouseNpcs.injectGen3(mapId, def)
+  if not mapId then return end
+  local okSp, Space = pcall(require, "src.core.game3.scripting.space")
+  if okSp and Space and not Space.bundle and Space.ensureBundle then
+    pcall(Space.ensureBundle)
+  end
+
+  local okC, MapCatalog = pcall(require, "src.import.gba.map_catalog")
+  local engineId = okC and MapCatalog and MapCatalog.pretToEngine and MapCatalog.pretToEngine(mapId)
+
+  local ev = okSp and Space and Space.bundle and Space.bundle.events
+    and (Space.bundle.events[mapId] or (engineId and Space.bundle.events[engineId]))
+  local evObjs = ev and (ev.objects or ev.objectEvents)
+
+  local toInject = {}
+  local seen = {}
+  local function addList(list)
+    for _, obj in ipairs(list or {}) do
+      local k = tostring(obj.localId) .. "@" .. tostring(obj.x) .. "," .. tostring(obj.y)
+      if not seen[k] then
+        seen[k] = true
+        toInject[#toInject + 1] = obj
+      end
+    end
+  end
+
+  addList(HouseNpcs._gen3Injections[mapId])
+  if engineId and engineId ~= mapId then
+    addList(HouseNpcs._gen3Injections[engineId])
+  end
+  if mapId:find("^FR_") then
+    addList(HouseNpcs._gen3Injections[mapId:gsub("^FR_", "")])
+  else
+    addList(HouseNpcs._gen3Injections["FR_" .. mapId])
+  end
+  for origMap, aliases in pairs(HouseNpcs.GEN3_MAP_ALIASES) do
+    for _, a in ipairs(aliases) do
+      if a == mapId or (engineId and a == engineId) then
+        addList(HouseNpcs._gen3Injections[origMap])
+        break
+      end
+    end
+  end
+
+  if #toInject == 0 then return end
+
+  for _, custom in ipairs(toInject) do
+    if evObjs then
+      local exists = false
+      for _, o in ipairs(evObjs) do
+        if o.localId == custom.localId or (o.x == custom.x and o.y == custom.y) then
+          exists = true
+          break
+        end
+      end
+      if not exists then
+        table.insert(evObjs, custom)
+      end
+    end
+    if def then
+      def.objects = def.objects or {}
+      local exists = false
+      for _, o in ipairs(def.objects) do
+        if o.localId == custom.localId or (o.x == custom.x and o.y == custom.y) then
+          exists = true
+          break
+        end
+      end
+      if not exists then
+        table.insert(def.objects, custom)
+      end
+    end
+  end
+end
+
 function HouseNpcs.appendNpc(mod, mapId, row, owner)
   HouseNpcs.claim(mapId, row.index, owner or row.name or "house_npcs")
-  mod.content.maps:patch(mapId, {
-    objects = { __append = { HouseNpcs.npcObject(row) } },
-  })
+  local Host = require("mods.Kanto-Reforged.core.host")
+  if not Host.isGen3() then
+    mod.content.maps:patch(mapId, {
+      objects = { __append = { HouseNpcs.npcObject(row) } },
+    })
+  end
+
+  -- Register for Gen 3 injection
+  local targetKeys = {}
+  targetKeys[mapId] = true
+  if HouseNpcs.GEN3_MAP_ALIASES[mapId] then
+    for _, a in ipairs(HouseNpcs.GEN3_MAP_ALIASES[mapId]) do
+      targetKeys[a] = true
+    end
+  end
+  if mapId:find("^FR_") then
+    targetKeys[mapId:gsub("^FR_", "")] = true
+  else
+    targetKeys["FR_" .. mapId] = true
+  end
+
+  local g3X = row.gen3X or (row.gen3Pos and row.gen3Pos.x) or row.x
+  local g3Y = row.gen3Y or (row.gen3Pos and row.gen3Pos.y) or row.y
+  local gfx = row.graphicsId or row.graphics or HouseNpcs.SPRITE_GEN3_GFX[row.sprite] or 18
+
+  for tKey in pairs(targetKeys) do
+    local g3Obj = {
+      localId = row.localId or (80 + (row.index or 1)),
+      graphicsId = gfx,
+      graphics = gfx,
+      movementType = row.movementType or 8,
+      movement = row.movement or "STAY",
+      range = row.range or "DOWN",
+      scriptKey = row.scriptKey or row.text or row.name,
+      text = row.text or row.scriptKey or row.name,
+      elevation = row.elevation or 3,
+      x = g3X,
+      y = g3Y,
+      name = row.name,
+      sprite = row.sprite,
+    }
+    HouseNpcs._gen3Injections[tKey] = HouseNpcs._gen3Injections[tKey] or {}
+    table.insert(HouseNpcs._gen3Injections[tKey], g3Obj)
+  end
+
+  pcall(function()
+    local okSp, Space = pcall(require, "src.core.game3.scripting.space")
+    if okSp and Space and Space.bundle and Space.bundle.events then
+      for tKey in pairs(targetKeys) do
+        HouseNpcs.injectGen3(tKey)
+      end
+    end
+  end)
+
+  HouseNpcs.installGen3Hook(mod)
 end
 
 -- Next free object index for a map. Prefer `preferred` when it does not collide
@@ -142,6 +340,7 @@ function HouseNpcs.nextFreeIndex(mod, mapId, preferred)
 end
 
 -- Register TEXT_* talk handlers. Gen1 → map_scripts; Gen2 → talkTo seam.
+-- Register TEXT_* talk handlers. Gen1 → map_scripts; Gen2/Gen3 → talk dispatch.
 function HouseNpcs.registerTalk(textId, handler)
   HouseNpcs._talks[textId] = handler
 end
@@ -150,59 +349,115 @@ function HouseNpcs.bindTalk(mod, mapId, talkTable)
   local Host = require("mods.Kanto-Reforged.core.host")
   if Host.isGen1() then
     mod.content.map_scripts:register(mapId, { talk = talkTable })
-    return
   end
   for textId, fn in pairs(talkTable or {}) do
     HouseNpcs.registerTalk(textId, fn)
   end
 end
 
--- Gold: wrap OverworldController.talkTo so TEXT_* handlers fire (map_scripts
--- has no Gen2 reader). A true return suppresses the built-in object path.
+-- Wrap OverworldController.talkTo (Gen2) and world.talk hook (Gen3) so TEXT_* handlers fire.
 function HouseNpcs.installTalkDispatch(mod)
-  local Host = require("mods.Kanto-Reforged.core.host")
-  if not Host.isGen2() or HouseNpcs._talkInstalled then return end
+  if HouseNpcs._talkInstalled then return end
   HouseNpcs._talkInstalled = true
-  local OC = require("src.world.OverworldController")
-  local prev = OC.talkTo
-  OC.talkTo = function(world, npc)
-    local d = npc and npc.def
-    local key = d and (d.text or d.name)
-    local fn = key and HouseNpcs._talks[key]
-    if fn then
-      local game = (world and world.game) or Host.liveGame(mod)
-      fn(game, world, npc, function() end)
-      return true
+  local Host = require("mods.Kanto-Reforged.core.host")
+
+  if Host.isGen2() then
+    local okOC, OC = pcall(require, "src.world.OverworldController")
+    if okOC and OC then
+      local prev = OC.talkTo
+      OC.talkTo = function(world, npc)
+        local d = npc and npc.def
+        local key = d and (d.text or d.name)
+        local fn = key and HouseNpcs._talks[key]
+        if fn then
+          local game = (world and world.game) or Host.liveGame(mod)
+          fn(game, world, npc, function() end)
+          return true
+        end
+        if type(prev) == "function" then
+          return prev(world, npc)
+        end
+        return false
+      end
     end
-    if type(prev) == "function" then
-      return prev(world, npc)
-    end
-    return false
+  end
+
+  if mod and mod.hooks and mod.hooks.wrap then
+    mod.hooks:wrap("world.talk", function(next, game, eo)
+      local d = eo and eo.def
+      local key = (d and (d.scriptKey or d.text or d.name)) or (eo and (eo.text or eo.name))
+      local fn = key and HouseNpcs._talks[key]
+      if fn then
+        local lid = eo and (eo.localId or (eo.def and eo.def.localId))
+        local okObj, Objects = pcall(require, "src.core.game3.objects")
+        if lid and okObj and Objects then
+          if Objects.freeze then pcall(Objects.freeze, lid) end
+          if Objects.facePlayer then pcall(Objects.facePlayer, lid, game) end
+        end
+        local finished = false
+        local function finish()
+          if finished then return end
+          finished = true
+          if lid and okObj and Objects and Objects.unfreeze then
+            pcall(Objects.unfreeze, lid)
+          end
+        end
+        fn(game, nil, eo, finish)
+        return true
+      end
+      return next(game, eo)
+    end)
   end
   if mod and mod.log then
-    mod.log:info("Gen2 house NPC talkTo dispatch installed")
+    mod.log:info("House NPC talk dispatch installed")
   end
 end
 
--- Badge check: Gen1 inventory *BADGE; Gold kantoBadges / Johto badges.
+-- Badge check: Gen1 inventory *BADGE; Gold kantoBadges / Johto badges; Gen3 flags / badges.
 function HouseNpcs.hasBadge(save, badge)
   if not save or not badge then return false end
   if save.inventory and (save.inventory[badge] or 0) > 0 then
     return true
   end
   local p = save.player
-  if not p then return false end
-  local short = badge:gsub("BADGE$", "")
-  if p.kantoBadges and p.kantoBadges[short] then
+  if p then
+    local short = tostring(badge):gsub("BADGE$", "")
+    if p.kantoBadges and p.kantoBadges[short] then
+      return true
+    end
+    if p.badges and (p.badges[badge] or p.badges[short]) then
+      return true
+    end
+  end
+  if save.badges and (save.badges[badge] or (type(badge) == "string" and save.badges[badge:gsub("BADGE$", "")])) then
     return true
   end
-  if p.badges and (p.badges[badge] or p.badges[short]) then
-    return true
+  -- Gen 3 flags lookup
+  local okF, Flags = pcall(require, "src.core.game3.scripting.flags")
+  if okF and Flags and Flags.badgeInfo then
+    local info = Flags.badgeInfo(badge)
+    if info and info.flag then
+      local store = save.flags or save
+      if type(store) == "table" and (store[info.flag] or store[string.format("FLAG_BADGE0%d_GET", info.num)]) then
+        return true
+      end
+      if Flags.hasBadge and Flags.hasBadge(store, badge) then
+        return true
+      end
+    end
   end
   return false
 end
 
 function HouseNpcs.pushText(game, msg, done)
+  local Host = require("mods.Kanto-Reforged.core.host")
+  if Host.isGen3() then
+    local okM, Message = pcall(require, "src.ui.game3.message")
+    if okM and Message and Message.show then
+      Message.show(msg, done)
+      return
+    end
+  end
   if not (game and game.stack and game.stack.push) then
     if done then done() end
     return
@@ -212,10 +467,19 @@ function HouseNpcs.pushText(game, msg, done)
 end
 
 function HouseNpcs.ask(game, msg, onChoice)
-  -- Gen 1 YesNoChoice sits on the still-open text box (InitYesNoTextBox-
-  -- Parameters). TextBox opts.choice pushes ChoiceBox correctly; the old
-  -- ChoiceBox.new(game, {"YES","NO"}, fn) call used the wrong arity and
-  -- crashed when confirming (onChoose was a table).
+  local Host = require("mods.Kanto-Reforged.core.host")
+  if Host.isGen3() then
+    local okM, Message = pcall(require, "src.ui.game3.message")
+    local okC, Choice = pcall(require, "src.ui.game3.choice")
+    if okM and Message and Message.show and okC and Choice and Choice.yesNo then
+      Message.show(msg, function()
+        Choice.yesNo(function(yes)
+          if onChoice then onChoice(yes == true or yes == 0) end
+        end)
+      end)
+      return
+    end
+  end
   if not (game and game.stack and game.stack.push) then
     if onChoice then onChoice(false) end
     return
@@ -248,17 +512,15 @@ function HouseNpcs.softCap(mod, game)
   return LevelCaps.capFor(data, save) or 20
 end
 
--- Highest usable party level (skips eggs / empty slots). Not lead-only.
-function HouseNpcs.highestPartyLevel(game)
-  local Breeding = require("mods.Kanto-Reforged.pokemon.breeding")
-  local best = 0
-  for _, mon in ipairs((game and game.save and game.save.party) or {}) do
-    if mon and mon.species and not Breeding.isEgg(mon) then
-      local lv = mon.level or 0
-      if lv > best then best = lv end
-    end
+function HouseNpcs.getParty(game)
+  local party = (game and game.save and game.save.party)
+    or (game and game.session and game.session.party)
+  if not party then
+    local Runtime = package.loaded["src.core.game3.runtime"]
+    local s = Runtime and Runtime.getSession and Runtime.getSession()
+    party = s and s.party
   end
-  return best
+  return party or {}
 end
 
 local function resolveScaleGame(game, mod)
@@ -267,27 +529,68 @@ local function resolveScaleGame(game, mod)
       or (mod and require("mods.Kanto-Reforged.core.host").liveGame(mod))
 end
 
+-- Highest usable party level (skips eggs / empty slots). Not lead-only.
+function HouseNpcs.highestPartyLevel(game)
+  game = resolveScaleGame(game, nil)
+  local Breeding = require("mods.Kanto-Reforged.pokemon.breeding")
+  local okP, Pokemon = pcall(require, "src.core.game3.pokemon")
+  local party = HouseNpcs.getParty(game)
+  local best = 0
+  for _, mon in ipairs(party) do
+    local isEgg = Breeding.isEgg(mon) or (okP and Pokemon and Pokemon.isEgg and Pokemon.isEgg(mon))
+    if mon and (mon.species or mon.speciesId) and not isEgg then
+      local lv = tonumber(mon.level or mon.lvl) or 0
+      if lv > best then best = lv end
+    end
+  end
+  return best
+end
+
 -- Club / specialist / rematch bracket:
---   Level caps ON  → story soft-cap only (competitive on-cap fights).
---   Level caps OFF → max(soft-cap, highest non-egg party level) so
---                    overleveled teams still get a serious Circuit.
+--   Level caps ON  → story soft-cap (competitive on-cap fights).
+--                    If post-game (soft-cap >= 100), scale to party.
+--   Level caps OFF → party's highest level (floor 20, ceiling 100).
 function HouseNpcs.scaleCap(mod, game)
   game = resolveScaleGame(game, mod)
-  local soft = HouseNpcs.softCap(mod, game)
-  local Host = require("mods.Kanto-Reforged.core.host")
-  if Host.isGen1() and LevelCaps.enabled(mod) then
+  local partyHigh = HouseNpcs.highestPartyLevel(game)
+  local capsOn = LevelCaps.enabled(mod)
+
+  if capsOn then
+    local soft = HouseNpcs.softCap(mod, game)
+    if soft >= 100 and partyHigh > 0 then
+      return math.min(100, math.max(20, partyHigh))
+    end
     return soft
   end
-  local partyHigh = HouseNpcs.highestPartyLevel(game)
+
   if partyHigh > 0 then
-    return math.max(soft, partyHigh)
+    return math.min(100, math.max(20, partyHigh))
   end
-  return soft
+  return HouseNpcs.softCap(mod, game)
 end
 
 function HouseNpcs.partyHasType(game, typeId)
-  local party = game.save and game.save.party or {}
-  local pokemon = game.data and game.data.pokemon or {}
+  local party = HouseNpcs.getParty(game)
+  local Host = require("mods.Kanto-Reforged.core.host")
+  if Host.isGen3() then
+    local okP, Pokemon = pcall(require, "src.core.game3.pokemon")
+    if okP and Pokemon and Pokemon.types then
+      local TypeNames = {
+        [0] = "NORMAL", [1] = "FIGHTING", [2] = "FLYING", [3] = "POISON", [4] = "GROUND",
+        [5] = "ROCK", [6] = "BUG", [7] = "GHOST", [8] = "STEEL", [9] = "MYSTERY",
+        [10] = "FIRE", [11] = "WATER", [12] = "GRASS", [13] = "ELECTRIC", [14] = "PSYCHIC",
+        [15] = "ICE", [16] = "DRAGON", [17] = "DARK"
+      }
+      for _, mon in ipairs(party) do
+        local sp = mon and (mon.species or mon.speciesId)
+        if sp then
+          local t1, t2 = Pokemon.types(sp)
+          if TypeNames[t1] == typeId or TypeNames[t2] == typeId then return true end
+        end
+      end
+    end
+  end
+  local pokemon = game and game.data and game.data.pokemon or {}
   for _, mon in ipairs(party) do
     if mon and mon.species then
       local def = pokemon[mon.species]
@@ -305,15 +608,42 @@ end
 
 function HouseNpcs.leadHoldsBerry(game)
   local HeldItems = require("mods.Kanto-Reforged.items.held_items")
-  local party = game.save and game.save.party or {}
+  local party = HouseNpcs.getParty(game)
   local lead = party[1]
   if not lead then return false end
+  local Host = require("mods.Kanto-Reforged.core.host")
+  if Host.isGen3() then
+    local item = lead.heldItem or lead.item
+    local okB, Berry = pcall(require, "src.core.game3.berry")
+    if okB and Berry and Berry.isBerry and item then
+      return Berry.isBerry(item)
+    end
+  end
   return HeldItems.isBerry(HeldItems.get(lead))
 end
 
 function HouseNpcs.giveItem(game, itemId, qty)
-  local Bag = require("src.inventory.Bag")
-  return Bag.add(game.save, itemId, qty or 1)
+  if not game then return false end
+  local save = game.save or game.session
+  if not save then
+    local Runtime = package.loaded["src.core.game3.runtime"]
+    save = Runtime and Runtime.getSession and Runtime.getSession()
+  end
+  if not save then return false end
+  -- Keep game.save filled so downstream Gen3 bag helpers stay consistent.
+  if not game.save then game.save = save end
+  local Host = require("mods.Kanto-Reforged.core.host")
+  if Host.isGen3() then
+    local BerryFarmGame3 = require("mods.Kanto-Reforged.world.berry_farm_game3")
+    return BerryFarmGame3.bagAddItem(save, itemId, qty or 1)
+  end
+  local okBag, Bag = pcall(require, "src.inventory.Bag")
+  if okBag and Bag and Bag.add then
+    local res = Bag.add(save, itemId, qty or 1)
+    if res then return true end
+  end
+  local BerryFarmGame3 = require("mods.Kanto-Reforged.world.berry_farm_game3")
+  return BerryFarmGame3.bagAddItem(save, itemId, qty or 1)
 end
 
 function HouseNpcs.scaleParty(party, aceLevel)
@@ -376,8 +706,85 @@ local function startTrainerBattleGen2(game, ow, oppClass, partyIndex, onDone)
   end)
 end
 
+local function startTrainerBattleGen3(game, ow, oppClass, partyIndex, onDone)
+  local rows, def = partyRowsFor(oppClass, partyIndex)
+  if not rows then
+    error("no trainer def for " .. tostring(oppClass))
+  end
+  HouseNpcs._scaleGame = game
+  local ace = HouseNpcs.scaleCap(nil, game)
+  HouseNpcs._scaleGame = nil
+  local scaled = HouseNpcs.scaleParty(rows, ace)
+
+  local party = {}
+  local okP, Pokemon = pcall(require, "src.core.game3.pokemon")
+  for _, slot in ipairs(scaled) do
+    local sp = slot.species
+    if type(sp) == "string" and okP and Pokemon and Pokemon.speciesFromName then
+      sp = Pokemon.speciesFromName(sp) or sp
+    end
+    party[#party + 1] = {
+      species = sp,
+      level = slot.level,
+      moves = slot.moves,
+      ivs = { hp = 15, atk = 15, def = 15, spe = 15, spa = 15, spd = 15 },
+      evs = { hp = 0, atk = 0, def = 0, spe = 0, spa = 0, spd = 0 },
+    }
+  end
+
+  local lead = party[1] or {}
+  local trainerPic = 23 -- Hiker sprite
+  if oppClass == "OPP_EXP_DARK_SPECIALIST" then
+    trainerPic = 39 -- Super Nerd
+  elseif oppClass == "OPP_EXP_BERRY_SPECIALIST" then
+    trainerPic = 15 -- Lass
+  end
+  local trainerTitle = (def and def.name) or "TRAINER"
+
+  local okB, Bridge = pcall(require, "src.core.game3.battle_bridge")
+  local Runtime = package.loaded["src.core.game3.runtime"]
+  local g = game or (Runtime and Runtime._game)
+  local foe = {
+    species = lead.species,
+    level = lead.level,
+    moves = lead.moves,
+    ivs = lead.ivs,
+    evs = lead.evs,
+    party = party,
+    trainerClass = 23,
+    trainerClassName = trainerTitle,
+    trainerName = trainerTitle,
+    trainerPic = trainerPic,
+    trainerPicId = trainerPic,
+    frontierTrainer = {
+      class = 23,
+      className = trainerTitle,
+      name = trainerTitle,
+      pic = trainerPic,
+    },
+  }
+  local battleOpts = {
+    wild = false,
+    frontierTrainer = foe.frontierTrainer,
+    trainerClassName = trainerTitle,
+    trainerName = trainerTitle,
+    trainerPicId = trainerPic,
+    done = function(outcome)
+      if onDone then onDone(outcome == "win" and "win" or "lose") end
+    end,
+  }
+  if okB and Bridge and Bridge.start then
+    Bridge.start(Runtime and Runtime._mod or nil, g, foe, battleOpts)
+  else
+    if onDone then onDone("win") end
+  end
+end
+
 function HouseNpcs.startTrainerBattle(game, ow, oppClass, partyIndex, onDone)
   local Host = require("mods.Kanto-Reforged.core.host")
+  if Host.isGen3() then
+    return startTrainerBattleGen3(game, ow, oppClass, partyIndex, onDone)
+  end
   if Host.isGen2() then
     return startTrainerBattleGen2(game, ow, oppClass, partyIndex, onDone)
   end

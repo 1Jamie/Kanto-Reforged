@@ -320,6 +320,17 @@ do
   T.check(unownRec.letters.B ~= nil, "UNOWN letter B sprite preserved")
   local patch = SpriteResolve.registryPatch(mod, "UNOWN")
   T.eq(patch, nil, "SpriteResolve registryPatch returns nil for UNOWN on Gen 2")
+  local letterPath = "assets/generated/battle/front/unown_b.png"
+  T.eq(
+    SpriteResolve.resolvePath(mod, "UNOWN", "front", letterPath),
+    nil,
+    "Gen 2 live sprite hook leaves Unown letter pics alone"
+  )
+  T.eq(
+    SpriteResolve.resolvePath(mod, "UNOWN", "back", "assets/generated/battle/back/unown_z.png"),
+    nil,
+    "Gen 2 live sprite hook leaves Unown letter backs alone"
+  )
   Host.clearForce()
 end
 

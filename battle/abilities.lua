@@ -509,6 +509,56 @@ local function chance100(battle, percent)
   return roll < percent
 end
 
+local NON_CONTACT_PHYSICAL = {
+  EARTHQUAKE = true,
+  MAGNITUDE = true,
+  FISSURE = true,
+  ROCK_SLIDE = true,
+  ROCK_TOMB = true,
+  ROCK_BLAST = true,
+  ROCK_THROW = true,
+  SAND_TOMB = true,
+  MUD_SLAP = true,
+  MUD_SHOT = true,
+  RAZOR_LEAF = true,
+  BULLET_SEED = true,
+  BARRAGE = true,
+  BONE_CLUB = true,
+  BONEMERANG = true,
+  BONE_RUSH = true,
+  EGG_BOMB = true,
+  ICICLE_SPEAR = true,
+  PIN_MISSILE = true,
+  SPIKE_CANNON = true,
+  AEROBLAST = true,
+  EXPLOSION = true,
+  SELFDESTRUCT = true,
+  SWIFT = true,
+  POISON_STING = true,
+  TWINEEDLE = true,
+  PAY_DAY = true,
+}
+
+local CONTACT_SPECIAL = {
+  PETAL_DANCE = true,
+  DRAIN_PUNCH = true,
+}
+
+function Abilities.makesContact(move)
+  if not move then return false end
+  if move.makesContact ~= nil then return move.makesContact end
+  if move.flags and move.flags.contact ~= nil then return move.flags.contact end
+  local id = move.id or move.name or ""
+  if CONTACT_SPECIAL[id] then return true end
+  if NON_CONTACT_PHYSICAL[id] then return false end
+  local TypeChart = require("src.battle.TypeChart")
+  local Data = package.loaded["src.core.Data"]
+  local mdef = Data and Data.moves and Data.moves[id]
+  local mType = move.type or (mdef and mdef.type)
+  local category = move.category or (mdef and mdef.category) or (mType and TypeChart.category(mType)) or "physical"
+  return category == "physical"
+end
+
 function Abilities.onPostDamage(battle, user, target, move, damage)
   local targetMon = BattleCompat.mon(target)
   if not targetMon or (targetMon.hp and targetMon.hp <= 0) then return end
@@ -523,11 +573,12 @@ function Abilities.onPostDamage(battle, user, target, move, damage)
       displayName(battle, target), move.type))
   end
 
-  local TypeChart = require("src.battle.TypeChart")
-  local category = move.category or TypeChart.category(move.type) or "physical"
-  if category ~= "physical" or not damage or damage <= 0 then return end
+  if not damage or damage <= 0 then return end
   if target.substituteHP then return end
   if user == target then return end
+
+  local isContact = Abilities.makesContact(move)
+  if not isContact then return end
 
   if targetAbility == "ROUGH_SKIN" and userMon and (userMon.hp or 0) > 0 then
     local dmg = math.max(1, math.floor(BattleCompat.maxHp(user) / 8))

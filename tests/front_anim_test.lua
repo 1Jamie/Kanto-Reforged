@@ -44,6 +44,10 @@ T.check(
   not FrontAnim.allowCrystalNative("CHIKORITA", nil, nil, mod),
   "Gold never uses Crystal MonAnim fallback"
 )
+T.check(
+  not FrontAnim.prefersKrAnim("UNOWN", nil, nil, mod),
+  "Gold Unown keeps ROM letter pics instead of the single KR strip"
+)
 
 GameVersion.set("crystal")
 Host.clearForce()

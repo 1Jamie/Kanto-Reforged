@@ -135,10 +135,26 @@ local function merchantStock(mod)
   return BerryFarm.plantableList(mod)
 end
 
--- Gen1 ShopMenu reads save.money; Gold keeps ¥ on save.player.money, so a
--- buy compare (nil < price) hard-crashes. Use Gen2MartMenu on Gold.
+-- Gen1 ShopMenu reads save.money; Gold keeps ¥ on save.player.money; Game3 uses GBA ShopMenu.
 function BerryQuests.openShop(game, stock, done)
   local Host = require("mods.Kanto-Reforged.core.host")
+  if Host.isGen3() then
+    local BerryFarmGame3 = require("mods.Kanto-Reforged.world.berry_farm_game3")
+    local okShop, ShopMenu = pcall(require, "src.ui.game3.shop_menu")
+    if okShop and ShopMenu and ShopMenu.show then
+      local items = {}
+      for _, id in ipairs(stock) do
+        local numId = BerryFarmGame3.GBA_BERRIES[id]
+        items[#items + 1] = numId or id
+      end
+      ShopMenu.show({
+        items = items,
+        session = game and game.save,
+        onClose = done,
+      })
+      return
+    end
+  end
   if Host.isGen2() then
     local Screens = require("src.ui.Screens")
     Screens.push(game, "Gen2MartMenu", {
@@ -212,17 +228,26 @@ local function blenderReady(mod)
 end
 
 local function canAfford(save, need)
+  if not save then return false end
+  local BerryFarmGame3 = require("mods.Kanto-Reforged.world.berry_farm_game3")
   local inv = save.inventory or {}
   for id, n in pairs(need) do
-    if (inv[id] or 0) < n then return false end
+    local c = inv[id] or BerryFarmGame3.bagGetItemCount(save, id)
+    if c < n then return false end
   end
   return true
 end
 
 local function takeNeed(save, need)
-  local Bag = require("src.inventory.Bag")
+  if not save then return end
+  local BerryFarmGame3 = require("mods.Kanto-Reforged.world.berry_farm_game3")
   for id, n in pairs(need) do
-    Bag.remove(save, id, n)
+    if not BerryFarmGame3.bagRemoveItem(save, id, n) then
+      local okBag, Bag = pcall(require, "src.inventory.Bag")
+      if okBag and Bag and Bag.remove then
+        Bag.remove(save, id, n)
+      end
+    end
   end
 end
 
@@ -270,8 +295,10 @@ local function craftRecipe(mod, game, rec, done)
   end
   takeNeed(game.save, rec.need)
   if not HouseNpcs.giveItem(game, rec.give, 1) then
-    local Bag = require("src.inventory.Bag")
-    for id, n in pairs(rec.need) do Bag.add(game.save, id, n) end
+    local BerryFarmGame3 = require("mods.Kanto-Reforged.world.berry_farm_game3")
+    for id, n in pairs(rec.need) do
+      BerryFarmGame3.bagAddItem(game.save, id, n)
+    end
     HouseNpcs.pushText(game, Strings("The bag is full!"), done)
     return
   end
@@ -300,6 +327,33 @@ local function blenderTalk(mod)
         value = rec,
       }
     end
+    local Host = require("mods.Kanto-Reforged.core.host")
+    if Host.isGen3() then
+      local Choice = require("src.ui.game3.choice")
+      local labels = {}
+      for _, r in ipairs(rows) do
+        labels[#labels + 1] = r.label
+      end
+      labels[#labels + 1] = "CANCEL"
+      Choice.multi(labels, 0, function(idx)
+        local chosen = (type(idx) == "number") and rows[idx + 1]
+        if chosen then
+          local rec = chosen.value
+          local prompt = BerryQuests.formatRecipePrompt(game.data, rec)
+          HouseNpcs.ask(game, prompt, function(yes)
+            if not yes then
+              HouseNpcs.pushText(game, Strings("Maybe later."), done)
+              return
+            end
+            craftRecipe(mod, game, rec, done)
+          end)
+        else
+          if done then done() end
+        end
+      end)
+      return
+    end
+
     local ListMenu = require("src.ui.ListMenu")
     game.stack:push(ListMenu.new(game, Strings("Blend what?"), rows, {
       onCancel = function()
@@ -388,55 +442,83 @@ local function soilTalk(mod)
 end
 
 function BerryQuests.register(mod)
-  HouseNpcs.appendNpc(mod, "CELADON_MANSION_3F", {
-    index = 5,
-    name = "CELADONMANSION3F_BLENDER",
-    sprite = "SPRITE_BEAUTY",
-    text = "TEXT_CELADONMANSION3F_BLENDER",
-    x = 3, y = 8,
-  }, BerryQuests.OWNER)
+  HouseNpcs.installTalkDispatch(mod)
+
+  -- Celadon Condominiums 3F Blender NPC (Gen 1, Gen 2, and Gen 3 map names)
+  for _, condoMap in ipairs({ "CELADON_MANSION_3F", "FR_CELADON_CITY_CONDOMINIUMS_3F", "CeladonCity_Condominiums_3F" }) do
+    pcall(function()
+      HouseNpcs.appendNpc(mod, condoMap, {
+        index = 5,
+        name = "CELADONMANSION3F_BLENDER",
+        sprite = "SPRITE_BEAUTY",
+        graphicsId = 28, -- OBJ_EVENT_GFX_WOMAN_2
+        graphics = 28,
+        movementType = 8,
+        scriptKey = "TEXT_CELADONMANSION3F_BLENDER",
+        text = "TEXT_CELADONMANSION3F_BLENDER",
+        x = 3, y = 8,
+        gen3X = 2, gen3Y = 7,
+        graphicsId = 29,
+        graphics = 29,
+      }, BerryQuests.OWNER)
+      HouseNpcs.bindTalk(mod, condoMap, {
+        TEXT_CELADONMANSION3F_BLENDER = blenderTalk(mod),
+      })
+    end)
+  end
 
   -- Soil expert on berry farm — avoid girl at (12,7)
-  HouseNpcs.appendNpc(mod, "BERRY_FARM", {
-    index = 3,
-    name = "BERRY_FARM_SOIL_EXPERT",
-    sprite = "SPRITE_SCIENTIST",
-    text = "TEXT_BERRY_FARM_SOIL_EXPERT",
-    x = 16, y = 8,
-  }, BerryQuests.OWNER)
+  for _, farmMap in ipairs({ "BERRY_FARM", "FR_BERRY_FARM" }) do
+    pcall(function()
+      HouseNpcs.appendNpc(mod, farmMap, {
+        index = 3,
+        name = "BERRY_FARM_SOIL_EXPERT",
+        sprite = "SPRITE_SCIENTIST",
+        graphicsId = 55, -- OBJ_EVENT_GFX_SCIENTIST
+        graphics = 55,
+        movementType = 8,
+        scriptKey = "TEXT_BERRY_FARM_SOIL_EXPERT",
+        text = "TEXT_BERRY_FARM_SOIL_EXPERT",
+        x = 16, y = 8,
+      }, BerryQuests.OWNER)
 
-  -- Berry stall: buy any unlocked berry (restock if you ate your gifts).
-  HouseNpcs.appendNpc(mod, "BERRY_FARM", {
-    index = 5,
-    name = "BERRY_FARM_MERCHANT",
-    sprite = "SPRITE_GIRL",
-    text = "TEXT_BERRY_FARM_MERCHANT",
-    x = 8, y = 14,
-  }, BerryQuests.OWNER)
+      -- Berry stall: buy any unlocked berry (restock if you ate your gifts).
+      HouseNpcs.appendNpc(mod, farmMap, {
+        index = 5,
+        name = "BERRY_FARM_MERCHANT",
+        sprite = "SPRITE_GIRL",
+        graphicsId = 28, -- OBJ_EVENT_GFX_WOMAN_2
+        graphics = 28,
+        movementType = 8,
+        scriptKey = "TEXT_BERRY_FARM_MERCHANT",
+        text = "TEXT_BERRY_FARM_MERCHANT",
+        x = 8, y = 14,
+      }, BerryQuests.OWNER)
 
-  HouseNpcs.bindTalk(mod, "CELADON_MANSION_3F", {
-    TEXT_CELADONMANSION3F_BLENDER = blenderTalk(mod),
-  })
-  HouseNpcs.bindTalk(mod, "BERRY_FARM", {
-    TEXT_BERRY_FARM_SOIL_EXPERT = soilTalk(mod),
-    TEXT_BERRY_FARM_MERCHANT = merchantTalk(mod),
-  })
+      HouseNpcs.bindTalk(mod, farmMap, {
+        TEXT_BERRY_FARM_SOIL_EXPERT = soilTalk(mod),
+        TEXT_BERRY_FARM_MERCHANT = merchantTalk(mod),
+      })
+    end)
+  end
 
   -- Auto-unlock berries when badges are earned (on map enter farm or talk).
-  mod.events:on("map.entered", function(ev)
-    -- Engines emit mapId/map/fromMapId/via — never ev.game.
-    local game = ev and ev.game
-    if not game then
-      local ok, SS = pcall(require, "mods.Kanto-Reforged.species_scope")
-      if ok and SS and SS._game then game = SS._game end
-    end
-    if not game then
-      local Host = require("mods.Kanto-Reforged.core.host")
-      game = Host.liveGame(mod)
-    end
-    if not game then return end
-    BerryQuests.applyBadgeUnlocks(mod, game)
-  end)
+  if mod and mod.events and mod.events.on then
+    mod.events:on("map.entered", function(ev)
+      -- Engines emit mapId/map/fromMapId/via — never ev.game.
+      local game = ev and ev.game
+      if not game then
+        local ok, SS = pcall(require, "mods.Kanto-Reforged.species_scope")
+        if ok and SS and SS._game then game = SS._game end
+      end
+      if not game then
+        local Host = require("mods.Kanto-Reforged.core.host")
+        game = Host.liveGame(mod)
+      end
+      if not game then return end
+      BerryQuests.applyBadgeUnlocks(mod, game)
+    end)
+  end
 end
 
 return BerryQuests

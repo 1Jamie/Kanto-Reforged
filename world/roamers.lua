@@ -96,95 +96,123 @@ end
 function Roamers.register(mod)
   local Host = require("mods.Kanto-Reforged.core.host")
   if Host.isGen2() then return end
-  HouseNpcs.appendNpc(mod, "CELADON_MANSION_2F", {
+  local isG3 = Host.isGen3()
+  local mansionMap = isG3 and "FR_CELADON_CITY_CONDOMINIUMS_2F" or "CELADON_MANSION_2F"
+
+  HouseNpcs.appendNpc(mod, mansionMap, {
     index = 2,
     name = "CELADONMANSION2F_BEAST_TRACKER",
     sprite = "SPRITE_SUPER_NERD",
+    graphicsId = 89,
     text = "TEXT_CELADONMANSION2F_BEAST_TRACKER",
     -- SW of the meeting room so the east stair hall stays clear.
     x = 1, y = 8,
+    gen3X = 1, gen3Y = 8,
   }, Roamers.OWNER)
 
-  mod.content.items:register("ROAMING_RADAR", {
-    id = "ROAMING_RADAR", name = "ROAMING RADAR", price = 0,
-    keyItem = true, tossable = false,
-  })
+  if mod and mod.content and mod.content.items and mod.content.items.register then
+    mod.content.items:register("ROAMING_RADAR", {
+      id = "ROAMING_RADAR", name = "ROAMING RADAR", price = 0,
+      keyItem = true, tossable = false,
+    })
+  end
 
-  mod.content.map_scripts:register("CELADON_MANSION_2F", {
-    talk = {
-      TEXT_CELADONMANSION2F_BEAST_TRACKER = function(game, ow, npc, done)
-        local SpeciesScope = require("mods.Kanto-Reforged.pokemon.species_scope")
-        if SpeciesScope.mode(mod) == SpeciesScope.MODE_KANTO then
-          HouseNpcs.pushText(game, Strings(
-            "Beasts? On a KANTO-\nonly DEX?\f"
-              .. "Switch to NATIONAL\nif you want them."), done)
-          return
-        end
-        local flags = game.save.flags or {}
-        if not flags.EVENT_BEAT_SILPH_CO_GIOVANNI
-            and not flags.EVENT_BEAT_SILPH_CO_GIOVANNI then
-          -- Also accept Silph liberated style flags if present
-        end
-        local silph = flags.EVENT_BEAT_SILPH_CO_GIOVANNI
-          or flags.EVENT_GOT_MASTER_BALL
-          or (game.save.inventory and game.save.inventory.MASTER_BALL)
-        if not silph and not mod.save:get("roamers_beasts_on", false) then
-          HouseNpcs.pushText(game, Strings(
-            "Strange beasts are\nstirring...\f"
-              .. "Come back after\nSILPH CO."), done)
-          return
-        end
-        if not mod.save:get("got_roaming_radar", false) then
-          HouseNpcs.giveItem(game, "ROAMING_RADAR", 1)
-          mod.save:set("got_roaming_radar", true)
-          Roamers.activateBeasts(mod)
-          HouseNpcs.pushText(game, Strings(
-            "Take this ROAMING\nRADAR!\f"
-              .. "RAIKOU, ENTEI, and\nSUICUNE roam Kanto."), done)
-        else
-          HouseNpcs.pushText(game, Strings(
-            "Check the RADAR\nfrom the bag.\f"
-              .. "Fly reshuffles them."), done)
-        end
-      end,
-    },
+  local trackerTalk = function(game, ow, npc, done)
+    local SpeciesScope = require("mods.Kanto-Reforged.pokemon.species_scope")
+    if SpeciesScope.mode(mod) == SpeciesScope.MODE_KANTO then
+      HouseNpcs.pushText(game, Strings(
+        "Beasts? On a KANTO-\nonly DEX?\f"
+          .. "Switch to NATIONAL\nif you want them."), done)
+      return
+    end
+    local save = (game and game.save) or (game and game.session) or {}
+    local flags = save.flags or {}
+    local silph = flags.EVENT_BEAT_SILPH_CO_GIOVANNI
+      or flags.EVENT_GOT_MASTER_BALL
+      or (save.inventory and save.inventory.MASTER_BALL)
+      -- FRLG: FLAG_HIDE_SILPH_ROCKETS = 0x53 (0x825 is Marsh Badge, not Silph).
+      or (Host.isGen3() and (flags[0x53] or flags.FLAG_HIDE_SILPH_ROCKETS))
+    if not silph and not mod.save:get("roamers_beasts_on", false) then
+      HouseNpcs.pushText(game, Strings(
+        "Strange beasts are\nstirring...\f"
+          .. "Come back after\nSILPH CO."), done)
+      return
+    end
+    if not mod.save:get("got_roaming_radar", false) then
+      HouseNpcs.giveItem(game, "ROAMING_RADAR", 1)
+      mod.save:set("got_roaming_radar", true)
+      Roamers.activateBeasts(mod)
+      HouseNpcs.pushText(game, Strings(
+        "Take this ROAMING\nRADAR!\f"
+          .. "RAIKOU, ENTEI, and\nSUICUNE roam Kanto."), done)
+    else
+      HouseNpcs.pushText(game, Strings(
+        "Check the RADAR\nfrom the bag.\f"
+          .. "Fly reshuffles them."), done)
+    end
+  end
+
+  if Host.isGen1() then
+    mod.content.map_scripts:register("CELADON_MANSION_2F", {
+      talk = {
+        TEXT_CELADONMANSION2F_BEAST_TRACKER = trackerTalk,
+      },
+    })
+  end
+  HouseNpcs.bindTalk(mod, mansionMap, {
+    TEXT_CELADONMANSION2F_BEAST_TRACKER = trackerTalk,
   })
 
   -- Eon watcher at Indigo lobby
-  HouseNpcs.appendNpc(mod, "INDIGO_PLATEAU_LOBBY", {
+  local indigoMap = isG3 and "FR_INDIGO_PLATEAU_POKEMON_CENTER_1F" or "INDIGO_PLATEAU_LOBBY"
+  HouseNpcs.appendNpc(mod, indigoMap, {
     index = 6,
     name = "INDIGOPLATEAULOBBY_EON_WATCHER",
     sprite = "SPRITE_GIRL",
+    graphicsId = 23,
     text = "TEXT_INDIGOPLATEAULOBBY_EON_WATCHER",
-    x = 10, y = 6,
+    -- Gen1 (10,6) is solid wall on FRLG Indigo PC; open lobby floor west of desk.
+    x = isG3 and 8 or 10,
+    y = isG3 and 9 or 6,
+    gen3X = 8, gen3Y = 9,
   }, Roamers.OWNER)
 
-  mod.content.map_scripts:register("INDIGO_PLATEAU_LOBBY", {
-    talk = {
-      TEXT_INDIGOPLATEAULOBBY_EON_WATCHER = function(game, ow, npc, done)
-        local SpeciesScope = require("mods.Kanto-Reforged.pokemon.species_scope")
-        if SpeciesScope.mode(mod) == SpeciesScope.MODE_KANTO then
-          HouseNpcs.pushText(game, Strings(
-            "Eon POKéMON skip\nKANTO-scope trainers.\f"
-              .. "Try NATIONAL if you\nwant a chase."), done)
-          return
-        end
-        local flags = game.save.flags or {}
-        if not flags.EVENT_BEAT_CHAMPION_RIVAL then
-          HouseNpcs.pushText(game, Strings(
-            "Eon POKéMON appear\nafter the CHAMPION."), done)
-          return
-        end
-        if not mod.save:get("roamers_eons_on", false) then
-          Roamers.activateEons(mod)
-          HouseNpcs.pushText(game, Strings(
-            "LATIAS and LATIOS\nare roaming!\f"
-              .. "Your RADAR sees\nthem too."), done)
-        else
-          HouseNpcs.pushText(game, Strings("Keep hunting."), done)
-        end
-      end,
-    },
+  local eonTalk = function(game, ow, npc, done)
+    local SpeciesScope = require("mods.Kanto-Reforged.pokemon.species_scope")
+    if SpeciesScope.mode(mod) == SpeciesScope.MODE_KANTO then
+      HouseNpcs.pushText(game, Strings(
+        "Eon POKéMON skip\nKANTO-scope trainers.\f"
+          .. "Try NATIONAL if you\nwant a chase."), done)
+      return
+    end
+    local save = (game and game.save) or (game and game.session) or {}
+    local flags = save.flags or {}
+    local champ = flags.EVENT_BEAT_CHAMPION_RIVAL
+      or (Host.isGen3() and (flags[0x82c] or flags.FLAG_SYS_GAME_CLEAR))
+    if not champ then
+      HouseNpcs.pushText(game, Strings(
+        "Eon POKéMON appear\nafter the CHAMPION."), done)
+      return
+    end
+    if not mod.save:get("roamers_eons_on", false) then
+      Roamers.activateEons(mod)
+      HouseNpcs.pushText(game, Strings(
+        "LATIAS and LATIOS\nare roaming!\f"
+          .. "Your RADAR sees\nthem too."), done)
+    else
+      HouseNpcs.pushText(game, Strings("Keep hunting."), done)
+    end
+  end
+
+  if Host.isGen1() then
+    mod.content.map_scripts:register("INDIGO_PLATEAU_LOBBY", {
+      talk = {
+        TEXT_INDIGOPLATEAULOBBY_EON_WATCHER = eonTalk,
+      },
+    })
+  end
+  HouseNpcs.bindTalk(mod, indigoMap, {
+    TEXT_INDIGOPLATEAULOBBY_EON_WATCHER = eonTalk,
   })
 end
 

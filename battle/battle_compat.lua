@@ -269,6 +269,10 @@ end
 function BattleCompat.getWeather(battle)
   if not battle then return nil end
   if battle._krWeather then return battle._krWeather end
+  if battle.battle then
+    local w = BattleCompat.getWeather(battle.battle)
+    if w then return w end
+  end
   if BattleCompat.isGen2(battle) then
     local w = battle.weather
     if w == "sun" then return "SUNNY" end

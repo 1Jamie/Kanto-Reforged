@@ -151,7 +151,7 @@ return function(T, Data, run)
     Runtime.hooks.chains = {
       ["render.hud"] = {
         {
-          owner = "gen1_modern_ui",
+          owner = "omni_ui",
           callback = function()
             return fakeRuntime
           end,

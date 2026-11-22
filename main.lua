@@ -68,6 +68,30 @@ end
 -- so a sticky GameVersion cannot mis-label Gen1 vs Gen2 menus.
 local function buildOptionDefs(mod)
   local Host = require("mods.Kanto-Reforged.core.host")
+  if Host.isGen3From(mod) then
+    return {
+      {
+        key = Host.optionKey("full_spawn_random"),
+        label = "FULL SPAWN MIX",
+        type = "toggle",
+        default = false,
+      },
+      {
+        key = Host.optionKey("pure_spawn_random"),
+        label = "PURE RANDOM SPAWN",
+        type = "toggle",
+        default = false,
+      },
+      {
+        key = Host.optionKey("legends_in_mix"),
+        label = "LEGENDS IN MIX",
+        type = "toggle",
+        default = false,
+      },
+      -- BAG GIVE is native on FRLG; do not list a dead KR option.
+      require("mods.Kanto-Reforged.ui.dexnav").OPTION,
+    }
+  end
   local defs = {
     SpeciesScope.optionDef(mod),
     {
@@ -189,6 +213,131 @@ end
 return function(mod)
   local Host = require("mods.Kanto-Reforged.core.host")
   Host.modLoader(mod)
+
+  -- Manager / card options (host-aware labels / visibility).
+  mod.options:define(buildOptionDefs(mod))
+
+  if Host.isGen3From(mod) then
+    local EvolutionGame3 = require("mods.Kanto-Reforged.pokemon.evolution_game3")
+    local TrainersGame3 = require("mods.Kanto-Reforged.battle.trainers_game3")
+    local EncountersGame3 = require("mods.Kanto-Reforged.world.encounters_game3")
+    local BerryFarmGame3 = require("mods.Kanto-Reforged.world.berry_farm_game3")
+    local BerryQuests = require("mods.Kanto-Reforged.world.berry_quests")
+    local DexNav = require("mods.Kanto-Reforged.ui.dexnav")
+    local LevelCaps = require("mods.Kanto-Reforged.ui.level_caps")
+    local EventTicketsGame3 = require("mods.Kanto-Reforged.world.event_tickets_game3")
+    local RoamersGame3 = require("mods.Kanto-Reforged.world.roamers_game3")
+    local FossilsGame3 = require("mods.Kanto-Reforged.world.fossils_game3")
+    local RegisGame3 = require("mods.Kanto-Reforged.world.regis_game3")
+    local OldManTutorial = require("mods.Kanto-Reforged.world.old_man_tutorial")
+    local OakIntro = require("mods.Kanto-Reforged.world.oak_intro")
+
+    EvolutionGame3.install(mod)
+    OldManTutorial.install(mod)
+    OakIntro.install(mod)
+    TrainersGame3.install(mod)
+    EncountersGame3.install(mod)
+    BerryFarmGame3.install(mod)
+    DexNav.register(mod)
+    LevelCaps.register(mod)
+    LevelCaps.install(mod)
+    EventTicketsGame3.install(mod)
+    RoamersGame3.install(mod)
+    FossilsGame3.install(mod)
+    RegisGame3.install(mod)
+
+    local HouseNpcs = require("mods.Kanto-Reforged.world.house_npcs")
+    HouseNpcs.installTalkDispatch(mod)
+
+    local BattleClubs = require("mods.Kanto-Reforged.battle.battle_clubs")
+    BattleClubs.register(mod)
+
+    local JudgeNpc = require("mods.Kanto-Reforged.world.judge_npc")
+    JudgeNpc.register(mod)
+
+    local BerryQuests = require("mods.Kanto-Reforged.world.berry_quests")
+    BerryQuests.register(mod)
+
+    local Roamers = require("mods.Kanto-Reforged.world.roamers")
+    Roamers.register(mod)
+    Roamers.install(mod)
+    local RoamingRadar = require("mods.Kanto-Reforged.world.roaming_radar")
+    RoamingRadar.register(mod)
+
+    local ItemSmith = require("mods.Kanto-Reforged.world.item_smith")
+    ItemSmith.register(mod)
+
+    local MoveHub = require("mods.Kanto-Reforged.world.move_hub")
+    MoveHub.register(mod)
+
+    local TradesExtra = require("mods.Kanto-Reforged.world.trades_extra")
+    TradesExtra.register(mod)
+
+    local function unlockNationalDex(session)
+      if not session then return end
+      session.national_dex_unlocked = true
+      if session.dex then
+        session.dex.nationalUnlocked = true
+      end
+    end
+
+    if mod.events and mod.events.on then
+      mod.events:on("save.loaded", function(ev)
+        if ev and ev.save then unlockNationalDex(ev.save) end
+      end)
+      mod.events:on("save.created", function(ev)
+        if ev and ev.save then unlockNationalDex(ev.save) end
+      end)
+      mod.events:on("game.ready", function(ev)
+        local game = ev and ev.game
+        if game and game.session then
+          unlockNationalDex(game.session)
+        end
+        local Runtime = package.loaded["src.core.game3.runtime"]
+        if Runtime and Runtime.getSession then
+          unlockNationalDex(Runtime.getSession())
+        end
+      end)
+    end
+
+    local Runtime = package.loaded["src.core.game3.runtime"]
+    if Runtime and Runtime.start and not Runtime._krNatDexHook then
+      Runtime._krNatDexHook = true
+      local origStart = Runtime.start
+      Runtime.start = function(rmod, game, session, opts)
+        unlockNationalDex(session)
+        return origStart(rmod, game, session, opts)
+      end
+    end
+
+    if mod.events and mod.events.on then
+      mod.events:on("mod.options_changed", function(ev)
+        if not (ev and ev.mod == mod.id) then return end
+        if not (Host.optionEventIs(ev.key, "full_spawn_random")
+            or Host.optionEventIs(ev.key, "pure_spawn_random")
+            or Host.optionEventIs(ev.key, "legends_in_mix")) then
+          return
+        end
+        local mode = "curated"
+        if mod.options:get(Host.optionKey("pure_spawn_random")) then
+          mode = "pure_random"
+        elseif mod.options:get(Host.optionKey("full_spawn_random")) then
+          mode = "full_random"
+        end
+        local legends = false
+        if mode == "full_random" or mode == "pure_random" then
+          legends = mod.options:get(Host.optionKey("legends_in_mix")) and true or false
+        end
+        EncountersGame3.apply(mod, mode, { legends = legends, legendsInMix = legends })
+      end)
+    end
+
+    if mod.log then
+      mod.log:info("Kanto Reforged Gen 3 (FRLG) initialized successfully!")
+    end
+    return
+  end
+
   local PokemonGen2 = require("mods.Kanto-Reforged.pokemon.pokemon_gen2")
 
   ExpTrainers.extendSchemas()
@@ -202,8 +351,6 @@ return function(mod)
     pcall(function() LegendMapsApply.apply(mod) end)
   end
 
-  -- Manager / card options (host-aware labels / visibility).
-  mod.options:define(buildOptionDefs(mod))
   Host.installEngineShims(mod)
   Host.migrateScopedOptions(mod)
   if Host.isGen1From(mod) then
@@ -235,6 +382,9 @@ return function(mod)
 
   local Weather = require("mods.Kanto-Reforged.battle.weather")
   Weather.install(mod)
+
+  local CastformFx = require("mods.Kanto-Reforged.battle.castform_fx")
+  CastformFx.install(mod)
 
   Abilities.install(mod)
 
@@ -274,8 +424,10 @@ return function(mod)
 
   local HouseNpcs = require("mods.Kanto-Reforged.world.house_npcs")
   HouseNpcs.resetClaims()
-  if Host.isGen2() then
+  if Host.isGen2() or Host.isGen3() then
     HouseNpcs.installTalkDispatch(mod)
+  end
+  if Host.isGen2() then
     pcall(function()
       require("mods.Kanto-Reforged.world.kanto_campaign").install(mod)
     end)
@@ -285,7 +437,7 @@ return function(mod)
   LevelCaps.register(mod)
   LevelCaps.install(mod)
 
-  if Host.isGen1() then
+  if Host.isGen1From(mod) or Host.isGen1() then
     local OverworldLoot = require("mods.Kanto-Reforged.world.overworld_loot")
     OverworldLoot.register(mod)
     local Competitive = require("mods.Kanto-Reforged.items.competitive_items")
@@ -321,7 +473,7 @@ return function(mod)
     FossilsGen3.register(mod)
     local QuarantineRecover = require("mods.Kanto-Reforged.core.quarantine_recover")
     QuarantineRecover.install(mod)
-  else
+  elseif Host.isGen2From(mod) or Host.isGen2() then
     -- Gold Kanto parity: farm quests + Celadon/Vermilion clubs (Kanto maps).
     -- Utility NPCs stay on Kanto maps (not Johto remaps).
     local Competitive = require("mods.Kanto-Reforged.items.competitive_items")
@@ -336,7 +488,6 @@ return function(mod)
     local MoveHub = require("mods.Kanto-Reforged.world.move_hub")
     MoveHub.register(mod)
     local ItemSmith = require("mods.Kanto-Reforged.world.item_smith")
-    ItemSmith.register(mod)
   end
 
   -- Slot-2 XP share via battle.exp_award (shared Gen1/Gen2 hook).
@@ -1032,9 +1183,9 @@ return function(mod)
     BagPockets.register(mod)
   end
 
-  -- Optional Gen1 Modern UI adapter (no-op when that mod is absent).
+  -- Optional OmniUI adapter (no-op when omni_ui is absent).
   if require("mods.Kanto-Reforged.ui.gen1_modern_ui_adapter")(mod) then
-    mod.log:info("Gen1 Modern UI adapter registered")
+    mod.log:info("OmniUI adapter registered")
   end
   -- Party/PC detail SPC→SAT/SDF patch may need a late bind if Modern UI
   -- loads after us; installModernUiPartyPatch watches render.hud once.
@@ -1630,6 +1781,8 @@ return function(mod)
     BattleSpriteScale.install(mod)
     local FrontAnim = require("mods.Kanto-Reforged.battle.front_anim")
     FrontAnim.install(mod)
+    local CastformFx = require("mods.Kanto-Reforged.battle.castform_fx")
+    CastformFx.install(mod)
   end)
 
   mod.events:on("battle.started", function(ev)
@@ -1666,12 +1819,21 @@ return function(mod)
         -- battle may already be tearing down; best-effort bag add already done
       end
     end
-    -- Gold battlers are party tables; wipe AI facade fields before SAVE.
-    local BattleCompat = require("mods.Kanto-Reforged.battle.battle_compat")
-    BattleCompat.scrubBattle(ev.battle)
-    local CastformFx = require("mods.Kanto-Reforged.battle.castform_fx")
-    CastformFx.resetOutOfBattle(mod)
-    mod.activeBattle = nil
+    -- In Gen 2, Battle (engine) emits battle.ended immediately on fatal damage,
+    -- while BattleState (UI) is still actively animating the attack, faint, and exp bar.
+    -- Defer resetting visual Castform forms and clearing activeBattle until the UI screen
+    -- actually finishes (BattleState:completeBattle or Gen 1 battle.ended).
+    local Host = require("mods.Kanto-Reforged.core.host")
+    local isGen2EngineEarly = Host.isGen2() and ev.battle and not ev.battle.battle and ev.battle.phase ~= "done"
+      and (mod.activeBattle and mod.activeBattle ~= ev.battle)
+    if not isGen2EngineEarly then
+      -- Gold battlers are party tables; wipe AI facade fields before SAVE.
+      local BattleCompat = require("mods.Kanto-Reforged.battle.battle_compat")
+      BattleCompat.scrubBattle(ev.battle)
+      local CastformFx = require("mods.Kanto-Reforged.battle.castform_fx")
+      CastformFx.resetOutOfBattle(mod)
+      mod.activeBattle = nil
+    end
   end)
 
   -- Belt-and-suspenders: scrub again at write time in case a battle left

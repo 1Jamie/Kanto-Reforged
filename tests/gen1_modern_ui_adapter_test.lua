@@ -1,13 +1,13 @@
--- Gen1 Modern UI adapter: no-op without that mod; registers when stubbed.
+-- OmniUI adapter: no-op without omni_ui; registers when stubbed.
 return function(T, Data, run)
   local install = require("mods.Kanto-Reforged.ui.gen1_modern_ui_adapter")
 
   local bare = { id = "Kanto-Reforged", exports = {}, find = function() return nil end }
   local ok, err = install(bare)
-  T.eq(ok, false, "adapter skips when Modern UI is absent")
+  T.eq(ok, false, "adapter skips when OmniUI is absent")
   T.check(type(err) == "string" and err:find("not installed", 1, true),
-    "skip reason mentions Modern UI missing")
-  T.eq(bare.exports.gen1ModernUi, nil, "no contract published without Modern UI")
+    "skip reason mentions OmniUI missing")
+  T.eq(bare.exports.gen1ModernUi, nil, "no contract published without OmniUI")
 
   local registered
   local fakeUi = {
@@ -29,13 +29,13 @@ return function(T, Data, run)
       end,
     },
     find = function(id)
-      if id == "gen1_modern_ui" then return fakeUi end
+      if id == "omni_ui" then return fakeUi end
       return nil
     end,
   }
 
   ok = install(withUi)
-  T.eq(ok, true, "adapter registers when Modern UI is present")
+  T.eq(ok, true, "adapter registers when OmniUI is present")
   T.check(registered ~= nil, "registerAdapter was called")
   T.eq(registered.owner, "Kanto-Reforged", "adapter owner is KR mod id")
   T.eq(withUi.exports.gen1ModernUi.apiVersion, 1, "contract apiVersion is 1")

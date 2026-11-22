@@ -517,6 +517,28 @@ return function(T, Data, run)
     T.eq(clearCtx.trueColor, false, "default Castform pic does not force trueColor")
     T.eq(CastformFx.paletteName(nil), "CASTFORM", "clear palette name")
 
+    -- Gen 2 UI BattleState wrapper preserves Castform weather sprite during attacks/draws
+    do
+      local g2Engine = { weather = "sun", player = { species = "CASTFORM" }, enemy = { species = "PIDGEY" } }
+      local g2UiState = { battle = g2Engine }
+      local g2Mon = { species = "CASTFORM" }
+      local g2Ctx = { species = "CASTFORM", side = "back", kind = "battle", mon = g2Mon }
+      local g2Resolved = CastformFx.resolveSprite(
+        "mods/Kanto-Reforged/assets/gs/CASTFORM_back.png", g2Ctx, g2UiState,
+        { path = "mods/Kanto-Reforged", activeBattle = g2UiState })
+      T.check(g2Resolved:find("CASTFORM_SUNNY_back", 1, true),
+        "Gen2 BattleState resolves Castform sunny form during battle and attack draws")
+      T.eq(g2Mon._krCastformForm, "sunny", "mon._krCastformForm is sunny")
+
+      -- Test attack move does not clear Castform weather form
+      Abilities.onMoveUsed(g2Engine, g2Engine.player, { id = "TACKLE" })
+      local afterAttackResolved = CastformFx.resolveSprite(
+        "mods/Kanto-Reforged/assets/gs/CASTFORM_back.png", g2Ctx, g2UiState,
+        { path = "mods/Kanto-Reforged", activeBattle = g2UiState })
+      T.check(afterAttackResolved:find("CASTFORM_SUNNY_back", 1, true),
+        "Castform maintains sunny form after using an attack move")
+    end
+
     -- Hoenn battleScaleBack 1.5 must not resize the trainer intro pic when
     -- Treecko, Castform, or any KR mon is the lead.
     do

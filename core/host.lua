@@ -16,19 +16,26 @@ function Host.clearForce()
 end
 
 function Host.generation()
-  if forced == 1 or forced == 2 then
+  if forced == 1 or forced == 2 or forced == 3 then
     return forced
   end
   -- NOTE: do NOT probe package.loaded["src.core.Game2"] here.
   -- Game2 is cached by Lua's require system for the lifetime of the process;
   -- if a Gen2 game was booted first in the launcher, this would falsely
   -- return 2 for Red.  GameVersion.generation() is authoritative for all
-  -- Gen2 ids (gold / silver / crystal).
-  if type(GameVersion.generation) == "function" and GameVersion.generation() == 2 then
-    return 2
+  -- Gen2/Gen3 ids (gold / silver / crystal / firered / leafgreen).
+  if type(GameVersion.generation) == "function" then
+    local g = GameVersion.generation()
+    if g == 2 or g == 3 then
+      return g
+    end
   end
-  if _G.game and (_G.game.generation == 2 or _G.game.isGold) then
-    return 2
+  if _G.game then
+    if _G.game.generation == 3 or _G.game.isGame3 or _G.game.isFireRed then
+      return 3
+    elseif _G.game.generation == 2 or _G.game.isGold then
+      return 2
+    end
   end
   return 1
 end
@@ -41,13 +48,29 @@ function Host.isGen2()
   return Host.generation() == 2
 end
 
+function Host.isGen3()
+  return Host.generation() == 3
+end
+
+function Host.isFireRed()
+  return Host.versionId() == "firered"
+end
+
+function Host.isLeafGreen()
+  return Host.versionId() == "leafgreen"
+end
+
+function Host.isGame3()
+  return Host.isGen3()
+end
+
 -- Prefer the loader's fixed generation when building option schemas or
 -- branching at define time. Launcher return can leave GameVersion / globals
 -- sticky across boots; loader.generation is set once in Loader.new.
 function Host.generationFrom(mod)
   local loader = Host.modLoader(mod)
   local gen = loader and loader.generation
-  if gen == 1 or gen == 2 then
+  if gen == 1 or gen == 2 or gen == 3 then
     return gen
   end
   return Host.generation()
@@ -59,6 +82,10 @@ end
 
 function Host.isGen2From(mod)
   return Host.generationFrom(mod) == 2
+end
+
+function Host.isGen3From(mod)
+  return Host.generationFrom(mod) == 3
 end
 
 function Host.versionId()
@@ -100,15 +127,25 @@ function Host.liveGame(mod)
     -- safe global fallback.
     return nil
   end
+  if Host.isGen3() then
+    local Runtime = package.loaded["src.core.game3.runtime"]
+    if Runtime and Runtime._game then return Runtime._game end
+    local Field = package.loaded["src.core.game3.field"]
+    if Field and Field._game then return Field._game end
+    local okG3, Game3 = pcall(require, "src.core.Game3")
+    if okG3 and type(Game3) == "table" and (Game3.save or Game3.session) then return Game3 end
+    return nil
+  end
   local ok, Game = pcall(require, "src.core.Game")
   if ok and type(Game) == "table" then return Game end
   return nil
 end
 
--- Per-host mod.save keys so a Red↔Gold continue cannot poison farm
+-- Per-host mod.save keys so a Red↔Gold↔FireRed continue cannot poison farm
 -- unlocks / return PC coords across generations.
 function Host.saveKey(key)
-  return (Host.isGen2() and "g2:" or "g1:") .. tostring(key)
+  local prefix = Host.isGen3() and "g3:" or (Host.isGen2() and "g2:" or "g1:")
+  return prefix .. tostring(key)
 end
 
 -- Progress keys may migrate once from the unprefixed legacy form.

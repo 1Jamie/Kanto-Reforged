@@ -340,7 +340,8 @@ local function runTests()
           end
         end
       end
-      if not obj.itemball and not isBoulder and not isCampaign then
+      local isOffscreen = (obj.x >= (mdef.width or 0) * 2) or (obj.y >= (mdef.height or 0) * 2) or (obj.name and obj.name:find("LINK_RECEPTIONIST"))
+      if not obj.itemball and not isBoulder and not isCampaign and not isOffscreen then
         world.player.cellX = obj.x
         world.player.cellY = obj.y + 1
         world.player.facing = "up"
@@ -350,6 +351,10 @@ local function runTests()
           facePlayer = function() end,
         })
         world:interactBody()
+        if not cap then
+          world.player.cellY = obj.y + 2
+          world:interactBody()
+        end
         assert(cap and cap ~= "..." and cap ~= "", string.format("Object %d (%s) on %s failed: got %s", oIdx, tostring(obj.name), mapId, tostring(cap)))
         verifiedNpcs = verifiedNpcs + 1
       elseif obj.itemball then

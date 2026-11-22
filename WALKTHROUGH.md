@@ -17,7 +17,7 @@ If you want full raw tables (recipes, internal module maps, formulas), that's [F
    - **FULL SPAWN MIX** (default off): fully random gen1-3 wilds. On Gen 2 this covers Johto and Kanto (with a density pass so Kanto stays full). It rewrites encounter tables, so flip it before a long run if you care.
    - **PURE RANDOM SPAWN** (default off): absolute chaos mode with no habitat or BST restrictions.
    - **LEGENDS IN MIX** (default off): only matters with FULL SPAWN MIX / PURE RANDOM on — lets legendaries/mythicals roll into wild grass (still level-gated).
-   - **SP.ATK / SP.DEF** (Red only, default off): special damage and summary UI use separate Sp.Atk / Sp.Def instead of Gen 1 Special. Leave off for classic mechanics.
+   - **SP.ATK / SP.DEF** (Red only, default on): special damage and summary UI use separate Sp.Atk / Sp.Def instead of Gen 1 Special.
    - **DEXNAV** (Red only): start-menu label or off. (Gen 2 DexNav is automatically a card on your Pokegear).
 ---
 
@@ -40,11 +40,11 @@ One important heads up before anything else: **static legendaries despawn if you
 - Talk to the Berry Scholar if you want an in-game reference of what every berry cures.
 - Talk to the merchant at the stall and the Soil Expert. Early on the merchant only sells plain BERRY (¥300). Status berries unlock as you earn gym badges.
 - Face a plot and press A. Pick a berry from your bag to spend **1** berry and plant it.
-- There are **9** plots. Growth is based on steps taken anywhere in the overworld (base is **320** steps). Harvesting yields **2** berries, so replanting nets you +1 every harvest.
+- There are **9** plots. Growth is based on steps taken anywhere in the overworld (base is **500** steps). A growing plot says it was freshly planted, is still growing, or is almost full grown. Harvesting yields **2** berries, so replanting nets you +1 every harvest.
 - Soil Ranks (talk to the Soil Expert later):
-  - Rank 1: Own **5** species → 280 steps.
-  - Rank 2: Grass-type in party at **Lv 20+** → 240 steps.
-  - Rank 3: **3** different berry types in bag → 192 steps (also speeds up the Juice Blender). Starter BERRY + Cheri + Pecha is enough.
+  - Rank 1: Own **5** species → 438 steps.
+  - Rank 2: Grass-type in party at **Lv 20+** → 375 steps.
+  - Rank 3: **3** different berry types in bag → 300 steps (also speeds up the Juice Blender). Starter BERRY + Cheri + Pecha is enough.
 
 #### Pewter City
 
@@ -200,9 +200,11 @@ With **60+ species owned** in your Pokédex, talk to the NPC in the Route 16 Fly
 Johto wild version exclusives are cross-injected so each cart can catch the bases it was missing (Gold gets Ledyba/Phanpy/…, Silver gets Spinarak/Gligar/…, Crystal gets Mareep/Girafarig/…). Legendary mascot story beats still follow the cart you imported — KR overlays Gen 3 guests onto the active ROM tables rather than forcing one cart's mascot quest onto another.
 
 > [!IMPORTANT]
+>
 > **A quick heads up on how Gen 2 works in Kanto Reforged:**
 > Vanilla Johto plays almost entirely the same as the classic game (Gold, Silver, or Crystal), with several nice QoL additions built right in (Pokegear DexNav, Berry Farm access, Cherrygrove level caps, Johto badge berry unlocks, Gen 3 wild guests, Moon Stone trade evos, and cross-injected wild exclusives). Story mascots still follow the cart.
-> **The massive bulk and meat of Kanto-Reforged's new content in Gen 2 is the fully overhauled Post-Johto Kanto campaign.** 
+>
+> **The massive bulk and meat of Kanto-Reforged's new content in Gen 2 is the fully overhauled Post-Johto Kanto campaign.**
 > Once you step off the S.S. Aqua in Vermilion, Kanto has been rebuilt with a rebalanced level progression, full Gen 3 wild encounter tables, overhauled Gym Leaders and gym trainers, dedicated battle circuits (Nugget Bridge, Saffron Dojo), relocated utility hubs, and a proper ramp up to Red at Mt. Silver.
 
 ---
@@ -354,28 +356,78 @@ With all 8 Kanto Badges and the Mt. Moon Rival conquered, your level cap expands
 
 ---
 
+# Part 3: FireRed / LeafGreen Walkthrough
+
+Version **1.8.0**. Vanilla FRLG story still runs the way you remember it. This part only marks where Kanto Reforged hangs new choices off that path, from Pallet Town through the Sevii Islands.
+
+### Pallet Town (new game)
+
+Oak talks to you before the shrink into your bedroom.
+
+1. He opens with a short line about having a few questions. Press A through each page.
+2. **Randomize your starters?** Yes rolls three distinct species for the lab balls (the rival gets the counter-pick). No keeps Bulbasaur, Charmander, and Squirtle.
+3. **Full-mix the spawn tables?** Yes rebuilds wild tables for a randomized run.
+4. If you said yes to the mix: **Add legendaries to the spawn mix?**
+5. He reads the choices back. **Yes** locks them in and the scene continues into your bedroom. **No** asks the three questions again.
+
+The question stays on screen while you pick Yes or No.
+
+### Viridian City
+
+1. **Catch tutorial:** On the way north, the old man offers to show you how to catch. **No** skips the Weedle battle, still hands you the Teachy TV, and gets him off the road.
+2. **Soft level caps:** The Rare Candy kid is in Viridian City, east of the Mart, the same offer as on Red. Yes turns soft caps on for this save. No leaves experience alone.
+3. **Berry Farm:** Step into the Pokémon Center and take the farm mat.
+   - A growing plot says it was freshly planted, is still growing, or is almost full grown.
+   - Base time is **500** steps. Soil rank shortens that to 438, 375, or 300. A finished plot is ready to pick.
+
+### Pewter through the League
+
+Story order is the cart's: Pewter, Cerulean, Vermilion, Celadon, Fuchsia, Saffron, Cinnabar, then the Pokémon League. KR wilds, the full-mix option you set with Oak, and the farm all stay available the whole way. Trade evolutions are single-player items used on the Pokémon in your party: Metal Coat, Dragon Scale, Up-Grade, King's Rock, and DeepSeaTooth / DeepSeaScale. A Moon Stone will not evolve Onix or Scyther here.
+
+The Pokédex and the PC include species **1–386**. On the Pokédex area page, **SELECT** toggles the habitat markers between Kanto and the Sevii Islands.
+
+### Sevii Islands
+
+After the League, Bill's ferry opens the islands the way FireRed and LeafGreen already do.
+
+1. **Pokédex area page:** **SELECT** flips the markers between **Kanto** and **Sevii**.
+2. **Post-game finds:**
+   - Roaming beasts cycle Raikou, then Entei, then Suicune.
+   - Root Fossil in Five Island Lost Cave. Claw Fossil in Four Island Icefall Cave. The Cinnabar Lab experiment room revives them into Lileep and Anorith at level 20.
+   - Regirock, Regice, and Registeel in the Tanoby chambers after the Tanoby Key.
+   - **Mystic Ticket** from a Celadon Circuit streak (Navel Rock). **Aurora Ticket** from the One Island Center researcher after you become Champion (Birth Island).
+
+---
+
 ## Where is that again? (Quick Reference)
 
-| What | Gen 1 (Red / Blue) | Gen 2 (Gold / Silver / Crystal) |
-|---|---|---|
-| **Rare Candy / Level Caps** | Viridian City (east of Mart) | Cherrygrove City (east path) |
-| **Berry Farm Access** | Right carpet in any Center | Stairs / south mat in any Center |
-| **DexNav** | Start Menu under Pokédex | Pokegear Card (`pokegear_cards`) |
-| **Party Ability / Held Screen** | Summary Page 3 | Summary Page 4 |
-| **DV / Hidden Power Judge** | Underground Path (Route 5 side) | Underground Path (Route 5/6 tunnel) |
-| **Move Hub (Relearn / Tutor / Delete)** | Saffron Pidgey House | Saffron (Mr. Psychic's House) |
-| **Item Smith (Life Orb / Focus Sash)** | Cinnabar Lab Metronome Room | Cinnabar Pokémon Center 1F |
-| **2-Slot Day Care & Breeding** | Route 5 Day Care | Route 34 Day Care (Vanilla Gen 2) |
-| **Celadon Circuit (Choice Band)** | Celadon Mansion 2F | Celadon Mansion 2F |
-| **Blender (Vitamins from Berries)** | Celadon Mansion 3F | Celadon Mansion 3F |
-| **Snack Scout (Focus Sash)** | Celadon Hotel (lead holds berry) | Celadon Hotel |
-| **Night Eyes (Blackglasses)** | Vermilion Pidgey House (Dark lead) | Vermilion Pidgey House |
-| **Gen 3 Fossils (Lileep / Anorith)** | Cinnabar Lab Fossil Room | N/A (Gen 1 only) |
-| **Roamer Radar (Beasts / Eon)** | Celadon 2F (after Silph) | N/A (Vanilla Pokegear map / Gen 1 Radar) |
-| **Sky Pillar (Rayquaza)** | Route 23 Hiker (after Kyogre/Groudon) | N/A (Gen 1 only) |
-| **Ilex Shrine (Celebi)** | Viridian Forest Channeler | N/A (Gen 1 only) |
-| **Birth Island (Deoxys)** | Vermilion Dock Sailor (3 Legends owned) | N/A (Gen 1 only) |
-| **Mt. Moon (Jirachi)** | Mt. Moon B1F (5 Heart Scales) | N/A (Gen 1 only) |
+| What | Gen 1 (Red / Blue) | Gen 2 (Gold / Silver / Crystal) | FireRed / LeafGreen |
+|---|---|---|---|
+| **Rare Candy / Level Caps** | Viridian City (east of Mart) | Cherrygrove City (east path) | Viridian City (east of Mart) |
+| **Berry Farm Access** | Right carpet in any Center | Stairs / south mat in any Center | Center mat; 500-step ladder, same stage lines |
+| **DexNav** | Start Menu under Pokédex | Pokegear Card (`pokegear_cards`) | Native Pokédex, species 1–386 |
+| **Gen 3 Fossils (Lileep / Anorith)** | Cinnabar Lab Fossil Room (Lv 30) | N/A (Gen 1 only) | Lost Cave / Icefall Cave, Cinnabar Lab (Lv 20) |
+| **Roamer Radar (Beasts / Eon)** | Celadon 2F (after Silph) | N/A (Vanilla Pokegear map / Gen 1 Radar) | Raikou → Entei → Suicune cycle |
+| **Pokédex area region** | N/A | N/A | Area page, SELECT |
+| **Trade evolutions** | Moon Stone bypasses | Moon Stone bypasses | Single-player trade items (Metal Coat, Dragon Scale, etc.) |
+| **Regi trio** | Gen 1 shrines | N/A | Tanoby chambers, after the Tanoby Key |
+| **Mystic Ticket** | N/A | N/A | Celadon Circuit streak, Navel Rock |
+| **Aurora Ticket** | N/A | N/A | One Island Center, after Champion |
+| **Party Ability / Held Screen** | Summary Page 3 | Summary Page 4 | Native summary |
+| **DV / Hidden Power Judge** | Underground Path (Route 5 side) | Underground Path (Route 5/6 tunnel) | Native IVs |
+| **Move Hub (Relearn / Tutor / Delete)** | Saffron Pidgey House | Saffron (Mr. Psychic's House) | Move Reminder (native) |
+| **Item Smith (Life Orb / Focus Sash)** | Cinnabar Lab Metronome Room | Cinnabar Pokémon Center 1F | N/A (FRLG bag maps those rewards) |
+| **2-Slot Day Care & Breeding** | Route 5 Day Care | Route 34 Day Care (Vanilla Gen 2) | Four Island / Sevii Day Care (native) |
+| **Celadon Circuit (Choice Band)** | Celadon Mansion 2F | Celadon Mansion 2F | Celadon Condos 2F (Choice Band; 4th streak is the Mystic Ticket) |
+| **Blender (Vitamins from Berries)** | Celadon Mansion 3F | Celadon Mansion 3F | Berry blender where the cart has it |
+| **Snack Scout (Focus Sash)** | Celadon Hotel (lead holds berry) | Celadon Hotel | N/A |
+| **Night Eyes (Blackglasses)** | Vermilion Pidgey House (Dark lead) | Vermilion Pidgey House | N/A |
+| **Sky Pillar (Rayquaza)** | Route 23 Hiker (after Kyogre/Groudon) | N/A (Gen 1 only) | N/A |
+| **Ilex Shrine (Celebi)** | Viridian Forest Channeler | N/A (Gen 1 only) | N/A |
+| **Birth Island (Deoxys)** | Vermilion Dock Sailor (3 Legends owned) | N/A (Gen 1 only) | Aurora Ticket, One Island Center |
+| **Mt. Moon (Jirachi)** | Mt. Moon B1F (5 Heart Scales) | N/A (Gen 1 only) | N/A |
+| **New-game questions** | N/A | N/A | Oak, before the bedroom |
+| **Catch tutorial** | Old man (required) | N/A | Old man; No skips the battle |
 
 ---
 

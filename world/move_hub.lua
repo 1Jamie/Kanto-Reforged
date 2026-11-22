@@ -1,4 +1,5 @@
--- Move relearner / tutor / deleter hub in Saffron Pidgey House.
+-- Move relearner / tutor / deleter hub.
+-- Gen1: Saffron Pidgey House. Gen2/FRLG: Mr. Psychic's House.
 
 local HouseNpcs = require("mods.Kanto-Reforged.world.house_npcs")
 local Strings = require("src.core.Strings")
@@ -28,7 +29,6 @@ local function setMoveSlot(game, mon, slot, moveId)
     mon.moves[#mon.moves + 1] = nil
   end
   mon.moves[slot] = { id = moveId, pp = maxPp }
-  -- densify
   local dense = {}
   for _, mv in ipairs(mon.moves) do
     if mv and mv.id then dense[#dense + 1] = mv end
@@ -63,7 +63,6 @@ local function learnsetMoves(game, mon)
       end
     end
   end
-  -- Gold: levelMoves is { { level, move }, ... } or similar.
   if def and def.levelMoves then
     for _, row in ipairs(def.levelMoves) do
       if type(row) == "table" then
@@ -73,7 +72,6 @@ local function learnsetMoves(game, mon)
       end
     end
   end
-  -- egg moves from breeding data if present
   local ok, Breeding = pcall(require, "mods.Kanto-Reforged.breeding")
   if ok and Breeding and Breeding.eggMovesFor then
     for _, id in ipairs(Breeding.eggMovesFor(mon.species) or {}) do
@@ -85,6 +83,15 @@ local function learnsetMoves(game, mon)
 end
 
 local function takeScales(game, n)
+  local Host = require("mods.Kanto-Reforged.core.host")
+  if Host.isGen3() then
+    local BerryFarmGame3 = require("mods.Kanto-Reforged.world.berry_farm_game3")
+    local save = game.save or game.session
+    if BerryFarmGame3.bagGetItemCount(save, "HEART_SCALE") < n then
+      return false
+    end
+    return BerryFarmGame3.bagRemoveItem(save, "HEART_SCALE", n)
+  end
   local Bag = require("src.inventory.Bag")
   local have = (game.save.inventory and game.save.inventory.HEART_SCALE) or 0
   if have < n then return false end
@@ -93,13 +100,22 @@ local function takeScales(game, n)
 end
 
 local function pickParty(game, done, onPick)
-  local party = game.save.party or {}
+  local Host = require("mods.Kanto-Reforged.core.host")
+  local party = HouseNpcs.getParty(game)
   local rows = {}
   for i, mon in ipairs(party) do
-    if mon and mon.species then
+    if mon and (mon.species or mon.speciesId) then
       local label = mon.nickname
-        or (game.data.pokemon[mon.species] and game.data.pokemon[mon.species].name)
-        or mon.species
+      if not label or label == "" then
+        if Host.isGen3() then
+          local okP, Pokemon = pcall(require, "src.core.game3.pokemon")
+          label = (okP and Pokemon and Pokemon.name and Pokemon.name(mon.species or mon.speciesId))
+            or tostring(mon.species or mon.speciesId)
+        else
+          label = (game.data.pokemon[mon.species] and game.data.pokemon[mon.species].name)
+            or mon.species
+        end
+      end
       rows[#rows + 1] = { label = label, value = i }
     end
   end
@@ -107,6 +123,23 @@ local function pickParty(game, done, onPick)
     HouseNpcs.pushText(game, Strings("No POKéMON."), done)
     return
   end
+
+  if Host.isGen3() then
+    local Choice = require("src.ui.game3.choice")
+    local labels = {}
+    for _, r in ipairs(rows) do labels[#labels + 1] = r.label end
+    labels[#labels + 1] = "CANCEL"
+    Choice.multi(labels, 0, function(idx)
+      local chosen = (type(idx) == "number") and rows[idx + 1]
+      if chosen then
+        onPick(party[chosen.value])
+      elseif done then
+        done()
+      end
+    end)
+    return
+  end
+
   local ListMenu = require("src.ui.ListMenu")
   game.stack:push(ListMenu.new(game, Strings("Which POKéMON?"), rows, {
     onChoose = function(row, menu)
@@ -116,7 +149,188 @@ local function pickParty(game, done, onPick)
   }))
 end
 
+local function g3Choice(labels, onPick, done)
+  local Choice = require("src.ui.game3.choice")
+  local opts = {}
+  for _, l in ipairs(labels) do opts[#opts + 1] = l end
+  opts[#opts + 1] = "CANCEL"
+  Choice.multi(opts, 0, function(idx)
+    if type(idx) == "number" and idx + 1 <= #labels then
+      onPick(idx + 1)
+    elseif done then
+      done()
+    end
+  end)
+end
+
+local function resolveMoveNum(nameOrId)
+  local Gen3Compat = require("src.mods.Gen3Compat")
+  return Gen3Compat.moveId(nameOrId) or tonumber(nameOrId)
+end
+
+local function learnsetMovesGen3(mon)
+  local Pokemon = require("src.core.game3.pokemon")
+  local Gen3Compat = require("src.mods.Gen3Compat")
+  local species = mon.species or mon.speciesId
+  local seen, list = {}, {}
+  local function add(num)
+    num = tonumber(num)
+    if not num or num < 1 or seen[num] then return end
+    seen[num] = true
+    list[#list + 1] = {
+      num = num,
+      label = Gen3Compat.moveName(num) or Pokemon.moveName(num) or tostring(num),
+    }
+  end
+  for _, e in ipairs(Pokemon.learnset(species) or {}) do
+    local mv = type(e) == "table" and (e.move or e[2] or e.id) or e
+    add(mv)
+  end
+  local eggs = Pokemon.eggMoves and Pokemon.eggMoves(species)
+  if eggs then
+    for _, mv in ipairs(eggs) do add(mv) end
+  end
+  table.sort(list, function(a, b) return (a.label or "") < (b.label or "") end)
+  return list
+end
+
+local function relearnFlowGen3(game, mod, done)
+  pickParty(game, done, function(mon)
+    if not mon then if done then done() end return end
+    local Pokemon = require("src.core.game3.pokemon")
+    local moves = learnsetMovesGen3(mon)
+    if #moves == 0 then
+      HouseNpcs.pushText(game, Strings("Nothing to relearn."), done)
+      return
+    end
+    local labels = {}
+    for _, m in ipairs(moves) do labels[#labels + 1] = m.label end
+    g3Choice(labels, function(mi)
+      local move = moves[mi]
+      local slotLabels = {}
+      local slots = {}
+      for i = 1, 4 do
+        local id = Pokemon.moveIdAt(mon, i)
+        if id and id > 0 then
+          slots[#slots + 1] = i
+          slotLabels[#slotLabels + 1] = Pokemon.moveName(id) or tostring(id)
+        end
+      end
+      if Pokemon.moveSlotCount(mon) < 4 then
+        slots[#slots + 1] = Pokemon.moveSlotCount(mon) + 1
+        slotLabels[#slotLabels + 1] = Strings("(empty)")
+      end
+      g3Choice(slotLabels, function(si)
+        if not takeScales(game, 1) then
+          HouseNpcs.pushText(game, Strings("Need a HEART SCALE."), done)
+          return
+        end
+        local slot = slots[si]
+        if Pokemon.moveIdAt(mon, slot) then
+          Pokemon.replaceMove(mon, slot, move.num)
+        else
+          Pokemon.teachMove(mon, move.num)
+        end
+        HouseNpcs.pushText(game, Strings("Done!"), done)
+      end, done)
+    end, done)
+  end)
+end
+
+local function tutorFlowGen3(game, mod, done)
+  pickParty(game, done, function(mon)
+    if not mon then if done then done() end return end
+    local Pokemon = require("src.core.game3.pokemon")
+    local Gen3Compat = require("src.mods.Gen3Compat")
+    local moves = {}
+    for _, id in ipairs(MoveHub.TUTOR_MOVES) do
+      local num = resolveMoveNum(id)
+      if num then
+        moves[#moves + 1] = {
+          num = num,
+          label = Gen3Compat.moveName(num) or Pokemon.moveName(num) or id,
+        }
+      end
+    end
+    local labels = {}
+    for _, m in ipairs(moves) do labels[#labels + 1] = m.label end
+    g3Choice(labels, function(mi)
+      local move = moves[mi]
+      local slotLabels, slots = {}, {}
+      for i = 1, 4 do
+        local id = Pokemon.moveIdAt(mon, i)
+        if id and id > 0 then
+          slots[#slots + 1] = i
+          slotLabels[#slotLabels + 1] = Pokemon.moveName(id) or tostring(id)
+        end
+      end
+      if Pokemon.moveSlotCount(mon) < 4 then
+        slots[#slots + 1] = Pokemon.moveSlotCount(mon) + 1
+        slotLabels[#slotLabels + 1] = Strings("(empty)")
+      end
+      g3Choice(slotLabels, function(si)
+        if not takeScales(game, 2) then
+          HouseNpcs.pushText(game, Strings("Need 2 HEART SCALES."), done)
+          return
+        end
+        local slot = slots[si]
+        if Pokemon.moveIdAt(mon, slot) then
+          Pokemon.replaceMove(mon, slot, move.num)
+        else
+          Pokemon.teachMove(mon, move.num)
+        end
+        HouseNpcs.pushText(game, Strings("Tutored!"), done)
+      end, done)
+    end, done)
+  end)
+end
+
+local function deleteFlowGen3(game, mod, done)
+  pickParty(game, done, function(mon)
+    if not mon then if done then done() end return end
+    local Pokemon = require("src.core.game3.pokemon")
+    if Pokemon.moveSlotCount(mon) <= 1 then
+      HouseNpcs.pushText(game, Strings("Can't forget the\nlast move."), done)
+      return
+    end
+    local slotLabels, slots = {}, {}
+    for i = 1, 4 do
+      local id = Pokemon.moveIdAt(mon, i)
+      if id and id > 0 then
+        slots[#slots + 1] = i
+        slotLabels[#slotLabels + 1] = Pokemon.moveName(id) or tostring(id)
+      end
+    end
+    g3Choice(slotLabels, function(si)
+      local slot = slots[si]
+      local id = Pokemon.moveIdAt(mon, slot)
+      if Pokemon.isHmMove and Pokemon.isHmMove(id) then
+        HouseNpcs.pushText(game, Strings("Can't forget an\nHM move."), done)
+        return
+      end
+      -- Compact dense move list after delete.
+      local moves, pp, maxPp = {}, {}, {}
+      for i = 1, 4 do
+        if i ~= slot then
+          local mid = Pokemon.moveIdAt(mon, i)
+          if mid and mid > 0 then
+            moves[#moves + 1] = mid
+            pp[#pp + 1] = (mon.pp and mon.pp[i]) or Pokemon.movePp(mid)
+            maxPp[#maxPp + 1] = (mon.maxPp and mon.maxPp[i]) or Pokemon.movePp(mid)
+          end
+        end
+      end
+      mon.moves, mon.pp, mon.maxPp = moves, pp, maxPp
+      HouseNpcs.pushText(game, Strings("Forgotten."), done)
+    end, done)
+  end)
+end
+
 local function relearnFlow(game, mod, done)
+  local Host = require("mods.Kanto-Reforged.core.host")
+  if Host.isGen3() then
+    return relearnFlowGen3(game, mod, done)
+  end
   pickParty(game, done, function(mon)
     if not mon then if done then done() end return end
     local moves = learnsetMoves(game, mon)
@@ -163,6 +377,10 @@ local function relearnFlow(game, mod, done)
 end
 
 local function tutorFlow(game, mod, done)
+  local Host = require("mods.Kanto-Reforged.core.host")
+  if Host.isGen3() then
+    return tutorFlowGen3(game, mod, done)
+  end
   pickParty(game, done, function(mon)
     if not mon then if done then done() end return end
     local rows = {}
@@ -202,6 +420,10 @@ local function tutorFlow(game, mod, done)
 end
 
 local function deleteFlow(game, mod, done)
+  local Host = require("mods.Kanto-Reforged.core.host")
+  if Host.isGen3() then
+    return deleteFlowGen3(game, mod, done)
+  end
   pickParty(game, done, function(mon)
     if not mon then if done then done() end return end
     local slots = packedMoves(mon)
@@ -231,6 +453,27 @@ end
 
 local function hubTalk(mod)
   return function(game, ow, npc, done)
+    local Host = require("mods.Kanto-Reforged.core.host")
+    if Host.isGen3() then
+      local Choice = require("src.ui.game3.choice")
+      Choice.multi({
+        Strings("RELEARN"),
+        Strings("TUTOR"),
+        Strings("DELETE"),
+        Strings("CANCEL"),
+      }, 0, function(idx)
+        if idx == 0 then
+          relearnFlow(game, mod, done)
+        elseif idx == 1 then
+          tutorFlow(game, mod, done)
+        elseif idx == 2 then
+          deleteFlow(game, mod, done)
+        elseif done then
+          done()
+        end
+      end)
+      return
+    end
     local ListMenu = require("src.ui.ListMenu")
     game.stack:push(ListMenu.new(game, Strings("MOVE HUB"), {
       { label = Strings("RELEARN"), value = "relearn" },
@@ -256,17 +499,29 @@ end
 
 function MoveHub.register(mod)
   local Host = require("mods.Kanto-Reforged.core.host")
-  local mapId = Host.isGen2() and "MR_PSYCHICS_HOUSE" or "SAFFRON_PIDGEY_HOUSE"
-  local index = Host.isGen2()
-    and HouseNpcs.nextFreeIndex(mod, mapId, 2)
-    or 5
+  local mapId
+  local index
+  local x, y = 6, 5
+  if Host.isGen3() then
+    mapId = "FR_SAFFRON_CITY_MR_PSYCHICS_HOUSE"
+    index = 84
+    x, y = 4, 4
+  elseif Host.isGen2() then
+    mapId = "MR_PSYCHICS_HOUSE"
+    index = HouseNpcs.nextFreeIndex(mod, mapId, 2)
+  else
+    mapId = "SAFFRON_PIDGEY_HOUSE"
+    index = 5
+  end
 
   HouseNpcs.appendNpc(mod, mapId, {
     index = index,
     name = "SAFFRONPIDGEYHOUSE_MOVE_HUB",
     sprite = "SPRITE_HIKER",
+    graphicsId = 56,
     text = "TEXT_SAFFRONPIDGEYHOUSE_MOVE_HUB",
-    x = 6, y = 5,
+    x = x, y = y,
+    gen3X = 4, gen3Y = 4,
   }, MoveHub.OWNER)
 
   -- Heart Scale hidden items (Gen1 field registry only).

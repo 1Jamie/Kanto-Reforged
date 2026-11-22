@@ -118,9 +118,14 @@ local function activeClubParties()
   }
 end
 
--- Gen1 house maps that do not exist on Gold → nearest Kanto indoor.
 local function clubMaps()
-  if Host.isGen2() then
+  if Host.isGen3() then
+    return {
+      circuit = "FR_CELADON_CITY_CONDOMINIUMS_2F",
+      dark = "FR_VERMILION_CITY_HOUSE1",
+      berry = "FR_CELADON_CITY_HOTEL",
+    }
+  elseif Host.isGen2() then
     return {
       circuit = "CELADON_MANSION_2F",
       dark = "VERMILION_FISHING_SPEECH_HOUSE",
@@ -180,7 +185,7 @@ local function registerTrainers(mod)
     mod.content.trainers:register(CLUB_CLASS, asGen2(defClub))
     mod.content.trainers:register(DARK_CLASS, asGen2(defDark))
     mod.content.trainers:register(BERRY_CLASS, asGen2(defBerry))
-  else
+  elseif Host.isGen1() then
     mod.content.trainers:register(CLUB_CLASS, {
       id = CLUB_CLASS,
       name = "CIRCUIT HOST",
@@ -207,21 +212,24 @@ end
 
 function BattleClubs.refreshScope(mod, scopeMode)
   if not mod then return end
+  local Host = require("mods.Kanto-Reforged.core.host")
   local parties = activeClubParties()
-  local function patchParties(classId, partyList)
-    local ok = pcall(function()
-      mod.content.trainers:patch(classId, { parties = partyList })
-    end)
-    if not ok then
-      local Data = require("src.core.Data")
-      if Data.trainers and Data.trainers[classId] then
-        Data.trainers[classId].parties = partyList
+  if not Host.isGen3() then
+    local function patchParties(classId, partyList)
+      local ok = pcall(function()
+        mod.content.trainers:patch(classId, { parties = partyList })
+      end)
+      if not ok then
+        local Data = require("src.core.Data")
+        if Data.trainers and Data.trainers[classId] then
+          Data.trainers[classId].parties = partyList
+        end
       end
     end
+    patchParties(CLUB_CLASS, parties.club)
+    patchParties(DARK_CLASS, parties.dark)
+    patchParties(BERRY_CLASS, parties.berry)
   end
-  patchParties(CLUB_CLASS, parties.club)
-  patchParties(DARK_CLASS, parties.dark)
-  patchParties(BERRY_CLASS, parties.berry)
   HouseNpcs.registerTrainerDef(CLUB_CLASS, {
     id = CLUB_CLASS, name = "CIRCUIT HOST", baseMoney = 40, parties = parties.club,
   })
@@ -244,7 +252,18 @@ local function scaleHook(mod)
   end)
 end
 
-local function afterClubWin(game, mod, first)
+local function afterClubWin(game, mod, first, streak)
+  local Host = require("mods.Kanto-Reforged.core.host")
+  if Host.isGen3() then
+    if streak and streak >= 4 and not mod.save:get("got_mystic_ticket_game3", false) then
+      local EventTickets = require("mods.Kanto-Reforged.world.event_tickets_game3")
+      local session = (game and (game.session or game.save))
+      if EventTickets.awardMysticTicket(mod, session) then
+        return Strings("Incredible streak!\nA 4-win run on the\nCELADON CIRCUIT!\fTake this rare\nMYSTIC TICKET!\fBoard the Seagallop\nferry in Vermilion\nto reach Navel Rock!")
+      end
+    end
+  end
+
   if first and not mod.save:get("got_choice_band", false) then
     if HouseNpcs.giveItem(game, "CHOICE_BAND", 1) then
       mod.save:set("got_choice_band", true)
@@ -253,7 +272,9 @@ local function afterClubWin(game, mod, first)
   end
   local ace = HouseNpcs.scaleCap(mod, game)
   local money = ace * 40
-  game.save.money = (game.save.money or 0) + money
+  local sess = game and (game.session or game.save)
+  if sess then sess.money = (sess.money or 0) + money end
+  if game and game.save and game.save ~= sess then game.save.money = (game.save.money or 0) + money end
   local extra = ""
   if love.math.random() < 0.3 then
     if HouseNpcs.giveItem(game, "HEART_SCALE", 1) then
@@ -277,9 +298,10 @@ local function clubTalk(mod)
       HouseNpcs.startTrainerBattle(game, ow, CLUB_CLASS, partyIndex, function(result)
         if result == "win" then
           local first = not mod.save:get("battle_club_cleared", false)
+          local newStreak = streak + 1
           mod.save:set("battle_club_cleared", true)
-          mod.save:set("battle_club_streak", streak + 1)
-          HouseNpcs.pushText(game, afterClubWin(game, mod, first), done)
+          mod.save:set("battle_club_streak", newStreak)
+          HouseNpcs.pushText(game, afterClubWin(game, mod, first, newStreak), done)
         else
           if done then done() end
         end
@@ -315,13 +337,17 @@ local function darkTalk(mod)
               "Take these\nBLACKGLASSES!\f"
               .. "Celadon Mansion's\nmeeting room hosts\vserious battles.")
           else
-            game.save.money = (game.save.money or 0) + 5000
+            local sess = game and (game.session or game.save)
+            if sess then sess.money = (sess.money or 0) + 5000 end
+            if game and game.save and game.save ~= sess then game.save.money = (game.save.money or 0) + 5000 end
             msg = Strings(
               "Here's ¥5000!\f"
               .. "Celadon Mansion's\nmeeting room hosts\vserious battles.")
           end
         else
-          game.save.money = (game.save.money or 0) + 2000
+          local sess = game and (game.session or game.save)
+          if sess then sess.money = (sess.money or 0) + 2000 end
+          if game and game.save and game.save ~= sess then game.save.money = (game.save.money or 0) + 2000 end
           msg = Strings("Good rematch!\nWon ¥2000.")
         end
         HouseNpcs.pushText(game, msg, done)
@@ -364,34 +390,48 @@ local function berryTalk(mod)
 end
 
 function BattleClubs.register(mod)
+  local Host = require("mods.Kanto-Reforged.core.host")
   registerTrainers(mod)
-  scaleHook(mod)
+  if not Host.isGen3() then
+    scaleHook(mod)
+  end
 
   local maps = clubMaps()
+  local isG3 = Host.isGen3()
 
   HouseNpcs.appendNpc(mod, maps.circuit, {
     index = 1,
     name = "CELADONMANSION2F_BATTLE_CLUB",
     sprite = "SPRITE_HIKER",
+    graphicsId = 56,
     text = "TEXT_CELADONMANSION2F_BATTLE_CLUB",
     -- Meeting-room floor (left), not the east hall (x=6/7).
-    x = 2, y = 5,
+    x = isG3 and 2 or 2,
+    y = isG3 and 7 or 5,
+    gen3X = 2, gen3Y = 7,
   }, BattleClubs.OWNER)
 
   HouseNpcs.appendNpc(mod, maps.dark, {
     index = Host.isGen2() and 10 or 4,
     name = "VERMILIONPIDGEYHOUSE_DARK_SPECIALIST",
     sprite = "SPRITE_SUPER_NERD",
+    graphicsId = 89,
     text = "TEXT_VERMILIONPIDGEYHOUSE_DARK_SPECIALIST",
-    x = 6, y = 5,
+    x = isG3 and 4 or 6,
+    y = isG3 and 4 or 5,
+    gen3X = 4, gen3Y = 4,
   }, BattleClubs.OWNER)
 
   HouseNpcs.appendNpc(mod, maps.berry, {
     index = Host.isGen2() and 10 or 4,
     name = "CELADONHOTEL_BERRY_SPECIALIST",
     sprite = "SPRITE_GIRL",
+    graphicsId = 23,
     text = "TEXT_CELADONHOTEL_BERRY_SPECIALIST",
-    x = 6, y = 5,
+    -- Gen1 (6,5) lands on the FRLG desk row; stand on lobby floor instead.
+    x = isG3 and 7 or 6,
+    y = isG3 and 6 or 5,
+    gen3X = 7, gen3Y = 6,
   }, BattleClubs.OWNER)
 
   HouseNpcs.bindTalk(mod, maps.circuit, {

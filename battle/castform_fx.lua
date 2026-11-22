@@ -44,13 +44,15 @@ end
 -- to a stale mon._krCastformForm after weather ends — that kept rainy/sunny
 -- art up and carried into the next fight.
 function CastformFx.activeSuffix(battle, mon, back)
-  if battle then
-    local morphAll = battle._krCastformMorph
+  local b = battle or (CastformFx._mod and CastformFx._mod.activeBattle)
+  if b then
+    local engine = b.battle or b
+    local morphAll = engine._krCastformMorph or b._krCastformMorph
     if morphAll and mon then
       local side = back and "player" or "enemy"
-      if mon.isPlayer == true or mon == battle.player then
+      if mon.isPlayer == true or mon == engine.player or mon == b.player then
         side = "player"
-      elseif mon == battle.enemy then
+      elseif mon == engine.enemy or mon == b.enemy then
         side = "enemy"
       elseif not back and mon.isPlayer == false then
         side = "enemy"
@@ -64,7 +66,7 @@ function CastformFx.activeSuffix(battle, mon, back)
       end
     end
     local Weather = require("mods.Kanto-Reforged.battle.weather")
-    return BattleCompat.castformSuffix(Weather.current(battle))
+    return BattleCompat.castformSuffix(Weather.current(engine) or Weather.current(b))
   end
   if mon then return mon._krCastformForm end
   return nil
@@ -150,13 +152,26 @@ end
 -- Mutating battler.sprite is a Gen1-only surface.
 function CastformFx.resolveSprite(path, ctx, battle, mod)
   if not ctx or ctx.species ~= "CASTFORM" then return path end
-  if ctx.kind and ctx.kind ~= "battle" then return path end
+  if ctx.kind and ctx.kind ~= "battle" and not (ctx.mon and (ctx.mon._krCastformForm or ctx.mon.curTypes)) then
+    return path
+  end
 
   local modRef = mod or CastformFx._mod
   local back = ctx.side == "back"
-  local suffix = CastformFx.activeSuffix(battle, ctx.mon, back)
-  if ctx.mon then
-    -- Keep committed form in sync with weather (including clear → nil).
+  local b = battle or (modRef and modRef.activeBattle)
+  local suffix = CastformFx.activeSuffix(b, ctx.mon, back)
+  if not suffix and ctx.mon then
+    if ctx.mon._krCastformForm then
+      suffix = ctx.mon._krCastformForm
+    elseif ctx.mon.curTypes and ctx.mon.curTypes[1] then
+      local t = ctx.mon.curTypes[1]
+      if t == "FIRE" then suffix = "sunny"
+      elseif t == "WATER" then suffix = "rainy"
+      elseif t == "ICE" then suffix = "snowy"
+      end
+    end
+  end
+  if ctx.mon and suffix then
     ctx.mon._krCastformForm = suffix
   end
   CastformFx.applyFormPalette(suffix)

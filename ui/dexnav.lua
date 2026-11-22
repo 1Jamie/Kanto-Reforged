@@ -32,8 +32,8 @@ DexNav.OPTION = {
 DexNav.MENU_LABELS = { "DEXNAV", "DEXNAV-KR" }
 
 local SCREEN = "ExpDexNav"
-local METHOD_ORDER = { "grass", "water", "fish" }
-local METHOD_LABEL = { grass = "GRASS", water = "WATER", fish = "FISH" }
+local METHOD_ORDER = { "grass", "water", "fish", "smash" }
+local METHOD_LABEL = { grass = "GRASS", water = "WATER", fish = "FISH", smash = "SMASH" }
 local FISHING_NOTE = "No Old/Good Rod."
 local NO_WILD = "No wild Pokemon here."
 -- Bare ListMenu footer: 1 line at y=136, 2 lines start at y=120 (overlaps row 7).
@@ -68,10 +68,27 @@ end
 
 function DexNav.hasPokedex(game)
   local save = game and game.save
+  if not save and game and game.session then
+    save = game.session
+  end
+  if not save then
+    local okRt, Runtime = pcall(require, "src.core.game3.runtime")
+    if okRt and Runtime and Runtime.getSession then
+      save = Runtime.getSession()
+    end
+  end
+  if not save and _G.game and _G.game.session then
+    save = _G.game.session
+  end
   if not save then return false end
   if save.pokedexReceived then return true end
-  if save.flags and save.flags.EVENT_GOT_POKEDEX then return true end
+  if save.flags and (save.flags.EVENT_GOT_POKEDEX or save.flags.SYS_POKEDEX_GET or save.flags.FLAG_SYS_POKEDEX_GET or save.flags[0x829] or save.flags["0x829"]) then return true end
   if save.engineFlags and save.engineFlags[ENGINE_POKEDEX] then return true end
+  local store = save.store
+  if store and store.flags and (store.flags.SYS_POKEDEX_GET or store.flags.FLAG_SYS_POKEDEX_GET or store.flags[0x829] or store.flags["0x829"]) then return true end
+  local Space = package.loaded["src.core.game3.scripting.space"]
+  local liveStore = Space and Space.store
+  if liveStore and liveStore.flags and (liveStore.flags.SYS_POKEDEX_GET or liveStore.flags.FLAG_SYS_POKEDEX_GET or liveStore.flags[0x829] or liveStore.flags["0x829"]) then return true end
   return false
 end
 
@@ -80,7 +97,8 @@ local function absorb(byId, method, slots)
   for _, slot in ipairs(slots) do
     local id = slot.species
     if id then
-      local lv = slot.level or 1
+      local minLv = slot.minLevel or slot.level or 1
+      local maxLv = slot.maxLevel or slot.level or minLv
       local entry = byId[id]
       if not entry then
         entry = { id = id, methods = {} }
@@ -88,10 +106,10 @@ local function absorb(byId, method, slots)
       end
       local range = entry.methods[method]
       if not range then
-        entry.methods[method] = { min = lv, max = lv }
+        entry.methods[method] = { min = minLv, max = maxLv }
       else
-        if lv < range.min then range.min = lv end
-        if lv > range.max then range.max = lv end
+        if minLv < range.min then range.min = minLv end
+        if maxLv > range.max then range.max = maxLv end
       end
     end
   end
@@ -115,8 +133,36 @@ end
 
 -- Resolve Gen1-shaped enc + optional fish slots from either host's data.
 function DexNav.sourcesForMap(data, mapId)
-  if not data or not mapId then return nil, nil end
+  if not mapId then return nil, nil end
   local Host = require("mods.Kanto-Reforged.core.host")
+  if Host.isGen3() then
+    local okE, Enc = pcall(require, "mods.Kanto-Reforged.world.encounters_game3")
+    if okE and Enc and Enc.getTableForMap then
+      local t = Enc.getTableForMap(mapId)
+      if t then
+        local enc = {}
+        if t.land and t.land.slots and #t.land.slots > 0 then
+          enc.grass = t.land
+        end
+        if t.water and t.water.slots and #t.water.slots > 0 then
+          enc.water = t.water
+        end
+        if t.rockSmash and t.rockSmash.slots and #t.rockSmash.slots > 0 then
+          enc.smash = t.rockSmash
+        end
+        local fish = t.superRod and t.superRod.slots
+        if not fish and t.goodRod and t.goodRod.slots then
+          fish = t.goodRod.slots
+        end
+        if not enc.grass and not enc.water and not enc.smash then enc = nil end
+        return enc, fish
+      end
+    end
+    local enc = data and data.encounters and data.encounters[mapId]
+    local fish = data and data.field and data.field.superRod and data.field.superRod[mapId]
+    return enc, fish
+  end
+  if not data then return nil, nil end
   if Host.isGen2() then
     local g2 = data.gen2Encounters
     local grassRow = g2 and g2.grass and g2.grass[mapId]
@@ -140,12 +186,13 @@ function DexNav.sourcesForMap(data, mapId)
 end
 
 -- enc: encounters[mapId] or nil; fishSlots: field.superRod[mapId] or nil
--- Returns sorted array of { id, methods = { grass|water|fish = {min,max} } }
+-- Returns sorted array of { id, methods = { grass|water|fish|smash = {min,max} } }
 function DexNav.aggregate(enc, fishSlots, pokemon)
   local byId = {}
   if enc then
     if enc.grass then absorb(byId, "grass", enc.grass.slots) end
     if enc.water then absorb(byId, "water", enc.water.slots) end
+    if enc.smash then absorb(byId, "smash", enc.smash.slots) end
   end
   absorb(byId, "fish", fishSlots)
 
@@ -154,10 +201,10 @@ function DexNav.aggregate(enc, fishSlots, pokemon)
     rows[#rows + 1] = entry
   end
   table.sort(rows, function(a, b)
-    local da = (pokemon and pokemon[a.id] and pokemon[a.id].dex) or 9999
-    local db = (pokemon and pokemon[b.id] and pokemon[b.id].dex) or 9999
+    local da = (pokemon and pokemon[a.id] and pokemon[a.id].dex) or tonumber(a.id) or 9999
+    local db = (pokemon and pokemon[b.id] and pokemon[b.id].dex) or tonumber(b.id) or 9999
     if da ~= db then return da < db end
-    return a.id < b.id
+    return tostring(a.id) < tostring(b.id)
   end)
   return rows
 end
@@ -200,23 +247,63 @@ end
 function DexNav.formatRow(entry, dex, pokemon)
   dex = DexNav.dexFlags(dex)
   local id = entry.id
-  local def = pokemon and pokemon[id]
-  local name = (def and def.name) or id
+  local def = pokemon and (pokemon[id] or (tonumber(id) and pokemon[tonumber(id)]))
+  local name = def and def.name
+  if not name then
+    local Host = require("mods.Kanto-Reforged.core.host")
+    if Host.isGen3() then
+      local okP, Pokemon = pcall(require, "src.core.game3.pokemon")
+      if okP and Pokemon and Pokemon.name then
+        local okN, n = pcall(Pokemon.name, id)
+        if okN and n and n ~= "?????" then name = n end
+      end
+      if not name then
+        local okE, Enc = pcall(require, "mods.Kanto-Reforged.world.encounters_game3")
+        if okE and Enc and Enc.toSpeciesName then
+          name = Enc.toSpeciesName(id)
+        end
+      end
+    end
+  end
+  name = name or tostring(id)
 
-  if dex.owned[id] then
+  local isOwned = dex.owned[id]
+    or (tonumber(id) and dex.owned[tonumber(id)])
+    or (def and def.name and dex.owned[def.name])
+    or (type(id) == "string" and dex.owned[id:upper()])
+  local isSeen = dex.seen[id]
+    or (tonumber(id) and dex.seen[tonumber(id)])
+    or (def and def.name and dex.seen[def.name])
+    or (type(id) == "string" and dex.seen[id:upper()])
+
+  if isOwned then
     return {
       label = name,
       right = DexNav.formatOwnedMethods(entry.methods),
       value = id,
     }
   end
-  if dex.seen[id] then
+  if isSeen then
     return { label = name, right = "SEEN", value = id }
   end
   return { label = "????", right = "", value = id }
 end
 
 function DexNav.currentMapId(game)
+  local Host = require("mods.Kanto-Reforged.core.host")
+  if Host.isGen3() then
+    local okMap, Map = pcall(require, "src.core.game3.map")
+    if okMap and Map and Map.current then return Map.current end
+    if game and game.session and game.session.map then return game.session.map end
+    local okRt, Runtime = pcall(require, "src.core.game3.runtime")
+    if okRt and Runtime and Runtime.getSession and Runtime.getSession() then
+      local s = Runtime.getSession()
+      if s.map then return s.map end
+    end
+    if _G.game and _G.game.session and _G.game.session.map then
+      return _G.game.session.map
+    end
+  end
   if game and game.world and game.world.map and game.world.map.id then
     return game.world.map.id
   end
@@ -226,25 +313,69 @@ function DexNav.currentMapId(game)
   if game and game.save and game.save.player and game.save.player.map then
     return game.save.player.map
   end
+  if game and game.save and game.save.map then
+    return game.save.map
+  end
   return nil
+end
+
+function DexNav.friendlyMapName(mapId)
+  if not mapId then return "" end
+  local Host = require("mods.Kanto-Reforged.core.host")
+  if Host.isGen3() then
+    local okE, Enc = pcall(require, "mods.Kanto-Reforged.world.encounters_game3")
+    if okE and Enc and Enc.MAP_TABLES then
+      for k, def in pairs(Enc.MAP_TABLES) do
+        if k == mapId or (def.aliases and (def.aliases[1] == mapId or def.aliases[2] == mapId or def.aliases[3] == mapId or def.aliases[4] == mapId)) then
+          return k:gsub("(%a+)(%d+)", "%1 %2"):gsub("_", " ")
+        end
+      end
+    end
+  end
+  return tostring(mapId):gsub("^FR_", ""):gsub("(%a+)(%d+)", "%1 %2"):gsub("_", " ")
 end
 
 function DexNav.mapTitle(mapId, mod)
   local prefix = DexNav.menuLabel(mod)
   if not mapId then return prefix end
-  return prefix .. " " .. mapId:gsub("_", " ")
+  return prefix .. " " .. DexNav.friendlyMapName(mapId)
 end
 
 function DexNav.roamersHere(mod, mapId)
   if not mapId then return nil end
-  local ok, Roamers = pcall(require, "mods.Kanto-Reforged.roamers")
-  if not ok or not Roamers then return nil end
   local list = {}
-  for _, id in ipairs(Roamers.BEASTS or {}) do
-    if Roamers.getLocation(mod, id) == mapId then list[#list + 1] = id end
+  local ok, Roamers = pcall(require, "mods.Kanto-Reforged.roamers")
+  if ok and Roamers then
+    for _, id in ipairs(Roamers.BEASTS or {}) do
+      if Roamers.getLocation(mod, id) == mapId then list[#list + 1] = id end
+    end
+    for _, id in ipairs(Roamers.EONS or {}) do
+      if Roamers.getLocation(mod, id) == mapId then list[#list + 1] = id end
+    end
   end
-  for _, id in ipairs(Roamers.EONS or {}) do
-    if Roamers.getLocation(mod, id) == mapId then list[#list + 1] = id end
+  local Host = require("mods.Kanto-Reforged.core.host")
+  if Host.isGen3() then
+    local session
+    local okRt, Runtime = pcall(require, "src.core.game3.runtime")
+    if okRt and Runtime and Runtime.getSession then
+      session = Runtime.getSession()
+    end
+    if not session and _G.game and _G.game.session then
+      session = _G.game.session
+    end
+    if session and session.roamer and session.roamer.active then
+      local rMap = session.roamer.map
+      if rMap and (rMap == mapId or rMap:upper() == tostring(mapId):upper()) then
+        local sp = session.roamer.species
+        if sp then
+          local already = false
+          for _, x in ipairs(list) do
+            if x == sp then already = true break end
+          end
+          if not already then list[#list + 1] = sp end
+        end
+      end
+    end
   end
   if #list == 0 then return nil end
   return list
@@ -256,9 +387,26 @@ function DexNav.buildItems(data, mapId, pokedex, roamers, mod)
   local items = {}
   if roamers then
     for _, species in ipairs(roamers) do
-      local def = data and data.pokemon and data.pokemon[species]
+      local def = data and data.pokemon and (data.pokemon[species] or (tonumber(species) and data.pokemon[tonumber(species)]))
+      local name = def and def.name
+      if not name then
+        local Host = require("mods.Kanto-Reforged.core.host")
+        if Host.isGen3() then
+          local okP, Pokemon = pcall(require, "src.core.game3.pokemon")
+          if okP and Pokemon and Pokemon.name then
+            local okN, n = pcall(Pokemon.name, species)
+            if okN and n and n ~= "?????" then name = n end
+          end
+          if not name then
+            local okE, Enc = pcall(require, "mods.Kanto-Reforged.world.encounters_game3")
+            if okE and Enc and Enc.toSpeciesName then
+              name = Enc.toSpeciesName(species)
+            end
+          end
+        end
+      end
       items[#items + 1] = {
-        label = (def and def.name) or species,
+        label = name or tostring(species),
         right = "ROAM",
         value = species,
       }
@@ -271,7 +419,179 @@ function DexNav.buildItems(data, mapId, pokedex, roamers, mod)
   return items, note and FISHING_NOTE or nil
 end
 
+function DexNav.buildGame3Screen(mod, game, session)
+  session = session or (game and game.session)
+  if not session then
+    local okRt, Runtime = pcall(require, "src.core.game3.runtime")
+    if okRt and Runtime and Runtime.getSession then
+      session = Runtime.getSession()
+    end
+  end
+  local mapId = DexNav.currentMapId(game)
+  local dex = DexNav.dexFlags(session and session.dex or (game and game.save and game.save.pokedex))
+  local roamers = DexNav.roamersHere(mod, mapId)
+  local items, footer = DexNav.buildItems(game and game.data, mapId, dex, roamers, mod)
+  if #items == 0 then
+    items = { { label = NO_WILD, right = "", value = nil } }
+  end
+
+  local okLm, ListMenu = pcall(require, "src.ui.game3.list_menu")
+  local okWin, Window = pcall(require, "src.ui.game3.window")
+  local okFont, FrlgFont = pcall(require, "src.ui.game3.frlg_font")
+
+  local maxRows = footer and 5 or 6
+  local rightEdge = 220
+
+  for _, it in ipairs(items) do
+    it.print = function(item, px, py, selected, idx)
+      if okFont and FrlgFont and FrlgFont.draw then
+        FrlgFont.draw(item.label or "", px, py, { colors = FrlgFont.COLOR.NORMAL })
+        if item.right and item.right ~= "" then
+          local rw = (FrlgFont.measure and FrlgFont.measure(item.right)) or (#item.right * 6)
+          FrlgFont.draw(item.right, rightEdge - rw, py, { colors = FrlgFont.COLOR.NORMAL })
+        end
+      end
+    end
+  end
+
+  local screen = {
+    mod = mod,
+    game = game,
+    session = session,
+    mapId = mapId,
+    title = DexNav.mapTitle(mapId, mod),
+    items = items,
+    footer = footer,
+    rows = maxRows,
+    cursor = 1,
+    open = true,
+  }
+
+  local lm
+  if okLm and ListMenu and ListMenu.new then
+    local listTopTile = 4
+    local tpl = (okWin and Window and Window.template(2, listTopTile, 26, maxRows * 2))
+      or { left = 2, top = listTopTile, w = 26, h = maxRows * 2 }
+    lm = ListMenu.new({
+      template = tpl,
+      frame = "none",
+      items = items,
+      maxShowed = maxRows,
+      rowHeight = 16,
+      upTextY = 2,
+      cursorX = 0,
+      itemX = 10,
+      sound = true,
+      arrows = true,
+      onSelect = function() screen.close() end,
+      onCancel = function() screen.close() end,
+    })
+    screen._listMenu = lm
+  end
+
+  function screen.draw(...)
+    if not (love and love.graphics) then return end
+    if okWin and Window then
+      local outerTpl = Window.template(1, 1, 28, 18)
+      Window.fill(outerTpl)
+      Window.stdFrame(outerTpl)
+    end
+    if okFont and FrlgFont and FrlgFont.draw then
+      FrlgFont.draw(screen.title, 20, 16, { colors = FrlgFont.COLOR.NORMAL })
+      if love.graphics.rectangle then
+        love.graphics.setColor(FrlgFont.STDPAL[3] or { 0.83, 0.83, 0.80, 1 })
+        love.graphics.rectangle("fill", 16, 31, 208, 1)
+        love.graphics.setColor(1, 1, 1, 1)
+      end
+    end
+    if lm then lm:draw() end
+    if footer and okFont and FrlgFont and FrlgFont.draw then
+      local footDividerY = 32 + maxRows * 16 + 2
+      if love.graphics.rectangle then
+        love.graphics.setColor(FrlgFont.STDPAL[3] or { 0.83, 0.83, 0.80, 1 })
+        love.graphics.rectangle("fill", 16, footDividerY, 208, 1)
+        love.graphics.setColor(1, 1, 1, 1)
+      end
+      FrlgFont.draw(footer, 20, footDividerY + 6, { colors = FrlgFont.COLOR.NORMAL })
+    end
+  end
+
+  function screen.update(dt)
+    if lm and lm.update then lm:update(dt) end
+  end
+
+  function screen.handleInput(selfOrInput, maybeInput)
+    local inp = (type(selfOrInput) == "table" and selfOrInput.wasPressed and selfOrInput)
+      or (type(maybeInput) == "table" and maybeInput.wasPressed and maybeInput)
+    if not inp then return end
+
+    if inp:wasPressed("b") or inp:wasPressed("start") then
+      screen.close()
+      return "cancel"
+    end
+
+    if lm then
+      local res = lm:handleInput(inp)
+      if lm.selected then
+        local _, idx = lm:selected()
+        screen.cursor = idx or 1
+      end
+      if res then return res end
+    else
+      if inp:wasPressed("up") then
+        screen.cursor = math.max(1, screen.cursor - 1)
+        return "move"
+      elseif inp:wasPressed("down") then
+        screen.cursor = math.min(#items, screen.cursor + 1)
+        return "move"
+      end
+    end
+
+    if inp:wasPressed("a") then
+      screen.close()
+      return "select"
+    end
+  end
+
+  function screen.close(...)
+    if not screen.open then return end
+    screen.open = false
+    local okStack, Stack = pcall(require, "src.ui.game3.stack")
+    if okStack and Stack and Stack.pop then
+      Stack.pop("dexnav")
+    end
+    local okAudio, Audio = pcall(require, "src.core.game3.audio")
+    local okSe, SE = pcall(require, "src.core.game3.se_ids")
+    if okAudio and okSe and Audio.playSe and SE.SE_SELECT then
+      pcall(Audio.playSe, SE.SE_SELECT)
+    end
+  end
+
+  function screen.isOpen(...)
+    return screen.open
+  end
+
+  return screen
+end
+
+function DexNav.openGame3(mod, game, session)
+  local okStack, Stack = pcall(require, "src.ui.game3.stack")
+  if not (okStack and Stack and Stack.push) then return end
+  local screen = DexNav.buildGame3Screen(mod, game, session)
+  Stack.push("dexnav", screen, { hideBelow = true })
+  local okAudio, Audio = pcall(require, "src.core.game3.audio")
+  local okSe, SE = pcall(require, "src.core.game3.se_ids")
+  if okAudio and okSe and Audio.playSe and SE.SE_WIN_OPEN then
+    pcall(Audio.playSe, SE.SE_WIN_OPEN)
+  end
+  return screen
+end
+
 local function buildScreen(mod, game)
+  local Host = require("mods.Kanto-Reforged.core.host")
+  if Host.isGen3() then
+    return DexNav.buildGame3Screen(mod, game)
+  end
   local mapId = DexNav.currentMapId(game)
   local dex = DexNav.dexFlags(game.save and game.save.pokedex)
   local roamers = DexNav.roamersHere(mod, mapId)
@@ -450,11 +770,13 @@ local function installPokegear(mod)
 end
 
 function DexNav.register(mod)
-  mod.content.screens:register(SCREEN, {
-    new = function(game) return buildScreen(mod, game) end,
-  })
-
   local Host = require("mods.Kanto-Reforged.core.host")
+  if not Host.isGen3() and mod and mod.content and mod.content.screens then
+    mod.content.screens:register(SCREEN, {
+      new = function(game) return buildScreen(mod, game) end,
+    })
+  end
+
   if Host.isGen2() then
     installPokegear(mod)
     return
@@ -465,10 +787,28 @@ function DexNav.register(mod)
     if type(out) ~= "table" then return out end
     if DexNav.mode(mod) == DexNav.MODE_OFF then return out end
     if not DexNav.hasPokedex(game) then return out end
-    return mod.ui.insertAfter(out, "POKéDEX", {
+    local dexNavEntry = {
+      id = "dexnav",
       label = DexNav.menuLabel(mod),
-      onSelect = function() mod.ui.push(game, SCREEN) end,
-    })
+      onSelect = function(g, session)
+        if Host.isGen3() then
+          DexNav.openGame3(mod, g, session)
+        else
+          mod.ui.push(game, SCREEN)
+        end
+      end,
+    }
+    for i, item in ipairs(out) do
+      if item.id == "pokedex" or item.label == "POKéDEX" or item.label == "POKEDEX" then
+        table.insert(out, i + 1, dexNavEntry)
+        return out
+      end
+    end
+    if mod and mod.ui and mod.ui.insertAfter then
+      return mod.ui.insertAfter(out, "POKéDEX", dexNavEntry)
+    end
+    table.insert(out, 2, dexNavEntry)
+    return out
   end)
 end
 
