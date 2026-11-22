@@ -207,7 +207,7 @@ return function(mod)
   end
   local function findModernUi()
     if type(mod.find) == "function" then
-      local ui = mod.find("omni_ui")
+      local ui = mod.find("omni_ui") or mod.find("gen1_modern_ui")
       if ui and ui.exports and ui.exports.registerAdapter then
         return ui
       end
